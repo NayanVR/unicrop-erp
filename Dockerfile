@@ -11,7 +11,7 @@ COPY . .
 RUN composer dump-autoload --optimize --no-dev
 
 # Stage 2: Build frontend assets (needs PHP for wayfinder + Node for Vite)
-FROM php:8.3-cli-alpine AS assets
+FROM php:8.4-cli-alpine AS assets
 RUN apk add --no-cache nodejs npm
 
 WORKDIR /app
@@ -26,7 +26,7 @@ RUN cp .env.example .env && php artisan key:generate --quiet
 RUN npm ci && npm run build
 
 # Stage 3: Production image
-FROM php:8.3-fpm-alpine AS app
+FROM php:8.4-fpm-alpine AS app
 
 RUN apk add --no-cache \
         nginx \
