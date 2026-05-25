@@ -24,8 +24,6 @@ services:
       TRUSTED_PROXIES: "*"
     volumes:
       - storage:/var/www/html/storage
-    ports:
-      - "${APP_PORT:-80}:80"
     depends_on:
       mysql:
         condition: service_healthy
