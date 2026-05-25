@@ -1,0 +1,625 @@
+import { store } from '@/routes/orders';
+import { Head, useForm } from '@inertiajs/react';
+import { useMemo, useState } from 'react';
+
+type SalesUser = {
+    id: number;
+    name: string;
+};
+
+type Props = {
+    pageTitle: string;
+    salesUsers: SalesUser[];
+};
+
+type ProductRow = {
+    our_brand: string;
+    party_brand: string;
+    packing_size: string;
+    quantity: string;
+    rate: string;
+    gst_percent: string;
+    type: string;
+    shape: string;
+    cap_color: string;
+};
+
+type OrderFormData = {
+    company_name: string;
+    customer_name: string;
+    sales_user_id: string;
+    order_date: string;
+    transport_name: string;
+    destination: string;
+    delivery_address: string;
+    phone: string;
+    priority: 'normal' | 'high' | 'urgent';
+    notes: string;
+    freight_amount: string;
+    courier_amount: string;
+    round_off: string;
+    attachments: File[] | null;
+    save_as_draft: boolean;
+};
+
+const createRow = (): ProductRow => ({
+    our_brand: '',
+    party_brand: '',
+    packing_size: '',
+    quantity: '',
+    rate: '',
+    gst_percent: '18',
+    type: '',
+    shape: '',
+    cap_color: '',
+});
+
+const toNumber = (value: string) => {
+    const parsed = Number.parseFloat(value);
+
+    return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+export default function OrdersCreate({ salesUsers }: Props) {
+    const [rows, setRows] = useState<ProductRow[]>([createRow()]);
+
+    const form = useForm<OrderFormData>({
+        company_name: '',
+        customer_name: '',
+        sales_user_id: '',
+        order_date: '',
+        transport_name: '',
+        destination: '',
+        delivery_address: '',
+        phone: '',
+        priority: 'normal',
+        notes: '',
+        freight_amount: '0',
+        courier_amount: '0',
+        round_off: '0',
+        attachments: null,
+        save_as_draft: false,
+    });
+
+    const totals = useMemo(() => {
+        const subtotal = rows.reduce((acc, row) => {
+            return acc + toNumber(row.quantity) * toNumber(row.rate);
+        }, 0);
+        const gstTotal = rows.reduce((acc, row) => {
+            const lineAmount = toNumber(row.quantity) * toNumber(row.rate);
+            return acc + (lineAmount * toNumber(row.gst_percent)) / 100;
+        }, 0);
+        const freight = toNumber(form.data.freight_amount);
+        const courier = toNumber(form.data.courier_amount);
+        const roundOff = toNumber(form.data.round_off);
+        const total = subtotal + gstTotal + freight + courier + roundOff;
+
+        return { subtotal, gstTotal, total };
+    }, [
+        rows,
+        form.data.freight_amount,
+        form.data.courier_amount,
+        form.data.round_off,
+    ]);
+
+    const updateRow = (
+        index: number,
+        field: keyof ProductRow,
+        value: string,
+    ) => {
+        setRows((current) =>
+            current.map((row, idx) =>
+                idx === index ? { ...row, [field]: value } : row,
+            ),
+        );
+    };
+
+    const addRow = () => {
+        setRows((current) => [...current, createRow()]);
+    };
+
+    const removeRow = (index: number) => {
+        setRows((current) =>
+            current.length > 1
+                ? current.filter((_, idx) => idx !== index)
+                : current,
+        );
+    };
+
+    const handleAttachments = (files: FileList | null) => {
+        if (!files) {
+            form.setData('attachments', null);
+            return;
+        }
+
+        form.setData('attachments', Array.from(files));
+    };
+
+    const submit = (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+
+        form.transform((data) => ({
+            ...data,
+            sales_user_id: data.sales_user_id || null,
+            items: rows.map((row) => ({
+                ...row,
+                quantity: toNumber(row.quantity),
+                rate: toNumber(row.rate),
+                gst_percent: toNumber(row.gst_percent),
+            })),
+        }));
+
+        form.post(store(), {
+            forceFormData: true,
+            preserveScroll: true,
+        });
+    };
+
+    return (
+        <>
+            <Head title="New Order" />
+            <div id="view-order-create" className="view active">
+                <div className="page-header">
+                    <div className="page-header-left">
+                        <h1>New Order</h1>
+                        <p>
+                            Capture customer requirements and generate a new
+                            order.
+                        </p>
+                    </div>
+                </div>
+
+                <form onSubmit={submit}>
+                    {form.hasErrors && (
+                        <div
+                            className="form-msg error"
+                            style={{ marginBottom: '12px' }}
+                        >
+                            Please fix the highlighted fields.
+                        </div>
+                    )}
+
+                    <div className="form-card">
+                        <div className="form-card-title">Order Details</div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label>Company Name *</label>
+                                <input
+                                    type="text"
+                                    value={form.data.company_name}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'company_name',
+                                            event.target.value,
+                                        )
+                                    }
+                                    placeholder="e.g. Sri Agro Labs"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Customer Name *</label>
+                                <input
+                                    type="text"
+                                    value={form.data.customer_name}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'customer_name',
+                                            event.target.value,
+                                        )
+                                    }
+                                    placeholder="Contact person"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Sales Person</label>
+                                <select
+                                    value={form.data.sales_user_id}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'sales_user_id',
+                                            event.target.value,
+                                        )
+                                    }
+                                >
+                                    <option value="">Select</option>
+                                    {salesUsers.map((user) => (
+                                        <option key={user.id} value={user.id}>
+                                            {user.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label>Order Date *</label>
+                                <input
+                                    type="date"
+                                    value={form.data.order_date}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'order_date',
+                                            event.target.value,
+                                        )
+                                    }
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Transport Name *</label>
+                                <input
+                                    type="text"
+                                    value={form.data.transport_name}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'transport_name',
+                                            event.target.value,
+                                        )
+                                    }
+                                    placeholder="e.g. Sri Logistics"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Destination *</label>
+                                <input
+                                    type="text"
+                                    value={form.data.destination}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'destination',
+                                            event.target.value,
+                                        )
+                                    }
+                                    placeholder="City / District"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Delivery Address *</label>
+                                <input
+                                    type="text"
+                                    value={form.data.delivery_address}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'delivery_address',
+                                            event.target.value,
+                                        )
+                                    }
+                                    placeholder="Address"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Phone</label>
+                                <input
+                                    type="tel"
+                                    value={form.data.phone}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'phone',
+                                            event.target.value,
+                                        )
+                                    }
+                                    placeholder="Contact number"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Priority</label>
+                                <select
+                                    value={form.data.priority}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'priority',
+                                            event.target.value as
+                                                | 'normal'
+                                                | 'high'
+                                                | 'urgent',
+                                        )
+                                    }
+                                >
+                                    <option value="normal">Normal</option>
+                                    <option value="high">High</option>
+                                    <option value="urgent">Urgent</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="form-card">
+                        <div className="form-card-title">Products</div>
+                        <div className="prod-wrap">
+                            <table className="prod-table">
+                                <thead>
+                                    <tr>
+                                        <th>Our Brand</th>
+                                        <th>Party Brand</th>
+                                        <th>Packing</th>
+                                        <th>Qty</th>
+                                        <th>Rate</th>
+                                        <th>GST %</th>
+                                        <th>Type</th>
+                                        <th>Shape</th>
+                                        <th>Cap Color</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rows.map((row, index) => (
+                                        <tr key={`row-${index}`}>
+                                            <td>
+                                                <input
+                                                    type="text"
+                                                    value={row.our_brand}
+                                                    onChange={(event) =>
+                                                        updateRow(
+                                                            index,
+                                                            'our_brand',
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="Brand"
+                                                />
+                                            </td>
+                                            <td>
+                                                <input
+                                                    type="text"
+                                                    value={row.party_brand}
+                                                    onChange={(event) =>
+                                                        updateRow(
+                                                            index,
+                                                            'party_brand',
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="Customer brand"
+                                                />
+                                            </td>
+                                            <td>
+                                                <input
+                                                    type="text"
+                                                    value={row.packing_size}
+                                                    onChange={(event) =>
+                                                        updateRow(
+                                                            index,
+                                                            'packing_size',
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="500 ml"
+                                                />
+                                            </td>
+                                            <td>
+                                                <input
+                                                    type="number"
+                                                    value={row.quantity}
+                                                    onChange={(event) =>
+                                                        updateRow(
+                                                            index,
+                                                            'quantity',
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    min="0"
+                                                    step="0.01"
+                                                />
+                                            </td>
+                                            <td>
+                                                <input
+                                                    type="number"
+                                                    value={row.rate}
+                                                    onChange={(event) =>
+                                                        updateRow(
+                                                            index,
+                                                            'rate',
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    min="0"
+                                                    step="0.01"
+                                                />
+                                            </td>
+                                            <td>
+                                                <input
+                                                    type="number"
+                                                    value={row.gst_percent}
+                                                    onChange={(event) =>
+                                                        updateRow(
+                                                            index,
+                                                            'gst_percent',
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    min="0"
+                                                    step="0.01"
+                                                />
+                                            </td>
+                                            <td>
+                                                <input
+                                                    type="text"
+                                                    value={row.type}
+                                                    onChange={(event) =>
+                                                        updateRow(
+                                                            index,
+                                                            'type',
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="Liquid"
+                                                />
+                                            </td>
+                                            <td>
+                                                <input
+                                                    type="text"
+                                                    value={row.shape}
+                                                    onChange={(event) =>
+                                                        updateRow(
+                                                            index,
+                                                            'shape',
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="Bottle"
+                                                />
+                                            </td>
+                                            <td>
+                                                <input
+                                                    type="text"
+                                                    value={row.cap_color}
+                                                    onChange={(event) =>
+                                                        updateRow(
+                                                            index,
+                                                            'cap_color',
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="Green"
+                                                />
+                                            </td>
+                                            <td>
+                                                <button
+                                                    type="button"
+                                                    className="btn danger-xs"
+                                                    onClick={() =>
+                                                        removeRow(index)
+                                                    }
+                                                >
+                                                    Remove
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <button
+                            type="button"
+                            className="add-row-btn"
+                            onClick={addRow}
+                        >
+                            ＋ Add Row
+                        </button>
+                    </div>
+
+                    <div className="form-card">
+                        <div className="form-card-title">Charges & Notes</div>
+                        <div className="form-grid three">
+                            <div className="form-group">
+                                <label>Freight</label>
+                                <input
+                                    type="number"
+                                    value={form.data.freight_amount}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'freight_amount',
+                                            event.target.value,
+                                        )
+                                    }
+                                    min="0"
+                                    step="0.01"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Courier</label>
+                                <input
+                                    type="number"
+                                    value={form.data.courier_amount}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'courier_amount',
+                                            event.target.value,
+                                        )
+                                    }
+                                    min="0"
+                                    step="0.01"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Round Off</label>
+                                <input
+                                    type="number"
+                                    value={form.data.round_off}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'round_off',
+                                            event.target.value,
+                                        )
+                                    }
+                                    step="0.01"
+                                />
+                            </div>
+                        </div>
+                        <div
+                            className="form-group"
+                            style={{ marginTop: '12px' }}
+                        >
+                            <label>Notes</label>
+                            <textarea
+                                value={form.data.notes}
+                                onChange={(event) =>
+                                    form.setData('notes', event.target.value)
+                                }
+                                placeholder="Add any notes for production"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="form-card">
+                        <div className="form-card-title">Attachments</div>
+                        <div className="form-group">
+                            <label>Upload Files (max 3)</label>
+                            <input
+                                type="file"
+                                multiple
+                                onChange={(event) =>
+                                    handleAttachments(event.target.files)
+                                }
+                            />
+                        </div>
+                    </div>
+
+                    <div className="form-card">
+                        <div className="form-card-title">Order Summary</div>
+                        <div className="form-grid three">
+                            <div className="form-group">
+                                <label>Subtotal</label>
+                                <div>{totals.subtotal.toFixed(2)}</div>
+                            </div>
+                            <div className="form-group">
+                                <label>GST Total</label>
+                                <div>{totals.gstTotal.toFixed(2)}</div>
+                            </div>
+                            <div className="form-group">
+                                <label>Grand Total</label>
+                                <div>{totals.total.toFixed(2)}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="form-actions">
+                        <label
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                            }}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={form.data.save_as_draft}
+                                onChange={(event) =>
+                                    form.setData(
+                                        'save_as_draft',
+                                        event.target.checked,
+                                    )
+                                }
+                            />
+                            Save as draft
+                        </label>
+                        <button
+                            type="submit"
+                            className="btn primary"
+                            disabled={form.processing}
+                        >
+                            {form.processing ? 'Saving...' : 'Save Order'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </>
+    );
+}
