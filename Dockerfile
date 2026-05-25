@@ -1,16 +1,4 @@
-# Stage 1: Build frontend assets
-FROM node:22-alpine AS assets
-# Routes are pre-generated; skip wayfinder's php artisan call (no PHP in this stage)
-ENV SKIP_WAYFINDER=1
-WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
-COPY resources/ resources/
-COPY public/ public/
-COPY vite.config.ts tsconfig.json components.json ./
-RUN npm run build
-
-# Stage 2: Install PHP dependencies
+# Stage 1: Install PHP dependencies
 FROM composer:2 AS vendor
 WORKDIR /app
 COPY composer.json composer.lock ./
@@ -21,6 +9,21 @@ RUN composer install \
     --prefer-dist
 COPY . .
 RUN composer dump-autoload --optimize --no-dev
+
+# Stage 2: Build frontend assets (needs PHP for wayfinder + Node for Vite)
+FROM php:8.3-cli-alpine AS assets
+RUN apk add --no-cache nodejs npm
+
+WORKDIR /app
+
+# Copy full Laravel app + vendor from the composer stage
+COPY --from=vendor /app .
+
+# Provide a minimal .env so Laravel can boot for wayfinder:generate
+RUN cp .env.example .env && php artisan key:generate --quiet
+
+# Install JS deps and build (wayfinder will call php artisan wayfinder:generate)
+RUN npm ci && npm run build
 
 # Stage 3: Production image
 FROM php:8.3-fpm-alpine AS app
@@ -56,7 +59,9 @@ RUN apk add --no-cache \
 
 WORKDIR /var/www/html
 
+# PHP source + vendor (no .env — entrypoint gets env from Docker/Dokploy)
 COPY --from=vendor /app .
+# Compiled frontend assets
 COPY --from=assets /app/public/build ./public/build
 
 COPY docker/nginx.conf /etc/nginx/http.d/default.conf
