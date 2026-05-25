@@ -16,11 +16,13 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(RoleSeeder::class);
 
-        User::factory()
-            ->withRole(Role::ADMIN)
-            ->create([
-                'name' => 'Admin User',
-                'email' => 'admin@unicropbiochem.com',
-            ]);
+        if (!User::where('email', 'admin@unicropbiochem.com')->exists()) {
+            User::factory()
+                ->withRole(Role::ADMIN)
+                ->create([
+                    'name' => 'Admin User',
+                    'email' => 'admin@unicropbiochem.com',
+                ]);
+        }
     }
 }

@@ -23,7 +23,7 @@ case "$CONTAINER_ROLE" in
         ;;
     *)
         echo "Running migrations..."
-        php artisan migrate --force
+        php artisan migrate --force --seed
 
         echo "Caching config/routes/views..."
         php artisan config:cache
