@@ -20,7 +20,14 @@ WORKDIR /app
 COPY --from=vendor /app .
 
 # Create directories Laravel needs to boot (gitignored, so absent in fresh clone)
-RUN mkdir -p bootstrap/cache storage/framework/{sessions,views,cache} storage/logs storage/app
+# Note: no brace expansion — Alpine's /bin/sh is ash, not bash
+RUN mkdir -p \
+    bootstrap/cache \
+    storage/framework/sessions \
+    storage/framework/views \
+    storage/framework/cache \
+    storage/logs \
+    storage/app
 
 # Provide a minimal .env so Laravel can boot for artisan commands
 RUN cp .env.example .env && php artisan key:generate --quiet
