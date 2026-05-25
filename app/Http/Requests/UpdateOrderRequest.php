@@ -15,7 +15,7 @@ class UpdateOrderRequest extends FormRequest
     {
         $user = $this->user();
 
-        if (! $user) {
+        if (!$user) {
             return false;
         }
 
@@ -33,7 +33,7 @@ class UpdateOrderRequest extends FormRequest
     {
         $isDraft = $this->boolean('save_as_draft');
 
-        $requiredIfNotDraft = fn (array $rules) => $isDraft ? ['nullable', ...$rules] : ['required', ...$rules];
+        $requiredIfNotDraft = fn(array $rules) => $isDraft ? ['nullable', ...$rules] : ['required', ...$rules];
 
         return [
             'company_name' => $requiredIfNotDraft(['string', 'max:255']),
