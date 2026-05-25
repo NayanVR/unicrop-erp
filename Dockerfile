@@ -19,10 +19,14 @@ WORKDIR /app
 # Copy full Laravel app + vendor from the composer stage
 COPY --from=vendor /app .
 
-# Provide a minimal .env so Laravel can boot for wayfinder:generate
+# Provide a minimal .env so Laravel can boot for artisan commands
 RUN cp .env.example .env && php artisan key:generate --quiet
 
-# Install JS deps and build (wayfinder will call php artisan wayfinder:generate)
+# Generate route types before Vite runs (avoids subprocess issues in the plugin)
+RUN php artisan wayfinder:generate --with-form
+
+# Install JS deps and build; SKIP_WAYFINDER=1 so the plugin uses `true` (no-op)
+ENV SKIP_WAYFINDER=1
 RUN npm ci && npm run build
 
 # Stage 3: Production image
