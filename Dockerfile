@@ -1,5 +1,7 @@
 # Stage 1: Build frontend assets
 FROM node:22-alpine AS assets
+# Routes are pre-generated; skip wayfinder's php artisan call (no PHP in this stage)
+ENV SKIP_WAYFINDER=1
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
