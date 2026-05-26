@@ -1174,6 +1174,17 @@ html.dark .badge.indigo {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
 }
+.form-group input.error,
+.form-group select.error,
+.form-group textarea.error {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+.field-error {
+    font-size: 11px;
+    color: var(--danger);
+    margin-top: 1px;
+}
 .form-group textarea {
     resize: vertical;
     min-height: 70px;

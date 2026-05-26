@@ -252,7 +252,7 @@ export default function UsersIndex({ users, roles, companies }: Props) {
                 </div>
             </div>
 
-            <div className={`modal-overlay${modalOpen ? 'open' : ''}`}>
+            <div className={`modal-overlay${modalOpen ? ' open' : ''}`}>
                 <div
                     className="modal"
                     style={{
@@ -285,17 +285,20 @@ export default function UsersIndex({ users, roles, companies }: Props) {
                                 <label>Full Name *</label>
                                 <input
                                     type="text"
+                                    className={form.errors.name ? 'error' : ''}
                                     value={form.data.name}
                                     onChange={(event) =>
                                         form.setData('name', event.target.value)
                                     }
                                     placeholder="e.g. Amit Shah"
                                 />
+                                {form.errors.name && <span className="field-error">{form.errors.name}</span>}
                             </div>
                             <div className="form-group">
                                 <label>Email *</label>
                                 <input
                                     type="email"
+                                    className={form.errors.email ? 'error' : ''}
                                     value={form.data.email}
                                     onChange={(event) =>
                                         form.setData(
@@ -305,11 +308,13 @@ export default function UsersIndex({ users, roles, companies }: Props) {
                                     }
                                     placeholder="user@example.com"
                                 />
+                                {form.errors.email && <span className="field-error">{form.errors.email}</span>}
                             </div>
                             <div className="form-group">
                                 <label>Password {editingUser ? '' : '*'}</label>
                                 <input
                                     type="password"
+                                    className={form.errors.password ? 'error' : ''}
                                     value={form.data.password}
                                     onChange={(event) =>
                                         form.setData(
@@ -323,6 +328,7 @@ export default function UsersIndex({ users, roles, companies }: Props) {
                                             : 'Set password'
                                     }
                                 />
+                                {form.errors.password && <span className="field-error">{form.errors.password}</span>}
                             </div>
                             <div
                                 className="form-group"
@@ -335,6 +341,7 @@ export default function UsersIndex({ users, roles, companies }: Props) {
                                         gridTemplateColumns: '1fr 1fr',
                                         gap: '8px',
                                         marginTop: '6px',
+                                        ...(form.errors.roles ? { padding: '8px', border: '1px solid var(--danger)', borderRadius: 'var(--radius-sm)' } : {}),
                                     }}
                                 >
                                     {roles.map((role) => (
@@ -371,11 +378,13 @@ export default function UsersIndex({ users, roles, companies }: Props) {
                                         </label>
                                     ))}
                                 </div>
+                                {form.errors.roles && <span className="field-error">{form.errors.roles}</span>}
                             </div>
                             <div className="form-group">
                                 <label>Phone</label>
                                 <input
                                     type="tel"
+                                    className={form.errors.phone ? 'error' : ''}
                                     value={form.data.phone}
                                     onChange={(event) =>
                                         form.setData(
@@ -385,10 +394,12 @@ export default function UsersIndex({ users, roles, companies }: Props) {
                                     }
                                     placeholder="Contact number"
                                 />
+                                {form.errors.phone && <span className="field-error">{form.errors.phone}</span>}
                             </div>
                             <div className="form-group">
                                 <label>Status</label>
                                 <select
+                                    className={form.errors.status ? 'error' : ''}
                                     value={form.data.status}
                                     onChange={(event) =>
                                         form.setData(
@@ -402,6 +413,7 @@ export default function UsersIndex({ users, roles, companies }: Props) {
                                     <option value="active">Active</option>
                                     <option value="inactive">Inactive</option>
                                 </select>
+                                {form.errors.status && <span className="field-error">{form.errors.status}</span>}
                             </div>
                         </div>
 
