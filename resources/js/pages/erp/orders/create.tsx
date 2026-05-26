@@ -7,9 +7,17 @@ type SalesUser = {
     name: string;
 };
 
+type TransportOption = {
+    id: number;
+    name: string;
+};
+
 type Props = {
     pageTitle: string;
     salesUsers: SalesUser[];
+    transports: TransportOption[];
+    couriers: TransportOption[];
+    currentUser: { id: number; name: string };
 };
 
 type ProductRow = {
@@ -29,6 +37,7 @@ type OrderFormData = {
     customer_name: string;
     sales_user_id: string;
     order_date: string;
+    transport_type: 'transport' | 'courier';
     transport_name: string;
     destination: string;
     delivery_address: string;
@@ -60,14 +69,17 @@ const toNumber = (value: string) => {
     return Number.isNaN(parsed) ? 0 : parsed;
 };
 
-export default function OrdersCreate({ salesUsers }: Props) {
+const todayDate = () => new Date().toISOString().split('T')[0];
+
+export default function OrdersCreate({ salesUsers, transports, couriers, currentUser }: Props) {
     const [rows, setRows] = useState<ProductRow[]>([createRow()]);
 
     const form = useForm<OrderFormData>({
         company_name: '',
         customer_name: '',
-        sales_user_id: '',
-        order_date: '',
+        sales_user_id: String(currentUser.id),
+        order_date: todayDate(),
+        transport_type: 'transport',
         transport_name: '',
         destination: '',
         delivery_address: '',
@@ -135,6 +147,14 @@ export default function OrdersCreate({ salesUsers }: Props) {
         form.setData('attachments', Array.from(files));
     };
 
+    const setTransportType = (type: 'transport' | 'courier') => {
+        form.setData({
+            ...form.data,
+            transport_type: type,
+            transport_name: '',
+        });
+    };
+
     const submit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
@@ -154,6 +174,8 @@ export default function OrdersCreate({ salesUsers }: Props) {
             preserveScroll: true,
         });
     };
+
+    const transportOptions = form.data.transport_type === 'courier' ? couriers : transports;
 
     return (
         <>
@@ -186,6 +208,7 @@ export default function OrdersCreate({ salesUsers }: Props) {
                                 <label>Company Name *</label>
                                 <input
                                     type="text"
+                                    className={form.errors.company_name ? 'error' : ''}
                                     value={form.data.company_name}
                                     onChange={(event) =>
                                         form.setData(
@@ -195,11 +218,13 @@ export default function OrdersCreate({ salesUsers }: Props) {
                                     }
                                     placeholder="e.g. Sri Agro Labs"
                                 />
+                                {form.errors.company_name && <span className="field-error">{form.errors.company_name}</span>}
                             </div>
                             <div className="form-group">
                                 <label>Customer Name *</label>
                                 <input
                                     type="text"
+                                    className={form.errors.customer_name ? 'error' : ''}
                                     value={form.data.customer_name}
                                     onChange={(event) =>
                                         form.setData(
@@ -209,6 +234,7 @@ export default function OrdersCreate({ salesUsers }: Props) {
                                     }
                                     placeholder="Contact person"
                                 />
+                                {form.errors.customer_name && <span className="field-error">{form.errors.customer_name}</span>}
                             </div>
                             <div className="form-group">
                                 <label>Sales Person</label>
@@ -233,6 +259,7 @@ export default function OrdersCreate({ salesUsers }: Props) {
                                 <label>Order Date *</label>
                                 <input
                                     type="date"
+                                    className={form.errors.order_date ? 'error' : ''}
                                     value={form.data.order_date}
                                     onChange={(event) =>
                                         form.setData(
@@ -241,25 +268,82 @@ export default function OrdersCreate({ salesUsers }: Props) {
                                         )
                                     }
                                 />
+                                {form.errors.order_date && <span className="field-error">{form.errors.order_date}</span>}
                             </div>
+
+                            <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                                <label>Transport Type *</label>
+                                <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
+                                    <button
+                                        type="button"
+                                        className={`pill${form.data.transport_type === 'transport' ? ' active' : ''}`}
+                                        onClick={() => setTransportType('transport')}
+                                    >
+                                        🚛 Transport
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`pill${form.data.transport_type === 'courier' ? ' active' : ''}`}
+                                        onClick={() => setTransportType('courier')}
+                                    >
+                                        📦 Courier
+                                    </button>
+                                </div>
+                            </div>
+
                             <div className="form-group">
-                                <label>Transport Name *</label>
-                                <input
-                                    type="text"
+                                <label>
+                                    {form.data.transport_type === 'courier' ? 'Courier Name *' : 'Transport Name *'}
+                                </label>
+                                <select
+                                    className={form.errors.transport_name ? 'error' : ''}
                                     value={form.data.transport_name}
                                     onChange={(event) =>
-                                        form.setData(
-                                            'transport_name',
-                                            event.target.value,
-                                        )
+                                        form.setData('transport_name', event.target.value)
                                     }
-                                    placeholder="e.g. Sri Logistics"
-                                />
+                                >
+                                    <option value="">
+                                        {form.data.transport_type === 'courier'
+                                            ? '— Select Courier —'
+                                            : '— Select Transport —'}
+                                    </option>
+                                    {transportOptions.map((opt) => (
+                                        <option key={opt.id} value={opt.name}>
+                                            {opt.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                {transportOptions.length === 0 && (
+                                    <span style={{ fontSize: '11px', color: 'var(--tx-faint)' }}>
+                                        No {form.data.transport_type === 'courier' ? 'couriers' : 'transports'} added yet.
+                                    </span>
+                                )}
+                                {form.errors.transport_name && <span className="field-error">{form.errors.transport_name}</span>}
                             </div>
+
+                            {form.data.transport_type === 'courier' && (
+                                <div className="form-group">
+                                    <label>Courier Charge *</label>
+                                    <input
+                                        type="number"
+                                        className={form.errors.courier_amount ? 'error' : ''}
+                                        value={form.data.courier_amount}
+                                        onChange={(event) =>
+                                            form.setData('courier_amount', event.target.value)
+                                        }
+                                        min="0.01"
+                                        step="0.01"
+                                        placeholder="Enter courier charge"
+                                    />
+                                    {form.errors.courier_amount && <span className="field-error">{form.errors.courier_amount}</span>}
+                                </div>
+                            )}
+
                             <div className="form-group">
                                 <label>Destination *</label>
                                 <input
                                     type="text"
+                                    className={form.errors.destination ? 'error' : ''}
                                     value={form.data.destination}
                                     onChange={(event) =>
                                         form.setData(
@@ -269,11 +353,13 @@ export default function OrdersCreate({ salesUsers }: Props) {
                                     }
                                     placeholder="City / District"
                                 />
+                                {form.errors.destination && <span className="field-error">{form.errors.destination}</span>}
                             </div>
                             <div className="form-group">
                                 <label>Delivery Address *</label>
                                 <input
                                     type="text"
+                                    className={form.errors.delivery_address ? 'error' : ''}
                                     value={form.data.delivery_address}
                                     onChange={(event) =>
                                         form.setData(
@@ -283,6 +369,7 @@ export default function OrdersCreate({ salesUsers }: Props) {
                                     }
                                     placeholder="Address"
                                 />
+                                {form.errors.delivery_address && <span className="field-error">{form.errors.delivery_address}</span>}
                             </div>
                             <div className="form-group">
                                 <label>Phone</label>
@@ -513,21 +600,23 @@ export default function OrdersCreate({ salesUsers }: Props) {
                                     step="0.01"
                                 />
                             </div>
-                            <div className="form-group">
-                                <label>Courier</label>
-                                <input
-                                    type="number"
-                                    value={form.data.courier_amount}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'courier_amount',
-                                            event.target.value,
-                                        )
-                                    }
-                                    min="0"
-                                    step="0.01"
-                                />
-                            </div>
+                            {form.data.transport_type !== 'courier' && (
+                                <div className="form-group">
+                                    <label>Courier</label>
+                                    <input
+                                        type="number"
+                                        value={form.data.courier_amount}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'courier_amount',
+                                                event.target.value,
+                                            )
+                                        }
+                                        min="0"
+                                        step="0.01"
+                                    />
+                                </div>
+                            )}
                             <div className="form-group">
                                 <label>Round Off</label>
                                 <input

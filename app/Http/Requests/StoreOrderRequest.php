@@ -32,6 +32,7 @@ class StoreOrderRequest extends FormRequest
     public function rules(): array
     {
         $isDraft = $this->boolean('save_as_draft');
+        $isCourier = $this->input('transport_type') === 'courier';
 
         $requiredIfNotDraft = fn (array $rules) => $isDraft ? ['nullable', ...$rules] : ['required', ...$rules];
 
@@ -40,6 +41,7 @@ class StoreOrderRequest extends FormRequest
             'customer_name' => $requiredIfNotDraft(['string', 'max:255']),
             'sales_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
             'order_date' => $requiredIfNotDraft(['date']),
+            'transport_type' => ['nullable', Rule::in(['transport', 'courier'])],
             'transport_name' => $requiredIfNotDraft(['string', 'max:255']),
             'destination' => $requiredIfNotDraft(['string', 'max:255']),
             'delivery_address' => $requiredIfNotDraft(['string', 'max:500']),
@@ -47,7 +49,9 @@ class StoreOrderRequest extends FormRequest
             'priority' => $requiredIfNotDraft([Rule::in(['normal', 'high', 'urgent'])]),
             'notes' => ['nullable', 'string', 'max:1000'],
             'freight_amount' => ['nullable', 'numeric', 'min:0'],
-            'courier_amount' => ['nullable', 'numeric', 'min:0'],
+            'courier_amount' => $isDraft
+                ? ['nullable', 'numeric', 'min:0']
+                : ($isCourier ? ['required', 'numeric', 'min:0.01'] : ['nullable', 'numeric', 'min:0']),
             'round_off' => ['nullable', 'numeric'],
             'items' => $isDraft ? ['nullable', 'array'] : ['required', 'array', 'min:1'],
             'items.*.our_brand' => ['nullable', 'string', 'max:255'],

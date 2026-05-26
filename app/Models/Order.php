@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'confirmed_by',
     'order_date',
     'transport_name',
+    'transport_type',
     'destination',
     'delivery_address',
     'phone',

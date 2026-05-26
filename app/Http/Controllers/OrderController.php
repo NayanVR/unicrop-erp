@@ -6,6 +6,7 @@ use App\Http\Requests\StoreOrderRequest;
 use App\Http\Requests\UpdateOrderRequest;
 use App\Models\Order;
 use App\Models\Role;
+use App\Models\Transport;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -43,6 +44,8 @@ class OrderController extends Controller
 
     public function create(Request $request): Response
     {
+        $user = $request->user();
+
         $salesUsers = User::query()
             ->where('is_active', true)
             ->whereHas('roles', fn ($query) => $query->whereIn('slug', [Role::ADMIN, Role::OFFICE]))
@@ -52,6 +55,9 @@ class OrderController extends Controller
         return Inertia::render('erp/orders/create', [
             'pageTitle' => 'New Order',
             'salesUsers' => $salesUsers,
+            'transports' => Transport::transports()->orderBy('name')->get(['id', 'name']),
+            'couriers' => Transport::couriers()->orderBy('name')->get(['id', 'name']),
+            'currentUser' => ['id' => $user?->id, 'name' => $user?->name],
         ]);
     }
 
@@ -78,6 +84,7 @@ class OrderController extends Controller
                 'created_by' => $user?->id,
                 'order_date' => $data['order_date'] ?? ($saveAsDraft ? null : now()->toDateString()),
                 'transport_name' => $data['transport_name'] ?? null,
+                'transport_type' => $data['transport_type'] ?? 'transport',
                 'destination' => $data['destination'] ?? null,
                 'delivery_address' => $data['delivery_address'] ?? null,
                 'phone' => $data['phone'] ?? null,
