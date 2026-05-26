@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Models\Transport;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -15,6 +16,7 @@ class SettingsController extends Controller
         return Inertia::render('erp/settings/index', [
             'pageTitle' => 'Settings',
             'products' => Product::query()->orderBy('name')->get(),
+            'transports' => Transport::query()->orderBy('type')->orderBy('name')->get(),
         ]);
     }
 
@@ -54,5 +56,36 @@ class SettingsController extends Controller
         $product->delete();
 
         return redirect()->back()->with('success', 'Product deleted.');
+    }
+
+    public function storeTransport(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'type' => 'required|in:transport,courier',
+        ]);
+
+        Transport::create($data);
+
+        return redirect()->back()->with('success', ucfirst($data['type']).' added.');
+    }
+
+    public function updateTransport(Request $request, Transport $transport): RedirectResponse
+    {
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'type' => 'required|in:transport,courier',
+        ]);
+
+        $transport->update($data);
+
+        return redirect()->back()->with('success', ucfirst($data['type']).' updated.');
+    }
+
+    public function destroyTransport(Transport $transport): RedirectResponse
+    {
+        $transport->delete();
+
+        return redirect()->back()->with('success', 'Deleted.');
     }
 }
