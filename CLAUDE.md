@@ -9,3 +9,9 @@
 ## Deployment
 - This repo is connected to Dokploy — every push to `main` goes live automatically
 - Make sure changes are working before pushing
+
+## CRITICAL: Git Rules
+- You are on the `main` branch. Stay on it.
+- NEVER run `git checkout -b` or create any new branch
+- NEVER push to any branch other than `main`
+- Only run: `git add`, `git commit`, `git push origin main`
