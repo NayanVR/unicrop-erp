@@ -492,6 +492,28 @@ body {
     color: rgba(255, 255, 255, 0.85);
 }
 
+.sb-close-btn {
+    display: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: 1px solid var(--sb-border);
+    background: transparent;
+    color: rgba(255, 255, 255, 0.4);
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    transition: all var(--t-fast);
+    margin-left: 4px;
+    flex-shrink: 0;
+    line-height: 1;
+}
+.sb-close-btn:hover {
+    background: var(--sb-hover);
+    color: rgba(255, 255, 255, 0.85);
+}
+
 .sidebar-user {
     margin: 10px 10px 4px;
     padding: 10px 12px;
@@ -3136,13 +3158,16 @@ html.dark .badge.indigo {
 #mob-hamburger {
     display: none;
 }
-@media (max-width: 768px) {
+
+/* ========================================
+   TABLET + MOBILE LAYOUT (≤1024px)
+   Sidebar becomes off-canvas drawer;
+   hamburger and close buttons become visible.
+   ======================================== */
+@media (max-width: 1024px) {
     #mob-hamburger {
         display: flex;
     }
-}
-
-@media (max-width: 768px) {
     .sidebar {
         transform: translateX(-100%);
         transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
@@ -3168,14 +3193,14 @@ html.dark .badge.indigo {
         margin-left: 0 !important;
     }
     .topbar {
-        padding: 0 14px;
+        padding: 0 16px;
         gap: 10px;
-    }
-    .topbar-title {
-        font-size: 14px;
     }
     .topbar-chip {
         display: none;
+    }
+    .sb-close-btn {
+        display: flex;
     }
     .mob-hamburger {
         width: 38px;
@@ -3194,6 +3219,29 @@ html.dark .badge.indigo {
     }
     .mob-hamburger:hover {
         background: var(--border);
+    }
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+    .pipeline {
+        grid-template-columns: repeat(6, 130px);
+        overflow-x: auto;
+        padding-bottom: 8px;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* ========================================
+   MOBILE ONLY (≤768px) — visual tweaks
+   ======================================== */
+@media (max-width: 768px) {
+    .topbar {
+        padding: 0 14px;
+        gap: 10px;
+    }
+    .topbar-title {
+        font-size: 14px;
     }
     .content-area {
         padding: 14px 12px;

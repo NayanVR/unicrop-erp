@@ -165,6 +165,14 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
                     >
                         {resolvedAppearance === 'dark' ? '☀️' : '🌙'}
                     </button>
+                    <button
+                        className="sb-close-btn"
+                        onClick={() => setIsMobileOpen(false)}
+                        title="Close menu"
+                        aria-label="Close sidebar"
+                    >
+                        ✕
+                    </button>
                 </div>
                 <div className="sidebar-user">
                     <div
