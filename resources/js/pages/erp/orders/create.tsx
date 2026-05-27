@@ -316,7 +316,12 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                 </div>
 
                 <form onSubmit={submit}>
-                    {form.hasErrors && (
+                    {form.errors.order_error && (
+                        <div className="form-msg error" style={{ marginBottom: '12px' }}>
+                            {form.errors.order_error}
+                        </div>
+                    )}
+                    {form.hasErrors && !form.errors.order_error && (
                         <div className="form-msg error" style={{ marginBottom: '12px' }}>
                             Please fix the highlighted fields.
                         </div>

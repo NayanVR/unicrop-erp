@@ -12,6 +12,7 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -76,47 +77,60 @@ class OrderController extends Controller
         $roundOff = (float) ($data['round_off'] ?? 0);
         $saveAsDraft = $request->boolean('save_as_draft');
 
-        return DB::transaction(function () use ($request, $data, $itemsData, $freight, $courier, $roundOff, $saveAsDraft, $user) {
-            $orderNumber = $this->generateOrderNumber();
-            $status = $saveAsDraft ? 'draft' : 'submitted';
+        try {
+            return DB::transaction(function () use ($request, $data, $itemsData, $freight, $courier, $roundOff, $saveAsDraft, $user) {
+                $orderNumber = $this->generateOrderNumber();
+                $status = $saveAsDraft ? 'draft' : 'submitted';
 
-            $order = Order::create([
-                'order_number' => $orderNumber,
-                'party_id' => $data['party_id'] ?? null,
-                'company_name' => $data['company_name'] ?? 'Draft',
-                'customer_name' => $data['customer_name'] ?? 'Draft',
-                'gst_no' => $data['gst_no'] ?? null,
-                'pan_no' => $data['pan_no'] ?? null,
-                'aadhaar_no' => $data['aadhaar_no'] ?? null,
-                'sales_user_id' => $data['sales_user_id'] ?? $user?->id,
-                'created_by' => $user?->id,
-                'order_date' => $data['order_date'] ?? ($saveAsDraft ? null : now()->toDateString()),
-                'transport_name' => $data['transport_name'] ?? null,
-                'transport_type' => $data['transport_type'] ?? 'transport',
-                'destination' => $data['destination'] ?? null,
-                'delivery_address' => $data['delivery_address'] ?? null,
-                'phone' => $data['phone'] ?? null,
-                'priority' => $data['priority'] ?? 'normal',
-                'status' => $status,
-                'notes' => $data['notes'] ?? null,
-                'freight_amount' => $freight,
-                'courier_amount' => $courier,
-                'round_off' => $roundOff,
+                $order = Order::create([
+                    'order_number' => $orderNumber,
+                    'party_id' => $data['party_id'] ?? null,
+                    'company_name' => $data['company_name'] ?? 'Draft',
+                    'customer_name' => $data['customer_name'] ?? 'Draft',
+                    'gst_no' => $data['gst_no'] ?? null,
+                    'pan_no' => $data['pan_no'] ?? null,
+                    'aadhaar_no' => $data['aadhaar_no'] ?? null,
+                    'sales_user_id' => $data['sales_user_id'] ?? $user?->id,
+                    'created_by' => $user?->id,
+                    'order_date' => $data['order_date'] ?? ($saveAsDraft ? null : now()->toDateString()),
+                    'transport_name' => $data['transport_name'] ?? null,
+                    'transport_type' => $data['transport_type'] ?? 'transport',
+                    'destination' => $data['destination'] ?? null,
+                    'delivery_address' => $data['delivery_address'] ?? null,
+                    'phone' => $data['phone'] ?? null,
+                    'priority' => $data['priority'] ?? 'normal',
+                    'status' => $status,
+                    'notes' => $data['notes'] ?? null,
+                    'freight_amount' => $freight,
+                    'courier_amount' => $courier,
+                    'round_off' => $roundOff,
+                ]);
+
+                $totals = $this->syncOrderItems($order, $itemsData);
+                $order->update([
+                    'subtotal' => $totals['subtotal'],
+                    'gst_total' => $totals['gst_total'],
+                    'total_amount' => $totals['total_amount'] + $freight + $courier + $roundOff,
+                ]);
+
+                $this->storeAttachments($order, $request);
+
+                return redirect()
+                    ->route('orders.index')
+                    ->with('success', 'Order created.');
+            });
+        } catch (\Throwable $e) {
+            Log::error('Order creation failed', [
+                'user_id' => $user?->id,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
-            $totals = $this->syncOrderItems($order, $itemsData);
-            $order->update([
-                'subtotal' => $totals['subtotal'],
-                'gst_total' => $totals['gst_total'],
-                'total_amount' => $totals['total_amount'] + $freight + $courier + $roundOff,
-            ]);
-
-            $this->storeAttachments($order, $request);
-
-            return redirect()
-                ->route('orders.index')
-                ->with('success', 'Order created.');
-        });
+            return redirect()->back()
+                ->withInput()
+                ->withErrors(['order_error' => 'Server error: '.$e->getMessage()]);
+        }
     }
 
     public function confirm(Request $request, Order $order): RedirectResponse
