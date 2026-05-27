@@ -98,7 +98,7 @@ export default function RateCalculator() {
                     </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="rc-two-col">
                     {/* Left: Inputs */}
                     <div>
                         <div className="form-card">
@@ -132,26 +132,14 @@ export default function RateCalculator() {
                         </div>
 
                         <div className="form-card" style={{ marginTop: '12px' }}>
-                            <div
-                                className="form-card-title"
-                                style={{ display: 'flex', justifyContent: 'space-between' }}
-                            >
+                            <div className="form-card-title" style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span>🧪 Raw Materials</span>
                                 <button type="button" className="btn sm" onClick={addIngredient}>
                                     + Add
                                 </button>
                             </div>
                             {ingredients.map((ing, idx) => (
-                                <div
-                                    key={idx}
-                                    style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: '2fr 80px 60px 90px 28px',
-                                        gap: '6px',
-                                        marginBottom: '8px',
-                                        alignItems: 'center',
-                                    }}
-                                >
+                                <div key={idx} className="rc-ing-row">
                                     <input
                                         type="text"
                                         placeholder="Material name"
@@ -188,33 +176,11 @@ export default function RateCalculator() {
                                     </button>
                                 </div>
                             ))}
-                            <div
-                                style={{
-                                    marginTop: '10px',
-                                    padding: '10px 12px',
-                                    background: 'var(--bg-paper)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontSize: '13px',
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                }}
-                            >
+                            <div className="rc-summary-bar">
                                 <span>Total RM Cost (batch):</span>
                                 <strong>{formatAmt(totalRmCost)}</strong>
                             </div>
-                            <div
-                                style={{
-                                    marginTop: '6px',
-                                    padding: '10px 12px',
-                                    background: 'var(--accent-lt)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontSize: '13px',
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    border: '1px solid var(--accent)',
-                                    color: 'var(--accent-dark)',
-                                }}
-                            >
+                            <div className="rc-cost-bar">
                                 <span>Cost / {batchUnit} (incl. overhead):</span>
                                 <strong>{formatAmt(costPerUnit)}</strong>
                             </div>
@@ -224,10 +190,7 @@ export default function RateCalculator() {
                     {/* Right: Output rates */}
                     <div>
                         <div className="form-card">
-                            <div
-                                className="form-card-title"
-                                style={{ display: 'flex', justifyContent: 'space-between' }}
-                            >
+                            <div className="form-card-title" style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span>📦 Selling Rates</span>
                                 <button type="button" className="btn sm" onClick={addPacking}>
                                     + Packing
@@ -237,64 +200,31 @@ export default function RateCalculator() {
                             {packings.map((p, idx) => {
                                 const r = calcRate(p);
                                 return (
-                                    <div
-                                        key={idx}
-                                        style={{
-                                            marginBottom: '10px',
-                                            padding: '12px',
-                                            background: 'var(--bg-paper)',
-                                            border: '1px solid var(--border)',
-                                            borderRadius: 'var(--radius-sm)',
-                                        }}
-                                    >
-                                        <div
-                                            style={{
-                                                display: 'grid',
-                                                gridTemplateColumns: '80px 80px 60px 28px',
-                                                gap: '6px',
-                                                marginBottom: '8px',
-                                            }}
-                                        >
+                                    <div key={idx} className="rc-packing-card">
+                                        <div className="rc-packing-inputs">
                                             <input
                                                 type="text"
                                                 placeholder="Size"
                                                 value={p.size}
                                                 onChange={(e) => updatePacking(idx, 'size', e.target.value)}
-                                                style={{ fontSize: '13px' }}
                                             />
-                                            <div
-                                                style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px',
-                                                    fontSize: '12px',
-                                                }}
-                                            >
+                                            <div className="rc-field-wrap">
                                                 <input
                                                     type="number"
                                                     placeholder="Margin%"
                                                     value={p.margin}
                                                     onChange={(e) => updatePacking(idx, 'margin', e.target.value)}
-                                                    style={{ fontSize: '12px' }}
                                                 />
-                                                <span style={{ color: 'var(--tx-faint)' }}>%</span>
+                                                <span className="rc-suffix">%</span>
                                             </div>
-                                            <div
-                                                style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px',
-                                                    fontSize: '12px',
-                                                }}
-                                            >
+                                            <div className="rc-field-wrap">
                                                 <input
                                                     type="number"
                                                     placeholder="GST%"
                                                     value={p.gst}
                                                     onChange={(e) => updatePacking(idx, 'gst', e.target.value)}
-                                                    style={{ fontSize: '12px' }}
                                                 />
-                                                <span style={{ color: 'var(--tx-faint)' }}>%</span>
+                                                <span className="rc-suffix">%</span>
                                             </div>
                                             <button
                                                 type="button"
@@ -306,14 +236,7 @@ export default function RateCalculator() {
                                             </button>
                                         </div>
 
-                                        <div
-                                            style={{
-                                                display: 'grid',
-                                                gridTemplateColumns: '1fr 1fr 1fr',
-                                                gap: '8px',
-                                                fontSize: '12px',
-                                            }}
-                                        >
+                                        <div className="rc-rate-output">
                                             <div>
                                                 <div style={{ color: 'var(--tx-muted)', marginBottom: '2px' }}>Base Rate</div>
                                                 <div style={{ fontWeight: 700 }}>{formatAmt(r.baseRate)}</div>
@@ -324,13 +247,7 @@ export default function RateCalculator() {
                                             </div>
                                             <div>
                                                 <div style={{ color: 'var(--tx-muted)', marginBottom: '2px' }}>MRP</div>
-                                                <div
-                                                    style={{
-                                                        fontWeight: 700,
-                                                        fontSize: '14px',
-                                                        color: 'var(--accent)',
-                                                    }}
-                                                >
+                                                <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--accent)' }}>
                                                     {formatAmt(r.mrp)}
                                                 </div>
                                             </div>
