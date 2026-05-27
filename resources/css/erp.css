@@ -641,7 +641,7 @@ body {
 }
 
 .main-content {
-    width: calc(100vw - var(--sidebar-w));
+    flex: 1;
     margin-left: var(--sidebar-w);
     display: flex;
     flex-direction: column;
@@ -3150,7 +3150,6 @@ html.dark .badge.indigo {
     }
     .main-content {
         margin-left: 0 !important;
-        width: 100vw !important;
     }
     .topbar {
         padding: 0 14px;
