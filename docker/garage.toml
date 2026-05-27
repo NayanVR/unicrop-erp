@@ -1,14 +1,12 @@
 metadata_dir = "/var/lib/garage/meta"
 data_dir = "/var/lib/garage/data"
 db_engine = "lmdb"
-replication_factor = 1
+replication_mode = "1"
 
 rpc_bind_addr = "[::]:3901"
-rpc_public_addr = "127.0.0.1:3901"
 
-# Replaced at container start by garage-entrypoint.sh using $GARAGE_RPC_SECRET.
-# Generate your own with: openssl rand -hex 32
-rpc_secret = "REPLACE_WITH_64_HEX_CHARS_openssl_rand_hex_32"
+# Fixed secret — fine for single-node. Change with: openssl rand -hex 32
+rpc_secret = "b94f1e2d3a0c6e8f1b2d3a4c5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f"
 
 bootstrap_peers = []
 

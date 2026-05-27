@@ -124,17 +124,27 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # Garage S3-compatible object storage.
+  # v2 flags used:
+  #   --single-node         auto-creates the cluster layout (no manual garage layout apply)
+  #   --default-bucket      creates GARAGE_DEFAULT_BUCKET on first boot
+  #   --default-access-key  creates the key from GARAGE_DEFAULT_ACCESS_KEY / GARAGE_DEFAULT_SECRET_KEY
+  #
+  # Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY in Dokploy env vars — Garage will
+  # create the key + bucket automatically using those same values, so the app can connect
+  # without any manual init steps.
+  #
+  # After first start, set AWS_URL to http://<your-server-ip>:3900/unicrop-photos
+  # so photo URLs are publicly reachable from browsers.
   garage:
-    image: dxflrs/garage:v0.9.4
-    entrypoint: ["/bin/sh", "/garage-entrypoint.sh"]
+    image: dxflrs/garage:v2.3.0
+    command: ["/garage", "server", "--single-node", "--default-bucket", "--default-access-key"]
     environment:
-      # Generate with: openssl rand -hex 32
-      # Must be the same value across all Garage nodes (single node here)
-      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:-b94f1e2d3a0c6e8f1b2d3a4c5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f}
+      GARAGE_DEFAULT_ACCESS_KEY: ${AWS_ACCESS_KEY_ID:-GKunicropphotoapp000001}
+      GARAGE_DEFAULT_SECRET_KEY: ${AWS_SECRET_ACCESS_KEY:-unicrop-change-this-secret-key-32ch}
+      GARAGE_DEFAULT_BUCKET: ${AWS_BUCKET:-unicrop-photos}
     volumes:
-      - ./docker/garage.toml:/etc/garage.toml
-      - ./docker/garage-entrypoint.sh:/garage-entrypoint.sh:ro
-      - ./docker/garage-setup.sh:/garage-setup.sh:ro
+      - ./docker/garage.toml:/etc/garage.toml:ro
       - garage-meta:/var/lib/garage/meta
       - garage-data:/var/lib/garage/data
     ports:
