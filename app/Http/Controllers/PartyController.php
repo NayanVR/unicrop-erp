@@ -37,9 +37,10 @@ class PartyController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'name'    => 'required|string|max:255',
-            'type'    => 'required|in:customer,supplier,both',
-            'gst_no'  => 'nullable|string|max:20',
+            'name'          => 'required|string|max:255',
+            'customer_name' => 'nullable|string|max:255',
+            'type'          => 'required|in:customer,supplier,both',
+            'gst_no'        => 'nullable|string|max:20',
             'pan_no'  => 'nullable|string|max:10',
             'phone'   => 'nullable|string|max:20',
             'email'   => 'nullable|email|max:255',
@@ -61,9 +62,10 @@ class PartyController extends Controller
     public function update(Request $request, Party $party): RedirectResponse
     {
         $data = $request->validate([
-            'name'      => 'required|string|max:255',
-            'type'      => 'required|in:customer,supplier,both',
-            'gst_no'    => 'nullable|string|max:20',
+            'name'          => 'required|string|max:255',
+            'customer_name' => 'nullable|string|max:255',
+            'type'          => 'required|in:customer,supplier,both',
+            'gst_no'        => 'nullable|string|max:20',
             'pan_no'    => 'nullable|string|max:10',
             'phone'     => 'nullable|string|max:20',
             'email'     => 'nullable|email|max:255',

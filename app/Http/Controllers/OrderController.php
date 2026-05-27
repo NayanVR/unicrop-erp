@@ -60,7 +60,7 @@ class OrderController extends Controller
             'couriers' => Transport::couriers()->orderBy('name')->get(['id', 'name']),
             'parties' => Party::where('is_active', true)->orderBy('name')
                 ->with(['productRates' => fn ($q) => $q->where('is_active', true)->orderBy('our_brand')->orderBy('packing_size')])
-                ->get(['id', 'name', 'gst_no', 'pan_no', 'phone', 'address', 'city', 'state', 'default_transport_type', 'default_transport_id']),
+                ->get(['id', 'name', 'customer_name', 'gst_no', 'pan_no', 'phone', 'address', 'city', 'state', 'default_transport_type', 'default_transport_id']),
             'currentUser' => ['id' => $user?->id, 'name' => $user?->name],
         ]);
     }

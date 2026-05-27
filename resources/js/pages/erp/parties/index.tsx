@@ -36,6 +36,7 @@ type Transport = { id: number; name: string };
 type Party = {
     id: number;
     name: string;
+    customer_name: string | null;
     type: 'customer' | 'supplier' | 'both';
     gst_no: string | null;
     pan_no: string | null;
@@ -74,6 +75,7 @@ const GST_OPTIONS = ['0', '5', '12', '18', '28'];
 
 const defaultPartyForm = {
     name: '',
+    customer_name: '',
     type: 'customer' as 'customer' | 'supplier' | 'both',
     gst_no: '',
     pan_no: '',
@@ -129,7 +131,7 @@ export default function PartiesIndex() {
 
     const openEdit = (p: Party) => {
         setEditing(p);
-        setData({ name: p.name, type: p.type, gst_no: p.gst_no ?? '', pan_no: p.pan_no ?? '', phone: p.phone ?? '', email: p.email ?? '', address: p.address ?? '', city: p.city ?? '', state: p.state ?? '', pincode: p.pincode ?? '', notes: p.notes ?? '', default_transport_type: p.default_transport_type ?? '', default_transport_id: p.default_transport_id ?? '' });
+        setData({ name: p.name, customer_name: p.customer_name ?? '', type: p.type, gst_no: p.gst_no ?? '', pan_no: p.pan_no ?? '', phone: p.phone ?? '', email: p.email ?? '', address: p.address ?? '', city: p.city ?? '', state: p.state ?? '', pincode: p.pincode ?? '', notes: p.notes ?? '', default_transport_type: p.default_transport_type ?? '', default_transport_id: p.default_transport_id ?? '' });
         setShowModal(true);
     };
 
@@ -312,9 +314,13 @@ export default function PartiesIndex() {
                         <form onSubmit={submit} className="modal-form">
                             <div className="form-row">
                                 <div className="form-group" style={{ flex: 2 }}>
-                                    <label>Name *</label>
+                                    <label>Company Name *</label>
                                     <input value={data.name} onChange={(e) => setData('name', e.target.value)} required />
                                     {errors.name && <span className="field-error">{errors.name}</span>}
+                                </div>
+                                <div className="form-group">
+                                    <label>Customer Name</label>
+                                    <input value={data.customer_name} onChange={(e) => setData('customer_name', e.target.value)} placeholder="Contact person name" />
                                 </div>
                                 <div className="form-group">
                                     <label>Type *</label>

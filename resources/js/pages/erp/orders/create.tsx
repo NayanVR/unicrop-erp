@@ -15,6 +15,7 @@ type ProductRate = {
 type Party = {
     id: number;
     name: string;
+    customer_name?: string | null;
     gst_no?: string | null;
     pan_no?: string | null;
     phone?: string | null;
@@ -248,7 +249,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
             ...form.data,
             party_id: partyId,
             company_name: party.name,
-            customer_name: party.name,
+            customer_name: party.customer_name || party.name,
             gst_no: party.gst_no ?? '',
             pan_no: party.pan_no ?? '',
             phone: party.phone ?? form.data.phone,

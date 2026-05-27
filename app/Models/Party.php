@@ -11,6 +11,7 @@ class Party extends Model
     protected $fillable = [
         'created_by',
         'name',
+        'customer_name',
         'type',
         'gst_no',
         'pan_no',
