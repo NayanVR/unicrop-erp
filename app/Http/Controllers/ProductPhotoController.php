@@ -79,6 +79,12 @@ class ProductPhotoController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        Log::error('[gallery-debug] store() reached', [
+            'has_photo' => $request->hasFile('photo'),
+            'disk'      => config('filesystems.default'),
+            'endpoint'  => config('filesystems.disks.s3.endpoint'),
+        ]);
+
         $data = $request->validate([
             'party_id'     => 'nullable|exists:parties,id',
             'our_brand'    => 'required|string|max:255',
@@ -86,6 +92,8 @@ class ProductPhotoController extends Controller
             'packing_size' => 'nullable|string|max:100',
             'photo'        => 'required|image|mimes:jpg,jpeg,png,webp|max:8192',
         ]);
+
+        Log::error('[gallery-debug] validation passed');
 
         $disk = $this->storageDisk();
 
@@ -101,13 +109,21 @@ class ProductPhotoController extends Controller
         $filename     = Str::slug($productLabel) . '_' . Str::random(8) . '.' . strtolower($ext);
         $path         = 'product-photos/' . $folderName . '/' . $filename;
 
+        Log::error('[gallery-debug] attempting S3 put', ['disk' => $disk, 'path' => $path]);
+
         try {
             Storage::disk($disk)->put(
                 $path,
                 file_get_contents($request->file('photo')->getRealPath()),
             );
+            Log::error('[gallery-debug] S3 put succeeded');
         } catch (\Throwable $e) {
-            Log::error('Photo upload failed', ['disk' => $disk, 'path' => $path, 'error' => $e->getMessage()]);
+            Log::error('Photo upload failed', [
+                'disk'  => $disk,
+                'path'  => $path,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
 
             return redirect()->back()->with('error', 'Upload failed: ' . $e->getMessage());
         }
