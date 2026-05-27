@@ -143,3 +143,16 @@
         @apply bg-background text-foreground;
     }
 }
+
+/* Re-assert ERP design tokens — Tailwind's :root block above overrides --accent
+   and --border with its own values, so we restore them here (last :root wins). */
+:root {
+    --accent: #0f766e;
+    --accent-lt: #e6f7f5;
+    --accent-dark: #0a5c55;
+    --accent-hover: #0d9488;
+    --accent-rgb: 15, 118, 110;
+    --border: #e2e8f0;
+    --border-lt: #f1f5f9;
+    --border-md: #cbd5e1;
+}
