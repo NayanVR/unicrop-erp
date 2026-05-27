@@ -1,6 +1,5 @@
 import { store } from '@/routes/orders';
-import { destroy as destroyTransport, store as storeTransport } from '@/routes/settings/transports';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
 type SalesUser = {
@@ -73,8 +72,6 @@ const todayDate = () => new Date().toISOString().split('T')[0];
 
 export default function OrdersCreate({ salesUsers, transports, couriers, currentUser }: Props) {
     const [rows, setRows] = useState<ProductRow[]>([createRow()]);
-    const [newTransportName, setNewTransportName] = useState('');
-    const [addingTransport, setAddingTransport] = useState(false);
 
     const form = useForm<OrderFormData>({
         company_name: '',
@@ -123,43 +120,6 @@ export default function OrdersCreate({ salesUsers, transports, couriers, current
 
     const setTransportType = (type: 'transport' | 'courier') => {
         form.setData({ ...form.data, transport_type: type, transport_name: '' });
-        setNewTransportName('');
-        setAddingTransport(false);
-    };
-
-    const selectTransport = (name: string) => {
-        form.setData('transport_name', form.data.transport_name === name ? '' : name);
-    };
-
-    const handleAddTransport = () => {
-        const name = newTransportName.trim();
-        if (!name) return;
-        setAddingTransport(true);
-        router.post(
-            storeTransport().url,
-            { name, type: form.data.transport_type },
-            {
-                preserveState: true,
-                preserveScroll: true,
-                onSuccess: () => {
-                    form.setData('transport_name', name);
-                    setNewTransportName('');
-                    setAddingTransport(false);
-                },
-                onError: () => setAddingTransport(false),
-            },
-        );
-    };
-
-    const handleDeleteTransport = (id: number, name: string) => {
-        if (!confirm(`Delete "${name}"?`)) return;
-        if (form.data.transport_name === name) {
-            form.setData('transport_name', '');
-        }
-        router.delete(destroyTransport(id).url, {
-            preserveState: true,
-            preserveScroll: true,
-        });
     };
 
     const submit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -247,7 +207,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, current
 
                             {/* Transport / Courier */}
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
-                                <label>Transport Type *</label>
+                                <label>Transport / Courier</label>
                                 <div style={{ display: 'flex', gap: '8px', margin: '4px 0 8px' }}>
                                     <button
                                         type="button"
@@ -264,58 +224,21 @@ export default function OrdersCreate({ salesUsers, transports, couriers, current
                                         📦 Courier
                                     </button>
                                 </div>
-
-                                {form.errors.transport_name && (
-                                    <span className="field-error" style={{ marginBottom: '4px', display: 'block' }}>
-                                        {form.errors.transport_name}
-                                    </span>
-                                )}
-
-                                <div className="transport-list">
-                                    {transportOptions.length === 0 && (
-                                        <div className="transport-empty">
-                                            No {form.data.transport_type === 'courier' ? 'couriers' : 'transports'} yet — add one below.
-                                        </div>
-                                    )}
+                                <select
+                                    className={form.errors.transport_name ? 'error' : ''}
+                                    value={form.data.transport_name}
+                                    onChange={(e) => form.setData('transport_name', e.target.value)}
+                                >
+                                    <option value="">
+                                        — Select {form.data.transport_type === 'courier' ? 'courier' : 'transport'} —
+                                    </option>
                                     {transportOptions.map((opt) => (
-                                        <div
-                                            key={opt.id}
-                                            className={`transport-option${form.data.transport_name === opt.name ? ' selected' : ''}`}
-                                            onClick={() => selectTransport(opt.name)}
-                                        >
-                                            <div className="transport-option-check" />
-                                            <span className="transport-option-name">{opt.name}</span>
-                                            <button
-                                                type="button"
-                                                className="transport-option-del"
-                                                title="Delete"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDeleteTransport(opt.id, opt.name);
-                                                }}
-                                            >
-                                                ×
-                                            </button>
-                                        </div>
+                                        <option key={opt.id} value={opt.name}>{opt.name}</option>
                                     ))}
-                                    <div className="transport-add-row">
-                                        <input
-                                            type="text"
-                                            value={newTransportName}
-                                            onChange={(e) => setNewTransportName(e.target.value)}
-                                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTransport())}
-                                            placeholder={form.data.transport_type === 'courier' ? 'Add courier name…' : 'Add transport name…'}
-                                        />
-                                        <button
-                                            type="button"
-                                            className="transport-add-btn"
-                                            onClick={handleAddTransport}
-                                            disabled={!newTransportName.trim() || addingTransport}
-                                        >
-                                            ＋ Add
-                                        </button>
-                                    </div>
-                                </div>
+                                </select>
+                                {form.errors.transport_name && (
+                                    <span className="field-error">{form.errors.transport_name}</span>
+                                )}
                             </div>
 
                             {form.data.transport_type === 'courier' && (
