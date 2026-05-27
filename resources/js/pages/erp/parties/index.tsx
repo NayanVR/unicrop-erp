@@ -319,10 +319,6 @@ export default function PartiesIndex() {
                                     {errors.name && <span className="field-error">{errors.name}</span>}
                                 </div>
                                 <div className="form-group">
-                                    <label>Customer Name</label>
-                                    <input value={data.customer_name} onChange={(e) => setData('customer_name', e.target.value)} placeholder="Contact person name" />
-                                </div>
-                                <div className="form-group">
                                     <label>Type *</label>
                                     <select value={data.type} onChange={(e) => setData('type', e.target.value as typeof data.type)}>
                                         <option value="customer">Customer</option>
@@ -332,9 +328,15 @@ export default function PartiesIndex() {
                                 </div>
                             </div>
                             <div className="form-row">
+                                <div className="form-group" style={{ flex: 2 }}>
+                                    <label>Customer Name</label>
+                                    <input value={data.customer_name} onChange={(e) => setData('customer_name', e.target.value)} placeholder="Contact person name" />
+                                </div>
+                                <div className="form-group"><label>Phone</label><input value={data.phone} onChange={(e) => setData('phone', e.target.value)} /></div>
+                            </div>
+                            <div className="form-row">
                                 <div className="form-group"><label>GST No.</label><input value={data.gst_no} onChange={(e) => setData('gst_no', e.target.value)} placeholder="22AAAAA0000A1Z5" /></div>
                                 <div className="form-group"><label>PAN No.</label><input value={data.pan_no} onChange={(e) => setData('pan_no', e.target.value)} placeholder="AAAAA0000A" /></div>
-                                <div className="form-group"><label>Phone</label><input value={data.phone} onChange={(e) => setData('phone', e.target.value)} /></div>
                             </div>
                             <div className="form-row">
                                 <div className="form-group"><label>Email</label><input type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} /></div>
