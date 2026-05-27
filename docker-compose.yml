@@ -22,11 +22,22 @@ services:
       LOG_LEVEL: error
       # Required when behind Dokploy's Traefik reverse proxy
       TRUSTED_PROXIES: "*"
+      # S3 / Garage object storage
+      FILESYSTEM_DISK: ${FILESYSTEM_DISK:-s3}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-garage}
+      AWS_BUCKET: ${AWS_BUCKET:-unicrop-photos}
+      AWS_ENDPOINT: ${AWS_ENDPOINT:-http://garage:3900}
+      AWS_USE_PATH_STYLE_ENDPOINT: "true"
+      AWS_URL: ${AWS_URL}
     volumes:
       - storage:/var/www/html/storage
     depends_on:
       mysql:
         condition: service_healthy
+      garage:
+        condition: service_started
     restart: unless-stopped
 
   queue:
@@ -49,6 +60,15 @@ services:
       CACHE_STORE: database
       LOG_CHANNEL: stderr
       LOG_LEVEL: error
+      # S3 / Garage object storage
+      FILESYSTEM_DISK: ${FILESYSTEM_DISK:-s3}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-garage}
+      AWS_BUCKET: ${AWS_BUCKET:-unicrop-photos}
+      AWS_ENDPOINT: ${AWS_ENDPOINT:-http://garage:3900}
+      AWS_USE_PATH_STYLE_ENDPOINT: "true"
+      AWS_URL: ${AWS_URL}
     depends_on:
       mysql:
         condition: service_healthy
@@ -74,6 +94,15 @@ services:
       CACHE_STORE: database
       LOG_CHANNEL: stderr
       LOG_LEVEL: error
+      # S3 / Garage object storage
+      FILESYSTEM_DISK: ${FILESYSTEM_DISK:-s3}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-garage}
+      AWS_BUCKET: ${AWS_BUCKET:-unicrop-photos}
+      AWS_ENDPOINT: ${AWS_ENDPOINT:-http://garage:3900}
+      AWS_USE_PATH_STYLE_ENDPOINT: "true"
+      AWS_URL: ${AWS_URL}
     depends_on:
       mysql:
         condition: service_healthy
@@ -95,6 +124,23 @@ services:
       retries: 10
     restart: unless-stopped
 
+  garage:
+    image: dxflrs/garage:v1
+    entrypoint: ["/bin/sh", "/garage-entrypoint.sh"]
+    environment:
+      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET}
+    volumes:
+      - ./docker/garage.toml:/etc/garage.toml
+      - ./docker/garage-entrypoint.sh:/garage-entrypoint.sh:ro
+      - ./docker/garage-setup.sh:/garage-setup.sh:ro
+      - garage-meta:/var/lib/garage/meta
+      - garage-data:/var/lib/garage/data
+    ports:
+      - "3900:3900"
+    restart: unless-stopped
+
 volumes:
   mysql-data:
   storage:
+  garage-meta:
+  garage-data:

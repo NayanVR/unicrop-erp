@@ -9,6 +9,7 @@ use App\Models\ProductRate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -23,13 +24,13 @@ class ProductPhotoController extends Controller
             ->orderBy('packing_size')
             ->get()
             ->map(fn ($p) => [
-                'id'          => $p->id,
-                'party_id'    => $p->party_id,
-                'party_name'  => $p->party?->name,
-                'our_brand'   => $p->our_brand,
-                'party_brand' => $p->party_brand,
+                'id'           => $p->id,
+                'party_id'     => $p->party_id,
+                'party_name'   => $p->party?->name,
+                'our_brand'    => $p->our_brand,
+                'party_brand'  => $p->party_brand,
                 'packing_size' => $p->packing_size,
-                'photo_url'   => $p->photo_url,
+                'photo_url'    => $p->photo_url,
             ]);
 
         $folders = ProductPhotoFolder::with('party:id,name')
@@ -72,23 +73,46 @@ class ProductPhotoController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $request->validate([
-            'party_id'    => 'nullable|exists:parties,id',
-            'our_brand'   => 'required|string|max:255',
-            'party_brand' => 'nullable|string|max:255',
+        $data = $request->validate([
+            'party_id'     => 'nullable|exists:parties,id',
+            'our_brand'    => 'required|string|max:255',
+            'party_brand'  => 'nullable|string|max:255',
             'packing_size' => 'nullable|string|max:100',
-            'photo'       => 'required|image|mimes:jpg,jpeg,png,webp|max:8192',
+            'photo'        => 'required|image|mimes:jpg,jpeg,png,webp|max:8192',
         ]);
 
-        $path = $request->file('photo')->store('product-photos', 'public');
+        $disk = config('filesystems.default', 'public');
+
+        // Build an organized path: product-photos/{folder}/{product-name}.{ext}
+        if (! empty($data['party_id'])) {
+            $party = Party::find($data['party_id']);
+            $folderName = Str::slug($party?->name ?? 'party-' . $data['party_id']);
+        } else {
+            $folderName = 'our-brand';
+        }
+
+        $productLabel = ! empty($data['party_brand']) ? $data['party_brand'] : $data['our_brand'];
+        $ext          = $request->file('photo')->getClientOriginalExtension() ?: 'jpg';
+        $filename     = Str::slug($productLabel) . '_' . Str::random(8) . '.' . strtolower($ext);
+        $path         = 'product-photos/' . $folderName . '/' . $filename;
+
+        if ($disk === 's3') {
+            Storage::disk('s3')->put($path, file_get_contents($request->file('photo')->getRealPath()), 'public');
+        } else {
+            $request->file('photo')->storeAs(
+                'product-photos/' . $folderName,
+                $filename,
+                'public'
+            );
+        }
 
         ProductPhoto::create([
-            'party_id'    => $request->input('party_id') ?: null,
-            'our_brand'   => $request->input('our_brand'),
-            'party_brand' => $request->input('party_brand') ?: null,
-            'packing_size' => $request->input('packing_size') ?: null,
-            'photo_path'  => $path,
-            'uploaded_by' => $request->user()?->id,
+            'party_id'     => $data['party_id'] ?? null,
+            'our_brand'    => $data['our_brand'],
+            'party_brand'  => $data['party_brand'] ?? null,
+            'packing_size' => $data['packing_size'] ?? null,
+            'photo_path'   => $path,
+            'uploaded_by'  => $request->user()?->id,
         ]);
 
         return redirect()->back()->with('success', 'Photo uploaded successfully.');
@@ -110,7 +134,14 @@ class ProductPhotoController extends Controller
 
     public function destroy(ProductPhoto $photo): RedirectResponse
     {
-        Storage::disk('public')->delete($photo->photo_path);
+        $disk = config('filesystems.default', 'public');
+
+        if ($disk === 's3') {
+            Storage::disk('s3')->delete($photo->photo_path);
+        } else {
+            Storage::disk('public')->delete($photo->photo_path);
+        }
+
         $photo->delete();
 
         return redirect()->back()->with('success', 'Photo deleted.');

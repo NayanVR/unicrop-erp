@@ -29,6 +29,12 @@ class ProductPhoto extends Model
 
     public function getPhotoUrlAttribute(): string
     {
+        $disk = config('filesystems.default', 'public');
+
+        if ($disk === 's3') {
+            return Storage::disk('s3')->url($this->photo_path);
+        }
+
         return Storage::disk('public')->url($this->photo_path);
     }
 }
