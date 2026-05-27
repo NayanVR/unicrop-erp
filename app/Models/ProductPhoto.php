@@ -28,20 +28,6 @@ class ProductPhoto extends Model
 
     public function getPhotoUrlAttribute(): string
     {
-        $disk = config('filesystems.default', 'public');
-
-        if ($disk === 's3') {
-            $baseUrl = rtrim((string) config('filesystems.disks.s3.url', ''), '/');
-
-            if ($baseUrl === '') {
-                $baseUrl = rtrim((string) config('filesystems.disks.s3.endpoint', ''), '/') . '/' . trim((string) config('filesystems.disks.s3.bucket', ''), '/');
-            }
-
-            return $baseUrl . '/' . ltrim($this->photo_path, '/');
-        }
-
-        $baseUrl = rtrim((string) config('filesystems.disks.public.url', ''), '/');
-
-        return $baseUrl . '/' . ltrim($this->photo_path, '/');
+        return route('product-photos.show', ['photo' => $this->getKey()]);
     }
 }

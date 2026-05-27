@@ -23,6 +23,7 @@ Route::get('/', function () {
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('product-photos/{photo}/image', [ProductPhotoController::class, 'show'])->name('product-photos.show');
 
     Route::middleware(['role:admin'])->group(function () {
         Route::resource('users', UserController::class)->only(['index', 'store', 'update', 'destroy']);
@@ -69,7 +70,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('purchase-bills/{bill}', [PurchaseBillController::class, 'destroy'])->name('purchase-bills.destroy');
     });
 
-    Route::get('rate-calculator', fn () => inertia('erp/rate-calculator/index', ['pageTitle' => 'Rate Calculator']))->name('rate-calculator.index');
+    Route::get('rate-calculator', fn() => inertia('erp/rate-calculator/index', ['pageTitle' => 'Rate Calculator']))->name('rate-calculator.index');
 
     Route::middleware(['role:admin,factory'])->group(function () {
         Route::get('finished-goods', [FinishedGoodsController::class, 'index'])->name('finished-goods.index');
@@ -109,4 +110,4 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 });
 
-require __DIR__.'/settings.php';
+require __DIR__ . '/settings.php';
