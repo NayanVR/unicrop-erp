@@ -197,7 +197,7 @@ export default function FinishedGoodsIndex() {
             </div>
 
             {showModal && (
-                <div className="modal-overlay" onClick={() => setShowModal(false)}>
+                <div className="modal-overlay open" onClick={() => setShowModal(false)}>
                     <div className="modal" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <h2>{editing ? 'Edit Entry' : 'Add Finished Good'}</h2>

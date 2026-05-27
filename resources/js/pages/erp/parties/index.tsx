@@ -240,7 +240,7 @@ export default function PartiesIndex() {
             </div>
 
             {showModal && (
-                <div className="modal-overlay" onClick={() => setShowModal(false)}>
+                <div className="modal-overlay open" onClick={() => setShowModal(false)}>
                     <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <h2>{editing ? 'Edit Party' : 'Add Party'}</h2>
@@ -316,7 +316,7 @@ export default function PartiesIndex() {
             )}
 
             {showDocModal && selectedParty && (
-                <div className="modal-overlay" onClick={() => setShowDocModal(false)}>
+                <div className="modal-overlay open" onClick={() => setShowDocModal(false)}>
                     <div className="modal" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <h2>Documents — {selectedParty.name}</h2>
