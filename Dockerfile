@@ -81,6 +81,7 @@ COPY --from=assets /app/public/build ./public/build
 COPY docker/nginx.conf /etc/nginx/http.d/default.conf
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/php.ini /usr/local/etc/php/conf.d/99-app.ini
+COPY docker/php-fpm-pool.conf /usr/local/etc/php-fpm.d/zz-app.conf
 COPY docker/entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh \
