@@ -1,95 +1,46 @@
+import { create as ordersCreate } from '@/routes/orders';
 import { Head, Link } from '@inertiajs/react';
-import { create as ordersCreate, index as ordersIndex } from '@/routes/orders';
+import { useState } from 'react';
 
-type PipelineItem = {
-    id: number;
-    order_id: number;
-    our_brand?: string | null;
-    party_brand?: string | null;
-    packing_size?: string | null;
-    quantity: string | number;
-    status: string;
-    order?: {
-        id: number;
-        order_number: string;
-        company_name: string;
-        customer_name: string;
-        priority?: string | null;
-    } | null;
+type LeaderboardEntry = {
+    userId: number;
+    name: string;
+    orders: number;
+    value: number;
 };
 
-type RecentOrder = {
-    id: number;
-    order_number: string;
-    company_name: string;
-    customer_name: string;
-    order_date?: string | null;
-    total_amount?: string | number | null;
-    status?: string | null;
-    priority?: string | null;
-    sales_user?: { id: number; name: string } | null;
-    items: { id: number; status: string }[];
+type PeriodData = {
+    myOrders: number;
+    myValue: number;
+    leaderboard: LeaderboardEntry[];
 };
 
-type Stats = {
-    totalActiveOrders: number;
-    itemsInProduction: number;
-    readyToDispatch: number;
-    dispatchedThisMonth: number;
-};
+type Period = 'today' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear';
 
 type Props = {
-    stats: Stats;
-    pipeline: Record<string, PipelineItem[]>;
-    recentOrders: RecentOrder[];
+    salesData: Record<Period, PeriodData>;
+    currentUserId: number | null;
 };
 
-const STAGE_ORDER = ['pending', 'processing', 'filling', 'labeling', 'ready'];
+const PERIODS: { key: Period; label: string }[] = [
+    { key: 'today',     label: 'Today' },
+    { key: 'thisWeek',  label: 'This Week' },
+    { key: 'lastWeek',  label: 'Last Week' },
+    { key: 'thisMonth', label: 'This Month' },
+    { key: 'lastMonth', label: 'Last Month' },
+    { key: 'thisYear',  label: 'This Year' },
+    { key: 'lastYear',  label: 'Last Year' },
+];
 
-const STAGE_LABELS: Record<string, string> = {
-    pending: 'Pending',
-    processing: 'Processing',
-    filling: 'Filling',
-    labeling: 'Labeling',
-    ready: 'Ready',
-};
+const MEDALS = ['🥇', '🥈', '🥉'];
 
-const STAGE_ICONS: Record<string, string> = {
-    pending: '⏳',
-    processing: '⚗️',
-    filling: '🫙',
-    labeling: '🏷️',
-    ready: '✅',
-};
+const fmt = (v: number) =>
+    '₹' + v.toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
-const formatDate = (value?: string | null) => {
-    if (!value) return '—';
-    return new Date(`${value}T00:00:00`).toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    });
-};
-
-const formatAmount = (value?: string | number | null) => {
-    const n = Number(value ?? 0);
-    return '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-};
-
-const orderStatusClass = (status?: string | null) => {
-    switch (status) {
-        case 'submitted': return 'badge sky';
-        case 'confirmed': return 'badge teal';
-        case 'dispatched': return 'badge gray';
-        default: return 'badge amber';
-    }
-};
-
-export default function Dashboard({ stats, pipeline, recentOrders }: Props) {
-    const totalPipelineItems = STAGE_ORDER.reduce(
-        (sum, stage) => sum + (pipeline[stage]?.length ?? 0),
-        0,
-    );
+export default function Dashboard({ salesData, currentUserId }: Props) {
+    const [period, setPeriod] = useState<Period>('today');
+    const data = salesData[period];
+    const maxValue = Math.max(...data.leaderboard.map((e) => e.value), 1);
 
     return (
         <>
@@ -98,253 +49,133 @@ export default function Dashboard({ stats, pipeline, recentOrders }: Props) {
                 <div className="page-header">
                     <div className="page-header-left">
                         <h1>Dashboard</h1>
-                        <p>Live overview of agrochemical order production &amp; dispatch</p>
+                        <p>Sales performance &amp; confirmed order overview</p>
                     </div>
-                    <Link className="btn primary" href={ordersCreate()}>
+                    <Link className="btn primary" href={ordersCreate().url}>
                         ＋ New Order
                     </Link>
                 </div>
 
-                <div className="stats-grid">
-                    <div className="stat-card c-green">
-                        <div className="stat-icon si-green">📋</div>
-                        <div className="stat-val">{stats.totalActiveOrders}</div>
-                        <div className="stat-label">Active Orders</div>
-                        <div className="stat-sub up">In progress</div>
-                    </div>
-                    <div className="stat-card c-sky">
-                        <div className="stat-icon si-sky">⚗️</div>
-                        <div className="stat-val">{stats.itemsInProduction}</div>
-                        <div className="stat-label">In Production</div>
-                        <div className="stat-sub neu">Items being made</div>
-                    </div>
-                    <div className="stat-card c-amber">
-                        <div className="stat-icon si-amber">✅</div>
-                        <div className="stat-val">{stats.readyToDispatch}</div>
-                        <div className="stat-label">Ready to Dispatch</div>
-                        <div className="stat-sub up">Awaiting shipment</div>
-                    </div>
-                    <div className="stat-card c-slate">
-                        <div className="stat-icon si-slate">🚚</div>
-                        <div className="stat-val">{stats.dispatchedThisMonth}</div>
-                        <div className="stat-label">Dispatched</div>
-                        <div className="stat-sub neu">This month</div>
-                    </div>
-                </div>
-
                 <div className="card">
-                    <div className="card-title">
-                        🌾 Production Pipeline{' '}
-                        <span className="ct-badge">{totalPipelineItems} items</span>
+                    {/* Header + period pills */}
+                    <div style={{ marginBottom: '16px' }}>
+                        <div className="card-title" style={{ marginBottom: '12px' }}>
+                            💰 My Sales — Confirmed Order Value
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                            {PERIODS.map((p) => (
+                                <button
+                                    key={p.key}
+                                    type="button"
+                                    className={`pill${period === p.key ? ' active' : ''}`}
+                                    onClick={() => setPeriod(p.key)}
+                                >
+                                    {p.label}
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
-                    {totalPipelineItems === 0 ? (
-                        <div className="empty-state">
-                            <div className="icon">📋</div>
-                            <p>No active production. Create and confirm an order to get started.</p>
+                    {/* My stat cards */}
+                    <div style={{ display: 'flex', gap: '16px', marginBottom: '32px', flexWrap: 'wrap' }}>
+                        <div style={{
+                            border: '2px solid var(--accent)',
+                            borderRadius: '12px',
+                            padding: '20px 28px',
+                            flex: '1 1 160px',
+                            maxWidth: '220px',
+                            background: 'var(--accent-lt)',
+                        }}>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: '10px' }}>
+                                MY ORDERS
+                            </div>
+                            <div style={{ fontSize: '40px', fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}>
+                                {data.myOrders}
+                            </div>
+                            <div style={{ fontSize: '12px', color: 'var(--tx-sub)', marginTop: '6px' }}>
+                                confirmed orders
+                            </div>
                         </div>
-                    ) : (
-                        <div
-                            style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-                                gap: '12px',
-                                marginTop: '4px',
-                            }}
-                        >
-                            {STAGE_ORDER.map((stage) => {
-                                const items = pipeline[stage] ?? [];
-                                return (
-                                    <div
-                                        key={stage}
-                                        style={{
-                                            background: 'var(--bg-paper)',
-                                            border: '1px solid var(--border)',
-                                            borderRadius: 'var(--radius)',
-                                            padding: '12px',
-                                        }}
-                                    >
-                                        <div
-                                            style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '6px',
-                                                marginBottom: '10px',
-                                            }}
-                                        >
-                                            <span>{STAGE_ICONS[stage]}</span>
-                                            <span
-                                                style={{
-                                                    fontSize: '11px',
-                                                    fontWeight: 700,
-                                                    textTransform: 'uppercase',
-                                                    letterSpacing: '.5px',
-                                                    color: 'var(--tx-muted)',
-                                                }}
-                                            >
-                                                {STAGE_LABELS[stage]}
-                                            </span>
-                                            <span
-                                                style={{
-                                                    marginLeft: 'auto',
-                                                    fontSize: '11px',
-                                                    fontWeight: 700,
-                                                    background: 'var(--accent)',
-                                                    color: '#fff',
-                                                    borderRadius: '20px',
-                                                    padding: '1px 8px',
-                                                    minWidth: '20px',
-                                                    textAlign: 'center',
-                                                }}
-                                            >
-                                                {items.length}
-                                            </span>
-                                        </div>
-                                        <div
-                                            style={{
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                gap: '6px',
-                                            }}
-                                        >
-                                            {items.length === 0 ? (
-                                                <div
-                                                    style={{
-                                                        fontSize: '12px',
-                                                        color: 'var(--tx-faint)',
-                                                        textAlign: 'center',
-                                                        padding: '8px 0',
-                                                    }}
-                                                >
-                                                    Empty
-                                                </div>
-                                            ) : (
-                                                items.slice(0, 5).map((item) => (
-                                                    <div
-                                                        key={item.id}
-                                                        style={{
-                                                            fontSize: '12px',
-                                                            padding: '6px 8px',
-                                                            background: 'var(--bg)',
-                                                            border: '1px solid var(--border)',
-                                                            borderRadius: 'var(--radius-sm)',
-                                                        }}
-                                                    >
-                                                        <div
-                                                            style={{
-                                                                fontWeight: 600,
-                                                                marginBottom: '2px',
-                                                            }}
-                                                        >
-                                                            {item.our_brand ?? item.party_brand ?? '—'}
-                                                        </div>
-                                                        <div
-                                                            style={{
-                                                                color: 'var(--tx-muted)',
-                                                                fontSize: '11px',
-                                                            }}
-                                                        >
-                                                            {item.order?.order_number} · {item.packing_size ?? '—'}
-                                                        </div>
-                                                    </div>
-                                                ))
-                                            )}
-                                            {items.length > 5 && (
-                                                <div
-                                                    style={{
-                                                        fontSize: '11px',
-                                                        color: 'var(--tx-faint)',
-                                                        textAlign: 'center',
-                                                    }}
-                                                >
-                                                    +{items.length - 5} more
-                                                </div>
-                                            )}
-                                        </div>
+
+                        <div style={{
+                            border: '2px solid #d97706',
+                            borderRadius: '12px',
+                            padding: '20px 28px',
+                            flex: '1 1 160px',
+                            maxWidth: '260px',
+                            background: '#fffbeb',
+                        }}>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#d97706', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: '10px' }}>
+                                MY VALUE
+                            </div>
+                            <div style={{ fontSize: '40px', fontWeight: 800, color: '#d97706', lineHeight: 1 }}>
+                                {fmt(data.myValue)}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#92400e', marginTop: '6px' }}>
+                                confirmed order value
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Leaderboard */}
+                    <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--tx-head)', marginBottom: '14px' }}>
+                        🏆 Sales Leaderboard
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {data.leaderboard.map((entry, idx) => {
+                            const isMe = entry.userId === currentUserId;
+                            const barPct = maxValue > 0 ? (entry.value / maxValue) * 100 : 0;
+
+                            return (
+                                <div
+                                    key={entry.userId}
+                                    style={{
+                                        padding: '12px 16px',
+                                        borderRadius: '10px',
+                                        border: isMe ? '2px solid var(--accent)' : '1px solid var(--border)',
+                                        background: isMe ? 'var(--accent-lt)' : 'var(--bg-paper)',
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                                        <span style={{ fontSize: '22px', minWidth: '32px', textAlign: 'center' }}>
+                                            {MEDALS[idx] ?? `#${idx + 1}`}
+                                        </span>
+                                        <span style={{
+                                            fontWeight: 700,
+                                            fontSize: '15px',
+                                            flex: 1,
+                                            color: isMe ? 'var(--accent)' : 'var(--tx-head)',
+                                        }}>
+                                            {entry.name}{isMe ? ' (Me)' : ''}
+                                        </span>
+                                        <span style={{ fontWeight: 700, color: '#d97706', fontSize: '15px' }}>
+                                            {fmt(entry.value)}
+                                        </span>
+                                        <span style={{ fontSize: '12px', color: 'var(--tx-muted)', minWidth: '56px', textAlign: 'right' }}>
+                                            {entry.orders} order{entry.orders !== 1 ? 's' : ''}
+                                        </span>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
+                                    <div style={{ height: '8px', background: 'var(--border-lt)', borderRadius: '4px', overflow: 'hidden' }}>
+                                        <div style={{
+                                            height: '100%',
+                                            width: `${barPct}%`,
+                                            background: isMe ? 'var(--accent)' : '#94a3b8',
+                                            borderRadius: '4px',
+                                            transition: 'width 0.35s ease',
+                                        }} />
+                                    </div>
+                                </div>
+                            );
+                        })}
 
-                <div className="card">
-                    <div className="card-title">
-                        📋 Recent Orders
-                        <Link
-                            href={ordersIndex()}
-                            style={{
-                                marginLeft: 'auto',
-                                fontSize: '12px',
-                                color: 'var(--accent)',
-                                fontWeight: 600,
-                            }}
-                        >
-                            View All →
-                        </Link>
+                        {data.leaderboard.length === 0 && (
+                            <div className="empty-state" style={{ padding: '28px 0' }}>
+                                <div className="icon">📊</div>
+                                <p>No confirmed orders for this period.</p>
+                            </div>
+                        )}
                     </div>
-
-                    {recentOrders.length === 0 ? (
-                        <div className="empty-state">
-                            <div className="icon">📋</div>
-                            <p>No orders yet.</p>
-                        </div>
-                    ) : (
-                        <div className="prod-wrap">
-                            <table className="prod-table">
-                                <thead>
-                                    <tr>
-                                        <th>Order #</th>
-                                        <th>Company</th>
-                                        <th>Date</th>
-                                        <th>Amount</th>
-                                        <th>Items</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {recentOrders.map((order) => {
-                                        const totalItems = order.items.length;
-                                        const doneItems = order.items.filter(
-                                            (i) => i.status === 'dispatched',
-                                        ).length;
-                                        return (
-                                            <tr key={order.id}>
-                                                <td>
-                                                    <span
-                                                        style={{
-                                                            fontWeight: 700,
-                                                            color: 'var(--accent)',
-                                                        }}
-                                                    >
-                                                        {order.order_number}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <div className="prod-name">
-                                                        {order.company_name}
-                                                    </div>
-                                                    <div className="prod-detail">
-                                                        {order.customer_name}
-                                                    </div>
-                                                </td>
-                                                <td>{formatDate(order.order_date)}</td>
-                                                <td>{formatAmount(order.total_amount)}</td>
-                                                <td>
-                                                    {doneItems}/{totalItems} done
-                                                </td>
-                                                <td>
-                                                    <span className={orderStatusClass(order.status)}>
-                                                        {(order.status ?? 'draft').toUpperCase()}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
                 </div>
             </div>
         </>

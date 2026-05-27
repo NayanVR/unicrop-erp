@@ -3,55 +3,70 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
-use App\Models\OrderItem;
+use App\Models\Role;
+use App\Models\User;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
-        $totalActiveOrders = Order::query()
-            ->whereNotIn('status', ['dispatched'])
-            ->count();
+        $currentUser = $request->user();
 
-        $itemsInProduction = OrderItem::query()
-            ->whereIn('status', ['processing', 'filling', 'labeling'])
-            ->count();
+        $salesUsers = User::where('is_active', true)
+            ->whereHas('roles', fn ($q) => $q->whereIn('slug', [Role::ADMIN, Role::OFFICE]))
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
-        $readyToDispatch = OrderItem::query()
-            ->where('status', 'ready')
-            ->count();
+        $now = now();
 
-        $dispatchedThisMonth = OrderItem::query()
-            ->where('status', 'dispatched')
-            ->whereMonth('updated_at', now()->month)
-            ->whereYear('updated_at', now()->year)
-            ->count();
+        $periods = [
+            'today'     => [$now->copy()->startOfDay()->toDateString(),       $now->copy()->endOfDay()->toDateString()],
+            'thisWeek'  => [$now->copy()->startOfWeek()->toDateString(),      $now->copy()->endOfWeek()->toDateString()],
+            'lastWeek'  => [$now->copy()->subWeek()->startOfWeek()->toDateString(), $now->copy()->subWeek()->endOfWeek()->toDateString()],
+            'thisMonth' => [$now->copy()->startOfMonth()->toDateString(),     $now->copy()->endOfMonth()->toDateString()],
+            'lastMonth' => [$now->copy()->subMonth()->startOfMonth()->toDateString(), $now->copy()->subMonth()->endOfMonth()->toDateString()],
+            'thisYear'  => [$now->copy()->startOfYear()->toDateString(),      $now->copy()->endOfYear()->toDateString()],
+            'lastYear'  => [$now->copy()->subYear()->startOfYear()->toDateString(),  $now->copy()->subYear()->endOfYear()->toDateString()],
+        ];
 
-        $pipeline = OrderItem::query()
-            ->whereNotIn('status', ['dispatched'])
-            ->with(['order:id,order_number,company_name,customer_name,priority'])
-            ->get(['id', 'order_id', 'our_brand', 'party_brand', 'packing_size', 'quantity', 'status'])
-            ->groupBy('status')
-            ->map(fn ($items) => $items->values());
+        $salesData = [];
 
-        $recentOrders = Order::query()
-            ->with(['salesUser:id,name', 'items:id,order_id,status'])
-            ->orderByDesc('id')
-            ->limit(10)
-            ->get(['id', 'order_number', 'company_name', 'customer_name', 'order_date', 'total_amount', 'status', 'priority', 'sales_user_id']);
+        foreach ($periods as $key => [$start, $end]) {
+            $results = Order::query()
+                ->where('status', 'confirmed')
+                ->whereBetween('order_date', [$start, $end])
+                ->selectRaw('sales_user_id, COUNT(*) as orders_count, SUM(total_amount) as total_value')
+                ->groupBy('sales_user_id')
+                ->get()
+                ->keyBy('sales_user_id');
+
+            $leaderboard = $salesUsers->map(function (User $user) use ($results) {
+                $row = $results->get($user->id);
+
+                return [
+                    'userId' => $user->id,
+                    'name'   => $user->name,
+                    'orders' => $row ? (int) $row->orders_count : 0,
+                    'value'  => $row ? (float) $row->total_value : 0.0,
+                ];
+            })->sortByDesc('value')->values();
+
+            $myRow = $results->get($currentUser?->id);
+
+            $salesData[$key] = [
+                'myOrders'    => $myRow ? (int) $myRow->orders_count : 0,
+                'myValue'     => $myRow ? (float) $myRow->total_value : 0.0,
+                'leaderboard' => $leaderboard,
+            ];
+        }
 
         return Inertia::render('erp/dashboard', [
-            'pageTitle' => 'Dashboard',
-            'stats' => [
-                'totalActiveOrders' => $totalActiveOrders,
-                'itemsInProduction' => $itemsInProduction,
-                'readyToDispatch' => $readyToDispatch,
-                'dispatchedThisMonth' => $dispatchedThisMonth,
-            ],
-            'pipeline' => $pipeline,
-            'recentOrders' => $recentOrders,
+            'pageTitle'     => 'Dashboard',
+            'salesData'     => $salesData,
+            'currentUserId' => $currentUser?->id,
         ]);
     }
 }
