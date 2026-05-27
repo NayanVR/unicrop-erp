@@ -27,6 +27,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'delivery_address',
     'phone',
     'priority',
+    'urgent_approved',
+    'urgent_approved_by',
+    'urgent_approved_at',
     'status',
     'confirmed_at',
     'freight_amount',
@@ -50,6 +53,7 @@ class Order extends Model
         return [
             'order_date' => 'date',
             'confirmed_at' => 'datetime',
+            'urgent_approved_at' => 'datetime',
             'freight_amount' => 'decimal:2',
             'courier_amount' => 'decimal:2',
             'round_off' => 'decimal:2',

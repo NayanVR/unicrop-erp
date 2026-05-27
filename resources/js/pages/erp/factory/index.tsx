@@ -1,4 +1,5 @@
 import { advance as itemAdvance, revert as itemRevert } from '@/routes/factory/items';
+import { approveUrgent as ordersApproveUrgent, rejectUrgent as ordersRejectUrgent } from '@/routes/orders';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 
@@ -42,9 +43,21 @@ type Order = {
     items: OrderItem[];
 };
 
+type UrgentPendingOrder = {
+    id: number;
+    order_number: string;
+    company_name: string;
+    customer_name: string;
+    order_date?: string | null;
+    sales_user?: { id: number; name: string } | null;
+    created_by?: { id: number; name: string } | null;
+    items: { id: number; our_brand?: string | null; packing_size?: string | null; quantity: string | number }[];
+};
+
 type Props = {
     orders: Order[];
     stageFlow: Record<string, string>;
+    urgentPending: UrgentPendingOrder[];
 };
 
 const STAGE_ORDER = ['pending', 'processing', 'filling', 'labeling', 'ready', 'dispatched'];
@@ -86,11 +99,13 @@ const formatDate = (value?: string | null) => {
 
 const priorityClass = (priority?: string | null) => `badge priority-${priority ?? 'normal'}`;
 
-export default function FactoryIndex({ orders, stageFlow }: Props) {
+export default function FactoryIndex({ orders, stageFlow, urgentPending }: Props) {
     const [openOrders, setOpenOrders] = useState<number[]>([]);
     const [advancing, setAdvancing] = useState<number | null>(null);
     const [reverting, setReverting] = useState<number | null>(null);
     const [logItemId, setLogItemId] = useState<number | null>(null);
+    const [approvingId, setApprovingId] = useState<number | null>(null);
+    const [rejectingId, setRejectingId] = useState<number | null>(null);
 
     const toggleOrder = (orderId: number) => {
         setOpenOrders((curr) =>
@@ -123,6 +138,31 @@ export default function FactoryIndex({ orders, stageFlow }: Props) {
         );
     };
 
+    const approveUrgent = (orderId: number) => {
+        setApprovingId(orderId);
+        router.post(
+            ordersApproveUrgent(orderId).url,
+            {},
+            {
+                preserveScroll: true,
+                onFinish: () => setApprovingId(null),
+            },
+        );
+    };
+
+    const rejectUrgent = (orderId: number) => {
+        if (!confirm('Reject this urgent order? The office will need to address it.')) return;
+        setRejectingId(orderId);
+        router.post(
+            ordersRejectUrgent(orderId).url,
+            {},
+            {
+                preserveScroll: true,
+                onFinish: () => setRejectingId(null),
+            },
+        );
+    };
+
     const logItem = orders
         .flatMap((o) => o.items)
         .find((i) => i.id === logItemId);
@@ -137,6 +177,76 @@ export default function FactoryIndex({ orders, stageFlow }: Props) {
                         <p>Manage item stage progression for confirmed orders.</p>
                     </div>
                 </div>
+
+                {/* ── Urgent Approval Requests ── */}
+                {urgentPending.length > 0 && (
+                    <div className="card" style={{ marginBottom: '20px', border: '2px solid #ef4444' }}>
+                        <div className="card-title" style={{ color: '#ef4444' }}>
+                            🚨 Urgent Approval Requests
+                            <span className="ct-badge" style={{ background: '#ef4444', color: '#fff' }}>{urgentPending.length} pending</span>
+                        </div>
+                        <p style={{ fontSize: '13px', color: 'var(--tx-sub)', marginBottom: '14px' }}>
+                            These urgent orders are waiting for your approval before office can confirm them for production.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {urgentPending.map((order) => (
+                                <div
+                                    key={order.id}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '12px',
+                                        padding: '12px 14px',
+                                        background: 'var(--bg-page)',
+                                        border: '1px solid var(--border)',
+                                        borderRadius: 'var(--radius-sm)',
+                                        flexWrap: 'wrap',
+                                    }}
+                                >
+                                    <div style={{ minWidth: '80px', fontWeight: 700, color: 'var(--accent)', fontSize: '13px' }}>
+                                        {order.order_number}
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: '140px' }}>
+                                        <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--tx-head)' }}>{order.company_name}</div>
+                                        <div style={{ fontSize: '12px', color: 'var(--tx-sub)' }}>{order.customer_name}</div>
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: 'var(--tx-muted)', minWidth: '100px' }}>
+                                        {order.items.length} item{order.items.length !== 1 ? 's' : ''}
+                                        {order.items.slice(0, 2).map((item, idx) => (
+                                            <div key={idx} style={{ color: 'var(--tx-faint)' }}>
+                                                {item.our_brand ?? '—'} {item.packing_size ? `(${item.packing_size})` : ''} ×{item.quantity}
+                                            </div>
+                                        ))}
+                                        {order.items.length > 2 && <div style={{ color: 'var(--tx-faint)' }}>+{order.items.length - 2} more</div>}
+                                    </div>
+                                    {order.order_date && (
+                                        <div style={{ fontSize: '12px', color: 'var(--tx-muted)' }}>{formatDate(order.order_date)}</div>
+                                    )}
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <button
+                                            type="button"
+                                            className="btn primary"
+                                            style={{ padding: '6px 16px', fontSize: '13px' }}
+                                            onClick={() => approveUrgent(order.id)}
+                                            disabled={approvingId === order.id || rejectingId === order.id}
+                                        >
+                                            {approvingId === order.id ? '…' : '✓ Approve'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn danger-xs"
+                                            style={{ padding: '6px 14px', fontSize: '13px' }}
+                                            onClick={() => rejectUrgent(order.id)}
+                                            disabled={approvingId === order.id || rejectingId === order.id}
+                                        >
+                                            {rejectingId === order.id ? '…' : '✕ Reject'}
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {orders.length === 0 ? (
                     <div className="empty-state">

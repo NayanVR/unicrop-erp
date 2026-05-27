@@ -28,6 +28,7 @@ type Order = {
     transport_name?: string | null;
     priority?: string | null;
     status?: string | null;
+    urgent_approved?: boolean | null;
     subtotal?: string | number;
     gst_total?: string | number;
     total_amount?: string | number;
@@ -254,14 +255,24 @@ export default function OrdersIndex({
                                         </span>
                                         {order.status === 'submitted' && (
                                             <div className="confirm-btn">
-                                                <button
-                                                    type="button"
-                                                    className="btn sm primary"
-                                                    onClick={() => confirmOrder(order.id)}
-                                                    disabled={confirming === order.id}
-                                                >
-                                                    {confirming === order.id ? '…' : '✓ Confirm'}
-                                                </button>
+                                                {order.priority === 'urgent' && order.urgent_approved !== true ? (
+                                                    <span
+                                                        className={`badge ${order.urgent_approved === false ? 'red' : 'orange'}`}
+                                                        style={{ fontSize: '11px' }}
+                                                        title={order.urgent_approved === false ? 'Rejected by factory — please review' : 'Waiting for factory approval'}
+                                                    >
+                                                        {order.urgent_approved === false ? '✕ Factory Rejected' : '⏳ Awaiting Factory'}
+                                                    </span>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        className="btn sm primary"
+                                                        onClick={() => confirmOrder(order.id)}
+                                                        disabled={confirming === order.id}
+                                                    >
+                                                        {confirming === order.id ? '…' : '✓ Confirm'}
+                                                    </button>
+                                                )}
                                             </div>
                                         )}
                                         {order.status === 'confirmed' && (

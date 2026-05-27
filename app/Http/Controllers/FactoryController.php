@@ -28,10 +28,19 @@ class FactoryController extends Controller
             ->orderByDesc('id')
             ->get();
 
+        $urgentPending = Order::query()
+            ->where('status', 'submitted')
+            ->where('priority', 'urgent')
+            ->whereNull('urgent_approved')
+            ->with(['items:id,order_id,our_brand,packing_size,quantity', 'salesUser:id,name', 'createdBy:id,name'])
+            ->orderByDesc('id')
+            ->get();
+
         return Inertia::render('erp/factory/index', [
             'pageTitle' => 'Production Orders',
             'orders' => $orders,
             'stageFlow' => self::STAGE_FLOW,
+            'urgentPending' => $urgentPending,
         ]);
     }
 

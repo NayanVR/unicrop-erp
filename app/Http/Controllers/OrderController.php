@@ -125,6 +125,10 @@ class OrderController extends Controller
             return redirect()->back()->with('error', 'Only submitted orders can be confirmed.');
         }
 
+        if ($order->priority === 'urgent' && $order->urgent_approved !== true) {
+            return redirect()->back()->with('error', 'Urgent orders must be approved by factory before confirming.');
+        }
+
         $order->update([
             'status' => 'confirmed',
             'confirmed_by' => $request->user()?->id,
@@ -132,6 +136,36 @@ class OrderController extends Controller
         ]);
 
         return redirect()->back()->with('success', "Order {$order->order_number} confirmed.");
+    }
+
+    public function approveUrgent(Request $request, Order $order): RedirectResponse
+    {
+        if ($order->priority !== 'urgent' || $order->status !== 'submitted') {
+            return redirect()->back()->with('error', 'Order is not pending urgent approval.');
+        }
+
+        $order->update([
+            'urgent_approved' => true,
+            'urgent_approved_by' => $request->user()?->id,
+            'urgent_approved_at' => now(),
+        ]);
+
+        return redirect()->back()->with('success', "Urgent order {$order->order_number} approved for production.");
+    }
+
+    public function rejectUrgent(Request $request, Order $order): RedirectResponse
+    {
+        if ($order->priority !== 'urgent' || $order->status !== 'submitted') {
+            return redirect()->back()->with('error', 'Order is not pending urgent approval.');
+        }
+
+        $order->update([
+            'urgent_approved' => false,
+            'urgent_approved_by' => $request->user()?->id,
+            'urgent_approved_at' => now(),
+        ]);
+
+        return redirect()->back()->with('success', "Urgent order {$order->order_number} rejected.");
     }
 
     public function update(UpdateOrderRequest $request, Order $order): RedirectResponse

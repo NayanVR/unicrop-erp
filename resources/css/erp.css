@@ -1098,6 +1098,22 @@ html.dark .stage-dispatched {
     background: var(--lab-teal-lt);
     color: var(--lab-teal);
 }
+.badge.red {
+    background: #fee2e2;
+    color: #dc2626;
+}
+.badge.orange {
+    background: #fff7ed;
+    color: #c2410c;
+}
+html.dark .badge.red {
+    background: rgba(220, 38, 38, 0.2);
+    color: #fca5a5;
+}
+html.dark .badge.orange {
+    background: rgba(194, 65, 12, 0.2);
+    color: #fdba74;
+}
 html.dark .badge.indigo {
     background: rgba(76, 29, 149, 0.25);
     color: #c4b5fd;
