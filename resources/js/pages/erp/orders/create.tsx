@@ -743,7 +743,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                             Save as draft
                         </label>
                         <button type="submit" className="btn primary" disabled={form.processing}>
-                            {form.processing ? 'Saving…' : 'Save Order'}
+                            {form.processing ? 'Submitting…' : 'Submit Order'}
                         </button>
                     </div>
                 </form>
