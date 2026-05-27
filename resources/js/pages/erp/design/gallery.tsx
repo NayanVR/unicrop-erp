@@ -22,6 +22,7 @@ type PageProps = {
     partyRates: PartyRate[];
     packingSizes: string[];
     flash?: { success?: string; error?: string };
+    errors?: Record<string, string>;
 };
 
 type UploadForm = {
@@ -33,9 +34,11 @@ type UploadForm = {
 };
 
 export default function DesignGallery() {
-    const { photos, parties, ourBrands, partyRates, packingSizes, flash } = usePage<PageProps>().props;
+    const { photos, parties, ourBrands, partyRates, packingSizes, flash, errors: pageErrors } =
+        usePage<PageProps>().props;
 
-    const [activeTab, setActiveTab] = useState<'our-brand' | number>('our-brand');
+    // null = show folder list, 'our-brand' = Our Brand folder, number = party folder
+    const [activeFolder, setActiveFolder] = useState<null | 'our-brand' | number>(null);
     const [showModal, setShowModal] = useState(false);
     const [lightbox, setLightbox] = useState<Photo | null>(null);
     const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -50,17 +53,9 @@ export default function DesignGallery() {
 
     const fileRef = useRef<HTMLInputElement>(null);
 
-    // Parties that have at least one photo
-    const partiesWithPhotos = useMemo(() => {
-        const ids = new Set(photos.filter((p) => p.party_id !== null).map((p) => p.party_id));
-        return parties.filter((p) => ids.has(p.id));
-    }, [photos, parties]);
-
-    // Our brand photo list (party_id = null)
     const ourBrandPhotos = useMemo(() => photos.filter((p) => p.party_id === null), [photos]);
 
-    // Party brand photos grouped by party
-    const partyPhotos = useMemo(() => {
+    const partyPhotoMap = useMemo(() => {
         const map = new Map<number, Photo[]>();
         for (const ph of photos) {
             if (ph.party_id !== null) {
@@ -72,11 +67,19 @@ export default function DesignGallery() {
     }, [photos]);
 
     const displayedPhotos: Photo[] =
-        activeTab === 'our-brand'
-            ? ourBrandPhotos
-            : (partyPhotos.get(activeTab as number) ?? []);
+        activeFolder === null
+            ? []
+            : activeFolder === 'our-brand'
+              ? ourBrandPhotos
+              : (partyPhotoMap.get(activeFolder as number) ?? []);
 
-    // Party brand name suggestions for selected party
+    const activeFolderLabel =
+        activeFolder === null
+            ? ''
+            : activeFolder === 'our-brand'
+              ? 'Our Brand'
+              : (parties.find((p) => p.id === activeFolder)?.name ?? '');
+
     const brandSuggestions = useMemo(() => {
         if (!form.data.party_id) return [];
         return partyRates
@@ -95,13 +98,19 @@ export default function DesignGallery() {
 
     const openUpload = (partyId?: number) => {
         form.reset();
+        form.clearErrors();
         if (partyId) form.setData('party_id', String(partyId));
         setShowModal(true);
     };
 
+    const openFolderUpload = () => {
+        if (activeFolder === null) return openUpload();
+        if (activeFolder === 'our-brand') return openUpload();
+        openUpload(activeFolder as number);
+    };
+
     const submitUpload = (e: React.FormEvent) => {
         e.preventDefault();
-        form.transform((data) => ({ ...data }));
         form.post(galleryStore().url, {
             forceFormData: true,
             preserveScroll: true,
@@ -109,6 +118,8 @@ export default function DesignGallery() {
                 setShowModal(false);
                 form.reset();
                 if (fileRef.current) fileRef.current.value = '';
+                // Stay in the current folder after upload
+                if (activeFolder === null) setActiveFolder('our-brand');
             },
         });
     };
@@ -122,88 +133,124 @@ export default function DesignGallery() {
         });
     };
 
-    const activeTabLabel =
-        activeTab === 'our-brand'
-            ? 'Our Brand'
-            : (parties.find((p) => p.id === activeTab)?.name ?? '');
+    const folderPhotoCount = (id: 'our-brand' | number) =>
+        id === 'our-brand' ? ourBrandPhotos.length : (partyPhotoMap.get(id as number)?.length ?? 0);
 
+    // ── Folder list view ──────────────────────────────────────────────────────
+    if (activeFolder === null) {
+        return (
+            <div id="view-design-gallery" className="view active">
+                <div className="page-header">
+                    <div className="page-header-left">
+                        <h1>Photo Gallery</h1>
+                        <p>Select a folder to view and upload brand photos</p>
+                    </div>
+                    <button type="button" className="btn primary" onClick={() => openUpload()}>
+                        ＋ Upload Photo
+                    </button>
+                </div>
+
+                {flash?.success && (
+                    <div className="alert-success" style={{ marginBottom: '14px' }}>{flash.success}</div>
+                )}
+                {flash?.error && (
+                    <div className="alert-error" style={{ marginBottom: '14px' }}>{flash.error}</div>
+                )}
+
+                {/* Folder grid */}
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                    gap: '16px',
+                }}>
+                    {/* Our Brand folder */}
+                    <FolderCard
+                        label="Our Brand"
+                        icon="🌿"
+                        count={ourBrandPhotos.length}
+                        onClick={() => setActiveFolder('our-brand')}
+                        onUpload={() => openUpload()}
+                    />
+
+                    {/* Party folders */}
+                    {parties.map((party) => (
+                        <FolderCard
+                            key={party.id}
+                            label={party.name}
+                            icon="🏢"
+                            count={partyPhotoMap.get(party.id)?.length ?? 0}
+                            onClick={() => setActiveFolder(party.id)}
+                            onUpload={() => openUpload(party.id)}
+                        />
+                    ))}
+                </div>
+
+                {showModal && (
+                    <UploadModal
+                        form={form}
+                        fileRef={fileRef}
+                        parties={parties}
+                        ourBrands={ourBrands}
+                        brandSuggestions={brandSuggestions}
+                        sizeSuggestions={sizeSuggestions}
+                        onClose={() => { setShowModal(false); form.reset(); }}
+                        onSubmit={submitUpload}
+                    />
+                )}
+            </div>
+        );
+    }
+
+    // ── Folder contents view ──────────────────────────────────────────────────
     return (
         <div id="view-design-gallery" className="view active">
             <div className="page-header">
                 <div className="page-header-left">
-                    <h1>Photo Gallery</h1>
-                    <p>Brand and label photos organized by party</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <button
+                            type="button"
+                            onClick={() => setActiveFolder(null)}
+                            style={{
+                                background: 'none', border: 'none', cursor: 'pointer',
+                                color: 'var(--tx-sub)', fontSize: '13px', padding: '2px 6px 2px 0',
+                                display: 'flex', alignItems: 'center', gap: '4px',
+                            }}
+                        >
+                            ← All Folders
+                        </button>
+                        <span style={{ color: 'var(--tx-muted)', fontSize: '13px' }}>/</span>
+                        <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--tx-head)' }}>
+                            {activeFolder === 'our-brand' ? '🌿' : '🏢'} {activeFolderLabel}
+                        </span>
+                    </div>
+                    <h1 style={{ margin: 0 }}>{activeFolderLabel}</h1>
+                    <p style={{ margin: 0 }}>
+                        {displayedPhotos.length} photo{displayedPhotos.length !== 1 ? 's' : ''}
+                    </p>
                 </div>
-                <button
-                    type="button"
-                    className="btn primary"
-                    onClick={() => openUpload(activeTab !== 'our-brand' ? (activeTab as number) : undefined)}
-                >
+                <button type="button" className="btn primary" onClick={openFolderUpload}>
                     ＋ Upload Photo
                 </button>
             </div>
 
-            {flash?.success && <div className="alert-success" style={{ marginBottom: '12px' }}>{flash.success}</div>}
-            {flash?.error && <div className="alert-error" style={{ marginBottom: '12px' }}>{flash.error}</div>}
+            {flash?.success && (
+                <div className="alert-success" style={{ marginBottom: '14px' }}>{flash.success}</div>
+            )}
+            {flash?.error && (
+                <div className="alert-error" style={{ marginBottom: '14px' }}>{flash.error}</div>
+            )}
 
-            {/* ── Tabs ── */}
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '20px' }}>
-                <button
-                    type="button"
-                    className={`pill${activeTab === 'our-brand' ? ' active' : ''}`}
-                    onClick={() => setActiveTab('our-brand')}
-                >
-                    🌿 Our Brand ({ourBrandPhotos.length})
-                </button>
-                {partiesWithPhotos.map((party) => (
-                    <button
-                        key={party.id}
-                        type="button"
-                        className={`pill${activeTab === party.id ? ' active' : ''}`}
-                        onClick={() => setActiveTab(party.id)}
-                    >
-                        🏢 {party.name} ({partyPhotos.get(party.id)?.length ?? 0})
-                    </button>
-                ))}
-                {parties
-                    .filter((p) => !partiesWithPhotos.find((x) => x.id === p.id))
-                    .map((party) => (
-                        <button
-                            key={party.id}
-                            type="button"
-                            className={`pill${activeTab === party.id ? ' active' : ''}`}
-                            onClick={() => setActiveTab(party.id)}
-                        >
-                            🏢 {party.name} (0)
-                        </button>
-                    ))}
-            </div>
-
-            {/* ── Gallery Grid ── */}
+            {/* Photos grid */}
             <div className="card">
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                    <div className="card-title" style={{ marginBottom: 0 }}>
-                        {activeTab === 'our-brand' ? '🌿 Our Brand Photos' : `🏢 ${activeTabLabel} — Party Brand Photos`}
-                    </div>
-                    <button
-                        type="button"
-                        className="btn secondary"
-                        style={{ fontSize: '12px' }}
-                        onClick={() => openUpload(activeTab !== 'our-brand' ? (activeTab as number) : undefined)}
-                    >
-                        ＋ Upload
-                    </button>
-                </div>
-
                 {displayedPhotos.length === 0 ? (
                     <div className="empty-state" style={{ padding: '32px 0' }}>
                         <div className="icon">📷</div>
-                        <p>No photos yet for {activeTabLabel}.</p>
+                        <p>No photos yet in this folder.</p>
                         <button
                             type="button"
                             className="btn primary"
                             style={{ marginTop: '8px' }}
-                            onClick={() => openUpload(activeTab !== 'our-brand' ? (activeTab as number) : undefined)}
+                            onClick={openFolderUpload}
                         >
                             Upload First Photo
                         </button>
@@ -215,74 +262,19 @@ export default function DesignGallery() {
                         gap: '16px',
                     }}>
                         {displayedPhotos.map((photo) => (
-                            <div
+                            <PhotoCard
                                 key={photo.id}
-                                style={{
-                                    border: '1px solid var(--border)',
-                                    borderRadius: '10px',
-                                    overflow: 'hidden',
-                                    background: 'var(--bg-paper)',
-                                    position: 'relative',
-                                }}
-                            >
-                                {/* Photo */}
-                                <div
-                                    style={{ width: '100%', paddingBottom: '100%', position: 'relative', cursor: 'pointer' }}
-                                    onClick={() => setLightbox(photo)}
-                                >
-                                    <img
-                                        src={photo.photo_url}
-                                        alt={`${photo.party_brand ?? photo.our_brand} ${photo.packing_size ?? ''}`}
-                                        style={{
-                                            position: 'absolute',
-                                            inset: 0,
-                                            width: '100%',
-                                            height: '100%',
-                                            objectFit: 'contain',
-                                            background: '#fff',
-                                            padding: '8px',
-                                        }}
-                                    />
-                                </div>
-
-                                {/* Info */}
-                                <div style={{ padding: '8px 10px 10px' }}>
-                                    <div style={{ fontWeight: 700, fontSize: '12px', color: 'var(--tx-head)', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {photo.party_brand ?? photo.our_brand}
-                                    </div>
-                                    {photo.party_brand && (
-                                        <div style={{ fontSize: '11px', color: 'var(--tx-muted)', marginBottom: '2px' }}>
-                                            Our brand: {photo.our_brand}
-                                        </div>
-                                    )}
-                                    {photo.packing_size && (
-                                        <div style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>{photo.packing_size}</div>
-                                    )}
-                                    <button
-                                        type="button"
-                                        style={{
-                                            marginTop: '6px',
-                                            fontSize: '11px',
-                                            color: 'var(--danger)',
-                                            background: 'none',
-                                            border: 'none',
-                                            cursor: 'pointer',
-                                            padding: 0,
-                                            fontFamily: 'inherit',
-                                        }}
-                                        disabled={deletingId === photo.id}
-                                        onClick={() => handleDelete(photo)}
-                                    >
-                                        {deletingId === photo.id ? 'Deleting…' : '✕ Delete'}
-                                    </button>
-                                </div>
-                            </div>
+                                photo={photo}
+                                deleting={deletingId === photo.id}
+                                onView={() => setLightbox(photo)}
+                                onDelete={() => handleDelete(photo)}
+                            />
                         ))}
                     </div>
                 )}
             </div>
 
-            {/* ── Lightbox ── */}
+            {/* Lightbox */}
             {lightbox && (
                 <div
                     className="modal-overlay"
@@ -299,10 +291,14 @@ export default function DesignGallery() {
                                     {lightbox.party_brand ?? lightbox.our_brand}
                                 </span>
                                 {lightbox.packing_size && (
-                                    <span style={{ fontSize: '13px', color: 'var(--tx-muted)', marginLeft: '8px' }}>{lightbox.packing_size}</span>
+                                    <span style={{ fontSize: '13px', color: 'var(--tx-muted)', marginLeft: '8px' }}>
+                                        {lightbox.packing_size}
+                                    </span>
                                 )}
-                                {lightbox.party_name && (
-                                    <div style={{ fontSize: '12px', color: 'var(--tx-muted)', marginTop: '2px' }}>Party: {lightbox.party_name}</div>
+                                {lightbox.party_brand && (
+                                    <div style={{ fontSize: '12px', color: 'var(--tx-muted)', marginTop: '2px' }}>
+                                        Our brand: {lightbox.our_brand}
+                                    </div>
                                 )}
                             </div>
                             <button type="button" className="modal-close" onClick={() => setLightbox(null)}>✕</button>
@@ -316,123 +312,272 @@ export default function DesignGallery() {
                 </div>
             )}
 
-            {/* ── Upload Modal ── */}
             {showModal && (
-                <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                    <div className="modal" style={{ width: '460px' }} onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">Upload Photo</h2>
-                            <button type="button" className="modal-close" onClick={() => setShowModal(false)}>✕</button>
-                        </div>
-                        <form onSubmit={submitUpload}>
-                            <div className="modal-body">
-                                {/* Brand type: if party_id is empty → Our Brand; if set → Party Brand */}
-                                <div className="form-group" style={{ marginBottom: '14px' }}>
-                                    <label>Photo Type</label>
-                                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                                        <button
-                                            type="button"
-                                            className={`pill${!form.data.party_id ? ' active' : ''}`}
-                                            onClick={() => form.setData({ ...form.data, party_id: '', party_brand: '' })}
-                                        >
-                                            🌿 Our Brand
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className={`pill${form.data.party_id ? ' active' : ''}`}
-                                            onClick={() => { /* pills handled by party select below */ }}
-                                        >
-                                            🏢 Party Brand
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Party selection */}
-                                <div className="form-group" style={{ marginBottom: '14px' }}>
-                                    <label>Party {form.data.party_id ? '*' : '(leave blank for Our Brand)'}</label>
-                                    <select
-                                        value={form.data.party_id}
-                                        onChange={(e) => form.setData({ ...form.data, party_id: e.target.value, party_brand: '' })}
-                                    >
-                                        <option value="">— Our Brand (no party) —</option>
-                                        {parties.map((p) => (
-                                            <option key={p.id} value={p.id}>{p.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {/* Our Brand */}
-                                <div className="form-group" style={{ marginBottom: '14px' }}>
-                                    <label>Our Brand *</label>
-                                    <input
-                                        type="text"
-                                        list="gallery-our-brands"
-                                        className={form.errors.our_brand ? 'error' : ''}
-                                        value={form.data.our_brand}
-                                        onChange={(e) => form.setData('our_brand', e.target.value)}
-                                        placeholder="e.g. Unicrop Neem Oil"
-                                    />
-                                    <datalist id="gallery-our-brands">
-                                        {ourBrands.map((b) => <option key={b} value={b} />)}
-                                    </datalist>
-                                    {form.errors.our_brand && <span className="field-error">{form.errors.our_brand}</span>}
-                                </div>
-
-                                {/* Party Brand (only when party is selected) */}
-                                {form.data.party_id && (
-                                    <div className="form-group" style={{ marginBottom: '14px' }}>
-                                        <label>Party Brand Name</label>
-                                        <input
-                                            type="text"
-                                            list="gallery-party-brands"
-                                            value={form.data.party_brand}
-                                            onChange={(e) => form.setData('party_brand', e.target.value)}
-                                            placeholder="Customer's brand label name"
-                                        />
-                                        <datalist id="gallery-party-brands">
-                                            {brandSuggestions.map((b) => <option key={b} value={b} />)}
-                                        </datalist>
-                                    </div>
-                                )}
-
-                                {/* Packing Size */}
-                                <div className="form-group" style={{ marginBottom: '14px' }}>
-                                    <label>Packing Size</label>
-                                    <input
-                                        type="text"
-                                        list="gallery-packing-sizes"
-                                        value={form.data.packing_size}
-                                        onChange={(e) => form.setData('packing_size', e.target.value)}
-                                        placeholder="e.g. 500ml, 1ltr"
-                                    />
-                                    <datalist id="gallery-packing-sizes">
-                                        {sizeSuggestions.map((s) => <option key={s} value={s} />)}
-                                    </datalist>
-                                </div>
-
-                                {/* Photo */}
-                                <div className="form-group">
-                                    <label>Photo * (JPG, PNG, WEBP — max 8MB)</label>
-                                    <input
-                                        ref={fileRef}
-                                        type="file"
-                                        accept="image/jpeg,image/png,image/webp"
-                                        className={form.errors.photo ? 'error' : ''}
-                                        onChange={(e) => form.setData('photo', e.target.files?.[0] ?? null)}
-                                    />
-                                    {form.errors.photo && <span className="field-error">{form.errors.photo}</span>}
-                                </div>
-                            </div>
-                            <div className="modal-footer">
-                                <button type="button" className="btn secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                                <button type="submit" className="btn primary" disabled={form.processing}>
-                                    {form.processing ? 'Uploading…' : 'Upload Photo'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+                <UploadModal
+                    form={form}
+                    fileRef={fileRef}
+                    parties={parties}
+                    ourBrands={ourBrands}
+                    brandSuggestions={brandSuggestions}
+                    sizeSuggestions={sizeSuggestions}
+                    onClose={() => { setShowModal(false); form.reset(); }}
+                    onSubmit={submitUpload}
+                />
             )}
+        </div>
+    );
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function FolderCard({
+    label, icon, count, onClick, onUpload,
+}: {
+    label: string; icon: string; count: number;
+    onClick: () => void; onUpload: () => void;
+}) {
+    return (
+        <div
+            style={{
+                border: '1px solid var(--border)',
+                borderRadius: '12px',
+                background: 'var(--bg-paper)',
+                overflow: 'hidden',
+                cursor: 'pointer',
+                transition: 'box-shadow 0.15s',
+            }}
+            onClick={onClick}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.10)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = ''; }}
+        >
+            {/* Folder icon area */}
+            <div style={{
+                height: '100px',
+                background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-paper) 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '48px',
+                borderBottom: '1px solid var(--border)',
+            }}>
+                {icon}
+            </div>
+
+            <div style={{ padding: '12px 14px 14px' }}>
+                <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--tx-head)', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {label}
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--tx-muted)', marginBottom: '10px' }}>
+                    {count} photo{count !== 1 ? 's' : ''}
+                </div>
+                <button
+                    type="button"
+                    className="btn secondary"
+                    style={{ fontSize: '11px', padding: '3px 10px', width: '100%' }}
+                    onClick={(e) => { e.stopPropagation(); onUpload(); }}
+                >
+                    ＋ Upload
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function PhotoCard({
+    photo, deleting, onView, onDelete,
+}: {
+    photo: Photo; deleting: boolean;
+    onView: () => void; onDelete: () => void;
+}) {
+    const productName = photo.party_brand ?? photo.our_brand;
+
+    return (
+        <div style={{
+            border: '1px solid var(--border)',
+            borderRadius: '10px',
+            overflow: 'hidden',
+            background: 'var(--bg-paper)',
+        }}>
+            {/* Image - square ratio */}
+            <div
+                style={{ width: '100%', paddingBottom: '100%', position: 'relative', cursor: 'pointer' }}
+                onClick={onView}
+            >
+                <img
+                    src={photo.photo_url}
+                    alt={productName}
+                    style={{
+                        position: 'absolute',
+                        inset: 0,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        background: '#fff',
+                        padding: '8px',
+                    }}
+                />
+            </div>
+
+            {/* Info */}
+            <div style={{ padding: '8px 10px 10px' }}>
+                <div style={{ fontWeight: 700, fontSize: '12px', color: 'var(--tx-head)', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {productName}
+                </div>
+                {photo.party_brand && (
+                    <div style={{ fontSize: '11px', color: 'var(--tx-muted)', marginBottom: '2px' }}>
+                        Our brand: {photo.our_brand}
+                    </div>
+                )}
+                {photo.packing_size && (
+                    <div style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>{photo.packing_size}</div>
+                )}
+                <button
+                    type="button"
+                    style={{
+                        marginTop: '6px',
+                        fontSize: '11px',
+                        color: 'var(--danger)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: 0,
+                        fontFamily: 'inherit',
+                    }}
+                    disabled={deleting}
+                    onClick={onDelete}
+                >
+                    {deleting ? 'Deleting…' : '✕ Delete'}
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function UploadModal({
+    form, fileRef, parties, ourBrands, brandSuggestions, sizeSuggestions, onClose, onSubmit,
+}: {
+    form: ReturnType<typeof useForm<UploadForm>>;
+    fileRef: React.RefObject<HTMLInputElement | null>;
+    parties: Party[];
+    ourBrands: string[];
+    brandSuggestions: string[];
+    sizeSuggestions: string[];
+    onClose: () => void;
+    onSubmit: (e: React.FormEvent) => void;
+}) {
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" style={{ width: '460px' }} onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                    <h2 className="modal-title">Upload Photo</h2>
+                    <button type="button" className="modal-close" onClick={onClose}>✕</button>
+                </div>
+                <form onSubmit={onSubmit}>
+                    <div className="modal-body">
+                        {/* Party / folder selection */}
+                        <div className="form-group" style={{ marginBottom: '14px' }}>
+                            <label>Folder (Party)</label>
+                            <select
+                                value={form.data.party_id}
+                                onChange={(e) =>
+                                    form.setData({ ...form.data, party_id: e.target.value, party_brand: '' })
+                                }
+                            >
+                                <option value="">— Our Brand —</option>
+                                {parties.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Our Brand (product name in our catalog) */}
+                        <div className="form-group" style={{ marginBottom: '14px' }}>
+                            <label>Our Brand / Product Name *</label>
+                            <input
+                                type="text"
+                                list="gallery-our-brands"
+                                className={form.errors.our_brand ? 'error' : ''}
+                                value={form.data.our_brand}
+                                onChange={(e) => form.setData('our_brand', e.target.value)}
+                                placeholder="e.g. Unicrop Neem Oil"
+                            />
+                            <datalist id="gallery-our-brands">
+                                {ourBrands.map((b) => (
+                                    <option key={b} value={b} />
+                                ))}
+                            </datalist>
+                            {form.errors.our_brand && (
+                                <span className="field-error">{form.errors.our_brand}</span>
+                            )}
+                        </div>
+
+                        {/* Party Brand (only when a party is selected) */}
+                        {form.data.party_id && (
+                            <div className="form-group" style={{ marginBottom: '14px' }}>
+                                <label>Party Brand / Product Name</label>
+                                <input
+                                    type="text"
+                                    list="gallery-party-brands"
+                                    value={form.data.party_brand}
+                                    className={form.errors.party_brand ? 'error' : ''}
+                                    onChange={(e) => form.setData('party_brand', e.target.value)}
+                                    placeholder="Customer's label name for this product"
+                                />
+                                <datalist id="gallery-party-brands">
+                                    {brandSuggestions.map((b) => (
+                                        <option key={b} value={b} />
+                                    ))}
+                                </datalist>
+                                {form.errors.party_brand && (
+                                    <span className="field-error">{form.errors.party_brand}</span>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Packing Size */}
+                        <div className="form-group" style={{ marginBottom: '14px' }}>
+                            <label>Packing Size</label>
+                            <input
+                                type="text"
+                                list="gallery-packing-sizes"
+                                value={form.data.packing_size}
+                                onChange={(e) => form.setData('packing_size', e.target.value)}
+                                placeholder="e.g. 500ml, 1ltr"
+                            />
+                            <datalist id="gallery-packing-sizes">
+                                {sizeSuggestions.map((s) => (
+                                    <option key={s} value={s} />
+                                ))}
+                            </datalist>
+                        </div>
+
+                        {/* Photo file */}
+                        <div className="form-group">
+                            <label>Photo * (JPG, PNG, WEBP — max 8 MB)</label>
+                            <input
+                                ref={fileRef}
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp"
+                                className={form.errors.photo ? 'error' : ''}
+                                onChange={(e) => form.setData('photo', e.target.files?.[0] ?? null)}
+                            />
+                            {form.errors.photo && (
+                                <span className="field-error">{form.errors.photo}</span>
+                            )}
+                        </div>
+                    </div>
+                    <div className="modal-footer">
+                        <button type="button" className="btn secondary" onClick={onClose}>
+                            Cancel
+                        </button>
+                        <button type="submit" className="btn primary" disabled={form.processing}>
+                            {form.processing ? 'Uploading…' : 'Upload Photo'}
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     );
 }
