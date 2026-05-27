@@ -2,6 +2,38 @@ import { confirm as ordersConfirm, create as ordersCreate } from '@/routes/order
 import { Head, Link, router } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
+function buildPhotoMap(photos: ProductPhoto[]) {
+    const ob = new Map<string, string>(); // "our_brand|packing_size" → url
+    const pb = new Map<string, string>(); // "party_id|party_brand|packing_size" → url
+    for (const p of photos) {
+        const size = (p.packing_size ?? '').toLowerCase();
+        if (p.party_id === null) {
+            ob.set(`${p.our_brand.toLowerCase()}|${size}`, p.photo_url);
+            if (!p.packing_size) ob.set(`${p.our_brand.toLowerCase()}|`, p.photo_url);
+        } else if (p.party_brand) {
+            pb.set(`${p.party_id}|${p.party_brand.toLowerCase()}|${size}`, p.photo_url);
+        }
+    }
+    return { ob, pb };
+}
+
+function getItemPhoto(
+    item: OrderItem,
+    partyId: number | null | undefined,
+    map: { ob: Map<string, string>; pb: Map<string, string> },
+): string | null {
+    if (!item.our_brand) return null;
+    const size = (item.packing_size ?? '').toLowerCase();
+    if (partyId && item.party_brand) {
+        const key = `${partyId}|${item.party_brand.toLowerCase()}|${size}`;
+        const url = map.pb.get(key) ?? map.pb.get(`${partyId}|${item.party_brand.toLowerCase()}|`);
+        if (url) return url;
+    }
+    return map.ob.get(`${item.our_brand.toLowerCase()}|${size}`)
+        ?? map.ob.get(`${item.our_brand.toLowerCase()}|`)
+        ?? null;
+}
+
 type OrderItem = {
     id: number;
     our_brand?: string | null;
@@ -17,6 +49,7 @@ type OrderItem = {
 
 type Order = {
     id: number;
+    party_id?: number | null;
     order_number: string;
     company_name: string;
     customer_name: string;
@@ -35,11 +68,21 @@ type Order = {
     items: OrderItem[];
 };
 
+type ProductPhoto = {
+    id: number;
+    party_id: number | null;
+    our_brand: string;
+    party_brand: string | null;
+    packing_size: string | null;
+    photo_url: string;
+};
+
 type Props = {
     pageTitle: string;
     orders: Order[];
     currentUserId?: number | null;
     canViewAll?: boolean;
+    productPhotos?: ProductPhoto[];
 };
 
 const formatDate = (value?: string | null) => {
@@ -96,12 +139,15 @@ export default function OrdersIndex({
     orders,
     currentUserId,
     canViewAll,
+    productPhotos = [],
 }: Props) {
     const [activeFilter, setActiveFilter] = useState<'all' | 'mine'>(
         canViewAll ? 'all' : 'mine',
     );
     const [openOrders, setOpenOrders] = useState<number[]>([]);
     const [confirming, setConfirming] = useState<number | null>(null);
+
+    const photoMap = useMemo(() => buildPhotoMap(productPhotos), [productPhotos]);
 
     const confirmOrder = (orderId: number) => {
         setConfirming(orderId);
@@ -288,6 +334,7 @@ export default function OrdersIndex({
                                         <table className="prod-table">
                                             <thead>
                                                 <tr>
+                                                    <th style={{ width: '52px' }}></th>
                                                     <th>Product</th>
                                                     <th>Packing</th>
                                                     <th>Qty</th>
@@ -301,7 +348,7 @@ export default function OrdersIndex({
                                                 {order.items.length === 0 ? (
                                                     <tr>
                                                         <td
-                                                            colSpan={7}
+                                                            colSpan={8}
                                                             style={{
                                                                 textAlign:
                                                                     'center',
@@ -312,8 +359,23 @@ export default function OrdersIndex({
                                                         </td>
                                                     </tr>
                                                 ) : (
-                                                    order.items.map((item) => (
+                                                    order.items.map((item) => {
+                                                        const photo = getItemPhoto(item, order.party_id, photoMap);
+                                                        return (
                                                         <tr key={item.id}>
+                                                            <td style={{ textAlign: 'center', padding: '4px 6px' }}>
+                                                                {photo ? (
+                                                                    <img
+                                                                        src={photo}
+                                                                        alt=""
+                                                                        style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '6px', border: '1px solid var(--border)', background: '#fff', padding: '2px', display: 'block' }}
+                                                                    />
+                                                                ) : (
+                                                                    <div style={{ width: '40px', height: '40px', borderRadius: '6px', border: '1px dashed var(--border)', background: 'var(--bg-paper)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', color: 'var(--tx-muted)' }}>
+                                                                        📷
+                                                                    </div>
+                                                                )}
+                                                            </td>
                                                             <td>
                                                                 <div className="prod-name">
                                                                     {item.our_brand ??
@@ -362,7 +424,8 @@ export default function OrdersIndex({
                                                                 </span>
                                                             </td>
                                                         </tr>
-                                                    ))
+                                                        );
+                                                    })
                                                 )}
                                             </tbody>
                                         </table>

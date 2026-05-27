@@ -38,10 +38,20 @@ class OrderController extends Controller
         $orders = $ordersQuery->get();
 
         return Inertia::render('erp/orders/index', [
-            'pageTitle' => 'All Orders',
-            'orders' => $orders,
+            'pageTitle'     => 'All Orders',
+            'orders'        => $orders,
             'currentUserId' => $user?->id,
-            'canViewAll' => $user?->hasRole(Role::ADMIN) ?? false,
+            'canViewAll'    => $user?->hasRole(Role::ADMIN) ?? false,
+            'productPhotos' => ProductPhoto::orderBy('our_brand')->orderBy('packing_size')
+                ->get()
+                ->map(fn ($p) => [
+                    'id'           => $p->id,
+                    'party_id'     => $p->party_id,
+                    'our_brand'    => $p->our_brand,
+                    'party_brand'  => $p->party_brand,
+                    'packing_size' => $p->packing_size,
+                    'photo_url'    => $p->photo_url,
+                ]),
         ]);
     }
 

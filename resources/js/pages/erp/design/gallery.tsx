@@ -140,6 +140,9 @@ export default function DesignGallery() {
                 folderForm.reset();
                 if (partyId) setActiveFolder(partyId);
             },
+            onError: () => {
+                // errors are shown inline via folderForm.errors
+            },
         });
     };
 
@@ -166,8 +169,6 @@ export default function DesignGallery() {
                             type="button"
                             className="btn secondary"
                             onClick={() => setShowCreate(true)}
-                            disabled={availableParties.length === 0}
-                            title={availableParties.length === 0 ? 'All parties already have folders' : undefined}
                         >
                             📁 New Folder
                         </button>
@@ -236,39 +237,55 @@ export default function DesignGallery() {
                                 <h2 className="modal-title">📁 Create Party Folder</h2>
                                 <button type="button" className="modal-close" onClick={() => setShowCreate(false)}>✕</button>
                             </div>
-                            <form onSubmit={submitCreateFolder}>
-                                <div className="modal-body">
-                                    <div className="form-group">
-                                        <label>Select Party *</label>
-                                        <select
-                                            value={folderForm.data.party_id}
-                                            onChange={(e) => folderForm.setData('party_id', e.target.value)}
-                                            className={folderForm.errors.party_id ? 'error' : ''}
-                                        >
-                                            <option value="">— Choose a party —</option>
-                                            {availableParties.map((p) => (
-                                                <option key={p.id} value={p.id}>{p.name}</option>
-                                            ))}
-                                        </select>
-                                        {folderForm.errors.party_id && (
-                                            <span className="field-error">{folderForm.errors.party_id}</span>
-                                        )}
-                                        {availableParties.length === 0 && (
-                                            <span className="field-error">All active parties already have folders.</span>
-                                        )}
+                            {availableParties.length === 0 ? (
+                                <div className="modal-body" style={{ textAlign: 'center', padding: '24px 20px' }}>
+                                    <div style={{ fontSize: '32px', marginBottom: '10px' }}>📁</div>
+                                    <p style={{ color: 'var(--tx-head)', fontWeight: 600, marginBottom: '6px' }}>
+                                        {parties.length === 0
+                                            ? 'No active parties found'
+                                            : 'All parties already have folders'}
+                                    </p>
+                                    <p style={{ color: 'var(--tx-muted)', fontSize: '13px' }}>
+                                        {parties.length === 0
+                                            ? 'Add active parties from the Parties section first.'
+                                            : 'Every active party already has a folder. Upload photos directly into each folder.'}
+                                    </p>
+                                    <div className="modal-footer" style={{ justifyContent: 'center', borderTop: 'none' }}>
+                                        <button type="button" className="btn secondary" onClick={() => setShowCreate(false)}>Close</button>
                                     </div>
                                 </div>
-                                <div className="modal-footer">
-                                    <button type="button" className="btn secondary" onClick={() => setShowCreate(false)}>Cancel</button>
-                                    <button
-                                        type="submit"
-                                        className="btn primary"
-                                        disabled={folderForm.processing || !folderForm.data.party_id}
-                                    >
-                                        {folderForm.processing ? 'Creating…' : 'Create Folder'}
-                                    </button>
-                                </div>
-                            </form>
+                            ) : (
+                                <form onSubmit={submitCreateFolder}>
+                                    <div className="modal-body">
+                                        <div className="form-group">
+                                            <label>Select Party *</label>
+                                            <select
+                                                value={folderForm.data.party_id}
+                                                onChange={(e) => folderForm.setData('party_id', e.target.value)}
+                                                className={folderForm.errors.party_id ? 'error' : ''}
+                                            >
+                                                <option value="">— Choose a party —</option>
+                                                {availableParties.map((p) => (
+                                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                                ))}
+                                            </select>
+                                            {folderForm.errors.party_id && (
+                                                <span className="field-error">{folderForm.errors.party_id}</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="modal-footer">
+                                        <button type="button" className="btn secondary" onClick={() => setShowCreate(false)}>Cancel</button>
+                                        <button
+                                            type="submit"
+                                            className="btn primary"
+                                            disabled={folderForm.processing || !folderForm.data.party_id}
+                                        >
+                                            {folderForm.processing ? 'Creating…' : 'Create Folder'}
+                                        </button>
+                                    </div>
+                                </form>
+                            )}
                         </div>
                     </div>
                 )}
