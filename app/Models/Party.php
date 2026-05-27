@@ -22,6 +22,8 @@ class Party extends Model
         'pincode',
         'notes',
         'is_active',
+        'default_transport_type',
+        'default_transport_id',
     ];
 
     protected $casts = [

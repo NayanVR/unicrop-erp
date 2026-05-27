@@ -21,6 +21,8 @@ type Party = {
     address?: string | null;
     city?: string | null;
     state?: string | null;
+    default_transport_type?: 'transport' | 'courier' | null;
+    default_transport_id?: number | null;
     product_rates: ProductRate[];
 };
 
@@ -236,6 +238,12 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         }
         const party = parties.find((p) => String(p.id) === partyId);
         if (!party) return;
+        const transportType = party.default_transport_type ?? form.data.transport_type;
+        const transportList = transportType === 'courier' ? couriers : transports;
+        const transportName = party.default_transport_id
+            ? (transportList.find((t) => t.id === party.default_transport_id)?.name ?? form.data.transport_name)
+            : form.data.transport_name;
+
         form.setData({
             ...form.data,
             party_id: partyId,
@@ -246,6 +254,8 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
             phone: party.phone ?? form.data.phone,
             delivery_address: party.address ?? form.data.delivery_address,
             destination: party.city ? (party.state ? `${party.city}, ${party.state}` : party.city) : form.data.destination,
+            transport_type: transportType,
+            transport_name: transportName,
         });
         if (party.pan_no) setShowPan(true);
         setPartySearch(party.name);

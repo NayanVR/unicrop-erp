@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Party;
 use App\Models\PartyDocument;
 use App\Models\ProductRate;
+use App\Models\Transport;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -27,7 +28,10 @@ class PartyController extends Controller
             'active' => $parties->where('is_active', true)->count(),
         ];
 
-        return Inertia::render('erp/parties/index', compact('parties', 'stats'));
+        $transports = Transport::transports()->orderBy('name')->get(['id', 'name']);
+        $couriers = Transport::couriers()->orderBy('name')->get(['id', 'name']);
+
+        return Inertia::render('erp/parties/index', compact('parties', 'stats', 'transports', 'couriers'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -43,7 +47,9 @@ class PartyController extends Controller
             'city'    => 'nullable|string|max:100',
             'state'   => 'nullable|string|max:100',
             'pincode' => 'nullable|string|max:10',
-            'notes'   => 'nullable|string',
+            'notes'                  => 'nullable|string',
+            'default_transport_type' => 'nullable|in:transport,courier',
+            'default_transport_id'   => 'nullable|integer|exists:transports,id',
         ]);
 
         $data['created_by'] = $request->user()?->id;
@@ -65,8 +71,10 @@ class PartyController extends Controller
             'city'      => 'nullable|string|max:100',
             'state'     => 'nullable|string|max:100',
             'pincode'   => 'nullable|string|max:10',
-            'notes'     => 'nullable|string',
-            'is_active' => 'boolean',
+            'notes'                  => 'nullable|string',
+            'is_active'              => 'boolean',
+            'default_transport_type' => 'nullable|in:transport,courier',
+            'default_transport_id'   => 'nullable|integer|exists:transports,id',
         ]);
 
         $party->update($data);

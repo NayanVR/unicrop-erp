@@ -31,6 +31,8 @@ type PartyProduct = {
     gst_percent: string | number;
 };
 
+type Transport = { id: number; name: string };
+
 type Party = {
     id: number;
     name: string;
@@ -45,6 +47,8 @@ type Party = {
     pincode: string | null;
     notes: string | null;
     is_active: boolean;
+    default_transport_type: 'transport' | 'courier' | null;
+    default_transport_id: number | null;
     documents_count: number;
     product_rates: PartyProduct[];
     created_at: string;
@@ -55,6 +59,8 @@ type Stats = { total: number; customers: number; suppliers: number; active: numb
 type PageProps = {
     parties: Party[];
     stats: Stats;
+    transports: Transport[];
+    couriers: Transport[];
     flash?: { success?: string; error?: string };
 };
 
@@ -78,6 +84,8 @@ const defaultPartyForm = {
     state: '',
     pincode: '',
     notes: '',
+    default_transport_type: '' as '' | 'transport' | 'courier',
+    default_transport_id: '' as '' | number,
 };
 
 const defaultProductForm = {
@@ -89,7 +97,7 @@ const defaultProductForm = {
 };
 
 export default function PartiesIndex() {
-    const { parties, stats, flash } = usePage<PageProps>().props;
+    const { parties, stats, transports, couriers, flash } = usePage<PageProps>().props;
     const [showModal, setShowModal] = useState(false);
     const [editing, setEditing] = useState<Party | null>(null);
     const [selectedParty, setSelectedParty] = useState<Party | null>(null);
@@ -121,7 +129,7 @@ export default function PartiesIndex() {
 
     const openEdit = (p: Party) => {
         setEditing(p);
-        setData({ name: p.name, type: p.type, gst_no: p.gst_no ?? '', pan_no: p.pan_no ?? '', phone: p.phone ?? '', email: p.email ?? '', address: p.address ?? '', city: p.city ?? '', state: p.state ?? '', pincode: p.pincode ?? '', notes: p.notes ?? '' });
+        setData({ name: p.name, type: p.type, gst_no: p.gst_no ?? '', pan_no: p.pan_no ?? '', phone: p.phone ?? '', email: p.email ?? '', address: p.address ?? '', city: p.city ?? '', state: p.state ?? '', pincode: p.pincode ?? '', notes: p.notes ?? '', default_transport_type: p.default_transport_type ?? '', default_transport_id: p.default_transport_id ?? '' });
         setShowModal(true);
     };
 
@@ -332,6 +340,31 @@ export default function PartiesIndex() {
                                 <div className="form-group"><label>Pincode</label><input value={data.pincode} onChange={(e) => setData('pincode', e.target.value)} /></div>
                             </div>
                             <div className="form-group"><label>Notes</label><textarea value={data.notes} onChange={(e) => setData('notes', e.target.value)} rows={2} /></div>
+                            <div className="form-group">
+                                <label>Default Transport</label>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <select
+                                        value={data.default_transport_type}
+                                        onChange={(e) => setData({ ...data, default_transport_type: e.target.value as '' | 'transport' | 'courier', default_transport_id: '' })}
+                                        style={{ width: '130px', flexShrink: 0 }}
+                                    >
+                                        <option value="">— Type —</option>
+                                        <option value="transport">🚛 Transport</option>
+                                        <option value="courier">📦 Courier</option>
+                                    </select>
+                                    <select
+                                        value={data.default_transport_id}
+                                        onChange={(e) => setData('default_transport_id', e.target.value ? Number(e.target.value) : '')}
+                                        disabled={!data.default_transport_type}
+                                        style={{ flex: 1 }}
+                                    >
+                                        <option value="">— Select —</option>
+                                        {(data.default_transport_type === 'courier' ? couriers : transports).map((t) => (
+                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
                             <div className="modal-actions">
                                 <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
                                 <button type="submit" className="btn-primary" disabled={processing}>{processing ? 'Saving…' : editing ? 'Update' : 'Add Party'}</button>
