@@ -24,13 +24,13 @@ services:
       TRUSTED_PROXIES: "*"
       # S3 / Garage object storage
       FILESYSTEM_DISK: ${FILESYSTEM_DISK:-s3}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-garage}
       AWS_BUCKET: ${AWS_BUCKET:-unicrop-photos}
       AWS_ENDPOINT: ${AWS_ENDPOINT:-http://garage:3900}
       AWS_USE_PATH_STYLE_ENDPOINT: "true"
-      AWS_URL: ${AWS_URL}
+      AWS_URL: ${AWS_URL:-}
     volumes:
       - storage:/var/www/html/storage
     depends_on:
@@ -62,13 +62,13 @@ services:
       LOG_LEVEL: error
       # S3 / Garage object storage
       FILESYSTEM_DISK: ${FILESYSTEM_DISK:-s3}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-garage}
       AWS_BUCKET: ${AWS_BUCKET:-unicrop-photos}
       AWS_ENDPOINT: ${AWS_ENDPOINT:-http://garage:3900}
       AWS_USE_PATH_STYLE_ENDPOINT: "true"
-      AWS_URL: ${AWS_URL}
+      AWS_URL: ${AWS_URL:-}
     depends_on:
       mysql:
         condition: service_healthy
@@ -96,13 +96,13 @@ services:
       LOG_LEVEL: error
       # S3 / Garage object storage
       FILESYSTEM_DISK: ${FILESYSTEM_DISK:-s3}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-garage}
       AWS_BUCKET: ${AWS_BUCKET:-unicrop-photos}
       AWS_ENDPOINT: ${AWS_ENDPOINT:-http://garage:3900}
       AWS_USE_PATH_STYLE_ENDPOINT: "true"
-      AWS_URL: ${AWS_URL}
+      AWS_URL: ${AWS_URL:-}
     depends_on:
       mysql:
         condition: service_healthy
@@ -125,10 +125,12 @@ services:
     restart: unless-stopped
 
   garage:
-    image: dxflrs/garage:v1
+    image: dxflrs/garage:v0.9.4
     entrypoint: ["/bin/sh", "/garage-entrypoint.sh"]
     environment:
-      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET}
+      # Generate with: openssl rand -hex 32
+      # Must be the same value across all Garage nodes (single node here)
+      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:-b94f1e2d3a0c6e8f1b2d3a4c5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f}
     volumes:
       - ./docker/garage.toml:/etc/garage.toml
       - ./docker/garage-entrypoint.sh:/garage-entrypoint.sh:ro
