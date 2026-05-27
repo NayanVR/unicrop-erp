@@ -287,7 +287,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                 gst_percent: toNumber(row.gst_percent),
             })),
         }));
-        form.post(store(), { forceFormData: true, preserveScroll: true });
+        form.post(store().url, { forceFormData: true, preserveScroll: true });
     };
 
     const transportOptions = form.data.transport_type === 'courier' ? couriers : transports;
