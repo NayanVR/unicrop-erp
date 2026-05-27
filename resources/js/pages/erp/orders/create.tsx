@@ -1,6 +1,6 @@
 import { store } from '@/routes/orders';
 import { Head, useForm } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type SalesUser = { id: number; name: string };
 type TransportOption = { id: number; name: string };
@@ -84,6 +84,19 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
     const [rows, setRows] = useState<ProductRow[]>([createRow()]);
     const [showPan, setShowPan] = useState(false);
     const [showAadhaar, setShowAadhaar] = useState(false);
+    const [partySearch, setPartySearch] = useState('');
+    const [partyDropdownOpen, setPartyDropdownOpen] = useState(false);
+    const partyRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (partyRef.current && !partyRef.current.contains(e.target as Node)) {
+                setPartyDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
 
     const form = useForm<OrderFormData>({
         party_id: '',
@@ -110,6 +123,14 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         save_as_draft: false,
     });
 
+    const filteredParties = useMemo(
+        () =>
+            partySearch.trim()
+                ? parties.filter((p) => p.name.toLowerCase().includes(partySearch.toLowerCase()))
+                : parties,
+        [partySearch, parties],
+    );
+
     const totals = useMemo(() => {
         const subtotal = rows.reduce((acc, row) => acc + toNumber(row.quantity) * toNumber(row.rate), 0);
         const gstTotal = rows.reduce((acc, row) => {
@@ -133,6 +154,8 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
     const handlePartySelect = (partyId: string) => {
         if (!partyId) {
             form.setData('party_id', '');
+            setPartySearch('');
+            setPartyDropdownOpen(false);
             return;
         }
         const party = parties.find((p) => String(p.id) === partyId);
@@ -148,6 +171,14 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
             destination: party.city ? (party.state ? `${party.city}, ${party.state}` : party.city) : form.data.destination,
         });
         if (party.pan_no) setShowPan(true);
+        setPartySearch(party.name);
+        setPartyDropdownOpen(false);
+    };
+
+    const clearPartySearch = () => {
+        setPartySearch('');
+        form.setData('party_id', '');
+        setPartyDropdownOpen(false);
     };
 
     const setTransportType = (type: 'transport' | 'courier') => {
@@ -210,15 +241,41 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                         {/* Party selector */}
                         <div className="form-group" style={{ marginBottom: '14px' }}>
                             <label>Load from Party</label>
-                            <select
-                                value={form.data.party_id}
-                                onChange={(e) => handlePartySelect(e.target.value)}
-                            >
-                                <option value="">— Select party to auto-fill details —</option>
-                                {parties.map((p) => (
-                                    <option key={p.id} value={p.id}>{p.name}</option>
-                                ))}
-                            </select>
+                            <div className="party-search-wrap" ref={partyRef}>
+                                <input
+                                    type="text"
+                                    className="party-search-input"
+                                    placeholder="Search party name…"
+                                    value={partySearch}
+                                    autoComplete="off"
+                                    onChange={(e) => {
+                                        setPartySearch(e.target.value);
+                                        setPartyDropdownOpen(true);
+                                    }}
+                                    onFocus={() => setPartyDropdownOpen(true)}
+                                />
+                                {partySearch && (
+                                    <button type="button" className="party-search-clear" onClick={clearPartySearch}>✕</button>
+                                )}
+                                {partyDropdownOpen && (
+                                    <div className="party-dropdown">
+                                        {filteredParties.length > 0 ? (
+                                            filteredParties.map((p) => (
+                                                <div
+                                                    key={p.id}
+                                                    className={`party-dropdown-item${String(p.id) === form.data.party_id ? ' selected' : ''}`}
+                                                    onMouseDown={() => handlePartySelect(String(p.id))}
+                                                >
+                                                    {p.name}
+                                                    {p.city && <span className="party-dropdown-sub">{p.city}{p.state ? `, ${p.state}` : ''}</span>}
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="party-dropdown-empty">No parties found</div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         <div className="form-grid">
