@@ -37,8 +37,12 @@ class StoreOrderRequest extends FormRequest
         $requiredIfNotDraft = fn (array $rules) => $isDraft ? ['nullable', ...$rules] : ['required', ...$rules];
 
         return [
+            'party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
             'company_name' => $requiredIfNotDraft(['string', 'max:255']),
             'customer_name' => $requiredIfNotDraft(['string', 'max:255']),
+            'gst_no' => ['nullable', 'string', 'max:20'],
+            'pan_no' => ['nullable', 'string', 'max:20', 'required_with:pan_file'],
+            'aadhaar_no' => ['nullable', 'string', 'max:20', 'required_with:aadhaar_file'],
             'sales_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
             'order_date' => $requiredIfNotDraft(['date']),
             'transport_type' => ['nullable', Rule::in(['transport', 'courier'])],
@@ -64,11 +68,9 @@ class StoreOrderRequest extends FormRequest
             'items.*.shape' => ['nullable', 'string', 'max:100'],
             'items.*.cap_color' => ['nullable', 'string', 'max:100'],
             'attachments' => ['nullable', 'array', 'max:3'],
-            'attachments.*' => [
-                'file',
-                'max:5120',
-                'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png,txt',
-            ],
+            'attachments.*' => ['file', 'max:5120', 'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png,txt'],
+            'pan_file' => ['nullable', 'file', 'max:5120', 'mimes:pdf,jpg,jpeg,png', 'required_with:pan_no'],
+            'aadhaar_file' => ['nullable', 'file', 'max:5120', 'mimes:pdf,jpg,jpeg,png', 'required_with:aadhaar_no'],
             'save_as_draft' => ['nullable', 'boolean'],
         ];
     }

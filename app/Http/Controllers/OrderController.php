@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreOrderRequest;
 use App\Http\Requests\UpdateOrderRequest;
 use App\Models\Order;
+use App\Models\Party;
 use App\Models\Role;
 use App\Models\Transport;
 use App\Models\User;
@@ -57,6 +58,8 @@ class OrderController extends Controller
             'salesUsers' => $salesUsers,
             'transports' => Transport::transports()->orderBy('name')->get(['id', 'name']),
             'couriers' => Transport::couriers()->orderBy('name')->get(['id', 'name']),
+            'parties' => Party::where('is_active', true)->orderBy('name')
+                ->get(['id', 'name', 'gst_no', 'pan_no', 'phone', 'address', 'city', 'state']),
             'currentUser' => ['id' => $user?->id, 'name' => $user?->name],
         ]);
     }
@@ -78,8 +81,12 @@ class OrderController extends Controller
 
             $order = Order::create([
                 'order_number' => $orderNumber,
+                'party_id' => $data['party_id'] ?? null,
                 'company_name' => $data['company_name'] ?? 'Draft',
                 'customer_name' => $data['customer_name'] ?? 'Draft',
+                'gst_no' => $data['gst_no'] ?? null,
+                'pan_no' => $data['pan_no'] ?? null,
+                'aadhaar_no' => $data['aadhaar_no'] ?? null,
                 'sales_user_id' => $data['sales_user_id'] ?? $user?->id,
                 'created_by' => $user?->id,
                 'order_date' => $data['order_date'] ?? ($saveAsDraft ? null : now()->toDateString()),
@@ -222,20 +229,31 @@ class OrderController extends Controller
 
     private function storeAttachments(Order $order, Request $request): void
     {
-        if (! $request->hasFile('attachments')) {
-            return;
-        }
-
         $attachments = [];
+
         foreach ($request->file('attachments', []) as $file) {
             $path = $file->store('orders/'.$order->id, 'public');
-
             $attachments[] = [
                 'original_name' => $file->getClientOriginalName(),
                 'path' => $path,
                 'mime_type' => $file->getClientMimeType() ?? 'application/octet-stream',
                 'size' => $file->getSize(),
+                'document_type' => null,
             ];
+        }
+
+        foreach (['pan_file' => 'pan', 'aadhaar_file' => 'aadhaar'] as $field => $docType) {
+            if ($request->hasFile($field)) {
+                $file = $request->file($field);
+                $path = $file->store('orders/'.$order->id.'/kyc', 'public');
+                $attachments[] = [
+                    'original_name' => $file->getClientOriginalName(),
+                    'path' => $path,
+                    'mime_type' => $file->getClientMimeType() ?? 'application/octet-stream',
+                    'size' => $file->getSize(),
+                    'document_type' => $docType,
+                ];
+            }
         }
 
         if ($attachments) {

@@ -2,14 +2,17 @@ import { store } from '@/routes/orders';
 import { Head, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
-type SalesUser = {
+type SalesUser = { id: number; name: string };
+type TransportOption = { id: number; name: string };
+type Party = {
     id: number;
     name: string;
-};
-
-type TransportOption = {
-    id: number;
-    name: string;
+    gst_no?: string | null;
+    pan_no?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    city?: string | null;
+    state?: string | null;
 };
 
 type Props = {
@@ -17,6 +20,7 @@ type Props = {
     salesUsers: SalesUser[];
     transports: TransportOption[];
     couriers: TransportOption[];
+    parties: Party[];
     currentUser: { id: number; name: string };
 };
 
@@ -33,8 +37,12 @@ type ProductRow = {
 };
 
 type OrderFormData = {
+    party_id: string;
     company_name: string;
     customer_name: string;
+    gst_no: string;
+    pan_no: string;
+    aadhaar_no: string;
     sales_user_id: string;
     order_date: string;
     transport_type: 'transport' | 'courier';
@@ -48,6 +56,8 @@ type OrderFormData = {
     courier_amount: string;
     round_off: string;
     attachments: File[] | null;
+    pan_file: File | null;
+    aadhaar_file: File | null;
     save_as_draft: boolean;
 };
 
@@ -70,12 +80,18 @@ const toNumber = (value: string) => {
 
 const todayDate = () => new Date().toISOString().split('T')[0];
 
-export default function OrdersCreate({ salesUsers, transports, couriers, currentUser }: Props) {
+export default function OrdersCreate({ salesUsers, transports, couriers, parties, currentUser }: Props) {
     const [rows, setRows] = useState<ProductRow[]>([createRow()]);
+    const [showPan, setShowPan] = useState(false);
+    const [showAadhaar, setShowAadhaar] = useState(false);
 
     const form = useForm<OrderFormData>({
+        party_id: '',
         company_name: '',
         customer_name: '',
+        gst_no: '',
+        pan_no: '',
+        aadhaar_no: '',
         sales_user_id: String(currentUser.id),
         order_date: todayDate(),
         transport_type: 'transport',
@@ -89,6 +105,8 @@ export default function OrdersCreate({ salesUsers, transports, couriers, current
         courier_amount: '0',
         round_off: '0',
         attachments: null,
+        pan_file: null,
+        aadhaar_file: null,
         save_as_draft: false,
     });
 
@@ -107,19 +125,43 @@ export default function OrdersCreate({ salesUsers, transports, couriers, current
     const updateRow = (index: number, field: keyof ProductRow, value: string) => {
         setRows((current) => current.map((row, idx) => idx === index ? { ...row, [field]: value } : row));
     };
-
     const addRow = () => setRows((current) => [...current, createRow()]);
-
     const removeRow = (index: number) => {
         setRows((current) => current.length > 1 ? current.filter((_, idx) => idx !== index) : current);
     };
 
-    const handleAttachments = (files: FileList | null) => {
-        form.setData('attachments', files ? Array.from(files) : null);
+    const handlePartySelect = (partyId: string) => {
+        if (!partyId) {
+            form.setData('party_id', '');
+            return;
+        }
+        const party = parties.find((p) => String(p.id) === partyId);
+        if (!party) return;
+        form.setData({
+            ...form.data,
+            party_id: partyId,
+            company_name: party.name,
+            gst_no: party.gst_no ?? '',
+            pan_no: party.pan_no ?? '',
+            phone: party.phone ?? form.data.phone,
+            delivery_address: party.address ?? form.data.delivery_address,
+            destination: party.city ? (party.state ? `${party.city}, ${party.state}` : party.city) : form.data.destination,
+        });
+        if (party.pan_no) setShowPan(true);
     };
 
     const setTransportType = (type: 'transport' | 'courier') => {
         form.setData({ ...form.data, transport_type: type, transport_name: '' });
+    };
+
+    const togglePan = (checked: boolean) => {
+        setShowPan(checked);
+        if (!checked) form.setData({ ...form.data, pan_no: '', pan_file: null });
+    };
+
+    const toggleAadhaar = (checked: boolean) => {
+        setShowAadhaar(checked);
+        if (!checked) form.setData({ ...form.data, aadhaar_no: '', aadhaar_file: null });
     };
 
     const submit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -127,6 +169,10 @@ export default function OrdersCreate({ salesUsers, transports, couriers, current
         form.transform((data) => ({
             ...data,
             sales_user_id: data.sales_user_id || null,
+            pan_no: showPan ? data.pan_no : null,
+            aadhaar_no: showAadhaar ? data.aadhaar_no : null,
+            pan_file: showPan ? data.pan_file : null,
+            aadhaar_file: showAadhaar ? data.aadhaar_file : null,
             items: rows.map((row) => ({
                 ...row,
                 quantity: toNumber(row.quantity),
@@ -157,8 +203,24 @@ export default function OrdersCreate({ salesUsers, transports, couriers, current
                         </div>
                     )}
 
+                    {/* ── Order Details ── */}
                     <div className="form-card">
                         <div className="form-card-title">Order Details</div>
+
+                        {/* Party selector */}
+                        <div className="form-group" style={{ marginBottom: '14px' }}>
+                            <label>Load from Party</label>
+                            <select
+                                value={form.data.party_id}
+                                onChange={(e) => handlePartySelect(e.target.value)}
+                            >
+                                <option value="">— Select party to auto-fill details —</option>
+                                {parties.map((p) => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
                         <div className="form-grid">
                             <div className="form-group">
                                 <label>Company Name *</label>
@@ -181,6 +243,26 @@ export default function OrdersCreate({ salesUsers, transports, couriers, current
                                     placeholder="Contact person"
                                 />
                                 {form.errors.customer_name && <span className="field-error">{form.errors.customer_name}</span>}
+                            </div>
+                            <div className="form-group">
+                                <label>GST Number</label>
+                                <input
+                                    type="text"
+                                    value={form.data.gst_no}
+                                    onChange={(e) => form.setData('gst_no', e.target.value.toUpperCase())}
+                                    placeholder="e.g. 24AABCU9603R1ZX"
+                                    maxLength={20}
+                                />
+                                {form.errors.gst_no && <span className="field-error">{form.errors.gst_no}</span>}
+                            </div>
+                            <div className="form-group">
+                                <label>Phone</label>
+                                <input
+                                    type="tel"
+                                    value={form.data.phone}
+                                    onChange={(e) => form.setData('phone', e.target.value)}
+                                    placeholder="Contact number"
+                                />
                             </div>
                             <div className="form-group">
                                 <label>Sales Person</label>
@@ -280,15 +362,6 @@ export default function OrdersCreate({ salesUsers, transports, couriers, current
                                 {form.errors.delivery_address && <span className="field-error">{form.errors.delivery_address}</span>}
                             </div>
                             <div className="form-group">
-                                <label>Phone</label>
-                                <input
-                                    type="tel"
-                                    value={form.data.phone}
-                                    onChange={(e) => form.setData('phone', e.target.value)}
-                                    placeholder="Contact number"
-                                />
-                            </div>
-                            <div className="form-group">
                                 <label>Priority</label>
                                 <select
                                     value={form.data.priority}
@@ -302,6 +375,88 @@ export default function OrdersCreate({ salesUsers, transports, couriers, current
                         </div>
                     </div>
 
+                    {/* ── KYC Documents ── */}
+                    <div className="form-card">
+                        <div className="form-card-title">🪪 KYC Documents</div>
+
+                        {/* PAN Card */}
+                        <div style={{ marginBottom: '16px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '10px' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={showPan}
+                                    onChange={(e) => togglePan(e.target.checked)}
+                                />
+                                <span style={{ fontWeight: 600, fontSize: '13px' }}>Include PAN Card details</span>
+                            </label>
+                            {showPan && (
+                                <div className="form-grid" style={{ marginLeft: '24px' }}>
+                                    <div className="form-group">
+                                        <label>PAN Number *</label>
+                                        <input
+                                            type="text"
+                                            className={form.errors.pan_no ? 'error' : ''}
+                                            value={form.data.pan_no}
+                                            onChange={(e) => form.setData('pan_no', e.target.value.toUpperCase())}
+                                            placeholder="e.g. ABCDE1234F"
+                                            maxLength={10}
+                                        />
+                                        {form.errors.pan_no && <span className="field-error">{form.errors.pan_no}</span>}
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Upload PAN Card * (PDF, JPG, PNG)</label>
+                                        <input
+                                            type="file"
+                                            className={form.errors.pan_file ? 'error' : ''}
+                                            accept=".pdf,.jpg,.jpeg,.png"
+                                            onChange={(e) => form.setData('pan_file', e.target.files?.[0] ?? null)}
+                                        />
+                                        {form.errors.pan_file && <span className="field-error">{form.errors.pan_file}</span>}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Aadhaar Card */}
+                        <div>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '10px' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={showAadhaar}
+                                    onChange={(e) => toggleAadhaar(e.target.checked)}
+                                />
+                                <span style={{ fontWeight: 600, fontSize: '13px' }}>Include Aadhaar Card details</span>
+                            </label>
+                            {showAadhaar && (
+                                <div className="form-grid" style={{ marginLeft: '24px' }}>
+                                    <div className="form-group">
+                                        <label>Aadhaar Number *</label>
+                                        <input
+                                            type="text"
+                                            className={form.errors.aadhaar_no ? 'error' : ''}
+                                            value={form.data.aadhaar_no}
+                                            onChange={(e) => form.setData('aadhaar_no', e.target.value.replace(/\D/g, '').slice(0, 12))}
+                                            placeholder="12-digit Aadhaar number"
+                                            maxLength={12}
+                                        />
+                                        {form.errors.aadhaar_no && <span className="field-error">{form.errors.aadhaar_no}</span>}
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Upload Aadhaar Card * (PDF, JPG, PNG)</label>
+                                        <input
+                                            type="file"
+                                            className={form.errors.aadhaar_file ? 'error' : ''}
+                                            accept=".pdf,.jpg,.jpeg,.png"
+                                            onChange={(e) => form.setData('aadhaar_file', e.target.files?.[0] ?? null)}
+                                        />
+                                        {form.errors.aadhaar_file && <span className="field-error">{form.errors.aadhaar_file}</span>}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* ── Products ── */}
                     <div className="form-card">
                         <div className="form-card-title">Products</div>
                         <div className="prod-wrap">
@@ -343,6 +498,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, current
                         <button type="button" className="add-row-btn" onClick={addRow}>＋ Add Row</button>
                     </div>
 
+                    {/* ── Charges & Notes ── */}
                     <div className="form-card">
                         <div className="form-card-title">Charges &amp; Notes</div>
                         <div className="form-grid three">
@@ -371,14 +527,16 @@ export default function OrdersCreate({ salesUsers, transports, couriers, current
                         </div>
                     </div>
 
+                    {/* ── Attachments ── */}
                     <div className="form-card">
                         <div className="form-card-title">Attachments</div>
                         <div className="form-group">
                             <label>Upload Files (max 3)</label>
-                            <input type="file" multiple onChange={(e) => handleAttachments(e.target.files)} />
+                            <input type="file" multiple onChange={(e) => form.setData('attachments', e.target.files ? Array.from(e.target.files) : null)} />
                         </div>
                     </div>
 
+                    {/* ── Order Summary ── */}
                     <div className="form-card">
                         <div className="form-card-title">Order Summary</div>
                         <div className="form-grid three">

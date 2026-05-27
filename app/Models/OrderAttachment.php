@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'path',
     'mime_type',
     'size',
+    'document_type',
 ])]
 class OrderAttachment extends Model
 {

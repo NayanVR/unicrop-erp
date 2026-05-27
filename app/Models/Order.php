@@ -11,8 +11,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'order_number',
+    'party_id',
     'company_name',
     'customer_name',
+    'gst_no',
+    'pan_no',
+    'aadhaar_no',
     'sales_user_id',
     'created_by',
     'confirmed_by',
