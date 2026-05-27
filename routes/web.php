@@ -59,10 +59,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::patch('erp/settings/transports/{transport}', [SettingsController::class, 'updateTransport'])->name('settings.transports.update');
 
-        Route::post('erp/settings/product-rates', [SettingsController::class, 'storeProductRate'])->name('settings.product-rates.store');
-        Route::patch('erp/settings/product-rates/{productRate}', [SettingsController::class, 'updateProductRate'])->name('settings.product-rates.update');
-        Route::delete('erp/settings/product-rates/{productRate}', [SettingsController::class, 'destroyProductRate'])->name('settings.product-rates.destroy');
-
         Route::get('purchase-bills', [PurchaseBillController::class, 'index'])->name('purchase-bills.index');
         Route::post('purchase-bills', [PurchaseBillController::class, 'store'])->name('purchase-bills.store');
         Route::patch('purchase-bills/{bill}', [PurchaseBillController::class, 'update'])->name('purchase-bills.update');
@@ -98,6 +94,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('parties/{party}', [PartyController::class, 'destroy'])->name('parties.destroy');
         Route::post('parties/{party}/documents', [PartyController::class, 'uploadDocument'])->name('parties.documents.upload');
         Route::delete('parties/documents/{document}', [PartyController::class, 'deleteDocument'])->name('parties.documents.destroy');
+        Route::post('parties/{party}/product-rates', [PartyController::class, 'storeProductRate'])->name('parties.product-rates.store');
+        Route::patch('parties/product-rates/{productRate}', [PartyController::class, 'updateProductRate'])->name('parties.product-rates.update');
+        Route::delete('parties/product-rates/{productRate}', [PartyController::class, 'destroyProductRate'])->name('parties.product-rates.destroy');
     });
 });
 

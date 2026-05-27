@@ -4,11 +4,6 @@ import {
     update as productUpdate,
 } from '@/routes/settings/products';
 import {
-    destroy as rateDestroy,
-    store as rateStore,
-    update as rateUpdate,
-} from '@/routes/settings/product-rates';
-import {
     destroy as transportDestroy,
     store as transportStore,
     update as transportUpdate,
@@ -33,20 +28,9 @@ type TransportEntry = {
     is_active: boolean;
 };
 
-type ProductRate = {
-    id: number;
-    our_brand: string;
-    party_brand: string | null;
-    packing_size: string;
-    rate: string | number;
-    gst_percent: string | number;
-    is_active: boolean;
-};
-
 type Props = {
     products: Product[];
     transports: TransportEntry[];
-    productRates: ProductRate[];
 };
 
 type ProductForm = {
@@ -63,27 +47,15 @@ type TransportForm = {
     type: 'transport' | 'courier';
 };
 
-type RateForm = {
-    our_brand: string;
-    party_brand: string;
-    packing_size: string;
-    rate: string;
-    gst_percent: string;
-};
-
 const GST_OPTIONS = ['0', '5', '12', '18', '28'];
 
-export default function SettingsIndex({ products, transports, productRates }: Props) {
+export default function SettingsIndex({ products, transports }: Props) {
     const [modalOpen, setModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
     const [transportModalOpen, setTransportModalOpen] = useState(false);
     const [editingTransport, setEditingTransport] = useState<TransportEntry | null>(null);
     const [transportTab, setTransportTab] = useState<'transport' | 'courier'>('transport');
-
-    const [rateModalOpen, setRateModalOpen] = useState(false);
-    const [editingRate, setEditingRate] = useState<ProductRate | null>(null);
-    const [rateBrandFilter, setRateBrandFilter] = useState('');
 
     const form = useForm<ProductForm>({
         name: '',
@@ -97,14 +69,6 @@ export default function SettingsIndex({ products, transports, productRates }: Pr
     const transportForm = useForm<TransportForm>({
         name: '',
         type: 'transport',
-    });
-
-    const rateForm = useForm<RateForm>({
-        our_brand: '',
-        party_brand: '',
-        packing_size: '',
-        rate: '',
-        gst_percent: '18',
     });
 
     // ── Product handlers ──────────────────────────────────────────────────
@@ -182,52 +146,7 @@ export default function SettingsIndex({ products, transports, productRates }: Pr
         transportForm.delete(transportDestroy(t.id).url, { preserveScroll: true });
     };
 
-    // ── Product Rate handlers ─────────────────────────────────────────────
-    const openNewRate = () => {
-        rateForm.reset();
-        rateForm.clearErrors();
-        setEditingRate(null);
-        setRateModalOpen(true);
-    };
-
-    const openEditRate = (r: ProductRate) => {
-        rateForm.setData({
-            our_brand: r.our_brand,
-            party_brand: r.party_brand ?? '',
-            packing_size: r.packing_size,
-            rate: String(r.rate),
-            gst_percent: String(r.gst_percent),
-        });
-        rateForm.clearErrors();
-        setEditingRate(r);
-        setRateModalOpen(true);
-    };
-
-    const closeRateModal = () => {
-        setRateModalOpen(false);
-        rateForm.reset();
-        setEditingRate(null);
-    };
-
-    const saveRate = () => {
-        if (editingRate) {
-            rateForm.patch(rateUpdate(editingRate.id).url, { preserveScroll: true, onSuccess: closeRateModal });
-        } else {
-            rateForm.post(rateStore().url, { preserveScroll: true, onSuccess: closeRateModal });
-        }
-    };
-
-    const deleteRate = (r: ProductRate) => {
-        if (!confirm(`Delete rate for "${r.our_brand} – ${r.packing_size}"?`)) return;
-        rateForm.delete(rateDestroy(r.id).url, { preserveScroll: true });
-    };
-
     const filteredTransports = transports.filter((t) => t.type === transportTab);
-
-    const brandOptions = [...new Set(productRates.map((r) => r.our_brand))].sort();
-    const filteredRates = rateBrandFilter
-        ? productRates.filter((r) => r.our_brand === rateBrandFilter)
-        : productRates;
 
     return (
         <>
@@ -297,66 +216,7 @@ export default function SettingsIndex({ products, transports, productRates }: Pr
                     )}
                 </div>
 
-                {/* Brand & Rates */}
-                <div className="card" style={{ marginTop: '16px' }}>
-                    <div className="card-title" style={{ marginBottom: '12px' }}>
-                        💰 Brand &amp; Rates
-                        <span className="ct-badge">{productRates.length} entries</span>
-                    </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
-                        <select
-                            value={rateBrandFilter}
-                            onChange={(e) => setRateBrandFilter(e.target.value)}
-                            style={{ fontSize: '13px', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--tx-body)' }}
-                        >
-                            <option value="">All Brands</option>
-                            {brandOptions.map((b) => <option key={b} value={b}>{b}</option>)}
-                        </select>
-                        <button className="btn primary" style={{ padding: '6px 14px', fontSize: '12px' }} onClick={openNewRate}>
-                            ＋ Add Rate
-                        </button>
-                    </div>
-
-                    {filteredRates.length === 0 ? (
-                        <div className="empty-state" style={{ padding: '28px 20px' }}>
-                            <div className="icon">💰</div>
-                            <p>No brand rates added yet. Add your first brand &amp; packing rate.</p>
-                        </div>
-                    ) : (
-                        <div className="prod-wrap">
-                            <table className="prod-table">
-                                <thead>
-                                    <tr>
-                                        <th>Our Brand</th>
-                                        <th>Party Brand</th>
-                                        <th>Packing Size</th>
-                                        <th>Rate (₹)</th>
-                                        <th>GST %</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredRates.map((r) => (
-                                        <tr key={r.id}>
-                                            <td><div className="prod-name">{r.our_brand}</div></td>
-                                            <td>{r.party_brand ?? '—'}</td>
-                                            <td><span className="badge sky">{r.packing_size}</span></td>
-                                            <td style={{ fontWeight: 600 }}>₹{Number(r.rate).toFixed(2)}</td>
-                                            <td>{r.gst_percent}%</td>
-                                            <td>
-                                                <div style={{ display: 'flex', gap: '6px' }}>
-                                                    <button className="btn sm" onClick={() => openEditRate(r)}>Edit</button>
-                                                    <button className="btn danger-xs" onClick={() => deleteRate(r)}>Delete</button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
 
                 {/* Transports & Couriers */}
                 <div className="card" style={{ marginTop: '16px' }}>
@@ -465,60 +325,6 @@ export default function SettingsIndex({ products, transports, productRates }: Pr
                         <button className="btn" onClick={closeModal}>Cancel</button>
                         <button className="btn primary" onClick={save} disabled={form.processing}>
                             {editingProduct ? 'Update' : 'Add Product'}
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Brand Rate Modal */}
-            <div className={`modal-overlay${rateModalOpen ? ' open' : ''}`}>
-                <div className="modal" style={{ maxWidth: '480px' }}>
-                    <div className="modal-header">
-                        <h2>{editingRate ? 'Edit Rate' : 'Add Brand Rate'}</h2>
-                        <button className="modal-close" onClick={closeRateModal}>✕</button>
-                    </div>
-                    <div className="modal-body">
-                        <div className="form-grid">
-                            <div className="form-group">
-                                <label>Our Brand *</label>
-                                <input
-                                    type="text"
-                                    list="brand-list"
-                                    value={rateForm.data.our_brand}
-                                    onChange={(e) => rateForm.setData('our_brand', e.target.value)}
-                                    placeholder="Our product brand name"
-                                />
-                                <datalist id="brand-list">
-                                    {brandOptions.map((b) => <option key={b} value={b} />)}
-                                </datalist>
-                                {rateForm.errors.our_brand && <span className="field-error">{rateForm.errors.our_brand}</span>}
-                            </div>
-                            <div className="form-group">
-                                <label>Party Brand</label>
-                                <input type="text" value={rateForm.data.party_brand} onChange={(e) => rateForm.setData('party_brand', e.target.value)} placeholder="Customer-facing brand name" />
-                            </div>
-                            <div className="form-group">
-                                <label>Packing Size *</label>
-                                <input type="text" value={rateForm.data.packing_size} onChange={(e) => rateForm.setData('packing_size', e.target.value)} placeholder="e.g. 500ml, 1ltr, 250gm" />
-                                {rateForm.errors.packing_size && <span className="field-error">{rateForm.errors.packing_size}</span>}
-                            </div>
-                            <div className="form-group">
-                                <label>Rate (₹) *</label>
-                                <input type="number" value={rateForm.data.rate} onChange={(e) => rateForm.setData('rate', e.target.value)} min="0" step="0.01" placeholder="0.00" />
-                                {rateForm.errors.rate && <span className="field-error">{rateForm.errors.rate}</span>}
-                            </div>
-                            <div className="form-group">
-                                <label>GST %</label>
-                                <select value={rateForm.data.gst_percent} onChange={(e) => rateForm.setData('gst_percent', e.target.value)}>
-                                    {GST_OPTIONS.map((g) => <option key={g} value={g}>{g}%</option>)}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="modal-footer">
-                        <button className="btn" onClick={closeRateModal}>Cancel</button>
-                        <button className="btn primary" onClick={saveRate} disabled={rateForm.processing}>
-                            {editingRate ? 'Update' : 'Add Rate'}
                         </button>
                     </div>
                 </div>

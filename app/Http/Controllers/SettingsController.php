@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
-use App\Models\ProductRate;
 use App\Models\Transport;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,7 +17,6 @@ class SettingsController extends Controller
             'pageTitle' => 'Settings',
             'products' => Product::query()->orderBy('name')->get(),
             'transports' => Transport::query()->orderBy('type')->orderBy('name')->get(),
-            'productRates' => ProductRate::query()->orderBy('our_brand')->orderBy('packing_size')->get(),
         ]);
     }
 
@@ -89,46 +87,5 @@ class SettingsController extends Controller
         $transport->delete();
 
         return redirect()->back()->with('success', 'Deleted.');
-    }
-
-    public function storeProductRate(Request $request): RedirectResponse
-    {
-        $data = $request->validate([
-            'our_brand'   => 'required|string|max:255',
-            'party_brand' => 'nullable|string|max:255',
-            'packing_size' => 'required|string|max:50',
-            'rate'        => 'required|numeric|min:0',
-            'gst_percent' => 'required|numeric|min:0|max:100',
-        ]);
-
-        ProductRate::updateOrCreate(
-            ['our_brand' => $data['our_brand'], 'packing_size' => $data['packing_size']],
-            $data
-        );
-
-        return redirect()->back()->with('success', 'Rate saved.');
-    }
-
-    public function updateProductRate(Request $request, ProductRate $productRate): RedirectResponse
-    {
-        $data = $request->validate([
-            'our_brand'   => 'required|string|max:255',
-            'party_brand' => 'nullable|string|max:255',
-            'packing_size' => 'required|string|max:50',
-            'rate'        => 'required|numeric|min:0',
-            'gst_percent' => 'required|numeric|min:0|max:100',
-            'is_active'   => 'boolean',
-        ]);
-
-        $productRate->update($data);
-
-        return redirect()->back()->with('success', 'Rate updated.');
-    }
-
-    public function destroyProductRate(ProductRate $productRate): RedirectResponse
-    {
-        $productRate->delete();
-
-        return redirect()->back()->with('success', 'Rate deleted.');
     }
 }

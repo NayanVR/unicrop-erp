@@ -1767,6 +1767,8 @@ html.dark .badge.indigo {
     border-top: 3px solid var(--accent);
     border: 1px solid var(--border);
 }
+.modal.modal-lg { max-width: 680px; }
+.modal.modal-xl { max-width: 860px; }
 @keyframes modalIn {
     from {
         opacity: 0;

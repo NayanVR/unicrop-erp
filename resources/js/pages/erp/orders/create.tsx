@@ -4,6 +4,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 type SalesUser = { id: number; name: string };
 type TransportOption = { id: number; name: string };
+type ProductRate = {
+    our_brand: string;
+    party_brand: string | null;
+    packing_size: string;
+    rate: string | number;
+    gst_percent: string | number;
+};
+
 type Party = {
     id: number;
     name: string;
@@ -13,13 +21,7 @@ type Party = {
     address?: string | null;
     city?: string | null;
     state?: string | null;
-};
-type ProductRate = {
-    our_brand: string;
-    party_brand: string | null;
-    packing_size: string;
-    rate: string | number;
-    gst_percent: string | number;
+    product_rates: ProductRate[];
 };
 
 type Props = {
@@ -28,7 +30,6 @@ type Props = {
     transports: TransportOption[];
     couriers: TransportOption[];
     parties: Party[];
-    productRates: ProductRate[];
     currentUser: { id: number; name: string };
 };
 
@@ -117,7 +118,7 @@ const toNumber = (value: string) => {
 
 const todayDate = () => new Date().toISOString().split('T')[0];
 
-export default function OrdersCreate({ salesUsers, transports, couriers, parties, productRates, currentUser }: Props) {
+export default function OrdersCreate({ salesUsers, transports, couriers, parties, currentUser }: Props) {
     const [rows, setRows] = useState<ProductRow[]>([createRow()]);
     const [showPan, setShowPan] = useState(false);
     const [showAadhaar, setShowAadhaar] = useState(false);
@@ -168,9 +169,15 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         [partySearch, parties],
     );
 
+    // Rates from the currently selected party
+    const partyRates = useMemo(() => {
+        if (!form.data.party_id) return [];
+        return parties.find((p) => String(p.id) === form.data.party_id)?.product_rates ?? [];
+    }, [form.data.party_id, parties]);
+
     const brandOptions = useMemo(
-        () => [...new Set(productRates.map((r) => r.our_brand))].sort(),
-        [productRates],
+        () => [...new Set(partyRates.map((r) => r.our_brand))].sort(),
+        [partyRates],
     );
 
     const totals = useMemo(() => {
@@ -192,27 +199,18 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                 let updated = { ...row, [field]: value };
 
                 if (field === 'our_brand') {
-                    const match = productRates.find(
+                    const match = partyRates.find(
                         (r) => r.our_brand.toLowerCase() === value.toLowerCase(),
                     );
-                    if (match) {
-                        updated.party_brand = match.party_brand ?? '';
-                    }
-                    // Reset size & rate when brand changes
-                    if (row.our_brand !== value) {
-                        updated.packing_size = '';
-                        updated.rate = '';
-                    }
+                    if (match) updated.party_brand = match.party_brand ?? '';
+                    if (row.our_brand !== value) { updated.packing_size = ''; updated.rate = ''; }
                 } else if (field === 'packing_size') {
-                    const match = productRates.find(
+                    const match = partyRates.find(
                         (r) =>
                             r.our_brand.toLowerCase() === row.our_brand.toLowerCase() &&
                             r.packing_size.toLowerCase() === value.toLowerCase(),
                     );
-                    if (match) {
-                        updated.rate = String(match.rate);
-                        updated.gst_percent = String(match.gst_percent);
-                    }
+                    if (match) { updated.rate = String(match.rate); updated.gst_percent = String(match.gst_percent); }
                 }
 
                 return updated;
@@ -607,7 +605,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                 </thead>
                                 <tbody>
                                     {rows.map((row, index) => {
-                                        const sizeOptions = productRates.filter(
+                                        const sizeOptions = partyRates.filter(
                                             (r) => r.our_brand.toLowerCase() === row.our_brand.toLowerCase(),
                                         );
                                         const qty = toNumber(row.quantity);
@@ -646,7 +644,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                                         placeholder="500ml"
                                                     />
                                                     <datalist id={`sizes-${index}`}>
-                                                        {(sizeOptions.length > 0 ? sizeOptions : productRates).map((r) => (
+                                                        {(sizeOptions.length > 0 ? sizeOptions : partyRates).map((r) => (
                                                             <option key={r.packing_size} value={r.packing_size} />
                                                         ))}
                                                     </datalist>

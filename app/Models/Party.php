@@ -37,4 +37,12 @@ class Party extends Model
     {
         return $this->hasMany(PartyDocument::class);
     }
+
+    /**
+     * @return HasMany<ProductRate>
+     */
+    public function productRates(): HasMany
+    {
+        return $this->hasMany(ProductRate::class);
+    }
 }

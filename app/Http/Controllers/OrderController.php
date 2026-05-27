@@ -6,7 +6,6 @@ use App\Http\Requests\StoreOrderRequest;
 use App\Http\Requests\UpdateOrderRequest;
 use App\Models\Order;
 use App\Models\Party;
-use App\Models\ProductRate;
 use App\Models\Role;
 use App\Models\Transport;
 use App\Models\User;
@@ -60,11 +59,9 @@ class OrderController extends Controller
             'transports' => Transport::transports()->orderBy('name')->get(['id', 'name']),
             'couriers' => Transport::couriers()->orderBy('name')->get(['id', 'name']),
             'parties' => Party::where('is_active', true)->orderBy('name')
+                ->with(['productRates' => fn ($q) => $q->where('is_active', true)->orderBy('our_brand')->orderBy('packing_size')])
                 ->get(['id', 'name', 'gst_no', 'pan_no', 'phone', 'address', 'city', 'state']),
             'currentUser' => ['id' => $user?->id, 'name' => $user?->name],
-            'productRates' => ProductRate::where('is_active', true)
-                ->orderBy('our_brand')->orderBy('packing_size')
-                ->get(['our_brand', 'party_brand', 'packing_size', 'rate', 'gst_percent']),
         ]);
     }
 
