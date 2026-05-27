@@ -189,7 +189,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         const freight = toNumber(form.data.freight_amount);
         const courier = toNumber(form.data.courier_amount);
         const roundOff = toNumber(form.data.round_off);
-        return { subtotal, gstTotal, total: subtotal + gstTotal + freight + courier + roundOff };
+        return { subtotal, gstTotal, freight, courier, roundOff, total: subtotal + gstTotal + freight + courier + roundOff };
     }, [rows, form.data.freight_amount, form.data.courier_amount, form.data.round_off]);
 
     const updateRow = (index: number, field: keyof ProductRow, value: string) => {
@@ -723,18 +723,36 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                     {/* ── Order Summary ── */}
                     <div className="form-card">
                         <div className="form-card-title">Order Summary</div>
-                        <div className="form-grid three">
-                            <div className="form-group">
-                                <label>Subtotal</label>
-                                <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--tx-head)' }}>{totals.subtotal.toFixed(2)}</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '4px 0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--tx-sub)' }}>
+                                <span>Subtotal</span>
+                                <span style={{ fontWeight: 500, color: 'var(--tx-head)' }}>₹{totals.subtotal.toFixed(2)}</span>
                             </div>
-                            <div className="form-group">
-                                <label>GST Total</label>
-                                <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--tx-head)' }}>{totals.gstTotal.toFixed(2)}</div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--tx-sub)' }}>
+                                <span>GST Total</span>
+                                <span style={{ fontWeight: 500, color: 'var(--tx-head)' }}>₹{totals.gstTotal.toFixed(2)}</span>
                             </div>
-                            <div className="form-group">
-                                <label>Grand Total</label>
-                                <div style={{ fontWeight: 700, fontSize: '18px', color: 'var(--accent)' }}>{totals.total.toFixed(2)}</div>
+                            {totals.freight !== 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--tx-sub)' }}>
+                                    <span>Freight</span>
+                                    <span style={{ fontWeight: 500, color: 'var(--tx-head)' }}>₹{totals.freight.toFixed(2)}</span>
+                                </div>
+                            )}
+                            {totals.courier !== 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--tx-sub)' }}>
+                                    <span>Courier Charge</span>
+                                    <span style={{ fontWeight: 500, color: 'var(--tx-head)' }}>₹{totals.courier.toFixed(2)}</span>
+                                </div>
+                            )}
+                            {totals.roundOff !== 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--tx-sub)' }}>
+                                    <span>Round Off</span>
+                                    <span style={{ fontWeight: 500, color: 'var(--tx-head)' }}>{totals.roundOff >= 0 ? '+' : ''}₹{totals.roundOff.toFixed(2)}</span>
+                                </div>
+                            )}
+                            <div style={{ borderTop: '2px solid var(--border)', marginTop: '6px', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontWeight: 600, fontSize: '15px', color: 'var(--tx-head)' }}>Grand Total</span>
+                                <span style={{ fontWeight: 700, fontSize: '20px', color: 'var(--accent)' }}>₹{totals.total.toFixed(2)}</span>
                             </div>
                         </div>
                     </div>
