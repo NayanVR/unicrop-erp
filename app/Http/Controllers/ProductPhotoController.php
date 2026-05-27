@@ -105,7 +105,6 @@ class ProductPhotoController extends Controller
             Storage::disk($disk)->put(
                 $path,
                 file_get_contents($request->file('photo')->getRealPath()),
-                'public',
             );
         } catch (\Throwable $e) {
             Log::error('Photo upload failed', ['disk' => $disk, 'path' => $path, 'error' => $e->getMessage()]);
