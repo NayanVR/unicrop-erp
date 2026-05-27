@@ -241,7 +241,8 @@ export default function PartiesIndex() {
                     </div>
                 </div>
 
-                <table className="data-table">
+                <div style={{ overflowX: 'auto' }}>
+                <table className="data-table" style={{ minWidth: '860px' }}>
                     <thead>
                         <tr>
                             <th>Name</th>
@@ -289,6 +290,7 @@ export default function PartiesIndex() {
                         ))}
                     </tbody>
                 </table>
+                </div>
             </div>
 
             {/* ── Add/Edit Party Modal ── */}
