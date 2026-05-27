@@ -188,9 +188,14 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         }, 0);
         const freight = toNumber(form.data.freight_amount);
         const courier = toNumber(form.data.courier_amount);
-        const roundOff = toNumber(form.data.round_off);
-        return { subtotal, gstTotal, freight, courier, roundOff, total: subtotal + gstTotal + freight + courier + roundOff };
-    }, [rows, form.data.freight_amount, form.data.courier_amount, form.data.round_off]);
+        const rawTotal = subtotal + gstTotal + freight + courier;
+        const roundOff = parseFloat((Math.round(rawTotal) - rawTotal).toFixed(2));
+        return { subtotal, gstTotal, freight, courier, roundOff, total: rawTotal + roundOff };
+    }, [rows, form.data.freight_amount, form.data.courier_amount]);
+
+    useEffect(() => {
+        form.setData('round_off', String(totals.roundOff));
+    }, [totals.roundOff]);
 
     const updateRow = (index: number, field: keyof ProductRow, value: string) => {
         setRows((current) =>
@@ -680,35 +685,6 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                             </table>
                         </div>
                         <button type="button" className="add-row-btn" onClick={addRow}>＋ Add Row</button>
-                    </div>
-
-                    {/* ── Charges & Notes ── */}
-                    <div className="form-card">
-                        <div className="form-card-title">Charges &amp; Notes</div>
-                        <div className="form-grid three">
-                            <div className="form-group">
-                                <label>Freight</label>
-                                <input type="number" value={form.data.freight_amount} onChange={(e) => form.setData('freight_amount', e.target.value)} min="0" step="0.01" />
-                            </div>
-                            {form.data.transport_type !== 'courier' && (
-                                <div className="form-group">
-                                    <label>Courier</label>
-                                    <input type="number" value={form.data.courier_amount} onChange={(e) => form.setData('courier_amount', e.target.value)} min="0" step="0.01" />
-                                </div>
-                            )}
-                            <div className="form-group">
-                                <label>Round Off</label>
-                                <input type="number" value={form.data.round_off} onChange={(e) => form.setData('round_off', e.target.value)} step="0.01" />
-                            </div>
-                        </div>
-                        <div className="form-group" style={{ marginTop: '12px' }}>
-                            <label>Notes</label>
-                            <textarea
-                                value={form.data.notes}
-                                onChange={(e) => form.setData('notes', e.target.value)}
-                                placeholder="Add any notes for production"
-                            />
-                        </div>
                     </div>
 
                     {/* ── Attachments ── */}
