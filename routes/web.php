@@ -91,6 +91,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('design/{designOrder}', [DesignController::class, 'destroy'])->name('design.destroy');
 
         Route::get('design/gallery', [ProductPhotoController::class, 'index'])->name('design.gallery.index');
+        Route::post('design/gallery/folders', [ProductPhotoController::class, 'storeFolder'])->name('design.gallery.folders.store');
         Route::post('design/gallery', [ProductPhotoController::class, 'store'])->name('design.gallery.store');
         Route::delete('design/gallery/{photo}', [ProductPhotoController::class, 'destroy'])->name('design.gallery.destroy');
     });

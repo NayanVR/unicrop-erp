@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Party;
 use App\Models\ProductPhoto;
+use App\Models\ProductPhotoFolder;
 use App\Models\ProductRate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,6 +32,15 @@ class ProductPhotoController extends Controller
                 'photo_url'   => $p->photo_url,
             ]);
 
+        $folders = ProductPhotoFolder::with('party:id,name')
+            ->orderBy('id')
+            ->get()
+            ->map(fn ($f) => [
+                'id'         => $f->id,
+                'party_id'   => $f->party_id,
+                'party_name' => $f->party?->name,
+            ]);
+
         $parties = Party::where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name']);
@@ -52,6 +62,7 @@ class ProductPhotoController extends Controller
 
         return Inertia::render('erp/design/gallery', [
             'photos'       => $photos,
+            'folders'      => $folders,
             'parties'      => $parties,
             'ourBrands'    => $ourBrands,
             'partyRates'   => $partyRates,
@@ -81,6 +92,20 @@ class ProductPhotoController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Photo uploaded successfully.');
+    }
+
+    public function storeFolder(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'party_id' => 'required|exists:parties,id',
+        ]);
+
+        ProductPhotoFolder::firstOrCreate(
+            ['party_id' => $request->input('party_id')],
+            ['created_by' => $request->user()?->id],
+        );
+
+        return redirect()->back()->with('success', 'Folder created.');
     }
 
     public function destroy(ProductPhoto $photo): RedirectResponse

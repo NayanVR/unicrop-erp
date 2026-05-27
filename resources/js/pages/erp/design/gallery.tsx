@@ -1,8 +1,10 @@
-import { destroy as galleryDestroy, store as galleryStore } from '@/routes/design/gallery';
+import { store as galleryStore, destroy as galleryDestroy } from '@/routes/design/gallery';
+import { store as foldersStore } from '@/routes/design/gallery/folders';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useRef, useState } from 'react';
 
-type Party = { id: number; name: string };
+type Party  = { id: number; name: string };
+type Folder = { id: number; party_id: number; party_name: string };
 type PartyRate = { party_id: number | null; our_brand: string; party_brand: string; packing_size: string };
 
 type Photo = {
@@ -17,43 +19,42 @@ type Photo = {
 
 type PageProps = {
     photos: Photo[];
+    folders: Folder[];
     parties: Party[];
     ourBrands: string[];
     partyRates: PartyRate[];
     packingSizes: string[];
     flash?: { success?: string; error?: string };
-    errors?: Record<string, string>;
 };
 
-type UploadForm = {
-    party_id: string;
-    our_brand: string;
-    party_brand: string;
-    packing_size: string;
-    photo: File | null;
-};
+type UploadForm   = { party_id: string; our_brand: string; party_brand: string; packing_size: string; photo: File | null };
+type FolderForm   = { party_id: string };
+
+// null = folder list, 'our-brand' = Our Brand, number = party_id
+type ActiveFolder = null | 'our-brand' | number;
 
 export default function DesignGallery() {
-    const { photos, parties, ourBrands, partyRates, packingSizes, flash, errors: pageErrors } =
+    const { photos, folders, parties, ourBrands, partyRates, packingSizes, flash } =
         usePage<PageProps>().props;
 
-    // null = show folder list, 'our-brand' = Our Brand folder, number = party folder
-    const [activeFolder, setActiveFolder] = useState<null | 'our-brand' | number>(null);
-    const [showModal, setShowModal] = useState(false);
-    const [lightbox, setLightbox] = useState<Photo | null>(null);
-    const [deletingId, setDeletingId] = useState<number | null>(null);
+    const [activeFolder, setActiveFolder] = useState<ActiveFolder>(null);
+    const [showUpload,   setShowUpload]   = useState(false);
+    const [showCreate,   setShowCreate]   = useState(false);
+    const [lightbox,     setLightbox]     = useState<Photo | null>(null);
+    const [deletingId,   setDeletingId]   = useState<number | null>(null);
 
-    const form = useForm<UploadForm>({
-        party_id: '',
-        our_brand: '',
-        party_brand: '',
-        packing_size: '',
-        photo: null,
+    const uploadForm = useForm<UploadForm>({
+        party_id: '', our_brand: '', party_brand: '', packing_size: '', photo: null,
     });
+    const folderForm = useForm<FolderForm>({ party_id: '' });
+    const fileRef    = useRef<HTMLInputElement | null>(null);
 
-    const fileRef = useRef<HTMLInputElement>(null);
+    // ── Derived data ─────────────────────────────────────────────────────────
 
-    const ourBrandPhotos = useMemo(() => photos.filter((p) => p.party_id === null), [photos]);
+    const ourBrandPhotos = useMemo(
+        () => photos.filter((p) => p.party_id === null),
+        [photos],
+    );
 
     const partyPhotoMap = useMemo(() => {
         const map = new Map<number, Photo[]>();
@@ -65,6 +66,28 @@ export default function DesignGallery() {
         }
         return map;
     }, [photos]);
+
+    // Parties that don't yet have a folder created
+    const availableParties = useMemo(() => {
+        const taken = new Set(folders.map((f) => f.party_id));
+        return parties.filter((p) => !taken.has(p.id));
+    }, [folders, parties]);
+
+    const brandSuggestions = useMemo(() => {
+        if (!uploadForm.data.party_id) return [];
+        return partyRates
+            .filter((r) => String(r.party_id) === uploadForm.data.party_id)
+            .map((r) => r.party_brand)
+            .filter(Boolean);
+    }, [uploadForm.data.party_id, partyRates]);
+
+    const sizeSuggestions = useMemo(() => {
+        if (!uploadForm.data.our_brand) return packingSizes;
+        return partyRates
+            .filter((r) => r.our_brand.toLowerCase() === uploadForm.data.our_brand.toLowerCase())
+            .map((r) => r.packing_size)
+            .filter(Boolean);
+    }, [uploadForm.data.our_brand, partyRates, packingSizes]);
 
     const displayedPhotos: Photo[] =
         activeFolder === null
@@ -78,48 +101,44 @@ export default function DesignGallery() {
             ? ''
             : activeFolder === 'our-brand'
               ? 'Our Brand'
-              : (parties.find((p) => p.id === activeFolder)?.name ?? '');
+              : (folders.find((f) => f.party_id === activeFolder)?.party_name ?? '');
 
-    const brandSuggestions = useMemo(() => {
-        if (!form.data.party_id) return [];
-        return partyRates
-            .filter((r) => String(r.party_id) === form.data.party_id)
-            .map((r) => r.party_brand)
-            .filter(Boolean);
-    }, [form.data.party_id, partyRates]);
-
-    const sizeSuggestions = useMemo(() => {
-        if (!form.data.our_brand) return packingSizes;
-        return partyRates
-            .filter((r) => r.our_brand.toLowerCase() === form.data.our_brand.toLowerCase())
-            .map((r) => r.packing_size)
-            .filter(Boolean);
-    }, [form.data.our_brand, partyRates, packingSizes]);
+    // ── Handlers ─────────────────────────────────────────────────────────────
 
     const openUpload = (partyId?: number) => {
-        form.reset();
-        form.clearErrors();
-        if (partyId) form.setData('party_id', String(partyId));
-        setShowModal(true);
+        uploadForm.reset();
+        uploadForm.clearErrors();
+        if (partyId) uploadForm.setData('party_id', String(partyId));
+        setShowUpload(true);
     };
 
     const openFolderUpload = () => {
-        if (activeFolder === null) return openUpload();
-        if (activeFolder === 'our-brand') return openUpload();
+        if (activeFolder === 'our-brand' || activeFolder === null) return openUpload();
         openUpload(activeFolder as number);
     };
 
     const submitUpload = (e: React.FormEvent) => {
         e.preventDefault();
-        form.post(galleryStore().url, {
+        uploadForm.post(galleryStore().url, {
             forceFormData: true,
             preserveScroll: true,
             onSuccess: () => {
-                setShowModal(false);
-                form.reset();
+                setShowUpload(false);
+                uploadForm.reset();
                 if (fileRef.current) fileRef.current.value = '';
-                // Stay in the current folder after upload
-                if (activeFolder === null) setActiveFolder('our-brand');
+            },
+        });
+    };
+
+    const submitCreateFolder = (e: React.FormEvent) => {
+        e.preventDefault();
+        const partyId = Number(folderForm.data.party_id);
+        folderForm.post(foldersStore().url, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowCreate(false);
+                folderForm.reset();
+                if (partyId) setActiveFolder(partyId);
             },
         });
     };
@@ -133,9 +152,6 @@ export default function DesignGallery() {
         });
     };
 
-    const folderPhotoCount = (id: 'our-brand' | number) =>
-        id === 'our-brand' ? ourBrandPhotos.length : (partyPhotoMap.get(id as number)?.length ?? 0);
-
     // ── Folder list view ──────────────────────────────────────────────────────
     if (activeFolder === null) {
         return (
@@ -143,19 +159,25 @@ export default function DesignGallery() {
                 <div className="page-header">
                     <div className="page-header-left">
                         <h1>Photo Gallery</h1>
-                        <p>Select a folder to view and upload brand photos</p>
+                        <p>Organize brand photos in party folders</p>
                     </div>
-                    <button type="button" className="btn primary" onClick={() => openUpload()}>
-                        ＋ Upload Photo
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                            type="button"
+                            className="btn secondary"
+                            onClick={() => setShowCreate(true)}
+                            disabled={availableParties.length === 0}
+                            title={availableParties.length === 0 ? 'All parties already have folders' : undefined}
+                        >
+                            📁 New Folder
+                        </button>
+                        <button type="button" className="btn primary" onClick={() => openUpload()}>
+                            ＋ Upload Photo
+                        </button>
+                    </div>
                 </div>
 
-                {flash?.success && (
-                    <div className="alert-success" style={{ marginBottom: '14px' }}>{flash.success}</div>
-                )}
-                {flash?.error && (
-                    <div className="alert-error" style={{ marginBottom: '14px' }}>{flash.error}</div>
-                )}
+                <FlashBar flash={flash} />
 
                 {/* Folder grid */}
                 <div style={{
@@ -163,7 +185,7 @@ export default function DesignGallery() {
                     gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
                     gap: '16px',
                 }}>
-                    {/* Our Brand folder */}
+                    {/* Our Brand — always present */}
                     <FolderCard
                         label="Our Brand"
                         icon="🌿"
@@ -172,28 +194,95 @@ export default function DesignGallery() {
                         onUpload={() => openUpload()}
                     />
 
-                    {/* Party folders */}
-                    {parties.map((party) => (
+                    {/* Created party folders */}
+                    {folders.map((folder) => (
                         <FolderCard
-                            key={party.id}
-                            label={party.name}
+                            key={folder.id}
+                            label={folder.party_name}
                             icon="🏢"
-                            count={partyPhotoMap.get(party.id)?.length ?? 0}
-                            onClick={() => setActiveFolder(party.id)}
-                            onUpload={() => openUpload(party.id)}
+                            count={partyPhotoMap.get(folder.party_id)?.length ?? 0}
+                            onClick={() => setActiveFolder(folder.party_id)}
+                            onUpload={() => openUpload(folder.party_id)}
                         />
                     ))}
+
+                    {/* Empty state when no party folders exist */}
+                    {folders.length === 0 && (
+                        <div
+                            style={{
+                                border: '2px dashed var(--border)',
+                                borderRadius: '12px',
+                                padding: '32px 16px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '8px',
+                                color: 'var(--tx-muted)',
+                                cursor: 'pointer',
+                            }}
+                            onClick={() => setShowCreate(true)}
+                        >
+                            <span style={{ fontSize: '32px' }}>📁</span>
+                            <span style={{ fontSize: '13px', fontWeight: 500 }}>Create Party Folder</span>
+                        </div>
+                    )}
                 </div>
 
-                {showModal && (
+                {/* Create Folder modal */}
+                {showCreate && (
+                    <div className="modal-overlay" onClick={() => setShowCreate(false)}>
+                        <div className="modal" style={{ width: '400px' }} onClick={(e) => e.stopPropagation()}>
+                            <div className="modal-header">
+                                <h2 className="modal-title">📁 Create Party Folder</h2>
+                                <button type="button" className="modal-close" onClick={() => setShowCreate(false)}>✕</button>
+                            </div>
+                            <form onSubmit={submitCreateFolder}>
+                                <div className="modal-body">
+                                    <div className="form-group">
+                                        <label>Select Party *</label>
+                                        <select
+                                            value={folderForm.data.party_id}
+                                            onChange={(e) => folderForm.setData('party_id', e.target.value)}
+                                            className={folderForm.errors.party_id ? 'error' : ''}
+                                        >
+                                            <option value="">— Choose a party —</option>
+                                            {availableParties.map((p) => (
+                                                <option key={p.id} value={p.id}>{p.name}</option>
+                                            ))}
+                                        </select>
+                                        {folderForm.errors.party_id && (
+                                            <span className="field-error">{folderForm.errors.party_id}</span>
+                                        )}
+                                        {availableParties.length === 0 && (
+                                            <span className="field-error">All active parties already have folders.</span>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="modal-footer">
+                                    <button type="button" className="btn secondary" onClick={() => setShowCreate(false)}>Cancel</button>
+                                    <button
+                                        type="submit"
+                                        className="btn primary"
+                                        disabled={folderForm.processing || !folderForm.data.party_id}
+                                    >
+                                        {folderForm.processing ? 'Creating…' : 'Create Folder'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* Upload modal (no pre-selected party) */}
+                {showUpload && (
                     <UploadModal
-                        form={form}
+                        form={uploadForm}
                         fileRef={fileRef}
-                        parties={parties}
+                        folders={folders}
                         ourBrands={ourBrands}
                         brandSuggestions={brandSuggestions}
                         sizeSuggestions={sizeSuggestions}
-                        onClose={() => { setShowModal(false); form.reset(); }}
+                        onClose={() => { setShowUpload(false); uploadForm.reset(); }}
                         onSubmit={submitUpload}
                     />
                 )}
@@ -206,13 +295,14 @@ export default function DesignGallery() {
         <div id="view-design-gallery" className="view active">
             <div className="page-header">
                 <div className="page-header-left">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    {/* Breadcrumb */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
                         <button
                             type="button"
                             onClick={() => setActiveFolder(null)}
                             style={{
                                 background: 'none', border: 'none', cursor: 'pointer',
-                                color: 'var(--tx-sub)', fontSize: '13px', padding: '2px 6px 2px 0',
+                                color: 'var(--tx-sub)', fontSize: '13px', padding: 0,
                                 display: 'flex', alignItems: 'center', gap: '4px',
                             }}
                         >
@@ -224,7 +314,7 @@ export default function DesignGallery() {
                         </span>
                     </div>
                     <h1 style={{ margin: 0 }}>{activeFolderLabel}</h1>
-                    <p style={{ margin: 0 }}>
+                    <p style={{ margin: '2px 0 0' }}>
                         {displayedPhotos.length} photo{displayedPhotos.length !== 1 ? 's' : ''}
                     </p>
                 </div>
@@ -233,26 +323,21 @@ export default function DesignGallery() {
                 </button>
             </div>
 
-            {flash?.success && (
-                <div className="alert-success" style={{ marginBottom: '14px' }}>{flash.success}</div>
-            )}
-            {flash?.error && (
-                <div className="alert-error" style={{ marginBottom: '14px' }}>{flash.error}</div>
-            )}
+            <FlashBar flash={flash} />
 
-            {/* Photos grid */}
+            {/* Photo grid */}
             <div className="card">
                 {displayedPhotos.length === 0 ? (
                     <div className="empty-state" style={{ padding: '32px 0' }}>
                         <div className="icon">📷</div>
-                        <p>No photos yet in this folder.</p>
+                        <p>No photos yet. Upload the first one!</p>
                         <button
                             type="button"
                             className="btn primary"
                             style={{ marginTop: '8px' }}
                             onClick={openFolderUpload}
                         >
-                            Upload First Photo
+                            Upload Photo
                         </button>
                     </div>
                 ) : (
@@ -312,15 +397,16 @@ export default function DesignGallery() {
                 </div>
             )}
 
-            {showModal && (
+            {/* Upload modal */}
+            {showUpload && (
                 <UploadModal
-                    form={form}
+                    form={uploadForm}
                     fileRef={fileRef}
-                    parties={parties}
+                    folders={folders}
                     ourBrands={ourBrands}
                     brandSuggestions={brandSuggestions}
                     sizeSuggestions={sizeSuggestions}
-                    onClose={() => { setShowModal(false); form.reset(); }}
+                    onClose={() => { setShowUpload(false); uploadForm.reset(); }}
                     onSubmit={submitUpload}
                 />
             )}
@@ -329,6 +415,20 @@ export default function DesignGallery() {
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
+
+function FlashBar({ flash }: { flash?: { success?: string; error?: string } }) {
+    if (!flash?.success && !flash?.error) return null;
+    return (
+        <>
+            {flash.success && (
+                <div className="alert-success" style={{ marginBottom: '14px' }}>{flash.success}</div>
+            )}
+            {flash.error && (
+                <div className="alert-error" style={{ marginBottom: '14px' }}>{flash.error}</div>
+            )}
+        </>
+    );
+}
 
 function FolderCard({
     label, icon, count, onClick, onUpload,
@@ -344,13 +444,11 @@ function FolderCard({
                 background: 'var(--bg-paper)',
                 overflow: 'hidden',
                 cursor: 'pointer',
-                transition: 'box-shadow 0.15s',
             }}
             onClick={onClick}
             onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.10)'; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = ''; }}
         >
-            {/* Folder icon area */}
             <div style={{
                 height: '100px',
                 background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-paper) 100%)',
@@ -362,7 +460,6 @@ function FolderCard({
             }}>
                 {icon}
             </div>
-
             <div style={{ padding: '12px 14px 14px' }}>
                 <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--tx-head)', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {label}
@@ -383,22 +480,13 @@ function FolderCard({
     );
 }
 
-function PhotoCard({
-    photo, deleting, onView, onDelete,
-}: {
+function PhotoCard({ photo, deleting, onView, onDelete }: {
     photo: Photo; deleting: boolean;
     onView: () => void; onDelete: () => void;
 }) {
     const productName = photo.party_brand ?? photo.our_brand;
-
     return (
-        <div style={{
-            border: '1px solid var(--border)',
-            borderRadius: '10px',
-            overflow: 'hidden',
-            background: 'var(--bg-paper)',
-        }}>
-            {/* Image - square ratio */}
+        <div style={{ border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden', background: 'var(--bg-paper)' }}>
             <div
                 style={{ width: '100%', paddingBottom: '100%', position: 'relative', cursor: 'pointer' }}
                 onClick={onView}
@@ -406,19 +494,9 @@ function PhotoCard({
                 <img
                     src={photo.photo_url}
                     alt={productName}
-                    style={{
-                        position: 'absolute',
-                        inset: 0,
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'contain',
-                        background: '#fff',
-                        padding: '8px',
-                    }}
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#fff', padding: '8px' }}
                 />
             </div>
-
-            {/* Info */}
             <div style={{ padding: '8px 10px 10px' }}>
                 <div style={{ fontWeight: 700, fontSize: '12px', color: 'var(--tx-head)', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {productName}
@@ -433,16 +511,7 @@ function PhotoCard({
                 )}
                 <button
                     type="button"
-                    style={{
-                        marginTop: '6px',
-                        fontSize: '11px',
-                        color: 'var(--danger)',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: 0,
-                        fontFamily: 'inherit',
-                    }}
+                    style={{ marginTop: '6px', fontSize: '11px', color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
                     disabled={deleting}
                     onClick={onDelete}
                 >
@@ -453,12 +522,10 @@ function PhotoCard({
     );
 }
 
-function UploadModal({
-    form, fileRef, parties, ourBrands, brandSuggestions, sizeSuggestions, onClose, onSubmit,
-}: {
+function UploadModal({ form, fileRef, folders, ourBrands, brandSuggestions, sizeSuggestions, onClose, onSubmit }: {
     form: ReturnType<typeof useForm<UploadForm>>;
     fileRef: React.RefObject<HTMLInputElement | null>;
-    parties: Party[];
+    folders: Folder[];
     ourBrands: string[];
     brandSuggestions: string[];
     sizeSuggestions: string[];
@@ -474,25 +541,21 @@ function UploadModal({
                 </div>
                 <form onSubmit={onSubmit}>
                     <div className="modal-body">
-                        {/* Party / folder selection */}
+                        {/* Folder / party */}
                         <div className="form-group" style={{ marginBottom: '14px' }}>
-                            <label>Folder (Party)</label>
+                            <label>Folder</label>
                             <select
                                 value={form.data.party_id}
-                                onChange={(e) =>
-                                    form.setData({ ...form.data, party_id: e.target.value, party_brand: '' })
-                                }
+                                onChange={(e) => form.setData({ ...form.data, party_id: e.target.value, party_brand: '' })}
                             >
-                                <option value="">— Our Brand —</option>
-                                {parties.map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                        {p.name}
-                                    </option>
+                                <option value="">🌿 Our Brand</option>
+                                {folders.map((f) => (
+                                    <option key={f.id} value={f.party_id}>🏢 {f.party_name}</option>
                                 ))}
                             </select>
                         </div>
 
-                        {/* Our Brand (product name in our catalog) */}
+                        {/* Our brand / product name */}
                         <div className="form-group" style={{ marginBottom: '14px' }}>
                             <label>Our Brand / Product Name *</label>
                             <input
@@ -504,31 +567,27 @@ function UploadModal({
                                 placeholder="e.g. Unicrop Neem Oil"
                             />
                             <datalist id="gallery-our-brands">
-                                {ourBrands.map((b) => (
-                                    <option key={b} value={b} />
-                                ))}
+                                {ourBrands.map((b) => <option key={b} value={b} />)}
                             </datalist>
                             {form.errors.our_brand && (
                                 <span className="field-error">{form.errors.our_brand}</span>
                             )}
                         </div>
 
-                        {/* Party Brand (only when a party is selected) */}
+                        {/* Party brand name (only when a party folder is selected) */}
                         {form.data.party_id && (
                             <div className="form-group" style={{ marginBottom: '14px' }}>
                                 <label>Party Brand / Product Name</label>
                                 <input
                                     type="text"
                                     list="gallery-party-brands"
-                                    value={form.data.party_brand}
                                     className={form.errors.party_brand ? 'error' : ''}
+                                    value={form.data.party_brand}
                                     onChange={(e) => form.setData('party_brand', e.target.value)}
-                                    placeholder="Customer's label name for this product"
+                                    placeholder="Customer's label name"
                                 />
                                 <datalist id="gallery-party-brands">
-                                    {brandSuggestions.map((b) => (
-                                        <option key={b} value={b} />
-                                    ))}
+                                    {brandSuggestions.map((b) => <option key={b} value={b} />)}
                                 </datalist>
                                 {form.errors.party_brand && (
                                     <span className="field-error">{form.errors.party_brand}</span>
@@ -536,7 +595,7 @@ function UploadModal({
                             </div>
                         )}
 
-                        {/* Packing Size */}
+                        {/* Packing size */}
                         <div className="form-group" style={{ marginBottom: '14px' }}>
                             <label>Packing Size</label>
                             <input
@@ -547,9 +606,7 @@ function UploadModal({
                                 placeholder="e.g. 500ml, 1ltr"
                             />
                             <datalist id="gallery-packing-sizes">
-                                {sizeSuggestions.map((s) => (
-                                    <option key={s} value={s} />
-                                ))}
+                                {sizeSuggestions.map((s) => <option key={s} value={s} />)}
                             </datalist>
                         </div>
 
@@ -569,9 +626,7 @@ function UploadModal({
                         </div>
                     </div>
                     <div className="modal-footer">
-                        <button type="button" className="btn secondary" onClick={onClose}>
-                            Cancel
-                        </button>
+                        <button type="button" className="btn secondary" onClick={onClose}>Cancel</button>
                         <button type="submit" className="btn primary" disabled={form.processing}>
                             {form.processing ? 'Uploading…' : 'Upload Photo'}
                         </button>
