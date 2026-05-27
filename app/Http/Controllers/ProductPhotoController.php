@@ -8,6 +8,7 @@ use App\Models\ProductPhotoFolder;
 use App\Models\ProductRate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -15,6 +16,11 @@ use Inertia\Response;
 
 class ProductPhotoController extends Controller
 {
+    private function storageDisk(): string
+    {
+        return config('filesystems.default') === 's3' ? 's3' : 'public';
+    }
+
     public function index(): Response
     {
         $photos = ProductPhoto::with('party:id,name')
@@ -81,9 +87,8 @@ class ProductPhotoController extends Controller
             'photo'        => 'required|image|mimes:jpg,jpeg,png,webp|max:8192',
         ]);
 
-        $disk = config('filesystems.default', 'public');
+        $disk = $this->storageDisk();
 
-        // Build an organized path: product-photos/{folder}/{product-name}.{ext}
         if (! empty($data['party_id'])) {
             $party = Party::find($data['party_id']);
             $folderName = Str::slug($party?->name ?? 'party-' . $data['party_id']);
@@ -96,14 +101,16 @@ class ProductPhotoController extends Controller
         $filename     = Str::slug($productLabel) . '_' . Str::random(8) . '.' . strtolower($ext);
         $path         = 'product-photos/' . $folderName . '/' . $filename;
 
-        if ($disk === 's3') {
-            Storage::disk('s3')->put($path, file_get_contents($request->file('photo')->getRealPath()), 'public');
-        } else {
-            $request->file('photo')->storeAs(
-                'product-photos/' . $folderName,
-                $filename,
-                'public'
+        try {
+            Storage::disk($disk)->put(
+                $path,
+                file_get_contents($request->file('photo')->getRealPath()),
+                'public',
             );
+        } catch (\Throwable $e) {
+            Log::error('Photo upload failed', ['disk' => $disk, 'path' => $path, 'error' => $e->getMessage()]);
+
+            return redirect()->back()->with('error', 'Upload failed: ' . $e->getMessage());
         }
 
         ProductPhoto::create([
@@ -134,12 +141,12 @@ class ProductPhotoController extends Controller
 
     public function destroy(ProductPhoto $photo): RedirectResponse
     {
-        $disk = config('filesystems.default', 'public');
+        $disk = $this->storageDisk();
 
-        if ($disk === 's3') {
-            Storage::disk('s3')->delete($photo->photo_path);
-        } else {
-            Storage::disk('public')->delete($photo->photo_path);
+        try {
+            Storage::disk($disk)->delete($photo->photo_path);
+        } catch (\Throwable $e) {
+            Log::warning('Photo file delete failed', ['disk' => $disk, 'path' => $photo->photo_path, 'error' => $e->getMessage()]);
         }
 
         $photo->delete();

@@ -24,8 +24,8 @@ services:
       TRUSTED_PROXIES: "*"
       # S3 / Garage object storage
       FILESYSTEM_DISK: ${FILESYSTEM_DISK:-s3}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-GKunicropphotoapp000001}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-unicropsecretkey0123456789abcdef}
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-garage}
       AWS_BUCKET: ${AWS_BUCKET:-unicrop-photos}
       AWS_ENDPOINT: ${AWS_ENDPOINT:-http://garage:3900}
@@ -62,8 +62,8 @@ services:
       LOG_LEVEL: error
       # S3 / Garage object storage
       FILESYSTEM_DISK: ${FILESYSTEM_DISK:-s3}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-GKunicropphotoapp000001}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-unicropsecretkey0123456789abcdef}
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-garage}
       AWS_BUCKET: ${AWS_BUCKET:-unicrop-photos}
       AWS_ENDPOINT: ${AWS_ENDPOINT:-http://garage:3900}
@@ -96,8 +96,8 @@ services:
       LOG_LEVEL: error
       # S3 / Garage object storage
       FILESYSTEM_DISK: ${FILESYSTEM_DISK:-s3}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-GKunicropphotoapp000001}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-unicropsecretkey0123456789abcdef}
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-garage}
       AWS_BUCKET: ${AWS_BUCKET:-unicrop-photos}
       AWS_ENDPOINT: ${AWS_ENDPOINT:-http://garage:3900}
@@ -124,24 +124,20 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # Garage S3-compatible object storage.
-  # v2 flags used:
-  #   --single-node         auto-creates the cluster layout (no manual garage layout apply)
-  #   --default-bucket      creates GARAGE_DEFAULT_BUCKET on first boot
-  #   --default-access-key  creates the key from GARAGE_DEFAULT_ACCESS_KEY / GARAGE_DEFAULT_SECRET_KEY
+  # Garage S3-compatible object storage (single-node).
+  # --single-node         auto-creates the cluster layout
+  # --default-bucket      creates GARAGE_DEFAULT_BUCKET on first boot
+  # --default-access-key  creates key from GARAGE_DEFAULT_ACCESS_KEY / SECRET_KEY
   #
-  # Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY in Dokploy env vars — Garage will
-  # create the key + bucket automatically using those same values, so the app can connect
-  # without any manual init steps.
-  #
-  # After first start, set AWS_URL to http://<your-server-ip>:3900/unicrop-photos
-  # so photo URLs are publicly reachable from browsers.
+  # The app and Garage share the same AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
+  # defaults, so everything works out-of-the-box without manual setup.
+  # Override them in Dokploy env vars if you want custom credentials.
   garage:
     image: dxflrs/garage:v2.3.0
     command: ["/garage", "server", "--single-node", "--default-bucket", "--default-access-key"]
     environment:
       GARAGE_DEFAULT_ACCESS_KEY: ${AWS_ACCESS_KEY_ID:-GKunicropphotoapp000001}
-      GARAGE_DEFAULT_SECRET_KEY: ${AWS_SECRET_ACCESS_KEY:-unicrop-change-this-secret-key-32ch}
+      GARAGE_DEFAULT_SECRET_KEY: ${AWS_SECRET_ACCESS_KEY:-unicropsecretkey0123456789abcdef}
       GARAGE_DEFAULT_BUCKET: ${AWS_BUCKET:-unicrop-photos}
     volumes:
       - ./docker/garage.toml:/etc/garage.toml:ro
