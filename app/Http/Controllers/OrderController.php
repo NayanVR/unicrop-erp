@@ -6,6 +6,7 @@ use App\Http\Requests\StoreOrderRequest;
 use App\Http\Requests\UpdateOrderRequest;
 use App\Models\Order;
 use App\Models\Party;
+use App\Models\ProductPhoto;
 use App\Models\Role;
 use App\Models\Transport;
 use App\Models\User;
@@ -63,6 +64,16 @@ class OrderController extends Controller
                 ->with(['productRates' => fn ($q) => $q->where('is_active', true)->orderBy('our_brand')->orderBy('packing_size')])
                 ->get(['id', 'name', 'customer_name', 'gst_no', 'pan_no', 'phone', 'address', 'city', 'state', 'default_transport_type', 'default_transport_id']),
             'currentUser' => ['id' => $user?->id, 'name' => $user?->name],
+            'productPhotos' => ProductPhoto::orderBy('our_brand')->orderBy('packing_size')
+                ->get()
+                ->map(fn ($p) => [
+                    'id'           => $p->id,
+                    'party_id'     => $p->party_id,
+                    'our_brand'    => $p->our_brand,
+                    'party_brand'  => $p->party_brand,
+                    'packing_size' => $p->packing_size,
+                    'photo_url'    => $p->photo_url,
+                ]),
         ]);
     }
 

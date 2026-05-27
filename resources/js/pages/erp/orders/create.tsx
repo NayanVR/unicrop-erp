@@ -27,6 +27,15 @@ type Party = {
     product_rates: ProductRate[];
 };
 
+type ProductPhoto = {
+    id: number;
+    party_id: number | null;
+    our_brand: string;
+    party_brand: string | null;
+    packing_size: string | null;
+    photo_url: string;
+};
+
 type Props = {
     pageTitle: string;
     salesUsers: SalesUser[];
@@ -34,6 +43,7 @@ type Props = {
     couriers: TransportOption[];
     parties: Party[];
     currentUser: { id: number; name: string };
+    productPhotos: ProductPhoto[];
 };
 
 // Pieces per box by normalized packing size
@@ -121,7 +131,7 @@ const toNumber = (value: string) => {
 
 const todayDate = () => new Date().toISOString().split('T')[0];
 
-export default function OrdersCreate({ salesUsers, transports, couriers, parties, currentUser }: Props) {
+export default function OrdersCreate({ salesUsers, transports, couriers, parties, currentUser, productPhotos }: Props) {
     const [rows, setRows] = useState<ProductRow[]>([createRow()]);
     const [showPan, setShowPan] = useState(false);
     const [showAadhaar, setShowAadhaar] = useState(false);
@@ -182,6 +192,34 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         () => [...new Set(partyRates.map((r) => r.our_brand))].sort(),
         [partyRates],
     );
+
+    // Photo lookup maps for fast thumbnail resolution
+    const photoMap = useMemo(() => {
+        const ob = new Map<string, string>(); // "our_brand|packing_size" → url
+        const pb = new Map<string, string>(); // "party_id|party_brand|packing_size" → url
+        for (const p of productPhotos) {
+            if (p.party_id === null) {
+                ob.set(`${p.our_brand.toLowerCase()}|${(p.packing_size ?? '').toLowerCase()}`, p.photo_url);
+                if (!p.packing_size) ob.set(`${p.our_brand.toLowerCase()}|`, p.photo_url);
+            } else if (p.party_brand) {
+                pb.set(`${p.party_id}|${p.party_brand.toLowerCase()}|${(p.packing_size ?? '').toLowerCase()}`, p.photo_url);
+            }
+        }
+        return { ob, pb };
+    }, [productPhotos]);
+
+    const getRowPhoto = (row: ProductRow, partyId: string): string | null => {
+        if (!row.our_brand) return null;
+        const size = row.packing_size.toLowerCase();
+        if (partyId && row.party_brand) {
+            const key = `${partyId}|${row.party_brand.toLowerCase()}|${size}`;
+            const url = photoMap.pb.get(key) ?? photoMap.pb.get(`${partyId}|${row.party_brand.toLowerCase()}|`);
+            if (url) return url;
+        }
+        return photoMap.ob.get(`${row.our_brand.toLowerCase()}|${size}`)
+            ?? photoMap.ob.get(`${row.our_brand.toLowerCase()}|`)
+            ?? null;
+    };
 
     const totals = useMemo(() => {
         const subtotal = rows.reduce((acc, row) => acc + toNumber(row.quantity) * toNumber(row.rate), 0);
@@ -613,6 +651,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                             <table className="prod-table">
                                 <thead>
                                     <tr>
+                                        <th style={{ width: '52px' }}></th>
                                         <th>Our Brand</th>
                                         <th>Party Brand</th>
                                         <th>Packing</th>
@@ -635,8 +674,23 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                         const boxes = pcsPerBox && qty > 0 ? qty / pcsPerBox : null;
                                         const boxesExact = boxes !== null && Number.isInteger(boxes);
 
+                                        const rowPhoto = getRowPhoto(row, form.data.party_id);
+
                                         return (
                                             <tr key={`row-${index}`}>
+                                                <td style={{ textAlign: 'center', padding: '4px' }}>
+                                                    {rowPhoto ? (
+                                                        <img
+                                                            src={rowPhoto}
+                                                            alt=""
+                                                            style={{ width: '44px', height: '44px', objectFit: 'contain', borderRadius: '6px', border: '1px solid var(--border)', background: '#fff', padding: '2px' }}
+                                                        />
+                                                    ) : (
+                                                        <div style={{ width: '44px', height: '44px', borderRadius: '6px', border: '1px dashed var(--border)', background: 'var(--bg-paper)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', color: 'var(--tx-muted)' }}>
+                                                            📷
+                                                        </div>
+                                                    )}
+                                                </td>
                                                 <td>
                                                     <input
                                                         type="text"

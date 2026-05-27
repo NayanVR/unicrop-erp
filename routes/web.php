@@ -8,6 +8,7 @@ use App\Http\Controllers\FinishedGoodsController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PartyController;
+use App\Http\Controllers\ProductPhotoController;
 use App\Http\Controllers\PurchaseBillController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\UnitTransferController;
@@ -88,6 +89,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('design/{designOrder}', [DesignController::class, 'update'])->name('design.update');
         Route::post('design/{designOrder}/advance', [DesignController::class, 'advance'])->name('design.advance');
         Route::delete('design/{designOrder}', [DesignController::class, 'destroy'])->name('design.destroy');
+
+        Route::get('design/gallery', [ProductPhotoController::class, 'index'])->name('design.gallery.index');
+        Route::post('design/gallery', [ProductPhotoController::class, 'store'])->name('design.gallery.store');
+        Route::delete('design/gallery/{photo}', [ProductPhotoController::class, 'destroy'])->name('design.gallery.destroy');
     });
 
     Route::middleware(['role:admin,office'])->group(function () {

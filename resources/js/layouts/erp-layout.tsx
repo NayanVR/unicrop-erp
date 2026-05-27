@@ -2,6 +2,7 @@ import { useAppearance } from '@/hooks/use-appearance';
 import { dashboard, logout } from '@/routes';
 import { index as bomIndex } from '@/routes/bom';
 import { index as designIndex } from '@/routes/design';
+import { index as galleryIndex } from '@/routes/design/gallery';
 import { index as factoryIndex } from '@/routes/factory';
 import { index as finishedGoodsIndex } from '@/routes/finished-goods';
 import { index as inventoryIndex } from '@/routes/inventory';
@@ -51,6 +52,7 @@ const NAV_DEFS: Record<string, NavItem[]> = {
         { id: 'rate-calc', label: 'Rate Calculator', icon: '🧮', href: rateCalcIndex() },
         { id: 'unit-transfer', label: 'Unit Transfer', icon: '🔄', href: unitTransferIndex() },
         { id: 'design-orders', label: 'Design Orders', icon: '🎨', href: designIndex() },
+        { id: 'photo-gallery', label: 'Photo Gallery', icon: '📷', href: galleryIndex() },
         { id: 'parties', label: 'Parties', icon: '🏢', href: partiesIndex() },
         { id: 'users', label: 'User Management', icon: '👥', href: usersIndex() },
         { id: 'settings', label: 'Settings', icon: '⚙️', href: settingsIndex() },
@@ -77,6 +79,7 @@ const NAV_DEFS: Record<string, NavItem[]> = {
     design: [
         { id: 'dashboard', label: 'Dashboard', icon: '🌾', href: dashboard() },
         { id: 'design-orders', label: 'Design Orders', icon: '🎨', href: designIndex() },
+        { id: 'photo-gallery', label: 'Photo Gallery', icon: '📷', href: galleryIndex() },
     ],
     accountant: [
         { id: 'acct-dashboard', label: 'Dashboard', icon: '📊', href: dashboard() },
