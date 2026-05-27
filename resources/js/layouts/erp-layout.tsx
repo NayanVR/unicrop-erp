@@ -144,11 +144,11 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
     return (
         <div id="app-screen" className="visible">
             <div
-                className={`mob-overlay${isMobileOpen ? 'show' : ''}`}
+                className={`mob-overlay${isMobileOpen ? ' show' : ''}`}
                 onClick={() => setIsMobileOpen(false)}
             />
             <aside
-                className={`sidebar${isMobileOpen ? 'mobile-open' : ''}`}
+                className={`sidebar${isMobileOpen ? ' mobile-open' : ''}`}
                 id="main-sidebar"
             >
                 <div className="sidebar-brand">
