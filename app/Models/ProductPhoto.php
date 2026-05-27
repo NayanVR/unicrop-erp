@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
 
 #[Fillable([
     'party_id',
@@ -32,9 +31,17 @@ class ProductPhoto extends Model
         $disk = config('filesystems.default', 'public');
 
         if ($disk === 's3') {
-            return Storage::disk('s3')->url($this->photo_path);
+            $baseUrl = rtrim((string) config('filesystems.disks.s3.url', ''), '/');
+
+            if ($baseUrl === '') {
+                $baseUrl = rtrim((string) config('filesystems.disks.s3.endpoint', ''), '/') . '/' . trim((string) config('filesystems.disks.s3.bucket', ''), '/');
+            }
+
+            return $baseUrl . '/' . ltrim($this->photo_path, '/');
         }
 
-        return Storage::disk('public')->url($this->photo_path);
+        $baseUrl = rtrim((string) config('filesystems.disks.public.url', ''), '/');
+
+        return $baseUrl . '/' . ltrim($this->photo_path, '/');
     }
 }
