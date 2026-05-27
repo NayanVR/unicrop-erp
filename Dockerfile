@@ -94,7 +94,8 @@ RUN chmod +x /entrypoint.sh \
         bootstrap/cache \
         /run/nginx \
         /var/log/supervisor \
-    && chown -R www-data:www-data storage bootstrap/cache \
+        /var/lib/nginx/tmp/client_body \
+    && chown -R www-data:www-data storage bootstrap/cache /var/lib/nginx \
     && chmod -R 775 storage bootstrap/cache
 
 EXPOSE 80
