@@ -231,7 +231,7 @@ export default function DesignGallery() {
 
                 {/* Create Folder modal */}
                 {showCreate && (
-                    <div className="modal-overlay" onClick={() => setShowCreate(false)}>
+                    <div className="modal-overlay open" onClick={() => setShowCreate(false)}>
                         <div className="modal" style={{ width: '400px' }} onClick={(e) => e.stopPropagation()}>
                             <div className="modal-header">
                                 <h2 className="modal-title">📁 Create Party Folder</h2>
@@ -379,7 +379,7 @@ export default function DesignGallery() {
             {/* Lightbox */}
             {lightbox && (
                 <div
-                    className="modal-overlay"
+                    className="modal-overlay open"
                     onClick={() => setLightbox(null)}
                     style={{ zIndex: 9999 }}
                 >
@@ -550,7 +550,7 @@ function UploadModal({ form, fileRef, folders, ourBrands, brandSuggestions, size
     onSubmit: (e: React.FormEvent) => void;
 }) {
     return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-overlay open" onClick={onClose}>
             <div className="modal" style={{ width: '460px' }} onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
                     <h2 className="modal-title">Upload Photo</h2>
