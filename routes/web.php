@@ -59,6 +59,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::patch('erp/settings/transports/{transport}', [SettingsController::class, 'updateTransport'])->name('settings.transports.update');
 
+        Route::post('erp/settings/product-rates', [SettingsController::class, 'storeProductRate'])->name('settings.product-rates.store');
+        Route::patch('erp/settings/product-rates/{productRate}', [SettingsController::class, 'updateProductRate'])->name('settings.product-rates.update');
+        Route::delete('erp/settings/product-rates/{productRate}', [SettingsController::class, 'destroyProductRate'])->name('settings.product-rates.destroy');
+
         Route::get('purchase-bills', [PurchaseBillController::class, 'index'])->name('purchase-bills.index');
         Route::post('purchase-bills', [PurchaseBillController::class, 'store'])->name('purchase-bills.store');
         Route::patch('purchase-bills/{bill}', [PurchaseBillController::class, 'update'])->name('purchase-bills.update');

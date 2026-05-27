@@ -14,6 +14,13 @@ type Party = {
     city?: string | null;
     state?: string | null;
 };
+type ProductRate = {
+    our_brand: string;
+    party_brand: string | null;
+    packing_size: string;
+    rate: string | number;
+    gst_percent: string | number;
+};
 
 type Props = {
     pageTitle: string;
@@ -21,8 +28,38 @@ type Props = {
     transports: TransportOption[];
     couriers: TransportOption[];
     parties: Party[];
+    productRates: ProductRate[];
     currentUser: { id: number; name: string };
 };
+
+// Pieces per box by normalized packing size
+const BOX_SIZES: Record<string, number> = {
+    '5ltr': 2,   '5kg': 2,
+    '1ltr': 10,  '1kg': 10,
+    '500ml': 20, '500gm': 20,
+    '250ml': 40, '250gm': 40,
+    '100ml': 50, '100gm': 50,
+    '50ml': 100, '50gm': 100,
+    '20ml': 300, '20gm': 300,
+    '10ml': 600, '10gm': 600,
+    '5ml': 600,  '5gm': 600,
+    // Carba large containers
+    '10ltr': 1, '20ltr': 1, '50ltr': 1, '200ltr': 1,
+    // Bags
+    '10kg': 1, '25kg': 1, '50kg': 1,
+};
+
+function normalizeSize(s: string): string {
+    return s.toLowerCase().replace(/\s+/g, '')
+        .replace(/litre|liter|litres|liters/g, 'ltr')
+        .replace(/kilogram|kilograms|kgs\b/g, 'kg')
+        .replace(/gram|grams\b/g, 'gm')
+        .replace(/millilitre|milliliter|millilitres|milliliters|mls\b/g, 'ml');
+}
+
+function getBoxQty(packingSize: string): number | null {
+    return BOX_SIZES[normalizeSize(packingSize)] ?? null;
+}
 
 type ProductRow = {
     our_brand: string;
@@ -80,7 +117,7 @@ const toNumber = (value: string) => {
 
 const todayDate = () => new Date().toISOString().split('T')[0];
 
-export default function OrdersCreate({ salesUsers, transports, couriers, parties, currentUser }: Props) {
+export default function OrdersCreate({ salesUsers, transports, couriers, parties, productRates, currentUser }: Props) {
     const [rows, setRows] = useState<ProductRow[]>([createRow()]);
     const [showPan, setShowPan] = useState(false);
     const [showAadhaar, setShowAadhaar] = useState(false);
@@ -131,6 +168,11 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         [partySearch, parties],
     );
 
+    const brandOptions = useMemo(
+        () => [...new Set(productRates.map((r) => r.our_brand))].sort(),
+        [productRates],
+    );
+
     const totals = useMemo(() => {
         const subtotal = rows.reduce((acc, row) => acc + toNumber(row.quantity) * toNumber(row.rate), 0);
         const gstTotal = rows.reduce((acc, row) => {
@@ -144,7 +186,38 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
     }, [rows, form.data.freight_amount, form.data.courier_amount, form.data.round_off]);
 
     const updateRow = (index: number, field: keyof ProductRow, value: string) => {
-        setRows((current) => current.map((row, idx) => idx === index ? { ...row, [field]: value } : row));
+        setRows((current) =>
+            current.map((row, idx) => {
+                if (idx !== index) return row;
+                let updated = { ...row, [field]: value };
+
+                if (field === 'our_brand') {
+                    const match = productRates.find(
+                        (r) => r.our_brand.toLowerCase() === value.toLowerCase(),
+                    );
+                    if (match) {
+                        updated.party_brand = match.party_brand ?? '';
+                    }
+                    // Reset size & rate when brand changes
+                    if (row.our_brand !== value) {
+                        updated.packing_size = '';
+                        updated.rate = '';
+                    }
+                } else if (field === 'packing_size') {
+                    const match = productRates.find(
+                        (r) =>
+                            r.our_brand.toLowerCase() === row.our_brand.toLowerCase() &&
+                            r.packing_size.toLowerCase() === value.toLowerCase(),
+                    );
+                    if (match) {
+                        updated.rate = String(match.rate);
+                        updated.gst_percent = String(match.gst_percent);
+                    }
+                }
+
+                return updated;
+            }),
+        );
     };
     const addRow = () => setRows((current) => [...current, createRow()]);
     const removeRow = (index: number) => {
@@ -533,22 +606,78 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {rows.map((row, index) => (
-                                        <tr key={`row-${index}`}>
-                                            <td><input type="text" value={row.our_brand} onChange={(e) => updateRow(index, 'our_brand', e.target.value)} placeholder="Brand" /></td>
-                                            <td><input type="text" value={row.party_brand} onChange={(e) => updateRow(index, 'party_brand', e.target.value)} placeholder="Customer brand" /></td>
-                                            <td><input type="text" value={row.packing_size} onChange={(e) => updateRow(index, 'packing_size', e.target.value)} placeholder="500 ml" /></td>
-                                            <td><input type="number" value={row.quantity} onChange={(e) => updateRow(index, 'quantity', e.target.value)} min="0" step="0.01" /></td>
-                                            <td><input type="number" value={row.rate} onChange={(e) => updateRow(index, 'rate', e.target.value)} min="0" step="0.01" /></td>
-                                            <td><input type="number" value={row.gst_percent} onChange={(e) => updateRow(index, 'gst_percent', e.target.value)} min="0" step="0.01" /></td>
-                                            <td><input type="text" value={row.type} onChange={(e) => updateRow(index, 'type', e.target.value)} placeholder="Liquid" /></td>
-                                            <td><input type="text" value={row.shape} onChange={(e) => updateRow(index, 'shape', e.target.value)} placeholder="Bottle" /></td>
-                                            <td><input type="text" value={row.cap_color} onChange={(e) => updateRow(index, 'cap_color', e.target.value)} placeholder="Green" /></td>
-                                            <td>
-                                                <button type="button" className="btn danger-xs" onClick={() => removeRow(index)}>✕</button>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {rows.map((row, index) => {
+                                        const sizeOptions = productRates.filter(
+                                            (r) => r.our_brand.toLowerCase() === row.our_brand.toLowerCase(),
+                                        );
+                                        const qty = toNumber(row.quantity);
+                                        const pcsPerBox = getBoxQty(row.packing_size);
+                                        const boxes = pcsPerBox && qty > 0 ? qty / pcsPerBox : null;
+                                        const boxesExact = boxes !== null && Number.isInteger(boxes);
+
+                                        return (
+                                            <tr key={`row-${index}`}>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        list={`brands-${index}`}
+                                                        value={row.our_brand}
+                                                        onChange={(e) => updateRow(index, 'our_brand', e.target.value)}
+                                                        placeholder="Brand"
+                                                    />
+                                                    <datalist id={`brands-${index}`}>
+                                                        {brandOptions.map((b) => <option key={b} value={b} />)}
+                                                    </datalist>
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        value={row.party_brand}
+                                                        onChange={(e) => updateRow(index, 'party_brand', e.target.value)}
+                                                        placeholder="Customer brand"
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        list={`sizes-${index}`}
+                                                        value={row.packing_size}
+                                                        onChange={(e) => updateRow(index, 'packing_size', e.target.value)}
+                                                        placeholder="500ml"
+                                                    />
+                                                    <datalist id={`sizes-${index}`}>
+                                                        {(sizeOptions.length > 0 ? sizeOptions : productRates).map((r) => (
+                                                            <option key={r.packing_size} value={r.packing_size} />
+                                                        ))}
+                                                    </datalist>
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="number"
+                                                        value={row.quantity}
+                                                        onChange={(e) => updateRow(index, 'quantity', e.target.value)}
+                                                        min="0"
+                                                        step="0.01"
+                                                    />
+                                                    {boxes !== null && (
+                                                        <div className={`box-count${boxesExact ? ' ok' : ' warn'}`}>
+                                                            {boxesExact
+                                                                ? `✓ ${boxes} box${boxes !== 1 ? 'es' : ''}`
+                                                                : `${boxes.toFixed(2)} boxes (${pcsPerBox} pcs/box)`}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td><input type="number" value={row.rate} onChange={(e) => updateRow(index, 'rate', e.target.value)} min="0" step="0.01" /></td>
+                                                <td><input type="number" value={row.gst_percent} onChange={(e) => updateRow(index, 'gst_percent', e.target.value)} min="0" step="0.01" /></td>
+                                                <td><input type="text" value={row.type} onChange={(e) => updateRow(index, 'type', e.target.value)} placeholder="Liquid" /></td>
+                                                <td><input type="text" value={row.shape} onChange={(e) => updateRow(index, 'shape', e.target.value)} placeholder="Bottle" /></td>
+                                                <td><input type="text" value={row.cap_color} onChange={(e) => updateRow(index, 'cap_color', e.target.value)} placeholder="Green" /></td>
+                                                <td>
+                                                    <button type="button" className="btn danger-xs" onClick={() => removeRow(index)}>✕</button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>

@@ -1345,6 +1345,23 @@ html.dark .badge.indigo {
     background: var(--accent-lt);
 }
 
+.box-count {
+    font-size: 10px;
+    font-weight: 600;
+    margin-top: 3px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    white-space: nowrap;
+}
+.box-count.ok {
+    color: var(--success);
+    background: var(--success-lt);
+}
+.box-count.warn {
+    color: var(--danger);
+    background: var(--danger-lt);
+}
+
 .btn {
     display: inline-flex;
     align-items: center;
