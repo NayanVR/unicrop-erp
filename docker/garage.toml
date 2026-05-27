@@ -1,7 +1,8 @@
 metadata_dir = "/var/lib/garage/meta"
 data_dir = "/var/lib/garage/data"
 db_engine = "lmdb"
-replication_mode = "1"
+replication_factor = 1
+consistency_mode = "consistent"
 
 rpc_bind_addr = "[::]:3901"
 
