@@ -24,8 +24,8 @@ services:
       TRUSTED_PROXIES: "*"
       # S3 / Garage object storage
       FILESYSTEM_DISK: ${FILESYSTEM_DISK:-s3}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-GKunicropphotoapp000001}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-unicropsecretkey0123456789abcdef}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-garage}
       AWS_BUCKET: ${AWS_BUCKET:-unicrop-photos}
       AWS_ENDPOINT: ${AWS_ENDPOINT:-http://garage:3900}
@@ -62,8 +62,8 @@ services:
       LOG_LEVEL: error
       # S3 / Garage object storage
       FILESYSTEM_DISK: ${FILESYSTEM_DISK:-s3}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-GKunicropphotoapp000001}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-unicropsecretkey0123456789abcdef}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-garage}
       AWS_BUCKET: ${AWS_BUCKET:-unicrop-photos}
       AWS_ENDPOINT: ${AWS_ENDPOINT:-http://garage:3900}
@@ -96,8 +96,8 @@ services:
       LOG_LEVEL: error
       # S3 / Garage object storage
       FILESYSTEM_DISK: ${FILESYSTEM_DISK:-s3}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-GKunicropphotoapp000001}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-unicropsecretkey0123456789abcdef}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-garage}
       AWS_BUCKET: ${AWS_BUCKET:-unicrop-photos}
       AWS_ENDPOINT: ${AWS_ENDPOINT:-http://garage:3900}
@@ -118,7 +118,7 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -134,10 +134,10 @@ services:
   # Override them in Dokploy env vars if you want custom credentials.
   garage:
     image: dxflrs/garage:v2.3.0
-    command: ["/garage", "server", "--single-node", "--default-bucket", "--default-access-key"]
+    command: [ "/garage", "server", "--single-node", "--default-bucket", "--default-access-key" ]
     environment:
-      GARAGE_DEFAULT_ACCESS_KEY: ${AWS_ACCESS_KEY_ID:-GKunicropphotoapp000001}
-      GARAGE_DEFAULT_SECRET_KEY: ${AWS_SECRET_ACCESS_KEY:-unicropsecretkey0123456789abcdef}
+      GARAGE_DEFAULT_ACCESS_KEY: ${AWS_ACCESS_KEY_ID}
+      GARAGE_DEFAULT_SECRET_KEY: ${AWS_SECRET_ACCESS_KEY}
       GARAGE_DEFAULT_BUCKET: ${AWS_BUCKET:-unicrop-photos}
     volumes:
       - ./docker/garage.toml:/etc/garage.toml:ro
