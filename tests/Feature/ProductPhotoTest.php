@@ -10,12 +10,11 @@ test('it generates a temporary s3 url for product photos', function () {
         ->once()
         ->with('s3')
         ->andReturn(new class {
-        public function temporaryUrl(string $path, DateTimeInterface $expiration): string
+        public function url(string $path): string
         {
             expect($path)->toBe('product-photos/our-brand/example.jpg');
-            expect($expiration)->toBeInstanceOf(DateTimeInterface::class);
 
-            return 'https://example.test/signed-photo-url';
+            return 'https://storage.example.test/unicrop-photos/product-photos/our-brand/example.jpg';
         }
         });
 
@@ -23,5 +22,5 @@ test('it generates a temporary s3 url for product photos', function () {
         'photo_path' => 'product-photos/our-brand/example.jpg',
     ]);
 
-    expect($photo->photo_url)->toBe('https://example.test/signed-photo-url');
+    expect($photo->photo_url)->toBe('https://storage.example.test/unicrop-photos/product-photos/our-brand/example.jpg');
 });

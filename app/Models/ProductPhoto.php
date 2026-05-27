@@ -32,7 +32,7 @@ class ProductPhoto extends Model
         $disk = config('filesystems.default', 'public');
 
         if ($disk === 's3') {
-            return Storage::disk('s3')->temporaryUrl($this->photo_path, now()->addHour());
+            return Storage::disk('s3')->url($this->photo_path);
         }
 
         return Storage::disk('public')->url($this->photo_path);
