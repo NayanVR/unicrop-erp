@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Party;
 use App\Models\PartyDocument;
+use App\Models\ProductPhoto;
+use App\Models\ProductPhotoFolder;
 use App\Models\ProductRate;
 use App\Models\Transport;
 use Illuminate\Http\RedirectResponse;
@@ -31,7 +33,17 @@ class PartyController extends Controller
         $transports = Transport::transports()->orderBy('name')->get(['id', 'name']);
         $couriers = Transport::couriers()->orderBy('name')->get(['id', 'name']);
 
-        return Inertia::render('erp/parties/index', compact('parties', 'stats', 'transports', 'couriers'));
+        $partyPhotos = ProductPhoto::whereNotNull('party_id')
+            ->get()
+            ->map(fn ($p) => [
+                'id'          => $p->id,
+                'party_id'    => $p->party_id,
+                'our_brand'   => $p->our_brand,
+                'party_brand' => $p->party_brand,
+                'photo_url'   => $p->photo_url,
+            ]);
+
+        return Inertia::render('erp/parties/index', compact('parties', 'stats', 'transports', 'couriers', 'partyPhotos'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -121,6 +133,37 @@ class PartyController extends Controller
         $document->delete();
 
         return redirect()->back()->with('success', 'Document removed.');
+    }
+
+    public function storeProductPhoto(Request $request, Party $party): RedirectResponse
+    {
+        $request->validate([
+            'our_brand'   => 'required|string|max:255',
+            'party_brand' => 'nullable|string|max:255',
+            'photo'       => 'required|image|mimes:jpg,jpeg,png,webp|max:8192',
+        ]);
+
+        $path = $request->file('photo')->store('product-photos', 'public');
+
+        ProductPhoto::updateOrCreate(
+            [
+                'party_id'    => $party->id,
+                'our_brand'   => $request->input('our_brand'),
+                'party_brand' => $request->input('party_brand') ?: null,
+            ],
+            [
+                'packing_size' => null,
+                'photo_path'   => $path,
+                'uploaded_by'  => $request->user()?->id,
+            ]
+        );
+
+        ProductPhotoFolder::firstOrCreate(
+            ['party_id' => $party->id],
+            ['created_by' => $request->user()?->id]
+        );
+
+        return redirect()->back()->with('success', 'Product photo saved.');
     }
 
     public function storeProductRate(Request $request, Party $party): RedirectResponse
