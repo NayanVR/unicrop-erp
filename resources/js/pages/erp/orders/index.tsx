@@ -124,6 +124,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
     const [activeFilter, setActiveFilter] = useState<'all' | 'mine'>('all');
     const [openOrders, setOpenOrders] = useState<number[]>([]);
     const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
+    const [confirmStep, setConfirmStep] = useState<'factory' | 'design'>('factory');
     const [submitting, setSubmitting] = useState<'factory' | 'design' | null>(null);
 
     const photoMap = useMemo(() => buildPhotoMap(productPhotos), [productPhotos]);
@@ -140,7 +141,14 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
 
     const openConfirm = (order: Order, e: React.MouseEvent) => {
         e.stopPropagation();
+        setConfirmStep('factory');
         setConfirmTarget({ id: order.id, number: order.order_number });
+    };
+
+    const closeConfirm = () => {
+        if (submitting) return;
+        setConfirmTarget(null);
+        setConfirmStep('factory');
     };
 
     const doSendToFactory = () => {
@@ -148,7 +156,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
         setSubmitting('factory');
         router.post(ordersConfirm(confirmTarget.id).url, {}, {
             preserveScroll: true,
-            onFinish: () => { setSubmitting(null); setConfirmTarget(null); },
+            onFinish: () => { setSubmitting(null); setConfirmTarget(null); setConfirmStep('factory'); },
         });
     };
 
@@ -157,7 +165,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
         setSubmitting('design');
         router.post(ordersSendToDesign(confirmTarget.id).url, {}, {
             preserveScroll: true,
-            onFinish: () => { setSubmitting(null); setConfirmTarget(null); },
+            onFinish: () => { setSubmitting(null); setConfirmTarget(null); setConfirmStep('factory'); },
         });
     };
 
@@ -165,50 +173,53 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
         <>
             <Head title="All Orders" />
 
-            {/* ── Confirm destination modal ────────────────────────── */}
+            {/* ── Confirm destination modal (two sequential steps) ──── */}
             {confirmTarget && (
-                <div className="modal-overlay open" onClick={() => !submitting && setConfirmTarget(null)}>
+                <div className="modal-overlay open" onClick={closeConfirm}>
                     <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
-                        <div className="modal-header">
-                            <h2>Confirm Order {confirmTarget.number}</h2>
-                            <button className="modal-close" onClick={() => setConfirmTarget(null)} disabled={!!submitting}>✕</button>
-                        </div>
-                        <div className="modal-form">
-                            <p style={{ color: 'var(--tx-muted)', marginBottom: '20px', fontSize: '14px' }}>
-                                Where should this order be sent?
-                            </p>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                                <button
-                                    type="button"
-                                    className="btn-secondary"
-                                    style={{ flex: 1, padding: '12px', fontSize: '14px', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
-                                    onClick={doSendToDesign}
-                                    disabled={!!submitting}
-                                >
-                                    <span style={{ fontSize: '28px' }}>🎨</span>
-                                    <span style={{ fontWeight: 600 }}>Design Team</span>
-                                    <span style={{ fontSize: '12px', color: 'var(--tx-muted)' }}>Label & packaging</span>
-                                    {submitting === 'design' && <span style={{ fontSize: '12px' }}>Sending…</span>}
-                                </button>
-                                <button
-                                    type="button"
-                                    className="btn-primary"
-                                    style={{ flex: 1, padding: '12px', fontSize: '14px', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
-                                    onClick={doSendToFactory}
-                                    disabled={!!submitting}
-                                >
-                                    <span style={{ fontSize: '28px' }}>🏭</span>
-                                    <span style={{ fontWeight: 600 }}>Factory</span>
-                                    <span style={{ fontSize: '12px', opacity: 0.8 }}>Start production</span>
-                                    {submitting === 'factory' && <span style={{ fontSize: '12px' }}>Sending…</span>}
-                                </button>
-                            </div>
-                            <div className="modal-actions" style={{ marginTop: '16px', justifyContent: 'flex-end' }}>
-                                <button type="button" className="btn-secondary" onClick={() => setConfirmTarget(null)} disabled={!!submitting}>
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
+                        {confirmStep === 'factory' ? (
+                            <>
+                                <div className="modal-header">
+                                    <h2>🏭 Send to Factory</h2>
+                                    <button className="modal-close" onClick={closeConfirm} disabled={!!submitting}>✕</button>
+                                </div>
+                                <div className="modal-form">
+                                    <p style={{ color: 'var(--tx-muted)', marginBottom: '20px', fontSize: '14px' }}>
+                                        Confirm and send order <strong>{confirmTarget.number}</strong> to the
+                                        Factory to start production?
+                                    </p>
+                                    <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
+                                        <button type="button" className="btn-secondary" onClick={() => setConfirmStep('design')} disabled={!!submitting}>
+                                            No, send to Design →
+                                        </button>
+                                        <button type="button" className="btn-primary" onClick={doSendToFactory} disabled={!!submitting}>
+                                            {submitting === 'factory' ? 'Sending…' : '✓ Send to Factory'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="modal-header">
+                                    <h2>🎨 Send to Design</h2>
+                                    <button className="modal-close" onClick={closeConfirm} disabled={!!submitting}>✕</button>
+                                </div>
+                                <div className="modal-form">
+                                    <p style={{ color: 'var(--tx-muted)', marginBottom: '20px', fontSize: '14px' }}>
+                                        Confirm and send order <strong>{confirmTarget.number}</strong> to the
+                                        Design team for label &amp; packaging?
+                                    </p>
+                                    <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
+                                        <button type="button" className="btn-secondary" onClick={() => setConfirmStep('factory')} disabled={!!submitting}>
+                                            ← Back
+                                        </button>
+                                        <button type="button" className="btn-primary" onClick={doSendToDesign} disabled={!!submitting}>
+                                            {submitting === 'design' ? 'Sending…' : '✓ Send to Design'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             )}
