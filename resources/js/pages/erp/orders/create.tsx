@@ -193,31 +193,27 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         [partyRates],
     );
 
-    // Photo lookup maps for fast thumbnail resolution
+    // Photo lookup — always use Our Brand gallery photos (party_id = null)
     const photoMap = useMemo(() => {
-        const ob = new Map<string, string>(); // "our_brand|packing_size" → url
-        const pb = new Map<string, string>(); // "party_id|party_brand|packing_size" → url
+        const exact = new Map<string, string>(); // "brand|size" → url
+        const byBrand = new Map<string, string>(); // "brand" → first photo url
         for (const p of productPhotos) {
-            if (p.party_id === null) {
-                ob.set(`${p.our_brand.toLowerCase()}|${(p.packing_size ?? '').toLowerCase()}`, p.photo_url);
-                if (!p.packing_size) ob.set(`${p.our_brand.toLowerCase()}|`, p.photo_url);
-            } else if (p.party_brand) {
-                pb.set(`${p.party_id}|${p.party_brand.toLowerCase()}|${(p.packing_size ?? '').toLowerCase()}`, p.photo_url);
-            }
+            if (p.party_id !== null) continue;
+            const b = p.our_brand.toLowerCase();
+            const s = (p.packing_size ?? '').toLowerCase();
+            exact.set(`${b}|${s}`, p.photo_url);
+            if (!byBrand.has(b)) byBrand.set(b, p.photo_url);
         }
-        return { ob, pb };
+        return { exact, byBrand };
     }, [productPhotos]);
 
-    const getRowPhoto = (row: ProductRow, partyId: string): string | null => {
+    const getRowPhoto = (row: ProductRow): string | null => {
         if (!row.our_brand) return null;
-        const size = row.packing_size.toLowerCase();
-        if (partyId && row.party_brand) {
-            const key = `${partyId}|${row.party_brand.toLowerCase()}|${size}`;
-            const url = photoMap.pb.get(key) ?? photoMap.pb.get(`${partyId}|${row.party_brand.toLowerCase()}|`);
-            if (url) return url;
-        }
-        return photoMap.ob.get(`${row.our_brand.toLowerCase()}|${size}`)
-            ?? photoMap.ob.get(`${row.our_brand.toLowerCase()}|`)
+        const b = row.our_brand.toLowerCase();
+        const s = row.packing_size.toLowerCase();
+        return photoMap.exact.get(`${b}|${s}`)
+            ?? photoMap.exact.get(`${b}|`)
+            ?? photoMap.byBrand.get(b)
             ?? null;
     };
 
@@ -674,7 +670,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                         const boxes = pcsPerBox && qty > 0 ? qty / pcsPerBox : null;
                                         const boxesExact = boxes !== null && Number.isInteger(boxes);
 
-                                        const rowPhoto = getRowPhoto(row, form.data.party_id);
+                                        const rowPhoto = getRowPhoto(row);
 
                                         return (
                                             <tr key={`row-${index}`}>
