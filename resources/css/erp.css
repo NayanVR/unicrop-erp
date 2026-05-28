@@ -1803,6 +1803,8 @@ html.dark .badge.indigo {
     align-items: center;
     justify-content: space-between;
     margin-bottom: 18px;
+    cursor: move;
+    user-select: none;
 }
 .modal-header h2 {
     font-family: var(--font-head);

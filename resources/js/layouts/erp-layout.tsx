@@ -1,4 +1,5 @@
 import { useAppearance } from '@/hooks/use-appearance';
+import { useDraggableModals } from '@/hooks/use-draggable-modals';
 import { dashboard, logout } from '@/routes';
 import { index as bomIndex } from '@/routes/bom';
 import { index as designIndex } from '@/routes/design';
@@ -123,6 +124,8 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
 
     const role = auth.user?.role ?? auth.user?.roles?.[0]?.slug ?? null;
     const navItems = useMemo(() => NAV_DEFS[role ?? 'admin'] ?? [], [role]);
+
+    useDraggableModals();
 
     useEffect(() => {
         const updateTime = () => {
