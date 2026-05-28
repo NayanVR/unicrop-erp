@@ -80,6 +80,14 @@ class Order extends Model
     }
 
     /**
+     * @return HasMany<DesignOrder>
+     */
+    public function designOrders(): HasMany
+    {
+        return $this->hasMany(DesignOrder::class);
+    }
+
+    /**
      * @return BelongsTo<User, Order>
      */
     public function salesUser(): BelongsTo

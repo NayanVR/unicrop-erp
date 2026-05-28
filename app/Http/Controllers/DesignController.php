@@ -101,7 +101,14 @@ class DesignController extends Controller
         $log = $designOrder->stage_log ?? [];
         $log[] = ['stage' => $next, 'at' => now()->toISOString(), 'by' => $request->user()?->name];
 
-        $designOrder->update(['status' => $next, 'stage_log' => $log]);
+        $update = ['status' => $next, 'stage_log' => $log];
+
+        // The first design user to move the order is the one who accepts it
+        if (! $designOrder->assigned_to) {
+            $update['assigned_to'] = $request->user()?->id;
+        }
+
+        $designOrder->update($update);
 
         return redirect()->back()->with('success', "Moved to: {$next}");
     }

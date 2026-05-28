@@ -27,7 +27,14 @@ class OrderController extends Controller
         $role = $user->roles->first()?->slug;
 
         $ordersQuery = Order::query()
-            ->with(['items', 'salesUser'])
+            ->with([
+                'items',
+                'salesUser:id,name',
+                'createdBy:id,name',
+                'confirmedBy:id,name',
+                'designOrders:id,order_id,assigned_to,status',
+                'designOrders.assignee:id,name',
+            ])
             ->orderByDesc('order_date')
             ->orderByDesc('id');
 
@@ -38,6 +45,23 @@ class OrderController extends Controller
         // Admin and office see all orders
 
         $orders = $ordersQuery->get();
+
+        // Surface activity attribution as plain fields, then drop the relation
+        // objects whose serialized keys would clobber the created_by / confirmed_by columns.
+        $orders->each(function (Order $order) {
+            $order->confirmed_by_name = $order->confirmedBy?->name;
+            $order->created_by_name = $order->createdBy?->name;
+            $order->design_handlers = $order->designOrders
+                ->map(fn ($d) => $d->assignee?->name)
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            $order->unsetRelation('confirmedBy');
+            $order->unsetRelation('createdBy');
+            $order->unsetRelation('designOrders');
+        });
 
         return Inertia::render('erp/orders/index', [
             'pageTitle'     => 'All Orders',

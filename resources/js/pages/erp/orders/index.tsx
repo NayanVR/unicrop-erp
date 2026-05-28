@@ -45,6 +45,13 @@ type OrderItem = {
     gst_percent: string | number;
     gst_amount: string | number;
     status?: string | null;
+    stage_log?: Array<{ stage?: string; name?: string | null; at?: string; revert?: boolean }> | null;
+};
+
+const lastStageActor = (item: OrderItem): string | null => {
+    const log = item.stage_log;
+    if (!log || log.length === 0) return null;
+    return log[log.length - 1]?.name ?? null;
 };
 
 type Order = {
@@ -65,6 +72,10 @@ type Order = {
     subtotal?: string | number;
     gst_total?: string | number;
     total_amount?: string | number;
+    confirmed_at?: string | null;
+    confirmed_by_name?: string | null;
+    created_by_name?: string | null;
+    design_handlers?: string[];
     items: OrderItem[];
 };
 
@@ -454,6 +465,28 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                         )}
                                     </div>
 
+                                    {/* Activity attribution — who did what */}
+                                    {(order.created_by_name || order.confirmed_by_name || (order.design_handlers?.length ?? 0) > 0) && (
+                                        <div className="activity-row">
+                                            {order.created_by_name && (
+                                                <span className="activity-chip">
+                                                    📝 Created by <strong>{order.created_by_name}</strong>
+                                                </span>
+                                            )}
+                                            {order.confirmed_by_name && (
+                                                <span className="activity-chip">
+                                                    ✓ Confirmed by <strong>{order.confirmed_by_name}</strong>
+                                                    {order.confirmed_at ? ` · ${formatDate((order.confirmed_at ?? '').slice(0, 10))}` : ''}
+                                                </span>
+                                            )}
+                                            {(order.design_handlers?.length ?? 0) > 0 && (
+                                                <span className="activity-chip">
+                                                    🎨 Design by <strong>{order.design_handlers!.join(', ')}</strong>
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+
                                     <div className="prod-wrap">
                                         <table className="prod-table">
                                             <thead>
@@ -502,6 +535,11 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                                     <span className={`badge s-${item.status ?? 'pending'}`}>
                                                                         {(item.status ?? 'pending').toUpperCase()}
                                                                     </span>
+                                                                    {lastStageActor(item) && (
+                                                                        <div className="prod-detail" style={{ marginTop: '2px' }}>
+                                                                            by {lastStageActor(item)}
+                                                                        </div>
+                                                                    )}
                                                                 </td>
                                                             </tr>
                                                         );

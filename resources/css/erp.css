@@ -1633,6 +1633,24 @@ html.dark .badge.indigo {
 .confirm-btn {
     margin-left: auto;
 }
+.activity-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0;
+}
+.activity-chip {
+    font-size: 12px;
+    color: var(--tx-muted);
+    background: var(--bg-paper);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 4px 12px;
+}
+.activity-chip strong {
+    color: var(--tx-head);
+    font-weight: 600;
+}
 .status-select {
     font-size: 11px;
     border-radius: 20px;
