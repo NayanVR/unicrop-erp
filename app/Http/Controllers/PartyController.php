@@ -177,7 +177,11 @@ class PartyController extends Controller
         ]);
 
         $party->productRates()->updateOrCreate(
-            ['our_brand' => $data['our_brand'], 'packing_size' => $data['packing_size']],
+            [
+                'our_brand'    => $data['our_brand'],
+                'party_brand'  => $data['party_brand'] ?? null,
+                'packing_size' => $data['packing_size'],
+            ],
             $data
         );
 
