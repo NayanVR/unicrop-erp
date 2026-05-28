@@ -224,13 +224,14 @@ class OrderController extends Controller
             DesignOrder::create([
                 'created_by'          => $request->user()?->id,
                 'order_id'            => $order->id,
+                'order_qty'           => (int) $item->quantity,
                 'party_brand'         => $item->party_brand ?? '',
                 'product_name'        => $item->our_brand ?? '',
                 'packing_size'        => $item->packing_size,
                 'instructions'        => $note,
-                'status'              => 'accepted',
+                'status'              => 'pending',
                 'skip_party_approval' => $skip,
-                'stage_log'           => [['status' => 'accepted', 'at' => now()->toISOString()]],
+                'stage_log'           => [['stage' => 'pending', 'at' => now()->toISOString(), 'by' => $request->user()?->name]],
             ]);
         }
 

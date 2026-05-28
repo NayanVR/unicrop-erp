@@ -12,11 +12,12 @@ use Inertia\Response;
 class DesignController extends Controller
 {
     private const STAGE_FLOW = [
-        'accepted' => 'design-ready',
-        'design-ready' => 'approved-party',
+        'pending'        => 'accepted',
+        'accepted'       => 'design-ready',
+        'design-ready'   => 'approved-party',
         'approved-party' => 'sent-print',
-        'sent-print' => 'completed',
-        'completed' => 'received-factory',
+        'sent-print'     => 'completed',
+        'completed'      => 'received-factory',
     ];
 
     public function index(): Response
@@ -24,7 +25,7 @@ class DesignController extends Controller
         $designOrders = DesignOrder::with([
             'creator:id,name',
             'assignee:id,name',
-            'order:id,order_number,company_name',
+            'order:id,order_number,company_name,customer_name',
         ])
             ->latest()
             ->get();
@@ -33,9 +34,10 @@ class DesignController extends Controller
             ->get(['id', 'name']);
 
         $stats = [
-            'total' => $designOrders->count(),
-            'in_progress' => $designOrders->whereNotIn('status', ['completed', 'received-factory'])->count(),
-            'completed' => $designOrders->where('status', 'completed')->count(),
+            'total'            => $designOrders->count(),
+            'pending'          => $designOrders->where('status', 'pending')->count(),
+            'in_progress'      => $designOrders->whereNotIn('status', ['pending', 'completed', 'received-factory'])->count(),
+            'completed'        => $designOrders->where('status', 'completed')->count(),
             'received_factory' => $designOrders->where('status', 'received-factory')->count(),
         ];
 
@@ -111,6 +113,38 @@ class DesignController extends Controller
         $designOrder->update($update);
 
         return redirect()->back()->with('success', "Moved to: {$next}");
+    }
+
+    public function updateTracking(Request $request, DesignOrder $designOrder): RedirectResponse
+    {
+        if ($designOrder->status === 'pending') {
+            return redirect()->back()->with('error', 'Order must be accepted before updating tracking.');
+        }
+
+        $data = $request->validate([
+            'pcs_to_print'    => 'nullable|integer|min:0',
+            'labels_received' => 'nullable|integer|min:0',
+        ]);
+
+        if (array_key_exists('pcs_to_print', $data)) {
+            $max = $designOrder->order_qty ?? PHP_INT_MAX;
+            if ((int) $data['pcs_to_print'] > $max) {
+                return redirect()->back()->with('error', "Pieces to print cannot exceed order quantity ({$max}).");
+            }
+            $designOrder->pcs_to_print = $data['pcs_to_print'];
+        }
+
+        if (array_key_exists('labels_received', $data)) {
+            $max = $designOrder->pcs_to_print ?? ($designOrder->order_qty ?? PHP_INT_MAX);
+            if ((int) $data['labels_received'] > $max) {
+                return redirect()->back()->with('error', "Labels received cannot exceed pieces to print ({$max}).");
+            }
+            $designOrder->labels_received = $data['labels_received'];
+        }
+
+        $designOrder->save();
+
+        return redirect()->back()->with('success', 'Tracking updated.');
     }
 
     public function destroy(DesignOrder $designOrder): RedirectResponse
