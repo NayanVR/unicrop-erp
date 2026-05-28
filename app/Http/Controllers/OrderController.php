@@ -30,9 +30,9 @@ class OrderController extends Controller
             ->orderByDesc('order_date')
             ->orderByDesc('id');
 
-        // Design users only see orders that have been explicitly sent to design
+        // Design users see confirmed orders (sent to both factory & design) and design-only orders
         if ($role === Role::DESIGN) {
-            $ordersQuery->where('status', 'design');
+            $ordersQuery->whereIn('status', ['confirmed', 'design']);
         }
         // Admin and office see all orders
 
