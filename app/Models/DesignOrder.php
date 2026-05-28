@@ -11,6 +11,7 @@ class DesignOrder extends Model
         'created_by',
         'assigned_to',
         'order_id',
+        'order_item_id',
         'order_qty',
         'pcs_to_print',
         'labels_received',

@@ -1,3 +1,4 @@
+import { advance as designAdvance, tracking as designTracking } from '@/routes/design';
 import { confirm as ordersConfirm, create as ordersCreate, sendToDesign as ordersSendToDesign } from '@/routes/orders';
 import { Head, Link, router } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
@@ -76,8 +77,34 @@ type Order = {
     confirmed_by_name?: string | null;
     created_by_name?: string | null;
     design_handlers?: string[];
+    design_items?: DesignItem[];
     items: OrderItem[];
 };
+
+type DesignItem = {
+    id: number;
+    order_item_id: number | null;
+    status: string;
+    order_qty: number | null;
+    pcs_to_print: number | null;
+    labels_received: number | null;
+    skip_party_approval: boolean;
+    assignee: string | null;
+    stage_log: Array<{ stage: string; at: string; by?: string | null }> | null;
+};
+
+const DESIGN_STAGES = [
+    { key: 'pending',          label: 'Pending Acceptance',  advanceLabel: '✓ Mark Accepted' },
+    { key: 'accepted',         label: 'Accepted',            advanceLabel: '✓ Mark Design Ready' },
+    { key: 'design-ready',     label: 'Design Ready',        advanceLabel: '✓ Party Approved' },
+    { key: 'approved-party',   label: 'Party Approved',      advanceLabel: '✓ Sent to Print' },
+    { key: 'sent-print',       label: 'Sent to Print',       advanceLabel: '✓ Mark Completed' },
+    { key: 'completed',        label: 'Completed',           advanceLabel: '✓ Received at Factory' },
+    { key: 'received-factory', label: 'Received at Factory', advanceLabel: '' },
+];
+
+const designStagesFor = (skip: boolean) =>
+    skip ? DESIGN_STAGES.filter((s) => s.key !== 'approved-party') : DESIGN_STAGES;
 
 type ProductPhoto = {
     id: number;
@@ -141,6 +168,13 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
     const [skipPartyApproval, setSkipPartyApproval] = useState(false);
     const [selectedItemIds, setSelectedItemIds] = useState<number[]>([]);
 
+    // Per-item design workflow modals (design role)
+    const [printModal, setPrintModal] = useState<{ id: number; orderQty: number; current: number | null } | null>(null);
+    const [printValue, setPrintValue] = useState('');
+    const [labelsModal, setLabelsModal] = useState<{ id: number; maxQty: number; current: number | null } | null>(null);
+    const [labelsValue, setLabelsValue] = useState('');
+    const [trackSaving, setTrackSaving] = useState(false);
+
     const photoMap = useMemo(() => buildPhotoMap(productPhotos), [productPhotos]);
 
     const visibleOrders = useMemo(() => {
@@ -202,6 +236,51 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
             onFinish: () => { setSubmitting(false); setConfirmTarget(null); setConfirmStep('factory'); },
         });
     };
+
+    // ── Per-item design workflow ──
+    const advanceDesign = (designId: number) =>
+        router.post(designAdvance(designId).url, {}, { preserveScroll: true });
+
+    const openPrintModal = (di: DesignItem) => {
+        const orderQty = di.order_qty ?? 0;
+        const remaining = orderQty - (di.pcs_to_print ?? 0);
+        setPrintModal({ id: di.id, orderQty, current: di.pcs_to_print });
+        setPrintValue(String(remaining > 0 ? remaining : 0));
+    };
+    const submitPrint = () => {
+        if (!printModal) return;
+        const val = parseInt(printValue, 10);
+        const remaining = printModal.orderQty - (printModal.current ?? 0);
+        if (isNaN(val) || val <= 0 || val > remaining) return;
+        setTrackSaving(true);
+        router.patch(designTracking(printModal.id).url, {
+            pcs_to_print: (printModal.current ?? 0) + val,
+        }, {
+            preserveScroll: true,
+            onFinish: () => { setTrackSaving(false); setPrintModal(null); },
+        });
+    };
+
+    const openLabelsModal = (di: DesignItem) => {
+        const maxQty = di.pcs_to_print ?? (di.order_qty ?? 0);
+        setLabelsModal({ id: di.id, maxQty, current: di.labels_received });
+        setLabelsValue(String(di.labels_received ?? 0));
+    };
+    const submitLabels = () => {
+        if (!labelsModal) return;
+        const val = parseInt(labelsValue, 10);
+        if (isNaN(val) || val < 0 || val > labelsModal.maxQty) return;
+        setTrackSaving(true);
+        router.patch(designTracking(labelsModal.id).url, {
+            labels_received: val,
+        }, {
+            preserveScroll: true,
+            onFinish: () => { setTrackSaving(false); setLabelsModal(null); },
+        });
+    };
+
+    const designItemFor = (order: Order, itemId: number): DesignItem | undefined =>
+        order.design_items?.find((d) => d.order_item_id === itemId);
 
     return (
         <>
@@ -343,6 +422,126 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                     </div>
                 );
             })()}
+
+            {/* ── Send to Print modal (design role) ──────────────────── */}
+            {printModal && (
+                <div className="modal-overlay open" onClick={() => !trackSaving && setPrintModal(null)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+                        <div className="modal-header">
+                            <h2>🖨️ Send to Print</h2>
+                            <button className="modal-close" onClick={() => setPrintModal(null)} disabled={trackSaving}>✕</button>
+                        </div>
+                        <div className="modal-form">
+                            <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label>Total Order Qty</label>
+                                    <div style={{ fontWeight: 700, fontSize: '20px', color: 'var(--tx-head)' }}>{printModal.orderQty}</div>
+                                </div>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label>Already Sent</label>
+                                    <div style={{ fontWeight: 700, fontSize: '20px', color: 'var(--tx-muted)' }}>{printModal.current ?? 0}</div>
+                                </div>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label>Remaining</label>
+                                    <div style={{ fontWeight: 700, fontSize: '20px', color: '#059669' }}>{printModal.orderQty - (printModal.current ?? 0)}</div>
+                                </div>
+                            </div>
+                            <div className="form-group" style={{ marginBottom: '20px' }}>
+                                <label>Pieces to Send Now</label>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    max={printModal.orderQty - (printModal.current ?? 0)}
+                                    value={printValue}
+                                    onChange={(e) => setPrintValue(e.target.value)}
+                                    style={{ fontSize: '16px', fontWeight: 700 }}
+                                    autoFocus
+                                    disabled={trackSaving}
+                                />
+                                {parseInt(printValue, 10) > printModal.orderQty - (printModal.current ?? 0) && (
+                                    <span style={{ color: '#dc2626', fontSize: '12px' }}>
+                                        Cannot exceed remaining quantity ({printModal.orderQty - (printModal.current ?? 0)})
+                                    </span>
+                                )}
+                            </div>
+                            <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
+                                <button type="button" className="btn-secondary" onClick={() => setPrintModal(null)} disabled={trackSaving}>Cancel</button>
+                                <button
+                                    type="button"
+                                    className="btn-primary"
+                                    onClick={submitPrint}
+                                    disabled={
+                                        trackSaving ||
+                                        !printValue ||
+                                        parseInt(printValue, 10) <= 0 ||
+                                        parseInt(printValue, 10) > printModal.orderQty - (printModal.current ?? 0)
+                                    }
+                                >
+                                    {trackSaving ? 'Saving…' : '🖨️ Send to Print'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Labels Received modal (design role) ────────────────── */}
+            {labelsModal && (
+                <div className="modal-overlay open" onClick={() => !trackSaving && setLabelsModal(null)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '360px' }}>
+                        <div className="modal-header">
+                            <h2>🏷️ Labels Received</h2>
+                            <button className="modal-close" onClick={() => setLabelsModal(null)} disabled={trackSaving}>✕</button>
+                        </div>
+                        <div className="modal-form">
+                            <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label>Printed / Expected</label>
+                                    <div style={{ fontWeight: 700, fontSize: '20px', color: 'var(--tx-head)' }}>{labelsModal.maxQty}</div>
+                                </div>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label>Pending</label>
+                                    <div style={{ fontWeight: 700, fontSize: '20px', color: '#dc2626' }}>{labelsModal.maxQty - (labelsModal.current ?? 0)}</div>
+                                </div>
+                            </div>
+                            <div className="form-group" style={{ marginBottom: '20px' }}>
+                                <label>Total Labels Received</label>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    max={labelsModal.maxQty}
+                                    value={labelsValue}
+                                    onChange={(e) => setLabelsValue(e.target.value)}
+                                    style={{ fontSize: '16px', fontWeight: 700 }}
+                                    autoFocus
+                                    disabled={trackSaving}
+                                />
+                                {parseInt(labelsValue, 10) > labelsModal.maxQty && (
+                                    <span style={{ color: '#dc2626', fontSize: '12px' }}>
+                                        Cannot exceed pieces to print ({labelsModal.maxQty})
+                                    </span>
+                                )}
+                            </div>
+                            <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
+                                <button type="button" className="btn-secondary" onClick={() => setLabelsModal(null)} disabled={trackSaving}>Cancel</button>
+                                <button
+                                    type="button"
+                                    className="btn-primary"
+                                    onClick={submitLabels}
+                                    disabled={
+                                        trackSaving ||
+                                        labelsValue === '' ||
+                                        parseInt(labelsValue, 10) < 0 ||
+                                        parseInt(labelsValue, 10) > labelsModal.maxQty
+                                    }
+                                >
+                                    {trackSaving ? 'Saving…' : '✓ Update Labels'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div id="view-orders" className="view active">
                 <div className="page-header">
@@ -487,96 +686,190 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                         </div>
                                     )}
 
-                                    <div className="prod-wrap">
-                                        <table className="prod-table">
-                                            <thead>
-                                                <tr>
-                                                    <th style={{ width: '52px' }}></th>
-                                                    <th>Product</th>
-                                                    <th>Packing</th>
-                                                    <th>Qty</th>
-                                                    {!isDesign && <th>Rate</th>}
-                                                    {!isDesign && <th>GST %</th>}
-                                                    {!isDesign && <th>Amount</th>}
-                                                    <th>Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {order.items.length === 0 ? (
-                                                    <tr>
-                                                        <td colSpan={isDesign ? 5 : 8} style={{ textAlign: 'center', padding: '16px' }}>
-                                                            No items yet.
-                                                        </td>
-                                                    </tr>
-                                                ) : (
-                                                    order.items.map((item) => {
-                                                        const photo = getItemPhoto(item, order.party_id, photoMap);
-                                                        return (
-                                                            <tr key={item.id}>
-                                                                <td style={{ textAlign: 'center', padding: '4px 6px' }}>
-                                                                    {photo ? (
-                                                                        <img src={photo} alt="" style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '6px', border: '1px solid var(--border)', background: '#fff', padding: '2px', display: 'block' }} />
-                                                                    ) : (
-                                                                        <div style={{ width: '40px', height: '40px', borderRadius: '6px', border: '1px dashed var(--border)', background: 'var(--bg-paper)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', color: 'var(--tx-muted)' }}>
-                                                                            📷
-                                                                        </div>
-                                                                    )}
-                                                                </td>
-                                                                <td>
-                                                                    <div className="prod-name">{item.our_brand ?? '—'}</div>
-                                                                    <div className="prod-detail">{item.party_brand ?? '—'}</div>
-                                                                </td>
-                                                                <td>{item.packing_size ?? '—'}</td>
-                                                                <td>{item.quantity}</td>
-                                                                {!isDesign && <td>{formatAmount(item.rate)}</td>}
-                                                                {!isDesign && <td>{item.gst_percent}</td>}
-                                                                {!isDesign && <td>{formatAmount(item.amount)}</td>}
-                                                                <td>
-                                                                    <span className={`badge s-${item.status ?? 'pending'}`}>
-                                                                        {(item.status ?? 'pending').toUpperCase()}
-                                                                    </span>
-                                                                    {lastStageActor(item) && (
-                                                                        <div className="prod-detail" style={{ marginTop: '2px' }}>
-                                                                            by {lastStageActor(item)}
-                                                                        </div>
-                                                                    )}
+                                    {/* ── Non-design: financial items table + summary ── */}
+                                    {!isDesign && (
+                                        <>
+                                            <div className="prod-wrap">
+                                                <table className="prod-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th style={{ width: '52px' }}></th>
+                                                            <th>Product</th>
+                                                            <th>Packing</th>
+                                                            <th>Qty</th>
+                                                            <th>Rate</th>
+                                                            <th>GST %</th>
+                                                            <th>Amount</th>
+                                                            <th>Status</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {order.items.length === 0 ? (
+                                                            <tr>
+                                                                <td colSpan={8} style={{ textAlign: 'center', padding: '16px' }}>
+                                                                    No items yet.
                                                                 </td>
                                                             </tr>
-                                                        );
-                                                    })
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                                        ) : (
+                                                            order.items.map((item) => {
+                                                                const photo = getItemPhoto(item, order.party_id, photoMap);
+                                                                return (
+                                                                    <tr key={item.id}>
+                                                                        <td style={{ textAlign: 'center', padding: '4px 6px' }}>
+                                                                            {photo ? (
+                                                                                <img src={photo} alt="" style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '6px', border: '1px solid var(--border)', background: '#fff', padding: '2px', display: 'block' }} />
+                                                                            ) : (
+                                                                                <div style={{ width: '40px', height: '40px', borderRadius: '6px', border: '1px dashed var(--border)', background: 'var(--bg-paper)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', color: 'var(--tx-muted)' }}>
+                                                                                    📷
+                                                                                </div>
+                                                                            )}
+                                                                        </td>
+                                                                        <td>
+                                                                            <div className="prod-name">{item.our_brand ?? '—'}</div>
+                                                                            <div className="prod-detail">{item.party_brand ?? '—'}</div>
+                                                                        </td>
+                                                                        <td>{item.packing_size ?? '—'}</td>
+                                                                        <td>{item.quantity}</td>
+                                                                        <td>{formatAmount(item.rate)}</td>
+                                                                        <td>{item.gst_percent}</td>
+                                                                        <td>{formatAmount(item.amount)}</td>
+                                                                        <td>
+                                                                            <span className={`badge s-${item.status ?? 'pending'}`}>
+                                                                                {(item.status ?? 'pending').toUpperCase()}
+                                                                            </span>
+                                                                            {lastStageActor(item) && (
+                                                                                <div className="prod-detail" style={{ marginTop: '2px' }}>
+                                                                                    by {lastStageActor(item)}
+                                                                                </div>
+                                                                            )}
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
 
-                                    <div className="form-card" style={{ marginBottom: 0 }}>
-                                        <div className="form-card-title">Order Summary</div>
-                                        {!isDesign && (
-                                            <div className="form-grid three">
-                                                <div className="form-group">
-                                                    <label>Subtotal</label>
-                                                    <div>{formatAmount(order.subtotal)}</div>
+                                            <div className="form-card" style={{ marginBottom: 0 }}>
+                                                <div className="form-card-title">Order Summary</div>
+                                                <div className="form-grid three">
+                                                    <div className="form-group">
+                                                        <label>Subtotal</label>
+                                                        <div>{formatAmount(order.subtotal)}</div>
+                                                    </div>
+                                                    <div className="form-group">
+                                                        <label>GST</label>
+                                                        <div>{formatAmount(order.gst_total)}</div>
+                                                    </div>
+                                                    <div className="form-group">
+                                                        <label>Total</label>
+                                                        <div>{formatAmount(order.total_amount)}</div>
+                                                    </div>
                                                 </div>
-                                                <div className="form-group">
-                                                    <label>GST</label>
-                                                    <div>{formatAmount(order.gst_total)}</div>
-                                                </div>
-                                                <div className="form-group">
-                                                    <label>Total</label>
-                                                    <div>{formatAmount(order.total_amount)}</div>
+                                                <div style={{ marginTop: '14px' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                                        <span>Production Progress</span>
+                                                        <span>{progress}%</span>
+                                                    </div>
+                                                    <div className="progress-bar">
+                                                        <div className="progress-fill" style={{ width: `${progress}%`, background: 'var(--accent)' }} />
+                                                    </div>
                                                 </div>
                                             </div>
-                                        )}
-                                        <div style={{ marginTop: isDesign ? 0 : '14px' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                                <span>Production Progress</span>
-                                                <span>{progress}%</span>
-                                            </div>
-                                            <div className="progress-bar">
-                                                <div className="progress-fill" style={{ width: `${progress}%`, background: 'var(--accent)' }} />
-                                            </div>
+                                        </>
+                                    )}
+
+                                    {/* ── Design: per-item workflow (accept gate, print, labels, stages) ── */}
+                                    {isDesign && (
+                                        <div className="design-items-wrap">
+                                            {order.items
+                                                .map((item) => ({ item, di: designItemFor(order, item.id) }))
+                                                .filter(({ di }) => di)
+                                                .map(({ item, di }) => {
+                                                    const d = di!;
+                                                    const isUnlocked = d.status !== 'pending';
+                                                    const orderQty = d.order_qty ?? Number(item.quantity) ?? 0;
+                                                    const pcsPending = orderQty - (d.pcs_to_print ?? 0);
+                                                    const labelMax = d.pcs_to_print ?? orderQty;
+                                                    const labelPending = labelMax - (d.labels_received ?? 0);
+                                                    const stages = designStagesFor(d.skip_party_approval);
+                                                    const curIdx = stages.findIndex((s) => s.key === d.status);
+                                                    const isDone = d.status === 'received-factory';
+                                                    const photo = getItemPhoto(item, order.party_id, photoMap);
+
+                                                    return (
+                                                        <div key={d.id} className="design-item-block">
+                                                            <div className="design-item-top">
+                                                                {photo ? (
+                                                                    <img src={photo} alt="" className="design-item-photo" />
+                                                                ) : (
+                                                                    <div className="design-item-photo placeholder">📷</div>
+                                                                )}
+                                                                <div className="design-item-info">
+                                                                    <div className="prod-name">{item.our_brand ?? '—'}</div>
+                                                                    <div className="prod-detail">{item.party_brand ?? '—'} · {item.packing_size ?? '—'}</div>
+                                                                </div>
+                                                                <div className="design-track">
+                                                                    <div className="track-box">
+                                                                        <span className="track-label">Order Qty</span>
+                                                                        <span className="track-num">{orderQty || '—'}</span>
+                                                                    </div>
+                                                                    <div className="track-box">
+                                                                        <span className="track-label" style={{ color: isUnlocked ? '#059669' : undefined }}>Pcs to Print</span>
+                                                                        {isUnlocked ? (
+                                                                            <button className="track-btn" onClick={() => openPrintModal(d)}>
+                                                                                <span className="track-num green">{d.pcs_to_print ?? '—'}</span>
+                                                                                <span className="track-sub">{pcsPending > 0 ? `${pcsPending} pending` : (d.pcs_to_print !== null ? '✓ done' : 'set')}</span>
+                                                                            </button>
+                                                                        ) : (
+                                                                            <span className="track-locked">🔒 locked</span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="track-box">
+                                                                        <span className="track-label" style={{ color: isUnlocked ? '#dc2626' : undefined }}>Labels Recv'd</span>
+                                                                        {isUnlocked ? (
+                                                                            <button className="track-btn" onClick={() => openLabelsModal(d)}>
+                                                                                <span className="track-num red">{d.labels_received ?? '—'}</span>
+                                                                                <span className="track-sub">{labelPending > 0 ? `${labelPending} pending` : (d.labels_received !== null ? '✓ all' : 'set')}</span>
+                                                                            </button>
+                                                                        ) : (
+                                                                            <span className="track-locked">🔒 locked</span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="design-stage-progress">
+                                                                <div className="design-stage-title">Design Stage Progress</div>
+                                                                {stages.map((s, i) => {
+                                                                    const isPast = i < curIdx;
+                                                                    const isCurrent = i === curIdx;
+                                                                    const isFuture = i > curIdx;
+                                                                    return (
+                                                                        <div key={s.key} className={`design-stage-row${isCurrent ? ' current' : ''}${isPast ? ' past' : ''}${isFuture ? ' future' : ''}`}>
+                                                                            <span className="stage-dot">{isPast ? '✓' : isCurrent ? '●' : '○'}</span>
+                                                                            <span className="stage-row-label">{s.label}</span>
+                                                                            {isCurrent && !isDone && (
+                                                                                <button className={`btn sm${s.key === 'pending' ? ' primary' : ' teal'}`} onClick={() => advanceDesign(d.id)}>
+                                                                                    {s.advanceLabel}
+                                                                                </button>
+                                                                            )}
+                                                                            {(isFuture || (isCurrent && isDone)) && <span className="stage-row-dash">—</span>}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            {order.items.every((item) => !designItemFor(order, item.id)) && (
+                                                <div className="empty-row" style={{ padding: '16px', textAlign: 'center', color: 'var(--tx-muted)' }}>
+                                                    No design items on this order yet.
+                                                </div>
+                                            )}
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             </div>
                         );

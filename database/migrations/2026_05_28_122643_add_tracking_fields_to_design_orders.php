@@ -34,9 +34,13 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('design_orders', function (Blueprint $table) {
-            $table->dropColumnIfExists('order_qty');
-            $table->dropColumnIfExists('pcs_to_print');
-            $table->dropColumnIfExists('labels_received');
+            $cols = array_filter(
+                ['order_qty', 'pcs_to_print', 'labels_received'],
+                fn ($c) => Schema::hasColumn('design_orders', $c)
+            );
+            if ($cols) {
+                $table->dropColumn(array_values($cols));
+            }
         });
     }
 };

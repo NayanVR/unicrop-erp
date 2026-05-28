@@ -32,7 +32,7 @@ class OrderController extends Controller
                 'salesUser:id,name',
                 'createdBy:id,name',
                 'confirmedBy:id,name',
-                'designOrders:id,order_id,assigned_to,status',
+                'designOrders:id,order_id,order_item_id,assigned_to,status,order_qty,pcs_to_print,labels_received,skip_party_approval,stage_log',
                 'designOrders.assignee:id,name',
             ])
             ->orderByDesc('order_date')
@@ -57,6 +57,19 @@ class OrderController extends Controller
                 ->unique()
                 ->values()
                 ->all();
+
+            // Per-item design workflow data, keyed by order_item_id for the design view
+            $order->design_items = $order->designOrders->map(fn ($d) => [
+                'id'                  => $d->id,
+                'order_item_id'       => $d->order_item_id,
+                'status'              => $d->status,
+                'order_qty'           => $d->order_qty,
+                'pcs_to_print'        => $d->pcs_to_print,
+                'labels_received'     => $d->labels_received,
+                'skip_party_approval' => (bool) $d->skip_party_approval,
+                'assignee'            => $d->assignee?->name,
+                'stage_log'           => $d->stage_log,
+            ])->all();
 
             $order->unsetRelation('confirmedBy');
             $order->unsetRelation('createdBy');
@@ -224,6 +237,7 @@ class OrderController extends Controller
             DesignOrder::create([
                 'created_by'          => $request->user()?->id,
                 'order_id'            => $order->id,
+                'order_item_id'       => $item->id,
                 'order_qty'           => (int) $item->quantity,
                 'party_brand'         => $item->party_brand ?? '',
                 'product_name'        => $item->our_brand ?? '',
