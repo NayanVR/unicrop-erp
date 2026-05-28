@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreOrderRequest;
 use App\Http\Requests\UpdateOrderRequest;
+use App\Models\DesignOrder;
 use App\Models\Order;
 use App\Models\Party;
 use App\Models\ProductPhoto;
@@ -176,15 +177,38 @@ class OrderController extends Controller
 
     public function sendToDesign(Request $request, Order $order): RedirectResponse
     {
-        if ($order->status !== 'submitted') {
-            return redirect()->back()->with('error', 'Only submitted orders can be sent to design.');
+        if ($order->status !== 'confirmed') {
+            return redirect()->back()->with('error', 'Order must be confirmed before sending to design team.');
         }
 
-        $order->update([
-            'status'       => 'design',
-            'confirmed_by' => $request->user()?->id,
-            'confirmed_at' => now(),
+        $data = $request->validate([
+            'note'                => 'nullable|string|max:1000',
+            'skip_party_approval' => 'boolean',
+            'item_ids'            => 'nullable|array',
+            'item_ids.*'          => 'integer',
         ]);
+
+        $itemIds    = $data['item_ids'] ?? null;
+        $skip       = (bool) ($data['skip_party_approval'] ?? false);
+        $note       = $data['note'] ?? null;
+
+        $items = $order->items()
+            ->when($itemIds, fn ($q) => $q->whereIn('id', $itemIds))
+            ->get();
+
+        foreach ($items as $item) {
+            DesignOrder::create([
+                'created_by'          => $request->user()?->id,
+                'order_id'            => $order->id,
+                'party_brand'         => $item->party_brand ?? '',
+                'product_name'        => $item->our_brand ?? '',
+                'packing_size'        => $item->packing_size,
+                'instructions'        => $note,
+                'status'              => 'accepted',
+                'skip_party_approval' => $skip,
+                'stage_log'           => [['status' => 'accepted', 'at' => now()->toISOString()]],
+            ]);
+        }
 
         return redirect()->back()->with('success', "Order {$order->order_number} sent to Design team.");
     }

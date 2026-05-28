@@ -1,4 +1,4 @@
-import { confirm as ordersConfirm, create as ordersCreate } from '@/routes/orders';
+import { confirm as ordersConfirm, create as ordersCreate, sendToDesign as ordersSendToDesign } from '@/routes/orders';
 import { Head, Link, router } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
@@ -77,7 +77,7 @@ type ProductPhoto = {
     photo_url: string;
 };
 
-type ConfirmTarget = { id: number; number: string };
+type ConfirmTarget = { id: number; number: string; companyName: string };
 
 type Props = {
     pageTitle: string;
@@ -126,6 +126,9 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
     const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
     const [confirmStep, setConfirmStep] = useState<'factory' | 'design'>('factory');
     const [submitting, setSubmitting] = useState(false);
+    const [designNote, setDesignNote] = useState('');
+    const [skipPartyApproval, setSkipPartyApproval] = useState(false);
+    const [selectedItemIds, setSelectedItemIds] = useState<number[]>([]);
 
     const photoMap = useMemo(() => buildPhotoMap(productPhotos), [productPhotos]);
 
@@ -142,7 +145,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
     const openConfirm = (order: Order, e: React.MouseEvent) => {
         e.stopPropagation();
         setConfirmStep('factory');
-        setConfirmTarget({ id: order.id, number: order.order_number });
+        setConfirmTarget({ id: order.id, number: order.order_number, companyName: order.company_name });
     };
 
     const closeConfirm = () => {
@@ -151,10 +154,39 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
         setConfirmStep('factory');
     };
 
-    const doConfirm = () => {
+    const advanceToDesign = () => {
+        const order = orders.find((o) => o.id === confirmTarget?.id);
+        setSelectedItemIds((order?.items ?? []).map((i) => i.id));
+        setDesignNote('');
+        setSkipPartyApproval(false);
+        setSubmitting(false);
+        setConfirmStep('design');
+    };
+
+    const doConfirmFactory = () => {
         if (!confirmTarget) return;
         setSubmitting(true);
         router.post(ordersConfirm(confirmTarget.id).url, {}, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: advanceToDesign,
+            onError: () => setSubmitting(false),
+        });
+    };
+
+    const toggleItem = (id: number) =>
+        setSelectedItemIds((cur) =>
+            cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id],
+        );
+
+    const doSendToDesign = () => {
+        if (!confirmTarget) return;
+        setSubmitting(true);
+        router.post(ordersSendToDesign(confirmTarget.id).url, {
+            note: designNote,
+            skip_party_approval: skipPartyApproval,
+            item_ids: selectedItemIds,
+        }, {
             preserveScroll: true,
             onFinish: () => { setSubmitting(false); setConfirmTarget(null); setConfirmStep('factory'); },
         });
@@ -164,62 +196,142 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
         <>
             <Head title="All Orders" />
 
-            {/* ── Confirm modal: Factory step, then Design step ─────── */}
-            {confirmTarget && (
-                <div className="modal-overlay open" onClick={closeConfirm}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-                        {confirmStep === 'factory' ? (
-                            <>
-                                <div className="modal-header">
-                                    <h2>🏭 Send to Factory</h2>
-                                    <button className="modal-close" onClick={closeConfirm} disabled={submitting}>✕</button>
-                                </div>
-                                <div className="modal-form">
-                                    <p style={{ color: 'var(--tx-muted)', marginBottom: '8px', fontSize: '14px' }}>
-                                        Step 1 of 2
-                                    </p>
-                                    <p style={{ color: 'var(--tx-muted)', marginBottom: '20px', fontSize: '14px' }}>
-                                        Send order <strong>{confirmTarget.number}</strong> to the
-                                        <strong> Factory</strong> to start production?
-                                    </p>
-                                    <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
-                                        <button type="button" className="btn-secondary" onClick={closeConfirm} disabled={submitting}>
-                                            Cancel
-                                        </button>
-                                        <button type="button" className="btn-primary" onClick={() => setConfirmStep('design')} disabled={submitting}>
-                                            ✓ Send to Factory →
-                                        </button>
+            {/* ── Confirm modal: Step 1 Factory, Step 2 Design ────────── */}
+            {confirmTarget && (() => {
+                const targetOrder = orders.find((o) => o.id === confirmTarget.id);
+                return (
+                    <div className="modal-overlay open" onClick={closeConfirm}>
+                        <div className="modal" onClick={(e) => e.stopPropagation()}
+                            style={{ maxWidth: confirmStep === 'design' ? '520px' : '400px' }}>
+
+                            {/* ── Step 1: Factory ── */}
+                            {confirmStep === 'factory' && (
+                                <>
+                                    <div className="modal-header">
+                                        <h2>🏭 Send to Factory</h2>
+                                        <button className="modal-close" onClick={closeConfirm} disabled={submitting}>✕</button>
                                     </div>
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <div className="modal-header">
-                                    <h2>🎨 Send to Design</h2>
-                                    <button className="modal-close" onClick={closeConfirm} disabled={submitting}>✕</button>
-                                </div>
-                                <div className="modal-form">
-                                    <p style={{ color: 'var(--tx-muted)', marginBottom: '8px', fontSize: '14px' }}>
-                                        Step 2 of 2
-                                    </p>
-                                    <p style={{ color: 'var(--tx-muted)', marginBottom: '20px', fontSize: '14px' }}>
-                                        Send order <strong>{confirmTarget.number}</strong> to the
-                                        <strong> Design team</strong> for label &amp; packaging?
-                                    </p>
-                                    <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
-                                        <button type="button" className="btn-secondary" onClick={() => setConfirmStep('factory')} disabled={submitting}>
-                                            ← Back
-                                        </button>
-                                        <button type="button" className="btn-primary" onClick={doConfirm} disabled={submitting}>
-                                            {submitting ? 'Confirming…' : '✓ Send to Design'}
-                                        </button>
+                                    <div className="modal-form">
+                                        <p style={{ color: 'var(--tx-muted)', fontSize: '12px', marginBottom: '6px' }}>Step 1 of 2</p>
+                                        <p style={{ color: 'var(--tx-muted)', marginBottom: '20px', fontSize: '14px' }}>
+                                            Confirm and send order <strong>{confirmTarget.number}</strong> to the
+                                            <strong> Factory</strong> to start production?
+                                        </p>
+                                        <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
+                                            <button type="button" className="btn-secondary" onClick={closeConfirm} disabled={submitting}>
+                                                Cancel
+                                            </button>
+                                            <button type="button" className="btn-primary" onClick={doConfirmFactory} disabled={submitting}>
+                                                {submitting ? 'Sending…' : '✓ Send to Factory →'}
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-                            </>
-                        )}
+                                </>
+                            )}
+
+                            {/* ── Step 2: Design ── */}
+                            {confirmStep === 'design' && (
+                                <>
+                                    <div className="modal-header">
+                                        <h2>🎨 Send to Design Team</h2>
+                                        <button className="modal-close" onClick={closeConfirm} disabled={submitting}>✕</button>
+                                    </div>
+                                    <div className="modal-form">
+                                        <p style={{ color: 'var(--tx-muted)', fontSize: '12px', marginBottom: '10px' }}>Step 2 of 2</p>
+
+                                        {/* Order summary chip */}
+                                        <div style={{ background: 'var(--accent-soft, #ede9fe)', color: 'var(--accent, #7c3aed)', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', fontWeight: 500, marginBottom: '18px' }}>
+                                            {confirmTarget.number} · {confirmTarget.companyName} · {targetOrder?.items.length ?? 0} product(s)
+                                        </div>
+
+                                        {/* Note */}
+                                        <div className="form-group" style={{ marginBottom: '16px' }}>
+                                            <label style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--tx-muted)', textTransform: 'uppercase' }}>
+                                                Note for Design Team
+                                            </label>
+                                            <textarea
+                                                value={designNote}
+                                                onChange={(e) => setDesignNote(e.target.value)}
+                                                placeholder="Any special design instructions…"
+                                                rows={3}
+                                                style={{ width: '100%', resize: 'vertical', marginTop: '6px' }}
+                                                disabled={submitting}
+                                            />
+                                        </div>
+
+                                        {/* Products with checkboxes */}
+                                        <div style={{ marginBottom: '16px' }}>
+                                            <label style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--tx-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+                                                Products
+                                            </label>
+                                            <table className="prod-table" style={{ fontSize: '13px' }}>
+                                                <thead>
+                                                    <tr>
+                                                        <th style={{ width: '32px' }}></th>
+                                                        <th>#</th>
+                                                        <th>Our Brand</th>
+                                                        <th>Party Brand</th>
+                                                        <th>Packing</th>
+                                                        <th>Qty</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {(targetOrder?.items ?? []).map((item, idx) => (
+                                                        <tr key={item.id} style={{ opacity: selectedItemIds.includes(item.id) ? 1 : 0.4 }}>
+                                                            <td style={{ textAlign: 'center' }}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedItemIds.includes(item.id)}
+                                                                    onChange={() => toggleItem(item.id)}
+                                                                    disabled={submitting}
+                                                                />
+                                                            </td>
+                                                            <td>{idx + 1}</td>
+                                                            <td style={{ fontWeight: 600 }}>{item.our_brand ?? '—'}</td>
+                                                            <td>{item.party_brand ?? '—'}</td>
+                                                            <td>{item.packing_size ?? '—'}</td>
+                                                            <td>{item.quantity}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        {/* Skip party approval */}
+                                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', background: 'var(--bg-yellow, #fefce8)', border: '1px solid var(--border-yellow, #fde68a)', borderRadius: '8px', padding: '12px', cursor: 'pointer', marginBottom: '20px', fontSize: '13px' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={skipPartyApproval}
+                                                onChange={(e) => setSkipPartyApproval(e.target.checked)}
+                                                disabled={submitting}
+                                                style={{ marginTop: '2px', flexShrink: 0 }}
+                                            />
+                                            <span>
+                                                <strong>⚡ Skip Party Approval</strong>
+                                                {' — '}Moves directly to Sent to Print once Design Ready
+                                            </span>
+                                        </label>
+
+                                        <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
+                                            <button type="button" className="btn-secondary" onClick={closeConfirm} disabled={submitting}>
+                                                Cancel
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="btn-primary"
+                                                onClick={doSendToDesign}
+                                                disabled={submitting || selectedItemIds.length === 0}
+                                            >
+                                                {submitting ? 'Sending…' : '🎨 Send to Design Team'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
 
             <div id="view-orders" className="view active">
                 <div className="page-header">
@@ -350,16 +462,16 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                     <th>Product</th>
                                                     <th>Packing</th>
                                                     <th>Qty</th>
-                                                    <th>Rate</th>
-                                                    <th>GST %</th>
-                                                    <th>Amount</th>
+                                                    {!isDesign && <th>Rate</th>}
+                                                    {!isDesign && <th>GST %</th>}
+                                                    {!isDesign && <th>Amount</th>}
                                                     <th>Status</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {order.items.length === 0 ? (
                                                     <tr>
-                                                        <td colSpan={8} style={{ textAlign: 'center', padding: '16px' }}>
+                                                        <td colSpan={isDesign ? 5 : 8} style={{ textAlign: 'center', padding: '16px' }}>
                                                             No items yet.
                                                         </td>
                                                     </tr>
@@ -383,9 +495,9 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                                 </td>
                                                                 <td>{item.packing_size ?? '—'}</td>
                                                                 <td>{item.quantity}</td>
-                                                                <td>{formatAmount(item.rate)}</td>
-                                                                <td>{item.gst_percent}</td>
-                                                                <td>{formatAmount(item.amount)}</td>
+                                                                {!isDesign && <td>{formatAmount(item.rate)}</td>}
+                                                                {!isDesign && <td>{item.gst_percent}</td>}
+                                                                {!isDesign && <td>{formatAmount(item.amount)}</td>}
                                                                 <td>
                                                                     <span className={`badge s-${item.status ?? 'pending'}`}>
                                                                         {(item.status ?? 'pending').toUpperCase()}
@@ -401,21 +513,23 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
 
                                     <div className="form-card" style={{ marginBottom: 0 }}>
                                         <div className="form-card-title">Order Summary</div>
-                                        <div className="form-grid three">
-                                            <div className="form-group">
-                                                <label>Subtotal</label>
-                                                <div>{formatAmount(order.subtotal)}</div>
+                                        {!isDesign && (
+                                            <div className="form-grid three">
+                                                <div className="form-group">
+                                                    <label>Subtotal</label>
+                                                    <div>{formatAmount(order.subtotal)}</div>
+                                                </div>
+                                                <div className="form-group">
+                                                    <label>GST</label>
+                                                    <div>{formatAmount(order.gst_total)}</div>
+                                                </div>
+                                                <div className="form-group">
+                                                    <label>Total</label>
+                                                    <div>{formatAmount(order.total_amount)}</div>
+                                                </div>
                                             </div>
-                                            <div className="form-group">
-                                                <label>GST</label>
-                                                <div>{formatAmount(order.gst_total)}</div>
-                                            </div>
-                                            <div className="form-group">
-                                                <label>Total</label>
-                                                <div>{formatAmount(order.total_amount)}</div>
-                                            </div>
-                                        </div>
-                                        <div style={{ marginTop: '14px' }}>
+                                        )}
+                                        <div style={{ marginTop: isDesign ? 0 : '14px' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                                                 <span>Production Progress</span>
                                                 <span>{progress}%</span>

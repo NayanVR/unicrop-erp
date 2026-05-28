@@ -18,11 +18,13 @@ class DesignOrder extends Model
         'instructions',
         'notes',
         'status',
+        'skip_party_approval',
         'stage_log',
         'due_date',
     ];
 
     protected $casts = [
+        'skip_party_approval' => 'boolean',
         'stage_log' => 'array',
         'due_date' => 'datetime',
     ];

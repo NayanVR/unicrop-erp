@@ -93,6 +93,11 @@ class DesignController extends Controller
             return redirect()->back()->with('error', 'Design order is already at the final stage.');
         }
 
+        // Skip party approval step when configured
+        if ($next === 'approved-party' && $designOrder->skip_party_approval) {
+            $next = 'sent-print';
+        }
+
         $log = $designOrder->stage_log ?? [];
         $log[] = ['stage' => $next, 'at' => now()->toISOString(), 'by' => $request->user()?->name];
 
