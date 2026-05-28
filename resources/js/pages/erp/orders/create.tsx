@@ -193,28 +193,53 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         [partyRates],
     );
 
-    // Photo lookup — always use Our Brand gallery photos (party_id = null)
+    // Photo lookup maps
     const photoMap = useMemo(() => {
-        const exact = new Map<string, string>(); // "brand|size" → url
-        const byBrand = new Map<string, string>(); // "brand" → first photo url
+        const ob     = new Map<string, string>(); // "brand|size" → url  (Our Brand folder)
+        const obAny  = new Map<string, string>(); // "brand" → first url (Our Brand folder, any size)
+        const pb     = new Map<string, string>(); // "partyId|partyBrand|size" → url
+        const pbAny  = new Map<string, string>(); // "partyId|partyBrand" → first url
+
         for (const p of productPhotos) {
-            if (p.party_id !== null) continue;
             const b = p.our_brand.toLowerCase();
             const s = (p.packing_size ?? '').toLowerCase();
-            exact.set(`${b}|${s}`, p.photo_url);
-            if (!byBrand.has(b)) byBrand.set(b, p.photo_url);
+
+            if (p.party_id === null) {
+                ob.set(`${b}|${s}`, p.photo_url);
+                if (!obAny.has(b)) obAny.set(b, p.photo_url);
+            } else if (p.party_brand) {
+                const pb_ = p.party_brand.toLowerCase();
+                pb.set(`${p.party_id}|${pb_}|${s}`, p.photo_url);
+                const anyKey = `${p.party_id}|${pb_}`;
+                if (!pbAny.has(anyKey)) pbAny.set(anyKey, p.photo_url);
+            }
         }
-        return { exact, byBrand };
+        return { ob, obAny, pb, pbAny };
     }, [productPhotos]);
 
     const getRowPhoto = (row: ProductRow): string | null => {
         if (!row.our_brand) return null;
-        const b = row.our_brand.toLowerCase();
         const s = row.packing_size.toLowerCase();
-        return photoMap.exact.get(`${b}|${s}`)
-            ?? photoMap.exact.get(`${b}|`)
-            ?? photoMap.byBrand.get(b)
-            ?? null;
+
+        // Party brand row → show party brand photo, fall back to Our Brand
+        if (form.data.party_id && row.party_brand) {
+            const pid = form.data.party_id;
+            const pb_ = row.party_brand.toLowerCase();
+            const url =
+                photoMap.pb.get(`${pid}|${pb_}|${s}`) ??
+                photoMap.pb.get(`${pid}|${pb_}|`) ??
+                photoMap.pbAny.get(`${pid}|${pb_}`);
+            if (url) return url;
+        }
+
+        // Our brand row (or no party brand photo found) → show Our Brand photo
+        const b = row.our_brand.toLowerCase();
+        return (
+            photoMap.ob.get(`${b}|${s}`) ??
+            photoMap.ob.get(`${b}|`) ??
+            photoMap.obAny.get(b) ??
+            null
+        );
     };
 
     const totals = useMemo(() => {
