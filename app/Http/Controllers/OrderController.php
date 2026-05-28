@@ -22,18 +22,19 @@ class OrderController extends Controller
     public function index(Request $request): Response
     {
         $user = $request->user();
+        $user->loadMissing('roles');
+        $role = $user->roles->first()?->slug;
 
         $ordersQuery = Order::query()
             ->with(['items', 'salesUser'])
             ->orderByDesc('order_date')
             ->orderByDesc('id');
 
-        if ($user && ! $user->hasRole(Role::ADMIN)) {
-            $ordersQuery->where(function ($query) use ($user) {
-                $query->where('created_by', $user->id)
-                    ->orWhere('sales_user_id', $user->id);
-            });
+        // Design users only see orders that have been explicitly sent to design
+        if ($role === Role::DESIGN) {
+            $ordersQuery->where('status', 'design');
         }
+        // Admin and office see all orders
 
         $orders = $ordersQuery->get();
 
@@ -41,7 +42,7 @@ class OrderController extends Controller
             'pageTitle'     => 'All Orders',
             'orders'        => $orders,
             'currentUserId' => $user?->id,
-            'canViewAll'    => $user?->hasRole(Role::ADMIN) ?? false,
+            'userRole'      => $role,
             'productPhotos' => ProductPhoto::orderBy('our_brand')->orderBy('packing_size')
                 ->get()
                 ->map(fn ($p) => [
@@ -171,6 +172,21 @@ class OrderController extends Controller
         ]);
 
         return redirect()->back()->with('success', "Order {$order->order_number} confirmed.");
+    }
+
+    public function sendToDesign(Request $request, Order $order): RedirectResponse
+    {
+        if ($order->status !== 'submitted') {
+            return redirect()->back()->with('error', 'Only submitted orders can be sent to design.');
+        }
+
+        $order->update([
+            'status'       => 'design',
+            'confirmed_by' => $request->user()?->id,
+            'confirmed_at' => now(),
+        ]);
+
+        return redirect()->back()->with('success', "Order {$order->order_number} sent to Design team.");
     }
 
     public function approveUrgent(Request $request, Order $order): RedirectResponse

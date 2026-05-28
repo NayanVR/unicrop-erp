@@ -29,9 +29,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('users', UserController::class)->only(['index', 'store', 'update', 'destroy']);
     });
 
+    // Orders list is visible to office AND design users (controller filters by role)
+    Route::middleware(['role:admin,office,design'])->group(function () {
+        Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
+    });
+
     Route::middleware(['role:admin,office'])->group(function () {
-        Route::resource('orders', OrderController::class)->only(['index', 'create', 'store', 'update']);
+        Route::get('orders/create', [OrderController::class, 'create'])->name('orders.create');
+        Route::post('orders', [OrderController::class, 'store'])->name('orders.store');
+        Route::patch('orders/{order}', [OrderController::class, 'update'])->name('orders.update');
         Route::post('orders/{order}/confirm', [OrderController::class, 'confirm'])->name('orders.confirm');
+        Route::post('orders/{order}/send-to-design', [OrderController::class, 'sendToDesign'])->name('orders.send-to-design');
         Route::post('erp/settings/transports', [SettingsController::class, 'storeTransport'])->name('settings.transports.store');
         Route::delete('erp/settings/transports/{transport}', [SettingsController::class, 'destroyTransport'])->name('settings.transports.destroy');
     });

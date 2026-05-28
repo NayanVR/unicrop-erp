@@ -1098,6 +1098,14 @@ html.dark .stage-dispatched {
     background: var(--lab-teal-lt);
     color: var(--lab-teal);
 }
+.badge.purple {
+    background: #ede9fe;
+    color: #7c3aed;
+}
+html.dark .badge.purple {
+    background: #2e1065;
+    color: #a78bfa;
+}
 .badge.red {
     background: #fee2e2;
     color: #dc2626;

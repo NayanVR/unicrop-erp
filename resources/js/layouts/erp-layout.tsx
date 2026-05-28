@@ -79,7 +79,8 @@ const NAV_DEFS: Record<string, NavItem[]> = {
     ],
     design: [
         { id: 'dashboard', label: 'Dashboard', icon: '🌾', href: dashboard() },
-        { id: 'design-orders', label: 'Design Orders', icon: '🎨', href: designIndex() },
+        { id: 'all-orders', label: 'My Design Orders', icon: '📋', href: ordersIndex() },
+        { id: 'design-orders', label: 'Design Work', icon: '🎨', href: designIndex() },
         { id: 'photo-gallery', label: 'Photo Gallery', icon: '📷', href: galleryIndex() },
     ],
     accountant: [
