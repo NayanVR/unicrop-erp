@@ -143,7 +143,8 @@ class PartyController extends Controller
             'photo'       => 'required|image|mimes:jpg,jpeg,png,webp|max:8192',
         ]);
 
-        $path = $request->file('photo')->store('product-photos', 'public');
+        $disk = config('filesystems.default') === 's3' ? 's3' : 'public';
+        $path = $request->file('photo')->store('product-photos', $disk);
 
         ProductPhoto::updateOrCreate(
             [
@@ -176,13 +177,15 @@ class PartyController extends Controller
             'gst_percent'  => 'required|numeric|min:0|max:100',
         ]);
 
+        $partyBrand = ($data['party_brand'] ?? '') ?: null;
+
         $party->productRates()->updateOrCreate(
             [
                 'our_brand'    => $data['our_brand'],
-                'party_brand'  => $data['party_brand'] ?? null,
+                'party_brand'  => $partyBrand,
                 'packing_size' => $data['packing_size'],
             ],
-            $data
+            array_merge($data, ['party_brand' => $partyBrand])
         );
 
         return redirect()->back()->with('success', 'Product rate saved.');
