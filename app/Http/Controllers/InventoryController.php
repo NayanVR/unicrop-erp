@@ -37,7 +37,7 @@ class InventoryController extends Controller
             ->get();
 
         $reorders = InventoryReorder::query()
-            ->with('rawMaterial:id,name')
+            ->with(['rawMaterial:id,name', 'receivedByUser:id,name'])
             ->orderByDesc('id')
             ->get();
 
@@ -331,6 +331,7 @@ class InventoryController extends Controller
             $reorder->update([
                 'status'      => 'received',
                 'received_at' => now(),
+                'received_by' => auth()->id(),
             ]);
         });
 
@@ -425,6 +426,7 @@ class InventoryController extends Controller
             $reorder->update([
                 'status'      => 'received',
                 'received_at' => now(),
+                'received_by' => auth()->id(),
             ]);
         });
 

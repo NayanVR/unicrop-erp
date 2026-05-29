@@ -86,6 +86,7 @@ type Reorder = {
     notes: string | null;
     status: 'pending' | 'received';
     received_at: string | null;
+    received_by_user: { id: number; name: string } | null;
     raw_material: { id: number; name: string } | null;
 };
 
@@ -1028,9 +1029,23 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                             <td>{r.transport_name ?? '—'}</td>
                                             <td>{r.lr_number ?? '—'}</td>
                                             <td>
-                                                {r.status === 'received'
-                                                    ? <span className="badge teal">Received</span>
-                                                    : <span className="badge amber">Pending</span>}
+                                                {r.status === 'received' ? (
+                                                    <div>
+                                                        <span className="badge teal">✓ Received</span>
+                                                        {r.received_by_user && (
+                                                            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
+                                                                by {r.received_by_user.name}
+                                                            </div>
+                                                        )}
+                                                        {r.received_at && (
+                                                            <div style={{ fontSize: 11, color: '#9ca3af' }}>
+                                                                {fmtDate(r.received_at)}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <span className="badge amber">Pending</span>
+                                                )}
                                             </td>
                                             <td>
                                                 <div style={{ display: 'flex', gap: 4 }}>
@@ -1919,7 +1934,21 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                 </div>
                                 <div>
                                     <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 2 }}>STATUS</div>
-                                    <span className="badge sky">Pending</span>
+                                    {viewReorder?.status === 'received' ? (
+                                        <div>
+                                            <span className="badge teal">✓ Received</span>
+                                            {viewReorder.received_by_user && (
+                                                <div style={{ fontSize: 12, color: '#374151', marginTop: 4 }}>
+                                                    by <strong>{viewReorder.received_by_user.name}</strong>
+                                                </div>
+                                            )}
+                                            {viewReorder.received_at && (
+                                                <div style={{ fontSize: 11, color: '#9ca3af' }}>{fmtDate(viewReorder.received_at)}</div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <span className="badge sky">Pending</span>
+                                    )}
                                 </div>
                                 {viewReorder.notes && (
                                     <div style={{ gridColumn: '1 / -1' }}>

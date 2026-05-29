@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['raw_material_id', 'qty_ordered', 'unit', 'supplier', 'order_date', 'expected_delivery', 'transport_name', 'lr_number', 'notes', 'status', 'received_at'])]
+#[Fillable(['raw_material_id', 'qty_ordered', 'unit', 'supplier', 'order_date', 'expected_delivery', 'transport_name', 'lr_number', 'notes', 'status', 'received_at', 'received_by'])]
 class InventoryReorder extends Model
 {
     /**
@@ -28,5 +28,13 @@ class InventoryReorder extends Model
     public function rawMaterial(): BelongsTo
     {
         return $this->belongsTo(RawMaterial::class);
+    }
+
+    /**
+     * @return BelongsTo<User, InventoryReorder>
+     */
+    public function receivedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'received_by');
     }
 }
