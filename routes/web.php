@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\BomController;
+use App\Http\Controllers\BomRecipeController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DesignController;
 use App\Http\Controllers\FactoryController;
@@ -57,7 +58,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('inventory/materials/{material}', [InventoryController::class, 'updateMaterial'])->name('inventory.materials.update');
         Route::post('inventory/materials/{material}/transactions', [InventoryController::class, 'addTransaction'])->name('inventory.materials.transactions');
 
-        Route::get('bom', [BomController::class, 'index'])->name('bom.index');
+        Route::get('bom', [BomRecipeController::class, 'webIndex'])->name('bom.index');
         Route::post('bom', [BomController::class, 'store'])->name('bom.store');
         Route::patch('bom/{bom}', [BomController::class, 'update'])->name('bom.update');
         Route::delete('bom/{bom}', [BomController::class, 'destroy'])->name('bom.destroy');

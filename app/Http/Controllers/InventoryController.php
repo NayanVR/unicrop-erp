@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\InventoryTransaction;
 use App\Models\RawMaterial;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -96,5 +97,26 @@ class InventoryController extends Controller
 
             return redirect()->back()->with('success', 'Stock updated.');
         });
+    }
+
+    /** GET /api/v1/inventory/search?q=humic */
+    public function search(Request $request): JsonResponse
+    {
+        $q = (string) $request->query('q', '');
+
+        $materials = RawMaterial::query()
+            ->where('is_active', true)
+            ->when(strlen($q) >= 1, fn ($query) => $query->where('name', 'like', "%{$q}%"))
+            ->orderBy('name')
+            ->limit(15)
+            ->get(['id', 'name', 'unit', 'cost_per_unit'])
+            ->map(fn ($m) => [
+                'id'   => (string) $m->id,
+                'name' => $m->name,
+                'unit' => $m->unit,
+                'cost' => (float) $m->cost_per_unit,
+            ]);
+
+        return response()->json($materials);
     }
 }
