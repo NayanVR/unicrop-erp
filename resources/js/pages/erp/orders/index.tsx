@@ -177,6 +177,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
     const [designNote, setDesignNote] = useState('');
     const [skipPartyApproval, setSkipPartyApproval] = useState(false);
     const [selectedItemIds, setSelectedItemIds] = useState<number[]>([]);
+    const [photoLightbox, setPhotoLightbox] = useState<string | null>(null);
 
     // Per-item design workflow modals (design role)
     const [printModal, setPrintModal] = useState<{ id: number; orderQty: number; current: number | null } | null>(null);
@@ -758,7 +759,11 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                                     <tr key={item.id}>
                                                                         <td style={{ textAlign: 'center', padding: '4px 6px' }}>
                                                                             {photo ? (
-                                                                                <img src={photo} alt="" style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '6px', border: '1px solid var(--border)', background: '#fff', padding: '2px', display: 'block' }} />
+                                                                                <img
+                                                                                    src={photo} alt=""
+                                                                                    onClick={(e) => { e.stopPropagation(); setPhotoLightbox(photo); }}
+                                                                                    style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '6px', border: '1px solid var(--border)', background: '#fff', padding: '2px', display: 'block', cursor: 'zoom-in' }}
+                                                                                />
                                                                             ) : (
                                                                                 <div style={{ width: '40px', height: '40px', borderRadius: '6px', border: '1px dashed var(--border)', background: 'var(--bg-paper)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', color: 'var(--tx-muted)' }}>
                                                                                     📷
@@ -843,7 +848,12 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                         <div key={d.id} className="design-item-block">
                                                             <div className="design-item-top">
                                                                 {photo ? (
-                                                                    <img src={photo} alt="" className="design-item-photo" />
+                                                                    <img
+                                                                        src={photo} alt=""
+                                                                        className="design-item-photo"
+                                                                        onClick={(e) => { e.stopPropagation(); setPhotoLightbox(photo); }}
+                                                                        style={{ cursor: 'zoom-in' }}
+                                                                    />
                                                                 ) : (
                                                                     <div className="design-item-photo placeholder">📷</div>
                                                                 )}
@@ -917,6 +927,33 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                     })
                 )}
             </div>
+
+            {/* Photo lightbox */}
+            {photoLightbox && (
+                <div
+                    className="modal-overlay open"
+                    onClick={() => setPhotoLightbox(null)}
+                    style={{ zIndex: 9999, background: 'rgba(0,0,0,0.75)' }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ maxWidth: '90vw', maxHeight: '90vh', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}
+                    >
+                        <img
+                            src={photoLightbox}
+                            alt=""
+                            style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: '8px', background: '#fff', padding: '8px', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setPhotoLightbox(null)}
+                            style={{ position: 'absolute', top: '-14px', right: '-14px', width: '32px', height: '32px', borderRadius: '50%', background: '#fff', border: 'none', cursor: 'pointer', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', fontWeight: 700 }}
+                        >
+                            ✕
+                        </button>
+                    </div>
+                </div>
+            )}
         </>
     );
 }
