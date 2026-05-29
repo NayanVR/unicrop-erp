@@ -238,6 +238,8 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
 
     const [photoLightbox, setPhotoLightbox] = useState<string | null>(null);
     const [labelEditor, setLabelEditor] = useState<{ order: Order; labels: EditableLabel[] } | null>(null);
+    const [boxSizeDraft, setBoxSizeDraft] = useState<Record<number, string>>({});
+    const [savingBoxSize, setSavingBoxSize] = useState<number | null>(null);
 
     const photoMap = useMemo(() => buildPhotoMap(productPhotos), [productPhotos]);
 
@@ -297,6 +299,19 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
             orderNotes(order.id).url,
             { factory_notes: value },
             { preserveScroll: true, onFinish: () => setSavingNotes(null) },
+        );
+    };
+
+    const saveBoxSize = (itemId: number) => {
+        const raw = boxSizeDraft[itemId];
+        if (raw === undefined) return;
+        const num = parseInt(raw, 10);
+        if (isNaN(num) || num < 1) return;
+        setSavingBoxSize(itemId);
+        router.patch(
+            `/factory/items/${itemId}`,
+            { box_size: num },
+            { preserveScroll: true, onFinish: () => setSavingBoxSize(null) },
         );
     };
 
@@ -760,11 +775,31 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                 <div style={{ fontSize: '13px' }}>
                                                                     {item.packing_size ? `${item.packing_size} · ` : ''}Qty: {item.quantity}
                                                                 </div>
-                                                                {boxes != null && (
-                                                                    <div className="prod-detail">
-                                                                        📦 {boxes} box{boxes !== 1 ? 'es' : ''} ({item.box_size}/box)
-                                                                    </div>
-                                                                )}
+                                                                {/* Per-box pcs — inline editable */}
+                                                                <div className="prod-detail" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                                                                    <span>📦</span>
+                                                                    <input
+                                                                        type="number"
+                                                                        min={1}
+                                                                        value={boxSizeDraft[item.id] ?? (item.box_size != null ? String(item.box_size) : '')}
+                                                                        onChange={(e) => setBoxSizeDraft((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                                                                        onBlur={() => saveBoxSize(item.id)}
+                                                                        onKeyDown={(e) => e.key === 'Enter' && saveBoxSize(item.id)}
+                                                                        placeholder="pcs/box"
+                                                                        disabled={savingBoxSize === item.id}
+                                                                        style={{
+                                                                            width: '64px', padding: '2px 5px', fontSize: '12px',
+                                                                            border: '1px solid var(--border)', borderRadius: '4px',
+                                                                            background: 'var(--bg-input, #fff)',
+                                                                        }}
+                                                                    />
+                                                                    <span style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>
+                                                                        pcs/box
+                                                                        {boxes != null && item.box_size
+                                                                            ? ` · ${boxes} box${boxes !== 1 ? 'es' : ''}`
+                                                                            : ''}
+                                                                    </span>
+                                                                </div>
                                                                 {item.type && (
                                                                     <div className="prod-detail" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                                                         {item.type}

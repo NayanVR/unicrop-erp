@@ -223,6 +223,17 @@ class FactoryController extends Controller
         return redirect()->back()->with('success', "Item set to {$targetStage}.");
     }
 
+    public function updateItem(Request $request, OrderItem $item): RedirectResponse
+    {
+        $data = $request->validate([
+            'box_size' => 'nullable|integer|min:1',
+        ]);
+
+        $item->update($data);
+
+        return redirect()->back()->with('success', 'Item updated.');
+    }
+
     /**
      * Record how many labels have been received at the factory for an item.
      */
