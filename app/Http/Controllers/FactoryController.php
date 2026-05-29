@@ -213,21 +213,17 @@ class FactoryController extends Controller
     }
 
     /**
-     * Record fill progress (filled pieces / box size) for an item.
+     * Record how many labels have been received at the factory for an item.
      */
-    public function recordFill(Request $request, OrderItem $item): RedirectResponse
+    public function recordLabels(Request $request, OrderItem $item): RedirectResponse
     {
         $data = $request->validate([
-            'filled_qty' => 'required|integer|min:0',
-            'box_size' => 'nullable|integer|min:1',
+            'labels_received' => 'required|integer|min:0',
         ]);
 
-        $item->update([
-            'filled_qty' => $data['filled_qty'],
-            'box_size' => $data['box_size'] ?? $item->box_size,
-        ]);
+        $item->update(['labels_received' => $data['labels_received']]);
 
-        return redirect()->back()->with('success', 'Fill progress updated.');
+        return redirect()->back()->with('success', 'Labels received updated.');
     }
 
     /**

@@ -1,4 +1,4 @@
-import { fill as itemFill, setStage as itemSetStage } from '@/routes/factory/items';
+import { labels as itemLabels, setStage as itemSetStage } from '@/routes/factory/items';
 import { dispatch as orderDispatch, notes as orderNotes } from '@/routes/factory/orders';
 import { approveUrgent as ordersApproveUrgent, rejectUrgent as ordersRejectUrgent } from '@/routes/orders';
 import { index as unitTransferIndex } from '@/routes/unit-transfer';
@@ -21,7 +21,7 @@ type OrderItem = {
     party_brand?: string | null;
     packing_size?: string | null;
     box_size?: number | null;
-    filled_qty?: number | null;
+    labels_received?: number | null;
     quantity: string | number;
     rate: string | number;
     amount: string | number;
@@ -175,10 +175,9 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance }: Prop
     const [savingNotes, setSavingNotes] = useState<number | null>(null);
 
     // Fill modal
-    const [fillModal, setFillModal] = useState<{ item: OrderItem } | null>(null);
-    const [fillQty, setFillQty] = useState('');
-    const [fillBox, setFillBox] = useState('');
-    const [fillSaving, setFillSaving] = useState(false);
+    const [labelsModal, setLabelsModal] = useState<{ item: OrderItem } | null>(null);
+    const [labelsValue, setLabelsValue] = useState('');
+    const [labelsSaving, setLabelsSaving] = useState(false);
 
     const visibleOrders = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -239,26 +238,25 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance }: Prop
         );
     };
 
-    const openFill = (item: OrderItem, e: React.MouseEvent) => {
+    const openLabelsModal = (item: OrderItem, e: React.MouseEvent) => {
         e.stopPropagation();
-        setFillModal({ item });
-        setFillQty(item.filled_qty != null ? String(item.filled_qty) : '');
-        setFillBox(item.box_size != null ? String(item.box_size) : '');
+        setLabelsModal({ item });
+        setLabelsValue(item.labels_received != null ? String(item.labels_received) : '');
     };
 
-    const submitFill = () => {
-        if (!fillModal) return;
-        const qty = parseInt(fillQty, 10);
+    const submitLabels = () => {
+        if (!labelsModal) return;
+        const qty = parseInt(labelsValue, 10);
         if (isNaN(qty) || qty < 0) return;
-        setFillSaving(true);
+        setLabelsSaving(true);
         router.post(
-            itemFill(fillModal.item.id).url,
-            { filled_qty: qty, box_size: fillBox ? parseInt(fillBox, 10) : null },
+            itemLabels(labelsModal.item.id).url,
+            { labels_received: qty },
             {
                 preserveScroll: true,
                 onFinish: () => {
-                    setFillSaving(false);
-                    setFillModal(null);
+                    setLabelsSaving(false);
+                    setLabelsModal(null);
                 },
             },
         );
@@ -605,9 +603,9 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance }: Prop
                                                     const isDispatched = item.status === 'dispatched';
                                                     const boxes = boxesFor(item);
                                                     const total = Number(item.quantity);
-                                                    const filled = item.filled_qty ?? null;
-                                                    const short = filled != null ? total - filled : null;
-                                                    const showFill = filled != null || ['filling', 'labeling', 'ready', 'dispatched'].includes(item.status);
+                                                    const received = item.labels_received ?? null;
+                                                    const short = received != null ? total - received : null;
+                                                    const showLabels = received != null || item.status !== 'pending';
                                                     const log = [...(item.stage_log ?? [])].reverse();
 
                                                     return (
@@ -655,15 +653,15 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance }: Prop
                                                             <td>
                                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                                                                        {showFill && (
+                                                                        {showLabels && (
                                                                             <span
-                                                                                className={`badge ${short != null && short > 0 ? 'red' : 'green'}`}
+                                                                                className={`badge ${short != null && short > 0 ? 'red' : received != null ? 'green' : 'gray'}`}
                                                                                 style={{ cursor: canAdvance ? 'pointer' : 'default' }}
-                                                                                onClick={canAdvance ? (e) => openFill(item, e) : undefined}
-                                                                                title={canAdvance ? 'Record fill progress' : undefined}
+                                                                                onClick={canAdvance ? (e) => openLabelsModal(item, e) : undefined}
+                                                                                title={canAdvance ? 'Record labels received at factory' : 'Labels received at factory'}
                                                                             >
-                                                                                🏷 {filled != null ? `${filled}/${total}` : `0/${total}`}
-                                                                                {short != null && short > 0 ? ` (${short} short)` : filled != null ? ' ✓' : ''}
+                                                                                🏷 Labels: {received != null ? `${received}/${total}` : `—/${total}`}
+                                                                                {short != null && short > 0 ? ` (${short} short)` : received != null ? ' ✓' : ''}
                                                                             </span>
                                                                         )}
                                                                         {!canAdvance && isDispatched && (
@@ -747,31 +745,38 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance }: Prop
             </div>
 
             {/* ── Fill progress modal ── */}
-            {fillModal && (
-                <div className="modal-overlay open" onClick={() => !fillSaving && setFillModal(null)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '380px' }}>
+            {labelsModal && (
+                <div className="modal-overlay open" onClick={() => !labelsSaving && setLabelsModal(null)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '340px' }}>
                         <div className="modal-header">
-                            <h2>🏷 Record Fill</h2>
-                            <button className="modal-close" onClick={() => setFillModal(null)} disabled={fillSaving}>✕</button>
+                            <h2>🏷 Labels Received at Factory</h2>
+                            <button className="modal-close" onClick={() => setLabelsModal(null)} disabled={labelsSaving}>✕</button>
                         </div>
                         <div className="modal-form">
                             <p style={{ fontSize: '13px', color: 'var(--tx-muted)', marginBottom: '14px' }}>
-                                {fillModal.item.our_brand ?? '—'} · Total Qty {fillModal.item.quantity}
+                                {labelsModal.item.our_brand ?? '—'} · Total Qty: <strong>{labelsModal.item.quantity}</strong>
                             </p>
-                            <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-                                <div className="form-group" style={{ flex: 1 }}>
-                                    <label>Filled Qty</label>
-                                    <input type="number" min={0} value={fillQty} onChange={(e) => setFillQty(e.target.value)} autoFocus disabled={fillSaving} />
-                                </div>
-                                <div className="form-group" style={{ flex: 1 }}>
-                                    <label>Qty per Box</label>
-                                    <input type="number" min={1} value={fillBox} onChange={(e) => setFillBox(e.target.value)} disabled={fillSaving} />
-                                </div>
+                            <div className="form-group" style={{ marginBottom: '16px' }}>
+                                <label>Labels Received</label>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    max={Number(labelsModal.item.quantity)}
+                                    value={labelsValue}
+                                    onChange={(e) => setLabelsValue(e.target.value)}
+                                    autoFocus
+                                    disabled={labelsSaving}
+                                />
+                                {labelsValue !== '' && parseInt(labelsValue, 10) < Number(labelsModal.item.quantity) && (
+                                    <span style={{ fontSize: '12px', color: '#dc2626', marginTop: '4px', display: 'block' }}>
+                                        {Number(labelsModal.item.quantity) - parseInt(labelsValue, 10)} short
+                                    </span>
+                                )}
                             </div>
                             <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
-                                <button type="button" className="btn-secondary" onClick={() => setFillModal(null)} disabled={fillSaving}>Cancel</button>
-                                <button type="button" className="btn-primary" onClick={submitFill} disabled={fillSaving || fillQty === ''}>
-                                    {fillSaving ? 'Saving…' : '✓ Save'}
+                                <button type="button" className="btn-secondary" onClick={() => setLabelsModal(null)} disabled={labelsSaving}>Cancel</button>
+                                <button type="button" className="btn-primary" onClick={submitLabels} disabled={labelsSaving || labelsValue === ''}>
+                                    {labelsSaving ? 'Saving…' : '✓ Save'}
                                 </button>
                             </div>
                         </div>
