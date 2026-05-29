@@ -207,6 +207,9 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const [packForm, setPackForm] = useState({
         size: '',
         shape: '',
+        dim_l: '',
+        dim_w: '',
+        dim_h: '',
         hsn: '',
         gst: '18',
         sku: '',
@@ -502,7 +505,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const openPackModal = () => {
         setPackStep(1);
         setPackCat(null);
-        setPackForm({ size: '', shape: '', hsn: '', gst: '18', sku: '', unit: 'pcs', supplier: '', stock: '0', cost_per_unit: '', selling_rate: '', notes: '' });
+        setPackForm({ size: '', shape: '', dim_l: '', dim_w: '', dim_h: '', hsn: '', gst: '18', sku: '', unit: 'pcs', supplier: '', stock: '0', cost_per_unit: '', selling_rate: '', notes: '' });
         setPackModal(true);
     };
 
@@ -535,7 +538,11 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             cost_per_unit: packForm.cost_per_unit || '0',
             selling_rate: packForm.selling_rate || '0',
             supplier: packForm.supplier,
-            notes: packForm.notes,
+            notes: (() => {
+                const dims = [packForm.dim_l, packForm.dim_w, packForm.dim_h].filter(Boolean);
+                const dimStr = dims.length === 3 ? `${dims.join('×')}mm` : dims.length ? `${dims.join('×')}mm` : '';
+                return [dimStr, packForm.notes].filter(Boolean).join(' | ');
+            })(),
             stock_qty: packForm.stock || '0',
             is_active: true,
         });
@@ -1580,6 +1587,41 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                         placeholder="Round"
                                     />
                                 </div>
+                                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                    <label>Box Dimensions (mm) — L × W × H</label>
+                                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.1"
+                                            value={packForm.dim_l}
+                                            onChange={(e) => setPackForm((p) => ({ ...p, dim_l: e.target.value }))}
+                                            placeholder="L"
+                                            style={{ flex: 1 }}
+                                        />
+                                        <span style={{ color: '#9ca3af', fontWeight: 700 }}>×</span>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.1"
+                                            value={packForm.dim_w}
+                                            onChange={(e) => setPackForm((p) => ({ ...p, dim_w: e.target.value }))}
+                                            placeholder="W"
+                                            style={{ flex: 1 }}
+                                        />
+                                        <span style={{ color: '#9ca3af', fontWeight: 700 }}>×</span>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.1"
+                                            value={packForm.dim_h}
+                                            onChange={(e) => setPackForm((p) => ({ ...p, dim_h: e.target.value }))}
+                                            placeholder="H"
+                                            style={{ flex: 1 }}
+                                        />
+                                        <span style={{ color: '#6b7280', fontSize: 13, whiteSpace: 'nowrap' }}>mm</span>
+                                    </div>
+                                </div>
                                 <div className="form-group">
                                     <label>HSN</label>
                                     <input
@@ -1609,6 +1651,11 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                         <div style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 700, color: '#059669' }}>
                                             {packForm.sku || buildSku(packCat.code, packForm.size, packForm.shape)}
                                         </div>
+                                        {(packForm.dim_l || packForm.dim_w || packForm.dim_h) && (
+                                            <div style={{ marginTop: 6, fontSize: 12, color: '#374151' }}>
+                                                📐 {[packForm.dim_l || '?', packForm.dim_w || '?', packForm.dim_h || '?'].join(' × ')} mm
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
