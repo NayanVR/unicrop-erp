@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PartyController extends Controller
 {
@@ -53,7 +54,8 @@ class PartyController extends Controller
             'customer_name' => 'nullable|string|max:255',
             'type'          => 'required|in:customer,supplier,both',
             'gst_no'        => 'nullable|string|max:20',
-            'pan_no'  => 'nullable|string|max:10',
+            'pan_no'        => 'nullable|string|max:10',
+            'pan_card_file' => 'nullable|file|max:5120|mimes:pdf,jpg,jpeg,png',
             'phone'   => 'nullable|string|max:20',
             'email'   => 'nullable|email|max:255',
             'address' => 'nullable|string',
@@ -65,8 +67,17 @@ class PartyController extends Controller
             'default_transport_id'   => 'nullable|integer|exists:transports,id',
         ]);
 
+        $panCardFile = $request->file('pan_card_file');
+        unset($data['pan_card_file']);
         $data['created_by'] = $request->user()?->id;
-        Party::create($data);
+
+        $party = Party::create($data);
+
+        if ($panCardFile) {
+            $ext = strtolower($panCardFile->getClientOriginalExtension() ?: 'pdf');
+            $path = $panCardFile->storeAs("party-pan-cards/{$party->id}", "pan_card.{$ext}", 'local');
+            $party->update(['pan_card_path' => $path]);
+        }
 
         return redirect()->back()->with('success', 'Party added.');
     }
@@ -78,7 +89,8 @@ class PartyController extends Controller
             'customer_name' => 'nullable|string|max:255',
             'type'          => 'required|in:customer,supplier,both',
             'gst_no'        => 'nullable|string|max:20',
-            'pan_no'    => 'nullable|string|max:10',
+            'pan_no'        => 'nullable|string|max:10',
+            'pan_card_file' => 'nullable|file|max:5120|mimes:pdf,jpg,jpeg,png',
             'phone'     => 'nullable|string|max:20',
             'email'     => 'nullable|email|max:255',
             'address'   => 'nullable|string',
@@ -91,9 +103,28 @@ class PartyController extends Controller
             'default_transport_id'   => 'nullable|integer|exists:transports,id',
         ]);
 
+        $panCardFile = $request->file('pan_card_file');
+        unset($data['pan_card_file']);
+
+        if ($panCardFile) {
+            if ($party->pan_card_path) {
+                Storage::disk('local')->delete($party->pan_card_path);
+            }
+            $ext = strtolower($panCardFile->getClientOriginalExtension() ?: 'pdf');
+            $data['pan_card_path'] = $panCardFile->storeAs("party-pan-cards/{$party->id}", "pan_card.{$ext}", 'local');
+        }
+
         $party->update($data);
 
         return redirect()->back()->with('success', 'Party updated.');
+    }
+
+    public function showPanCard(Party $party): StreamedResponse
+    {
+        abort_if(! $party->pan_card_path, 404);
+        abort_if(! Storage::disk('local')->exists($party->pan_card_path), 404);
+
+        return Storage::disk('local')->response($party->pan_card_path);
     }
 
     public function destroy(Party $party): RedirectResponse

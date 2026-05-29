@@ -18,6 +18,7 @@ type Party = {
     customer_name?: string | null;
     gst_no?: string | null;
     pan_no?: string | null;
+    pan_card_url?: string | null;
     phone?: string | null;
     address?: string | null;
     city?: string | null;
@@ -399,7 +400,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
             transport_type: transportType,
             transport_name: transportName,
         });
-        if (party.pan_no) setShowPan(true);
+        if (party.pan_no || party.pan_card_url) setShowPan(true);
         setPartySearch(party.name);
         setPartyDropdownOpen(false);
     };
@@ -448,6 +449,11 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
     };
 
     const transportOptions = form.data.transport_type === 'courier' ? couriers : transports;
+
+    const partyPanCardUrl = useMemo(
+        () => parties.find((p) => String(p.id) === form.data.party_id)?.pan_card_url ?? null,
+        [parties, form.data.party_id],
+    );
 
     return (
         <>
@@ -699,7 +705,16 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                         {form.errors.pan_no && <span className="field-error">{form.errors.pan_no}</span>}
                                     </div>
                                     <div className="form-group">
-                                        <label>Upload PAN Card * (PDF, JPG, PNG)</label>
+                                        <label>
+                                            Upload PAN Card{partyPanCardUrl ? '' : ' *'} (PDF, JPG, PNG)
+                                        </label>
+                                        {partyPanCardUrl && (
+                                            <div style={{ fontSize: '12px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span style={{ color: 'var(--green, #16a34a)', fontWeight: 600 }}>✓ PAN card on file from party profile</span>
+                                                <a href={partyPanCardUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--tx-sub)', textDecoration: 'underline' }}>View</a>
+                                                <span style={{ color: 'var(--tx-muted)' }}>— upload below to use a different one</span>
+                                            </div>
+                                        )}
                                         <input
                                             type="file"
                                             className={form.errors.pan_file ? 'error' : ''}

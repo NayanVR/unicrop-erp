@@ -15,6 +15,7 @@ class Party extends Model
         'type',
         'gst_no',
         'pan_no',
+        'pan_card_path',
         'phone',
         'email',
         'address',
@@ -30,6 +31,15 @@ class Party extends Model
     protected $casts = [
         'is_active' => 'boolean',
     ];
+
+    protected $appends = ['pan_card_url'];
+
+    public function getPanCardUrlAttribute(): ?string
+    {
+        return $this->pan_card_path
+            ? route('parties.pan-card', ['party' => $this->getKey()])
+            : null;
+    }
 
     public function creator(): BelongsTo
     {

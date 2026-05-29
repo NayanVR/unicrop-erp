@@ -25,6 +25,7 @@ Route::get('/', function () {
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('product-photos/{photo}/image', [ProductPhotoController::class, 'show'])->name('product-photos.show');
+    Route::get('parties/{party}/pan-card', [PartyController::class, 'showPanCard'])->name('parties.pan-card');
 
     Route::middleware(['role:admin'])->group(function () {
         Route::resource('users', UserController::class)->only(['index', 'store', 'update', 'destroy']);

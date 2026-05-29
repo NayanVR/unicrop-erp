@@ -69,7 +69,7 @@ class StoreOrderRequest extends FormRequest
             'items.*.cap_color' => ['nullable', 'string', 'max:100'],
             'attachments' => ['nullable', 'array', 'max:3'],
             'attachments.*' => ['file', 'max:5120', 'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png,txt'],
-            'pan_file' => ['nullable', 'file', 'max:5120', 'mimes:pdf,jpg,jpeg,png', 'required_with:pan_no'],
+            'pan_file' => ['nullable', 'file', 'max:5120', 'mimes:pdf,jpg,jpeg,png'],
             'aadhaar_file' => ['nullable', 'file', 'max:5120', 'mimes:pdf,jpg,jpeg,png', 'required_with:aadhaar_no'],
             'save_as_draft' => ['nullable', 'boolean'],
         ];

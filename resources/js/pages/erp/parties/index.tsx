@@ -56,6 +56,7 @@ type Party = {
     type: 'customer' | 'supplier' | 'both';
     gst_no: string | null;
     pan_no: string | null;
+    pan_card_url: string | null;
     phone: string | null;
     email: string | null;
     address: string | null;
@@ -96,6 +97,7 @@ const defaultPartyForm = {
     type: 'customer' as 'customer' | 'supplier' | 'both',
     gst_no: '',
     pan_no: '',
+    pan_card_file: null as File | null,
     phone: '',
     email: '',
     address: '',
@@ -131,8 +133,9 @@ export default function PartiesIndex() {
     const [filter, setFilter] = useState<'all' | 'customer' | 'supplier' | 'both'>('all');
 
     // ── Refs ───────────────────────────────────────────────────────────────
-    const docFileRef   = useRef<HTMLInputElement>(null);
-    const photoFileRef = useRef<HTMLInputElement>(null);
+    const docFileRef    = useRef<HTMLInputElement>(null);
+    const photoFileRef  = useRef<HTMLInputElement>(null);
+    const panFileRef    = useRef<HTMLInputElement>(null);
 
     // ── Forms ──────────────────────────────────────────────────────────────
     const { data, setData, post, patch, processing, reset, errors } = useForm(defaultPartyForm);
@@ -198,7 +201,12 @@ export default function PartiesIndex() {
     );
 
     // ── Party CRUD ─────────────────────────────────────────────────────────
-    const openAdd = () => { reset(); setEditing(null); setShowModal(true); };
+    const openAdd = () => {
+        reset();
+        setEditing(null);
+        setShowModal(true);
+        if (panFileRef.current) panFileRef.current.value = '';
+    };
 
     const openEdit = (p: Party) => {
         setEditing(p);
@@ -208,10 +216,18 @@ export default function PartiesIndex() {
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
+        const opts = {
+            forceFormData: true,
+            onSuccess: () => {
+                setShowModal(false);
+                reset();
+                if (panFileRef.current) panFileRef.current.value = '';
+            },
+        };
         if (editing) {
-            patch(partyUpdate(editing.id).url, { onSuccess: () => { setShowModal(false); reset(); } });
+            patch(partyUpdate(editing.id).url, opts);
         } else {
-            post(partyStore().url, { onSuccess: () => { setShowModal(false); reset(); } });
+            post(partyStore().url, opts);
         }
     };
 
@@ -455,6 +471,23 @@ export default function PartiesIndex() {
                             <div className="form-row">
                                 <div className="form-group"><label>GST No.</label><input value={data.gst_no} onChange={(e) => setData('gst_no', e.target.value)} placeholder="22AAAAA0000A1Z5" /></div>
                                 <div className="form-group"><label>PAN No.</label><input value={data.pan_no} onChange={(e) => setData('pan_no', e.target.value)} placeholder="AAAAA0000A" /></div>
+                            </div>
+                            <div className="form-group">
+                                <label>PAN Card File (PDF, JPG, PNG — max 5 MB)</label>
+                                {editing?.pan_card_url && (
+                                    <div style={{ fontSize: '12px', color: 'var(--tx-sub)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ color: 'var(--green, #16a34a)', fontWeight: 600 }}>✓ File on record</span>
+                                        <a href={editing.pan_card_url} target="_blank" rel="noreferrer" style={{ color: 'var(--tx-sub)', textDecoration: 'underline' }}>View current</a>
+                                        <span style={{ color: 'var(--tx-muted)' }}>— upload below to replace</span>
+                                    </div>
+                                )}
+                                <input
+                                    ref={panFileRef}
+                                    type="file"
+                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    onChange={(e) => setData('pan_card_file', e.target.files?.[0] ?? null)}
+                                />
+                                {errors.pan_card_file && <span className="field-error">{errors.pan_card_file}</span>}
                             </div>
                             <div className="form-row">
                                 <div className="form-group"><label>Email</label><input type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} /></div>

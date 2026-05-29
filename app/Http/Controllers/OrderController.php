@@ -15,6 +15,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -111,7 +113,7 @@ class OrderController extends Controller
             'couriers' => Transport::couriers()->orderBy('name')->get(['id', 'name']),
             'parties' => Party::where('is_active', true)->orderBy('name')
                 ->with(['productRates' => fn ($q) => $q->where('is_active', true)->orderBy('our_brand')->orderBy('packing_size')])
-                ->get(['id', 'name', 'customer_name', 'gst_no', 'pan_no', 'phone', 'address', 'city', 'state', 'default_transport_type', 'default_transport_id']),
+                ->get(['id', 'name', 'customer_name', 'gst_no', 'pan_no', 'pan_card_path', 'phone', 'address', 'city', 'state', 'default_transport_type', 'default_transport_id']),
             'currentUser' => ['id' => $user?->id, 'name' => $user?->name],
             'productPhotos' => ProductPhoto::orderBy('our_brand')->orderBy('packing_size')
                 ->get()
@@ -310,7 +312,7 @@ class OrderController extends Controller
             'couriers'     => Transport::couriers()->orderBy('name')->get(['id', 'name']),
             'parties'      => Party::where('is_active', true)->orderBy('name')
                 ->with(['productRates' => fn ($q) => $q->where('is_active', true)->orderBy('our_brand')->orderBy('packing_size')])
-                ->get(['id', 'name', 'customer_name', 'gst_no', 'pan_no', 'phone', 'address', 'city', 'state', 'default_transport_type', 'default_transport_id']),
+                ->get(['id', 'name', 'customer_name', 'gst_no', 'pan_no', 'pan_card_path', 'phone', 'address', 'city', 'state', 'default_transport_type', 'default_transport_id']),
             'currentUser'  => ['id' => $user?->id, 'name' => $user?->name],
             'productPhotos' => ProductPhoto::orderBy('our_brand')->orderBy('packing_size')
                 ->get()
@@ -512,6 +514,31 @@ class OrderController extends Controller
                     'size' => $file->getSize(),
                     'document_type' => $docType,
                 ];
+            }
+        }
+
+        // No PAN file uploaded — copy from party's permanent PAN card if available
+        if (! $request->hasFile('pan_file') && $request->filled('party_id')) {
+            $party = Party::find($request->input('party_id'));
+            if ($party?->pan_card_path && Storage::disk('local')->exists($party->pan_card_path)) {
+                try {
+                    $content = Storage::disk('local')->get($party->pan_card_path);
+                    $ext = strtolower(pathinfo($party->pan_card_path, PATHINFO_EXTENSION)) ?: 'pdf';
+                    $newPath = 'orders/'.$order->id.'/kyc/pan_card_'.Str::random(8).'.'.$ext;
+                    Storage::disk('public')->put($newPath, $content);
+                    $attachments[] = [
+                        'original_name' => 'PAN_Card.'.strtoupper($ext),
+                        'path'          => $newPath,
+                        'mime_type'     => $ext === 'pdf' ? 'application/pdf' : 'image/'.$ext,
+                        'size'          => Storage::disk('local')->size($party->pan_card_path),
+                        'document_type' => 'pan',
+                    ];
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to copy party PAN card to order', [
+                        'party_id' => $party->id,
+                        'error'    => $e->getMessage(),
+                    ]);
+                }
             }
         }
 
