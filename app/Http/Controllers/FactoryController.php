@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\ErpActivity;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\ProductPhoto;
@@ -13,11 +14,10 @@ use Inertia\Response;
 class FactoryController extends Controller
 {
     private const STAGE_FLOW = [
-        'pending' => 'processing',
-        'processing' => 'filling',
-        'filling' => 'labeling',
+        'accepted' => 'filling',
+        'filling'  => 'labeling',
         'labeling' => 'ready',
-        'ready' => 'dispatched',
+        'ready'    => 'dispatched',
     ];
 
     private const DESIGN_LABELS = [
@@ -220,6 +220,15 @@ class FactoryController extends Controller
             $order->update(['status' => 'confirmed']);
         }
 
+        $label = $item->party_brand ?? $item->our_brand ?? 'Item';
+        $stageName = ucfirst($targetStage);
+        broadcast(new ErpActivity(
+            type: 'stage_changed',
+            message: "{$user?->name} moved {$label} to {$stageName} (Order {$order->order_number})",
+            by: $user?->name ?? 'System',
+            meta: ['order_id' => $order->id, 'item_id' => $item->id, 'stage' => $targetStage],
+        ));
+
         return redirect()->back()->with('success', "Item set to {$targetStage}.");
     }
 
@@ -290,6 +299,13 @@ class FactoryController extends Controller
         if ($allDispatched) {
             $order->update(['status' => 'dispatched']);
         }
+
+        broadcast(new ErpActivity(
+            type: 'dispatched',
+            message: "{$user?->name} dispatched {$readyItems->count()} item(s) for Order {$order->order_number}",
+            by: $user?->name ?? 'System',
+            meta: ['order_id' => $order->id],
+        ));
 
         return redirect()->back()->with('success', "Dispatched {$readyItems->count()} item(s).");
     }

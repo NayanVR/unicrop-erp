@@ -118,23 +118,21 @@ type Props = {
     productPhotos?: ProductPhoto[];
 };
 
-const STAGE_ORDER = ['pending', 'processing', 'filling', 'labeling', 'ready', 'dispatched'];
+const STAGE_ORDER = ['accepted', 'filling', 'labeling', 'ready', 'dispatched'];
 
 const STAGE_LABELS: Record<string, string> = {
-    pending: 'Pending',
-    processing: 'Processing',
-    filling: 'Filling',
-    labeling: 'Labeling',
-    ready: 'Ready',
+    accepted:   'Accept Order',
+    filling:    'Filling',
+    labeling:   'Labeling',
+    ready:      'Ready',
     dispatched: 'Dispatched',
 };
 
 const STAGE_CLASS: Record<string, string> = {
-    pending: 's-pending',
-    processing: 's-processing',
-    filling: 's-filling',
-    labeling: 's-labeling',
-    ready: 's-ready',
+    accepted:   's-processing',
+    filling:    's-filling',
+    labeling:   's-labeling',
+    ready:      's-ready',
     dispatched: 's-dispatched',
 };
 
@@ -152,37 +150,45 @@ type EditableLabel = {
     orderRef: string;
 };
 
-type FilterKey = 'all' | 'pending' | 'in-process' | 'ready' | 'dispatched';
+type FilterKey = 'all' | 'new' | 'in-process' | 'ready' | 'dispatched';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
     { key: 'all', label: 'All' },
-    { key: 'pending', label: 'Pending' },
+    { key: 'new', label: 'New' },
     { key: 'in-process', label: 'In Process' },
     { key: 'ready', label: 'Ready' },
     { key: 'dispatched', label: 'Dispatched' },
 ];
 
 const stageIndex = (status?: string | null) => {
-    const idx = STAGE_ORDER.indexOf(status ?? 'pending');
-    return idx < 0 ? 0 : idx;
+    if (!status) return -1; // not yet accepted
+    const idx = STAGE_ORDER.indexOf(status);
+    return idx < 0 ? -1 : idx;
 };
 
-const itemProgress = (item: OrderItem) => Math.round((stageIndex(item.status) / (STAGE_ORDER.length - 1)) * 100);
+const itemProgress = (item: OrderItem) => {
+    const idx = stageIndex(item.status);
+    if (idx < 0) return 0;
+    return Math.round(((idx + 1) / STAGE_ORDER.length) * 100);
+};
 
 const orderProgress = (order: Order) => {
     if (order.items.length === 0) return 0;
-    const sum = order.items.reduce((acc, i) => acc + stageIndex(i.status) / (STAGE_ORDER.length - 1), 0);
+    const sum = order.items.reduce((acc, i) => {
+        const idx = stageIndex(i.status);
+        return acc + (idx < 0 ? 0 : (idx + 1) / STAGE_ORDER.length);
+    }, 0);
     return Math.round((sum / order.items.length) * 100);
 };
 
 const matchesFilter = (order: Order, filter: FilterKey) => {
     if (filter === 'all') return true;
-    const statuses = order.items.map((i) => i.status ?? 'pending');
+    const statuses = order.items.map((i) => i.status ?? null);
     switch (filter) {
-        case 'pending':
-            return statuses.some((s) => s === 'pending');
+        case 'new':
+            return statuses.some((s) => !s);
         case 'in-process':
-            return statuses.some((s) => ['processing', 'filling', 'labeling'].includes(s));
+            return statuses.some((s) => ['accepted', 'filling', 'labeling'].includes(s ?? ''));
         case 'ready':
             return statuses.some((s) => s === 'ready');
         case 'dispatched':
@@ -281,10 +287,10 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
     const toggleOrder = (orderId: number) =>
         setOpenOrders((curr) => (curr.includes(orderId) ? curr.filter((id) => id !== orderId) : [...curr, orderId]));
 
-    const setItemStage = (itemId: number, stage: string, current: string) => {
+    const setItemStage = (itemId: number, stage: string, current: string | null) => {
         if (stage === current) return;
         const targetIdx = STAGE_ORDER.indexOf(stage);
-        const currentIdx = STAGE_ORDER.indexOf(current);
+        const currentIdx = current ? STAGE_ORDER.indexOf(current) : -1;
         if (targetIdx < currentIdx && !confirm(`Move this item back to "${STAGE_LABELS[stage] ?? stage}"?`)) return;
         setStagingItem(itemId);
         router.post(
@@ -785,8 +791,11 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                     <div>
                                                                         <div className="prod-name">{item.our_brand ?? '—'}</div>
                                                                         {item.party_brand && <div className="prod-detail">{item.party_brand}</div>}
-                                                                        <span className={`badge ${STAGE_CLASS[item.status] ?? 'gray'}`} style={{ marginTop: '4px', display: 'inline-block' }}>
-                                                                            {STAGE_LABELS[item.status] ?? item.status}
+                                                                        <span
+                                                                            className={`badge ${item.status ? (STAGE_CLASS[item.status] ?? 'gray') : 's-pending'}`}
+                                                                            style={{ marginTop: '4px', display: 'inline-block' }}
+                                                                        >
+                                                                            {item.status ? (STAGE_LABELS[item.status] ?? item.status) : 'Awaiting Acceptance'}
                                                                         </span>
                                                                     </div>
                                                                 </div>
@@ -906,23 +915,25 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                     {canAdvance && (
                                                                         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
                                                                             {STAGE_ORDER.map((stage) => {
-                                                                                const isCurrent = item.status === stage;
+                                                                                const isCurrent = item.status === stage ||
+                                                                                    (!item.status && stage === 'accepted');
+                                                                                const isActive = item.status === stage;
                                                                                 return (
                                                                                     <button
                                                                                         key={stage}
                                                                                         type="button"
-                                                                                        className={`badge ${isCurrent ? (STAGE_CLASS[stage] ?? 'gray') : 'gray'}`}
-                                                                                        onClick={() => setItemStage(item.id, stage, item.status)}
-                                                                                        disabled={stagingItem === item.id || isCurrent}
-                                                                                        title={isCurrent ? 'Current stage' : `Set to ${STAGE_LABELS[stage]}`}
+                                                                                        className={`badge ${isActive ? (STAGE_CLASS[stage] ?? 'gray') : (isCurrent && !item.status ? 's-pending' : 'gray')}`}
+                                                                                        onClick={() => setItemStage(item.id, stage, item.status ?? '')}
+                                                                                        disabled={stagingItem === item.id || isActive}
+                                                                                        title={isActive ? 'Current stage' : `Set to ${STAGE_LABELS[stage]}`}
                                                                                         style={{
-                                                                                            cursor: isCurrent ? 'default' : 'pointer',
+                                                                                            cursor: isActive ? 'default' : 'pointer',
                                                                                             border: isCurrent ? '2px solid var(--accent)' : '1px solid var(--border)',
-                                                                                            opacity: isCurrent ? 1 : 0.75,
+                                                                                            opacity: isActive ? 1 : 0.75,
                                                                                             fontWeight: isCurrent ? 700 : 500,
                                                                                         }}
                                                                                     >
-                                                                                        {isCurrent ? '● ' : ''}
+                                                                                        {isActive ? '● ' : ''}
                                                                                         {STAGE_LABELS[stage]}
                                                                                     </button>
                                                                                 );

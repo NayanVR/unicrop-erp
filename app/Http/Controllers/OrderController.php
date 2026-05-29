@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\ErpActivity;
 use App\Http\Requests\StoreOrderRequest;
 use App\Http\Requests\UpdateOrderRequest;
 use App\Models\DesignOrder;
@@ -210,6 +211,14 @@ class OrderController extends Controller
             'confirmed_by' => $request->user()?->id,
             'confirmed_at' => now(),
         ]);
+
+        $user = $request->user();
+        broadcast(new ErpActivity(
+            type: 'order_confirmed',
+            message: "{$user?->name} confirmed Order {$order->order_number} ({$order->company_name})",
+            by: $user?->name ?? 'System',
+            meta: ['order_id' => $order->id],
+        ));
 
         return redirect()->back()->with('success', "Order {$order->order_number} confirmed.");
     }
