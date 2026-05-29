@@ -46,13 +46,24 @@ type OrderItem = {
     gst_percent: string | number;
     gst_amount: string | number;
     status?: string | null;
-    stage_log?: Array<{ stage?: string; name?: string | null; at?: string; revert?: boolean }> | null;
+    stage_log?: Array<{ from?: string; to?: string; name?: string | null; at?: string; revert?: boolean }> | null;
 };
 
 const lastStageActor = (item: OrderItem): string | null => {
     const log = item.stage_log;
     if (!log || log.length === 0) return null;
     return log[log.length - 1]?.name ?? null;
+};
+
+// Returns the name of the factory user who moved this item to `stage`
+// (picks the most recent log entry whose `to` matches the stage).
+const actorForStage = (item: OrderItem, stage: string): string | null => {
+    const log = item.stage_log;
+    if (!log) return null;
+    for (let i = log.length - 1; i >= 0; i--) {
+        if (log[i].to === stage) return log[i].name ?? null;
+    }
+    return null;
 };
 
 type Order = {
@@ -835,21 +846,35 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                             <tbody>
                                                                 {order.items.map((item) => {
                                                                     const stageIdx = PROD_STAGES.indexOf(normalizeStage(item.status));
+                                                                    const worker = lastStageActor(item);
                                                                     return (
                                                                         <tr key={item.id}>
                                                                             <td>
                                                                                 <div className="prod-name" style={{ fontSize: '12px' }}>{item.our_brand ?? '—'}</div>
                                                                                 {item.party_brand && <div className="prod-detail">{item.party_brand}</div>}
+                                                                                {worker && (
+                                                                                    <div style={{ fontSize: '11px', color: 'var(--tx-muted)', marginTop: '2px' }}>
+                                                                                        👷 {worker}
+                                                                                    </div>
+                                                                                )}
                                                                             </td>
                                                                             {PROD_STAGES.map((s, i) => {
                                                                                 const isPast = i < stageIdx;
                                                                                 const isCurrent = i === stageIdx;
+                                                                                const actor = actorForStage(item, s);
                                                                                 return (
-                                                                                    <td key={s} style={{ textAlign: 'center' }}>
+                                                                                    <td key={s} style={{ textAlign: 'center', verticalAlign: 'top', paddingTop: '6px' }}>
                                                                                         {isPast ? (
-                                                                                            <span style={{ color: '#059669', fontSize: '14px' }}>✓</span>
+                                                                                            <span title={actor ? `by ${actor}` : undefined} style={{ color: '#059669', fontSize: '14px', cursor: actor ? 'help' : 'default' }}>✓</span>
                                                                                         ) : isCurrent ? (
-                                                                                            <span className={`badge s-${s}`} style={{ fontSize: '10px' }}>●</span>
+                                                                                            <div>
+                                                                                                <span className={`badge s-${s}`} style={{ fontSize: '10px' }}>●</span>
+                                                                                                {actor && (
+                                                                                                    <div style={{ fontSize: '10px', color: 'var(--tx-muted)', marginTop: '3px', whiteSpace: 'nowrap' }}>
+                                                                                                        {actor}
+                                                                                                    </div>
+                                                                                                )}
+                                                                                            </div>
                                                                                         ) : (
                                                                                             <span style={{ color: 'var(--tx-faint)', fontSize: '12px' }}>○</span>
                                                                                         )}
