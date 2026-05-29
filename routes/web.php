@@ -102,7 +102,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('design/{designOrder}/advance', [DesignController::class, 'advance'])->name('design.advance');
         Route::patch('design/{designOrder}/tracking', [DesignController::class, 'updateTracking'])->name('design.tracking');
         Route::delete('design/{designOrder}', [DesignController::class, 'destroy'])->name('design.destroy');
+    });
 
+    Route::middleware(['role:admin,office,design'])->group(function () {
         Route::get('design/gallery', [ProductPhotoController::class, 'index'])->name('design.gallery.index');
         Route::post('design/gallery/folders', [ProductPhotoController::class, 'storeFolder'])->name('design.gallery.folders.store');
         Route::post('design/gallery', [ProductPhotoController::class, 'store'])->name('design.gallery.store');

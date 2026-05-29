@@ -66,6 +66,7 @@ const NAV_DEFS: Record<string, NavItem[]> = {
         { id: 'rate-calc', label: 'Rate Calculator', icon: '🧮', href: rateCalcIndex() },
         { id: 'inventory', label: 'Inventory', icon: '🗄️', href: inventoryIndex() },
         { id: 'design-orders', label: 'Design Orders', icon: '🎨', href: designIndex() },
+        { id: 'photo-gallery', label: 'Photo Gallery', icon: '📷', href: galleryIndex() },
     ],
     factory: [
         { id: 'dashboard', label: 'Dashboard', icon: '🌾', href: dashboard() },
