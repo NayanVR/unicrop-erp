@@ -213,9 +213,31 @@ const formatDay = (iso?: string | null) => {
 
 const priorityClass = (priority?: string | null) => `badge priority-${priority ?? 'normal'}`;
 
+// Standard pcs-per-box lookup by packing size
+const PCS_PER_BOX_RULES: [RegExp, number][] = [
+    [/^1\s*kg$/i, 10],
+    [/^500\s*(g|gm|ml)$/i, 20],
+    [/^250\s*(g|gm|ml)$/i, 40],
+    [/^100\s*(g|gm|ml)$/i, 50],
+    [/^50\s*(g|gm|ml)$/i, 100],
+];
+
+const stdPcsPerBox = (packing: string | null | undefined): number | null => {
+    if (!packing) return null;
+    for (const [re, pcs] of PCS_PER_BOX_RULES) {
+        if (re.test(packing.trim())) return pcs;
+    }
+    return null;
+};
+
+// Effective pcs/box: stored box_size takes priority, else derive from packing_size
+const pcsPerBox = (item: OrderItem): number | null =>
+    item.box_size ?? stdPcsPerBox(item.packing_size);
+
 const boxesFor = (item: OrderItem): number | null => {
-    if (!item.box_size || item.box_size <= 0) return null;
-    return Math.ceil(Number(item.quantity) / item.box_size);
+    const ppb = pcsPerBox(item);
+    if (!ppb || ppb <= 0) return null;
+    return Math.ceil(Number(item.quantity) / ppb);
 };
 
 export default function FactoryIndex({ orders, urgentPending, canAdvance, productPhotos = [] }: Props) {
@@ -358,7 +380,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                     itemBoxNum: b,
                     itemTotalBoxes: itemBoxes,
                     brand: `${brand}${item.packing_size ? ' · ' + item.packing_size : ''}`,
-                    inBoxPcs: item.box_size ? String(item.box_size) : '',
+                    inBoxPcs: pcsPerBox(item) != null ? String(pcsPerBox(item)) : '',
                     orderRef: order.order_number,
                 });
             }
@@ -775,31 +797,71 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                 <div style={{ fontSize: '13px' }}>
                                                                     {item.packing_size ? `${item.packing_size} · ` : ''}Qty: {item.quantity}
                                                                 </div>
-                                                                {/* Per-box pcs — inline editable */}
-                                                                <div className="prod-detail" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
-                                                                    <span>📦</span>
-                                                                    <input
-                                                                        type="number"
-                                                                        min={1}
-                                                                        value={boxSizeDraft[item.id] ?? (item.box_size != null ? String(item.box_size) : '')}
-                                                                        onChange={(e) => setBoxSizeDraft((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                                                                        onBlur={() => saveBoxSize(item.id)}
-                                                                        onKeyDown={(e) => e.key === 'Enter' && saveBoxSize(item.id)}
-                                                                        placeholder="pcs/box"
-                                                                        disabled={savingBoxSize === item.id}
-                                                                        style={{
-                                                                            width: '64px', padding: '2px 5px', fontSize: '12px',
-                                                                            border: '1px solid var(--border)', borderRadius: '4px',
-                                                                            background: 'var(--bg-input, #fff)',
-                                                                        }}
-                                                                    />
-                                                                    <span style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>
-                                                                        pcs/box
-                                                                        {boxes != null && item.box_size
-                                                                            ? ` · ${boxes} box${boxes !== 1 ? 'es' : ''}`
-                                                                            : ''}
-                                                                    </span>
-                                                                </div>
+                                                                {/* Per-box pcs — auto from packing size, overridable */}
+                                                                {(() => {
+                                                                    const auto = stdPcsPerBox(item.packing_size);
+                                                                    const effective = pcsPerBox(item);
+                                                                    const isOverridden = item.box_size != null;
+                                                                    const draftVal = boxSizeDraft[item.id];
+                                                                    const inputVal = draftVal ?? (item.box_size != null ? String(item.box_size) : '');
+                                                                    return (
+                                                                        <div className="prod-detail" style={{ marginTop: '4px' }}>
+                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                                <span>📦</span>
+                                                                                {/* Auto-derived value */}
+                                                                                {auto != null && !isOverridden ? (
+                                                                                    <span style={{ fontSize: '12px', fontWeight: 600 }}>
+                                                                                        {auto} pcs/box
+                                                                                    </span>
+                                                                                ) : (
+                                                                                    <input
+                                                                                        type="number"
+                                                                                        min={1}
+                                                                                        value={inputVal}
+                                                                                        onChange={(e) => setBoxSizeDraft((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                                                                                        onBlur={() => saveBoxSize(item.id)}
+                                                                                        onKeyDown={(e) => e.key === 'Enter' && saveBoxSize(item.id)}
+                                                                                        placeholder="pcs/box"
+                                                                                        disabled={savingBoxSize === item.id}
+                                                                                        style={{
+                                                                                            width: '60px', padding: '2px 4px', fontSize: '12px',
+                                                                                            border: '1px solid var(--border)', borderRadius: '4px',
+                                                                                            background: 'var(--bg-input, #fff)',
+                                                                                        }}
+                                                                                    />
+                                                                                )}
+                                                                                {effective != null && boxes != null && (
+                                                                                    <span style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>
+                                                                                        · {boxes} box{boxes !== 1 ? 'es' : ''}
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                            {/* Show override input when auto value exists */}
+                                                                            {auto != null && (
+                                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                                                                                    <span style={{ fontSize: '10px', color: 'var(--tx-faint)' }}>
+                                                                                        {isOverridden ? 'override:' : 'override?'}
+                                                                                    </span>
+                                                                                    <input
+                                                                                        type="number"
+                                                                                        min={1}
+                                                                                        value={inputVal}
+                                                                                        onChange={(e) => setBoxSizeDraft((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                                                                                        onBlur={() => saveBoxSize(item.id)}
+                                                                                        onKeyDown={(e) => e.key === 'Enter' && saveBoxSize(item.id)}
+                                                                                        placeholder="—"
+                                                                                        disabled={savingBoxSize === item.id}
+                                                                                        style={{
+                                                                                            width: '48px', padding: '1px 4px', fontSize: '11px',
+                                                                                            border: '1px dashed var(--border)', borderRadius: '4px',
+                                                                                            background: 'transparent', color: 'var(--tx-muted)',
+                                                                                        }}
+                                                                                    />
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })()}
                                                                 {item.type && (
                                                                     <div className="prod-detail" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                                                         {item.type}
