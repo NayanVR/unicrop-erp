@@ -22,6 +22,9 @@ type RawMaterial = {
     reorder_level: string | number;
     cost_per_unit: string | number;
     selling_rate: string | number;
+    dim_l: string | number | null;
+    dim_w: string | number | null;
+    dim_h: string | number | null;
     supplier: string | null;
     notes: string | null;
     is_active: boolean;
@@ -246,6 +249,9 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         reorder_level: '0',
         cost_per_unit: '0',
         selling_rate: '0',
+        dim_l: '',
+        dim_w: '',
+        dim_h: '',
         supplier: '',
         notes: '',
         is_active: true,
@@ -285,6 +291,9 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         reorder_level: '0',
         cost_per_unit: '0',
         selling_rate: '0',
+        dim_l: '',
+        dim_w: '',
+        dim_h: '',
         supplier: '',
         notes: '',
         stock_qty: '0',
@@ -344,6 +353,9 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             reorder_level: String(m.reorder_level),
             cost_per_unit: String(m.cost_per_unit),
             selling_rate: String(m.selling_rate),
+            dim_l: m.dim_l != null ? String(m.dim_l) : '',
+            dim_w: m.dim_w != null ? String(m.dim_w) : '',
+            dim_h: m.dim_h != null ? String(m.dim_h) : '',
             supplier: m.supplier ?? '',
             notes: m.notes ?? '',
             is_active: m.is_active,
@@ -537,12 +549,11 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             reorder_level: '0',
             cost_per_unit: packForm.cost_per_unit || '0',
             selling_rate: packForm.selling_rate || '0',
+            dim_l: packForm.dim_l || '',
+            dim_w: packForm.dim_w || '',
+            dim_h: packForm.dim_h || '',
             supplier: packForm.supplier,
-            notes: (() => {
-                const dims = [packForm.dim_l, packForm.dim_w, packForm.dim_h].filter(Boolean);
-                const dimStr = dims.length === 3 ? `${dims.join('×')}mm` : dims.length ? `${dims.join('×')}mm` : '';
-                return [dimStr, packForm.notes].filter(Boolean).join(' | ');
-            })(),
+            notes: packForm.notes,
             stock_qty: packForm.stock || '0',
             is_active: true,
         });
@@ -742,6 +753,11 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                             <td>
                                                 <div className="prod-name">{m.name}</div>
                                                 {m.sku && <div className="prod-detail">{m.sku}</div>}
+                                                {(m.dim_l || m.dim_w || m.dim_h) && (
+                                                    <div className="prod-detail" style={{ color: '#6b7280' }}>
+                                                        📐 {[m.dim_l, m.dim_w, m.dim_h].map((d) => d != null && Number(d) > 0 ? Number(d) : '?').join(' × ')} mm
+                                                    </div>
+                                                )}
                                             </td>
                                             <td>{m.category ?? <span style={{ color: '#9ca3af' }}>—</span>}</td>
                                             <td>{fmt(m.stock_qty)} {m.unit}</td>
@@ -1096,6 +1112,44 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                         onChange={(e) => matForm.setData('selling_rate', e.target.value)}
                                     />
                                     {matForm.errors.selling_rate && <div className="form-error">{matForm.errors.selling_rate}</div>}
+                                </div>
+                                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                    <label>Box Dimensions (mm) — L × W × H</label>
+                                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.1"
+                                            value={matForm.data.dim_l}
+                                            onChange={(e) => matForm.setData('dim_l', e.target.value)}
+                                            placeholder="L"
+                                            style={{ flex: 1 }}
+                                        />
+                                        <span style={{ color: '#9ca3af', fontWeight: 700 }}>×</span>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.1"
+                                            value={matForm.data.dim_w}
+                                            onChange={(e) => matForm.setData('dim_w', e.target.value)}
+                                            placeholder="W"
+                                            style={{ flex: 1 }}
+                                        />
+                                        <span style={{ color: '#9ca3af', fontWeight: 700 }}>×</span>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.1"
+                                            value={matForm.data.dim_h}
+                                            onChange={(e) => matForm.setData('dim_h', e.target.value)}
+                                            placeholder="H"
+                                            style={{ flex: 1 }}
+                                        />
+                                        <span style={{ color: '#6b7280', fontSize: 13, whiteSpace: 'nowrap' }}>mm</span>
+                                    </div>
+                                    {(matForm.errors.dim_l || matForm.errors.dim_w || matForm.errors.dim_h) && (
+                                        <div className="form-error">Invalid dimensions</div>
+                                    )}
                                 </div>
                                 <div className="form-group">
                                     <label>Supplier</label>

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'sku', 'hsn', 'gst', 'unit', 'category', 'stock_qty', 'min_stock', 'reorder_level', 'cost_per_unit', 'selling_rate', 'supplier', 'notes', 'is_active'])]
+#[Fillable(['name', 'sku', 'hsn', 'gst', 'unit', 'category', 'stock_qty', 'min_stock', 'reorder_level', 'cost_per_unit', 'selling_rate', 'dim_l', 'dim_w', 'dim_h', 'supplier', 'notes', 'is_active'])]
 class RawMaterial extends Model
 {
     /**
@@ -22,6 +22,9 @@ class RawMaterial extends Model
             'gst' => 'decimal:2',
             'reorder_level' => 'decimal:3',
             'selling_rate' => 'decimal:2',
+            'dim_l' => 'decimal:2',
+            'dim_w' => 'decimal:2',
+            'dim_h' => 'decimal:2',
         ];
     }
 
