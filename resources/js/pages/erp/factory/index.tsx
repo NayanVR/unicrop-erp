@@ -445,7 +445,9 @@ export default function FactoryIndex({ orders, stageFlow, urgentPending, canAdva
                                         if (e.key === 'Enter') toggleOrder(order.id);
                                     }}
                                 >
-                                    <div className="o-id">{order.order_number}</div>
+                                    <div className="o-id" style={order.status === 'dispatched' ? { background: '#d1fae5', color: '#065f46' } : undefined}>
+                                        {order.order_number}
+                                    </div>
                                     <div style={{ flex: 1 }}>
                                         <div className="o-company">{order.company_name}</div>
                                         <div className="o-customer">
@@ -464,6 +466,9 @@ export default function FactoryIndex({ orders, stageFlow, urgentPending, canAdva
                                             <span style={{ fontSize: '12px', color: 'var(--tx-muted)', fontWeight: 600 }}>{progress}%</span>
                                         </div>
                                         <span className={priorityClass(order.priority)}>{(order.priority ?? 'normal').toUpperCase()}</span>
+                                        {order.status === 'dispatched' && (
+                                            <span className="badge s-dispatched">✓ Dispatched</span>
+                                        )}
                                     </div>
                                     <div className="chevron">▶</div>
                                 </div>

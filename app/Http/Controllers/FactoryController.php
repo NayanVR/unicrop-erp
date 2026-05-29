@@ -37,7 +37,7 @@ class FactoryController extends Controller
         $canAdvance = in_array($role, ['admin', 'factory']);
 
         $orders = Order::query()
-            ->where('status', 'confirmed')
+            ->whereIn('status', ['confirmed', 'dispatched'])
             ->with([
                 'items',
                 'salesUser:id,name',
