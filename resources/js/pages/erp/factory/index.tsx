@@ -330,16 +330,16 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
             for (let b = 1; b <= totalBoxes; b++) {
                 labels.push(`
                     <div class="label">
-                        <div class="transport">${order.transport_name ?? '—'}</div>
-                        <div class="destination">${order.destination ?? '—'}</div>
-                        <div class="party">${order.company_name}</div>
+                        <div class="transport" contenteditable="true">${order.transport_name ?? '—'}</div>
+                        <div class="destination" contenteditable="true">${order.destination ?? '—'}</div>
+                        <div class="party" contenteditable="true">${order.company_name}</div>
                         <div class="mid-row">
-                            <span class="box-num">${b}</span>
-                            <span class="total-boxes">${totalBoxes} box</span>
+                            <span class="box-num" contenteditable="true">${b}</span>
+                            <span class="total-boxes" contenteditable="true">${totalBoxes} box</span>
                         </div>
-                        <div class="brand-name">${brand}${item.packing_size ? ' · ' + item.packing_size : ''}</div>
-                        ${item.box_size ? `<div class="inbox">In-box pcs: <b>${item.box_size}</b></div>` : ''}
-                        <div class="summary">${summaryLines}</div>
+                        <div class="brand-name" contenteditable="true">${brand}${item.packing_size ? ' · ' + item.packing_size : ''}</div>
+                        <div class="inbox" contenteditable="true">In-box pcs: <b>${item.box_size ?? '—'}</b></div>
+                        <div class="summary" contenteditable="true">${summaryLines}</div>
                     </div>`);
             }
         });
@@ -370,13 +370,34 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 .brand-name { font-size: 11pt; font-weight: 700; margin-bottom: 1mm; }
                 .inbox { font-size: 9pt; color: #333; margin-bottom: 1mm; }
                 .summary { font-size: 8pt; color: #555; border-top: 0.5px solid #bbb; padding-top: 1mm; margin-top: auto; line-height: 1.4; }
+                [contenteditable]:focus { outline: 2px solid #2563eb; outline-offset: 1px; border-radius: 2px; }
+                .toolbar {
+                    position: sticky; top: 0; z-index: 10;
+                    background: #1e293b; color: #fff; padding: 10px 16px;
+                    display: flex; align-items: center; gap: 12px; font-size: 14px;
+                }
+                .toolbar button {
+                    background: #2563eb; color: #fff; border: 0; border-radius: 6px;
+                    padding: 8px 18px; font-size: 14px; font-weight: 700; cursor: pointer;
+                }
+                .toolbar .hint { color: #cbd5e1; font-size: 12px; }
                 @media screen {
-                    body { background: #f0f0f0; padding: 10px; }
+                    body { background: #f0f0f0; }
+                    .sheet { padding: 10px; }
                     .label { margin: 10px auto; border: 1px dashed #888; border-radius: 4px; background: #fff; }
                 }
+                @media print {
+                    .toolbar { display: none; }
+                    .sheet { padding: 0; }
+                    [contenteditable]:focus { outline: none; }
+                }
             </style></head>
-            <body>${labels.join('')}
-            <script>window.onload = () => window.print();<\/script>
+            <body>
+            <div class="toolbar">
+                <button type="button" onclick="window.print()">🖨 Print</button>
+                <span class="hint">Tip: click any text on a label to edit it before printing.</span>
+            </div>
+            <div class="sheet">${labels.join('')}</div>
             </body></html>`);
         win.document.close();
     };
