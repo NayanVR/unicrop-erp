@@ -203,6 +203,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const [editingMat, setEditingMat] = useState<RawMaterial | null>(null);
     const [txnTarget, setTxnTarget] = useState<RawMaterial | null>(null);
     const [expandedBill, setExpandedBill] = useState<number | null>(null);
+    const [viewReorder, setViewReorder] = useState<Reorder | null>(null);
 
     // Packaging wizard
     const [packStep, setPackStep] = useState(1);
@@ -694,18 +695,31 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             {/* On The Way */}
             {pendingReorders.length > 0 && (
                 <div className="card" style={{ marginBottom: 16 }}>
-                    <div className="card-title" style={{ marginBottom: 8 }}>On The Way</div>
+                    <div className="card-title" style={{ marginBottom: 8 }}>🚚 On The Way</div>
                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                         {pendingReorders.map((r) => (
                             <div
                                 key={r.id}
-                                className="pill"
-                                style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '6px 12px', fontSize: 13 }}
+                                onClick={() => setViewReorder(r)}
+                                style={{
+                                    background: '#eff6ff',
+                                    border: '1px solid #bfdbfe',
+                                    borderRadius: 8,
+                                    padding: '8px 14px',
+                                    fontSize: 13,
+                                    cursor: 'pointer',
+                                    transition: 'box-shadow 0.15s',
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.boxShadow = '0 2px 8px #bfdbfe')}
+                                onMouseLeave={(e) => (e.currentTarget.style.boxShadow = 'none')}
                             >
-                                <strong>{r.raw_material?.name ?? '—'}</strong>
-                                {' — '}{fmt(r.qty_ordered)} {r.unit}
-                                {r.supplier ? ` | Supplier: ${r.supplier}` : ''}
-                                {r.expected_delivery ? ` | EDD: ${fmtDate(r.expected_delivery)}` : ''}
+                                <div style={{ fontWeight: 700, color: '#1e40af' }}>{r.raw_material?.name ?? '—'}</div>
+                                <div style={{ color: '#6b7280', marginTop: 2 }}>
+                                    {fmt(r.qty_ordered)} {r.unit}
+                                    {r.supplier ? ` · ${r.supplier}` : ''}
+                                    {r.expected_delivery ? ` · EDD ${fmtDate(r.expected_delivery)}` : ''}
+                                </div>
+                                {r.lr_number && <div style={{ color: '#2563eb', fontSize: 11, marginTop: 2 }}>LR: {r.lr_number}</div>}
                             </div>
                         ))}
                     </div>
@@ -1849,6 +1863,77 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                         {packStep === 4 && (
                             <button type="button" className="btn primary" onClick={submitPackaging} disabled={packSubmitForm.processing}>
                                 {packSubmitForm.processing ? 'Creating...' : 'Create Packaging Item'}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Transport Detail Modal (On The Way) ───────────────────────── */}
+            <div className={`modal-overlay${viewReorder ? ' open' : ''}`} onClick={() => setViewReorder(null)}>
+                <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480, width: '95%' }}>
+                    <div className="modal-header">
+                        <h3>🚚 Transport Details</h3>
+                        <button className="modal-close" onClick={() => setViewReorder(null)}>×</button>
+                    </div>
+                    {viewReorder && (
+                        <div className="modal-body">
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 20px', fontSize: 14 }}>
+                                <div>
+                                    <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 2 }}>MATERIAL</div>
+                                    <div style={{ fontWeight: 700, color: '#1e40af' }}>{viewReorder.raw_material?.name ?? '—'}</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 2 }}>QTY ORDERED</div>
+                                    <div style={{ fontWeight: 700 }}>{fmt(viewReorder.qty_ordered)} {viewReorder.unit}</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 2 }}>VENDOR / SUPPLIER</div>
+                                    <div>{viewReorder.supplier ?? '—'}</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 2 }}>ORDER DATE</div>
+                                    <div>{viewReorder.order_date ? fmtDate(viewReorder.order_date) : '—'}</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 2 }}>TRANSPORT COMPANY</div>
+                                    <div>{viewReorder.transport_name ?? '—'}</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 2 }}>LR / DOCKET NUMBER</div>
+                                    <div style={{ fontWeight: 600, color: '#2563eb' }}>{viewReorder.lr_number ?? '—'}</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 2 }}>EXPECTED DELIVERY</div>
+                                    <div>{viewReorder.expected_delivery ? fmtDate(viewReorder.expected_delivery) : '—'}</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 2 }}>STATUS</div>
+                                    <span className="badge sky">Pending</span>
+                                </div>
+                                {viewReorder.notes && (
+                                    <div style={{ gridColumn: '1 / -1' }}>
+                                        <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 2 }}>NOTES</div>
+                                        <div>{viewReorder.notes}</div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    <div className="modal-footer">
+                        <button className="btn" onClick={() => setViewReorder(null)}>Close</button>
+                        {viewReorder && (
+                            <button
+                                className="btn primary"
+                                onClick={() => {
+                                    if (!confirm('Mark as received and add to stock?')) return;
+                                    router.post(`/inventory/reorders/${viewReorder.id}/receive`, {}, {
+                                        preserveScroll: true,
+                                        onSuccess: () => setViewReorder(null),
+                                    });
+                                }}
+                            >
+                                ✓ Mark as Received
                             </button>
                         )}
                     </div>
