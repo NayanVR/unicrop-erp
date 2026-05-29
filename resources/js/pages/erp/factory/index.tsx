@@ -5,6 +5,47 @@ import { index as unitTransferIndex } from '@/routes/unit-transfer';
 import { Head, Link, router } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
+type ProductPhoto = {
+    id: number;
+    party_id: number | null;
+    our_brand: string;
+    party_brand: string | null;
+    packing_size: string | null;
+    photo_url: string;
+};
+
+function buildPhotoMap(photos: ProductPhoto[]) {
+    const ob = new Map<string, string>();
+    const pb = new Map<string, string>();
+    for (const p of photos) {
+        const size = (p.packing_size ?? '').toLowerCase();
+        if (p.party_id === null) {
+            ob.set(`${p.our_brand.toLowerCase()}|${size}`, p.photo_url);
+            if (!p.packing_size) ob.set(`${p.our_brand.toLowerCase()}|`, p.photo_url);
+        } else if (p.party_brand) {
+            pb.set(`${p.party_id}|${p.party_brand.toLowerCase()}|${size}`, p.photo_url);
+        }
+    }
+    return { ob, pb };
+}
+
+function getItemPhoto(
+    item: OrderItem,
+    partyId: number | null | undefined,
+    map: { ob: Map<string, string>; pb: Map<string, string> },
+): string | null {
+    if (!item.our_brand) return null;
+    const size = (item.packing_size ?? '').toLowerCase();
+    if (partyId && item.party_brand) {
+        const key = `${partyId}|${item.party_brand.toLowerCase()}|${size}`;
+        const url = map.pb.get(key) ?? map.pb.get(`${partyId}|${item.party_brand.toLowerCase()}|`);
+        if (url) return url;
+    }
+    return map.ob.get(`${item.our_brand.toLowerCase()}|${size}`)
+        ?? map.ob.get(`${item.our_brand.toLowerCase()}|`)
+        ?? null;
+}
+
 type StageLogEntry = {
     from: string;
     to: string;
@@ -41,6 +82,7 @@ type DesignStatus = {
 
 type Order = {
     id: number;
+    party_id?: number | null;
     order_number: string;
     company_name: string;
     customer_name: string;
@@ -73,6 +115,7 @@ type Props = {
     orders: Order[];
     urgentPending: UrgentPendingOrder[];
     canAdvance: boolean;
+    productPhotos?: ProductPhoto[];
 };
 
 const STAGE_ORDER = ['pending', 'processing', 'filling', 'labeling', 'ready', 'dispatched'];
@@ -161,7 +204,7 @@ const boxesFor = (item: OrderItem): number | null => {
     return Math.ceil(Number(item.quantity) / item.box_size);
 };
 
-export default function FactoryIndex({ orders, urgentPending, canAdvance }: Props) {
+export default function FactoryIndex({ orders, urgentPending, canAdvance, productPhotos = [] }: Props) {
     const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
     const [search, setSearch] = useState('');
     const [openOrders, setOpenOrders] = useState<number[]>([]);
@@ -174,10 +217,14 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance }: Prop
     const [notesDraft, setNotesDraft] = useState<Record<number, string>>({});
     const [savingNotes, setSavingNotes] = useState<number | null>(null);
 
-    // Fill modal
+    // Labels received modal
     const [labelsModal, setLabelsModal] = useState<{ item: OrderItem } | null>(null);
     const [labelsValue, setLabelsValue] = useState('');
     const [labelsSaving, setLabelsSaving] = useState(false);
+
+    const [photoLightbox, setPhotoLightbox] = useState<string | null>(null);
+
+    const photoMap = useMemo(() => buildPhotoMap(productPhotos), [productPhotos]);
 
     const visibleOrders = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -607,16 +654,33 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance }: Prop
                                                     const short = received != null ? total - received : null;
                                                     const showLabels = received != null || item.status !== 'pending';
                                                     const log = [...(item.stage_log ?? [])].reverse();
+                                                    const photo = getItemPhoto(item, order.party_id, photoMap);
 
                                                     return (
                                                         <tr key={item.id}>
                                                             {/* Product */}
                                                             <td>
-                                                                <div className="prod-name">{item.our_brand ?? '—'}</div>
-                                                                {item.party_brand && <div className="prod-detail">{item.party_brand}</div>}
-                                                                <span className={`badge ${STAGE_CLASS[item.status] ?? 'gray'}`} style={{ marginTop: '4px', display: 'inline-block' }}>
-                                                                    {STAGE_LABELS[item.status] ?? item.status}
-                                                                </span>
+                                                                <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                                                                    {photo ? (
+                                                                        <img
+                                                                            src={photo}
+                                                                            alt=""
+                                                                            onClick={(e) => { e.stopPropagation(); setPhotoLightbox(photo); }}
+                                                                            style={{ width: '48px', height: '48px', objectFit: 'contain', borderRadius: '6px', border: '1px solid var(--border)', background: '#fff', padding: '2px', flexShrink: 0, cursor: 'zoom-in' }}
+                                                                        />
+                                                                    ) : (
+                                                                        <div style={{ width: '48px', height: '48px', borderRadius: '6px', border: '1px dashed var(--border)', background: 'var(--bg-paper)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', color: 'var(--tx-muted)', flexShrink: 0 }}>
+                                                                            📷
+                                                                        </div>
+                                                                    )}
+                                                                    <div>
+                                                                        <div className="prod-name">{item.our_brand ?? '—'}</div>
+                                                                        {item.party_brand && <div className="prod-detail">{item.party_brand}</div>}
+                                                                        <span className={`badge ${STAGE_CLASS[item.status] ?? 'gray'}`} style={{ marginTop: '4px', display: 'inline-block' }}>
+                                                                            {STAGE_LABELS[item.status] ?? item.status}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
                                                             </td>
 
                                                             {/* Details */}
@@ -780,6 +844,33 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance }: Prop
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Photo lightbox */}
+            {photoLightbox && (
+                <div
+                    className="modal-overlay open"
+                    onClick={() => setPhotoLightbox(null)}
+                    style={{ zIndex: 9999, background: 'rgba(0,0,0,0.75)' }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ maxWidth: '90vw', maxHeight: '90vh', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}
+                    >
+                        <img
+                            src={photoLightbox}
+                            alt=""
+                            style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: '8px', background: '#fff', padding: '8px', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setPhotoLightbox(null)}
+                            style={{ position: 'absolute', top: '-14px', right: '-14px', width: '32px', height: '32px', borderRadius: '50%', background: '#fff', border: 'none', cursor: 'pointer', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', fontWeight: 700 }}
+                        >
+                            ✕
+                        </button>
                     </div>
                 </div>
             )}

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\ProductPhoto;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -87,6 +88,16 @@ class FactoryController extends Controller
             'stageFlow' => self::STAGE_FLOW,
             'urgentPending' => $urgentPending,
             'canAdvance' => $canAdvance,
+            'productPhotos' => ProductPhoto::orderBy('our_brand')->orderBy('packing_size')
+                ->get()
+                ->map(fn ($p) => [
+                    'id'           => $p->id,
+                    'party_id'     => $p->party_id,
+                    'our_brand'    => $p->our_brand,
+                    'party_brand'  => $p->party_brand,
+                    'packing_size' => $p->packing_size,
+                    'photo_url'    => $p->photo_url,
+                ]),
         ]);
     }
 
