@@ -507,6 +507,23 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         setReorderModal(true);
     };
 
+    const openOrderPlaced = (m: RawMaterial) => {
+        reorderForm.reset();
+        reorderForm.clearErrors();
+        reorderForm.setData({
+            raw_material_id: String(m.id),
+            qty_ordered: '',
+            unit: m.unit,
+            supplier: '',
+            order_date: new Date().toISOString().slice(0, 10),
+            expected_delivery: '',
+            transport_name: '',
+            lr_number: '',
+            notes: '',
+        });
+        setReorderModal(true);
+    };
+
     const handleReorderMaterialChange = (id: string) => {
         reorderForm.setData('raw_material_id', id);
         const mat = materials.find((m) => String(m.id) === id);
@@ -634,19 +651,46 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             {/* Low Stock Alerts */}
             {alertMaterials.length > 0 && (
                 <div className="card" style={{ marginBottom: 16 }}>
-                    <div className="card-title" style={{ marginBottom: 8 }}>Low Stock Alerts</div>
-                    <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+                    <div className="card-title" style={{ marginBottom: 8 }}>⚠ Low Stock Alerts</div>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                         {alertMaterials.map((m) => {
                             const s = stockStatus(m);
+                            const alreadyOrdered = reorders.some(
+                                (r) => r.raw_material_id === m.id && r.status === 'pending',
+                            );
                             return (
-                                <span
+                                <div
                                     key={m.id}
-                                    className={s === 'out' ? 'badge red' : 'badge amber'}
-                                    style={{ whiteSpace: 'nowrap', cursor: 'pointer' }}
-                                    onClick={() => { setSearch(m.name); setTab('materials'); }}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 8,
+                                        padding: '6px 10px',
+                                        borderRadius: 8,
+                                        border: `1px solid ${s === 'out' ? '#fca5a5' : '#fcd34d'}`,
+                                        background: s === 'out' ? '#fef2f2' : '#fffbeb',
+                                        fontSize: 13,
+                                    }}
                                 >
-                                    ⚠ {m.name}: {fmt(m.stock_qty)} {m.unit}
-                                </span>
+                                    <span
+                                        style={{ cursor: 'pointer', fontWeight: 600, color: s === 'out' ? '#dc2626' : '#d97706' }}
+                                        onClick={() => { setSearch(m.name); setTab('materials'); }}
+                                    >
+                                        {s === 'out' ? '🔴' : '🟡'} {m.name}: {fmt(m.stock_qty)} {m.unit}
+                                    </span>
+                                    {alreadyOrdered ? (
+                                        <span className="badge sky" style={{ fontSize: 11 }}>🚚 On the way</span>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            className="btn sm primary"
+                                            style={{ fontSize: 11, padding: '2px 8px' }}
+                                            onClick={() => openOrderPlaced(m)}
+                                        >
+                                            + Order Placed
+                                        </button>
+                                    )}
+                                </div>
                             );
                         })}
                     </div>
@@ -1444,7 +1488,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             <div className={`modal-overlay${reorderModal ? ' open' : ''}`} onClick={() => setReorderModal(false)}>
                 <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560, width: '95%' }}>
                     <div className="modal-header">
-                        <h3>New Reorder</h3>
+                        <h3>🚚 Order Placed</h3>
                         <button className="modal-close" onClick={() => setReorderModal(false)}>×</button>
                     </div>
                     <form onSubmit={submitReorder}>
@@ -1452,16 +1496,25 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                             <div className="form-grid">
                                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                                     <label>Material *</label>
-                                    <select
-                                        value={reorderForm.data.raw_material_id}
-                                        onChange={(e) => handleReorderMaterialChange(e.target.value)}
-                                        required
-                                    >
-                                        <option value="">— Select material —</option>
-                                        {materials.filter((m) => m.is_active).map((m) => (
-                                            <option key={m.id} value={String(m.id)}>{m.name} ({m.unit})</option>
-                                        ))}
-                                    </select>
+                                    {reorderForm.data.raw_material_id ? (
+                                        <>
+                                            <div style={{ padding: '8px 12px', background: '#eff6ff', borderRadius: 6, fontWeight: 600, color: '#1e40af', border: '1px solid #bfdbfe' }}>
+                                                {materials.find((m) => String(m.id) === reorderForm.data.raw_material_id)?.name ?? '—'}
+                                            </div>
+                                            <input type="hidden" name="raw_material_id" value={reorderForm.data.raw_material_id} />
+                                        </>
+                                    ) : (
+                                        <select
+                                            value={reorderForm.data.raw_material_id}
+                                            onChange={(e) => handleReorderMaterialChange(e.target.value)}
+                                            required
+                                        >
+                                            <option value="">— Select material —</option>
+                                            {materials.filter((m) => m.is_active).map((m) => (
+                                                <option key={m.id} value={String(m.id)}>{m.name} ({m.unit})</option>
+                                            ))}
+                                        </select>
+                                    )}
                                     {reorderForm.errors.raw_material_id && <div className="form-error">{reorderForm.errors.raw_material_id}</div>}
                                 </div>
                                 <div className="form-group">
@@ -1489,11 +1542,12 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                     {reorderForm.errors.unit && <div className="form-error">{reorderForm.errors.unit}</div>}
                                 </div>
                                 <div className="form-group">
-                                    <label>Supplier</label>
+                                    <label>Vendor / Supplier *</label>
                                     <input
                                         type="text"
                                         value={reorderForm.data.supplier}
                                         onChange={(e) => reorderForm.setData('supplier', e.target.value)}
+                                        placeholder="Vendor name"
                                     />
                                     {reorderForm.errors.supplier && <div className="form-error">{reorderForm.errors.supplier}</div>}
                                 </div>
@@ -1508,6 +1562,26 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                     {reorderForm.errors.order_date && <div className="form-error">{reorderForm.errors.order_date}</div>}
                                 </div>
                                 <div className="form-group">
+                                    <label>Transport LR Number</label>
+                                    <input
+                                        type="text"
+                                        value={reorderForm.data.lr_number}
+                                        onChange={(e) => reorderForm.setData('lr_number', e.target.value)}
+                                        placeholder="LR / docket number"
+                                    />
+                                    {reorderForm.errors.lr_number && <div className="form-error">{reorderForm.errors.lr_number}</div>}
+                                </div>
+                                <div className="form-group">
+                                    <label>Transport Company</label>
+                                    <input
+                                        type="text"
+                                        value={reorderForm.data.transport_name}
+                                        onChange={(e) => reorderForm.setData('transport_name', e.target.value)}
+                                        placeholder="e.g. DTDC, Delhivery"
+                                    />
+                                    {reorderForm.errors.transport_name && <div className="form-error">{reorderForm.errors.transport_name}</div>}
+                                </div>
+                                <div className="form-group">
                                     <label>Expected Delivery</label>
                                     <input
                                         type="date"
@@ -1515,24 +1589,6 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                         onChange={(e) => reorderForm.setData('expected_delivery', e.target.value)}
                                     />
                                     {reorderForm.errors.expected_delivery && <div className="form-error">{reorderForm.errors.expected_delivery}</div>}
-                                </div>
-                                <div className="form-group">
-                                    <label>Transport Name</label>
-                                    <input
-                                        type="text"
-                                        value={reorderForm.data.transport_name}
-                                        onChange={(e) => reorderForm.setData('transport_name', e.target.value)}
-                                    />
-                                    {reorderForm.errors.transport_name && <div className="form-error">{reorderForm.errors.transport_name}</div>}
-                                </div>
-                                <div className="form-group">
-                                    <label>LR Number</label>
-                                    <input
-                                        type="text"
-                                        value={reorderForm.data.lr_number}
-                                        onChange={(e) => reorderForm.setData('lr_number', e.target.value)}
-                                    />
-                                    {reorderForm.errors.lr_number && <div className="form-error">{reorderForm.errors.lr_number}</div>}
                                 </div>
                                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                                     <label>Notes</label>
