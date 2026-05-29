@@ -323,7 +323,8 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
 
     const alertMaterials = materials.filter((m) => {
         const s = stockStatus(m);
-        return s === 'low' || s === 'out';
+        if (s !== 'low' && s !== 'out') return false;
+        return !reorders.some((r) => r.raw_material_id === m.id && r.status === 'pending');
     });
 
     const pendingReorders = reorders.filter((r) => r.status === 'pending');
@@ -655,9 +656,6 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                         {alertMaterials.map((m) => {
                             const s = stockStatus(m);
-                            const alreadyOrdered = reorders.some(
-                                (r) => r.raw_material_id === m.id && r.status === 'pending',
-                            );
                             return (
                                 <div
                                     key={m.id}
@@ -678,18 +676,14 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                     >
                                         {s === 'out' ? '🔴' : '🟡'} {m.name}: {fmt(m.stock_qty)} {m.unit}
                                     </span>
-                                    {alreadyOrdered ? (
-                                        <span className="badge sky" style={{ fontSize: 11 }}>🚚 On the way</span>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            className="btn sm primary"
-                                            style={{ fontSize: 11, padding: '2px 8px' }}
-                                            onClick={() => openOrderPlaced(m)}
-                                        >
-                                            + Order Placed
-                                        </button>
-                                    )}
+                                    <button
+                                        type="button"
+                                        className="btn sm primary"
+                                        style={{ fontSize: 11, padding: '2px 8px' }}
+                                        onClick={() => openOrderPlaced(m)}
+                                    >
+                                        + Order Placed
+                                    </button>
                                 </div>
                             );
                         })}
