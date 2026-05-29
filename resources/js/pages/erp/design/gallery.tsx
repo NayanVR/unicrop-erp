@@ -37,11 +37,13 @@ export default function DesignGallery() {
     const { photos, folders, parties, ourBrands, partyRates, packingSizes, flash } =
         usePage<PageProps>().props;
 
-    const [activeFolder, setActiveFolder] = useState<ActiveFolder>(null);
-    const [showUpload,   setShowUpload]   = useState(false);
-    const [showCreate,   setShowCreate]   = useState(false);
-    const [lightbox,     setLightbox]     = useState<Photo | null>(null);
-    const [deletingId,   setDeletingId]   = useState<number | null>(null);
+    const [activeFolder,  setActiveFolder]  = useState<ActiveFolder>(null);
+    const [showUpload,    setShowUpload]    = useState(false);
+    const [showCreate,    setShowCreate]    = useState(false);
+    const [lightbox,      setLightbox]      = useState<Photo | null>(null);
+    const [deletingId,    setDeletingId]    = useState<number | null>(null);
+    const [folderSearch,  setFolderSearch]  = useState('');
+    const [photoSearch,   setPhotoSearch]   = useState('');
 
     const uploadForm = useForm<UploadForm>({
         party_id: '', our_brand: '', party_brand: '', packing_size: '', photo: null,
@@ -103,6 +105,21 @@ export default function DesignGallery() {
               ? 'Our Brand'
               : (folders.find((f) => f.party_id === activeFolder)?.party_name ?? '');
 
+    const folderQuery = folderSearch.toLowerCase().trim();
+    const filteredFolders = folderQuery
+        ? folders.filter((f) => f.party_name.toLowerCase().includes(folderQuery))
+        : folders;
+    const showOurBrand = !folderQuery || 'our brand'.includes(folderQuery);
+
+    const photoQuery = photoSearch.toLowerCase().trim();
+    const filteredPhotos = photoQuery
+        ? displayedPhotos.filter((p) =>
+            p.our_brand.toLowerCase().includes(photoQuery) ||
+            (p.party_brand ?? '').toLowerCase().includes(photoQuery) ||
+            (p.packing_size ?? '').toLowerCase().includes(photoQuery),
+          )
+        : displayedPhotos;
+
     // ── Handlers ─────────────────────────────────────────────────────────────
 
     const openUpload = (partyId?: number) => {
@@ -115,6 +132,11 @@ export default function DesignGallery() {
     const openFolderUpload = () => {
         if (activeFolder === 'our-brand' || activeFolder === null) return openUpload();
         openUpload(activeFolder as number);
+    };
+
+    const goToFolder = (folder: ActiveFolder) => {
+        setActiveFolder(folder);
+        setPhotoSearch('');
     };
 
     const submitUpload = (e: React.FormEvent) => {
@@ -180,35 +202,55 @@ export default function DesignGallery() {
 
                 <FlashBar flash={flash} />
 
+                {/* Search bar */}
+                <div style={{ marginBottom: '18px' }}>
+                    <input
+                        type="search"
+                        placeholder="Search folders…"
+                        value={folderSearch}
+                        onChange={(e) => setFolderSearch(e.target.value)}
+                        style={{ width: '100%', maxWidth: '340px' }}
+                    />
+                </div>
+
                 {/* Folder grid */}
                 <div style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
                     gap: '16px',
                 }}>
-                    {/* Our Brand — always present */}
-                    <FolderCard
-                        label="Our Brand"
-                        icon="🌿"
-                        count={ourBrandPhotos.length}
-                        onClick={() => setActiveFolder('our-brand')}
-                        onUpload={() => openUpload()}
-                    />
+                    {/* Our Brand — always present unless filtered out */}
+                    {showOurBrand && (
+                        <FolderCard
+                            label="Our Brand"
+                            icon="🌿"
+                            count={ourBrandPhotos.length}
+                            onClick={() => goToFolder('our-brand')}
+                            onUpload={() => openUpload()}
+                        />
+                    )}
 
                     {/* Created party folders */}
-                    {folders.map((folder) => (
+                    {filteredFolders.map((folder) => (
                         <FolderCard
                             key={folder.id}
                             label={folder.party_name}
                             icon="🏢"
                             count={partyPhotoMap.get(folder.party_id)?.length ?? 0}
-                            onClick={() => setActiveFolder(folder.party_id)}
+                            onClick={() => goToFolder(folder.party_id)}
                             onUpload={() => openUpload(folder.party_id)}
                         />
                     ))}
 
+                    {/* No results from search */}
+                    {folderQuery && !showOurBrand && filteredFolders.length === 0 && (
+                        <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '32px 0', color: 'var(--tx-muted)', fontSize: '14px' }}>
+                            No folders match "{folderSearch}"
+                        </div>
+                    )}
+
                     {/* Empty state when no party folders exist */}
-                    {folders.length === 0 && (
+                    {!folderQuery && folders.length === 0 && (
                         <div
                             style={{
                                 border: '2px dashed var(--border)',
@@ -316,7 +358,7 @@ export default function DesignGallery() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
                         <button
                             type="button"
-                            onClick={() => setActiveFolder(null)}
+                            onClick={() => { setActiveFolder(null); setPhotoSearch(''); }}
                             style={{
                                 background: 'none', border: 'none', cursor: 'pointer',
                                 color: 'var(--tx-sub)', fontSize: '13px', padding: 0,
@@ -332,7 +374,9 @@ export default function DesignGallery() {
                     </div>
                     <h1 style={{ margin: 0 }}>{activeFolderLabel}</h1>
                     <p style={{ margin: '2px 0 0' }}>
-                        {displayedPhotos.length} photo{displayedPhotos.length !== 1 ? 's' : ''}
+                        {photoQuery
+                            ? `${filteredPhotos.length} of ${displayedPhotos.length} photo${displayedPhotos.length !== 1 ? 's' : ''}`
+                            : `${displayedPhotos.length} photo${displayedPhotos.length !== 1 ? 's' : ''}`}
                     </p>
                 </div>
                 <button type="button" className="btn primary" onClick={openFolderUpload}>
@@ -341,6 +385,19 @@ export default function DesignGallery() {
             </div>
 
             <FlashBar flash={flash} />
+
+            {/* Search bar */}
+            {displayedPhotos.length > 0 && (
+                <div style={{ marginBottom: '18px' }}>
+                    <input
+                        type="search"
+                        placeholder="Search photos by brand or size…"
+                        value={photoSearch}
+                        onChange={(e) => setPhotoSearch(e.target.value)}
+                        style={{ width: '100%', maxWidth: '340px' }}
+                    />
+                </div>
+            )}
 
             {/* Photo grid */}
             <div className="card">
@@ -357,13 +414,18 @@ export default function DesignGallery() {
                             Upload Photo
                         </button>
                     </div>
+                ) : filteredPhotos.length === 0 ? (
+                    <div className="empty-state" style={{ padding: '32px 0' }}>
+                        <div className="icon">🔍</div>
+                        <p>No photos match "{photoSearch}"</p>
+                    </div>
                 ) : (
                     <div style={{
                         display: 'grid',
                         gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
                         gap: '16px',
                     }}>
-                        {displayedPhotos.map((photo) => (
+                        {filteredPhotos.map((photo) => (
                             <PhotoCard
                                 key={photo.id}
                                 photo={photo}
