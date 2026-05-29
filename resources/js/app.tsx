@@ -19,24 +19,22 @@ const ICONS: Record<string, string> = {
 
 function ErpActivityListener() {
     useEffect(() => {
-        // Lazily import Echo so the WebSocket only connects after the app mounts
+        let active = true;
         import('@/echo').then((mod) => {
-            const channel = mod.default.channel('erp.activity');
-            channel.listen('.activity', (e: { type: string; message: string; by: string; meta?: Record<string, unknown> }) => {
-                const icon = ICONS[e.type] ?? '🔔';
-                toast(`${icon} ${e.message}`, {
-                    duration: 6000,
-                    action: {
-                        label: 'Refresh',
-                        onClick: () => router.reload(),
-                    },
+            if (!active) return; // strict-mode double-fire guard
+            mod.default
+                .channel('erp.activity')
+                .listen('.activity', (e: { type: string; message: string }) => {
+                    const icon = ICONS[e.type] ?? '🔔';
+                    toast(`${icon} ${e.message}`, {
+                        duration: 7000,
+                        action: { label: 'Refresh', onClick: () => router.reload() },
+                    });
                 });
-            });
         });
         return () => {
-            if (window.Echo) {
-                window.Echo.leaveChannel('erp.activity');
-            }
+            active = false;
+            window.Echo?.leaveChannel('erp.activity');
         };
     }, []);
     return null;
