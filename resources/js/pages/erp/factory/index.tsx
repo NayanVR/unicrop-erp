@@ -515,24 +515,26 @@ export default function FactoryIndex({ orders, stageFlow, urgentPending, canAdva
                                                             borderBottom: '1px solid var(--border)',
                                                         }}
                                                     >
-                                                        <span style={{ color: 'var(--tx-faint)', minWidth: '80px' }}>
-                                                            {new Date(entry.at).toLocaleString('en-IN', {
-                                                                day: '2-digit',
-                                                                month: 'short',
-                                                                hour: '2-digit',
-                                                                minute: '2-digit',
-                                                            })}
-                                                        </span>
                                                         <span>
                                                             {entry.revert ? '↩' : '→'}{' '}
                                                             <b>{STAGE_LABELS[entry.from] ?? entry.from}</b>{' '}
                                                             → <b>{STAGE_LABELS[entry.to] ?? entry.to}</b>
                                                         </span>
-                                                        {entry.name && (
-                                                            <span style={{ color: 'var(--tx-muted)', marginLeft: 'auto' }}>
-                                                                by {entry.name}
+                                                        <span style={{ marginLeft: 'auto', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                            {entry.name && (
+                                                                <span style={{ color: 'var(--tx-muted)' }}>
+                                                                    by {entry.name}
+                                                                </span>
+                                                            )}
+                                                            <span style={{ color: 'var(--tx-faint)' }}>
+                                                                {new Date(entry.at).toLocaleString('en-IN', {
+                                                                    day: '2-digit',
+                                                                    month: 'short',
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit',
+                                                                })}
                                                             </span>
-                                                        )}
+                                                        </span>
                                                     </div>
                                                 ))}
                                             </div>
