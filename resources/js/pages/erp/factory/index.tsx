@@ -138,6 +138,18 @@ const STAGE_CLASS: Record<string, string> = {
     dispatched: 's-dispatched',
 };
 
+type EditableLabel = {
+    key: string;
+    transport: string;
+    destination: string;
+    party: string;
+    boxNum: number;
+    totalBoxes: number;
+    brand: string;
+    inBoxPcs: string;
+    summary: string;
+};
+
 type FilterKey = 'all' | 'pending' | 'in-process' | 'ready' | 'dispatched';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
@@ -223,6 +235,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
     const [labelsSaving, setLabelsSaving] = useState(false);
 
     const [photoLightbox, setPhotoLightbox] = useState<string | null>(null);
+    const [labelEditor, setLabelEditor] = useState<{ order: Order; labels: EditableLabel[] } | null>(null);
 
     const photoMap = useMemo(() => buildPhotoMap(productPhotos), [productPhotos]);
 
@@ -309,96 +322,94 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
         );
     };
 
-    const printBoxLabels = (order: Order, e: React.MouseEvent) => {
+    const openLabelEditor = (order: Order, e: React.MouseEvent) => {
         e.stopPropagation();
-        const win = window.open('', '_blank', 'width=900,height=700');
-        if (!win) return;
-
-        // Build summary lines: "Brand Packing · N box"
+        const totalBoxes = order.items.reduce((sum, item) => sum + (boxesFor(item) ?? 1), 0);
         const summaryLines = order.items
             .map((item) => {
                 const brand = item.party_brand || item.our_brand || '—';
-                const totalBoxes = boxesFor(item) ?? 1;
-                return `${brand}${item.packing_size ? ' ' + item.packing_size : ''} · ${totalBoxes} box`;
+                const boxes = boxesFor(item) ?? 1;
+                return `${brand}${item.packing_size ? ' ' + item.packing_size : ''} · ${boxes} box`;
             })
-            .join('<br>');
-
-        const labels: string[] = [];
+            .join('\n');
+        const labels: EditableLabel[] = [];
+        let seq = 1;
         order.items.forEach((item) => {
-            const totalBoxes = boxesFor(item) ?? 1;
+            const itemBoxes = boxesFor(item) ?? 1;
             const brand = item.party_brand || item.our_brand || '—';
-            for (let b = 1; b <= totalBoxes; b++) {
-                labels.push(`
-                    <div class="label">
-                        <div class="transport" contenteditable="true">${order.transport_name ?? '—'}</div>
-                        <div class="destination" contenteditable="true">${order.destination ?? '—'}</div>
-                        <div class="party" contenteditable="true">${order.company_name}</div>
-                        <div class="mid-row">
-                            <span class="box-num" contenteditable="true">${b}</span>
-                            <span class="total-boxes" contenteditable="true">${totalBoxes} box</span>
-                        </div>
-                        <div class="brand-name" contenteditable="true">${brand}${item.packing_size ? ' · ' + item.packing_size : ''}</div>
-                        <div class="inbox" contenteditable="true">In-box pcs: <b>${item.box_size ?? '—'}</b></div>
-                        <div class="summary" contenteditable="true">${summaryLines}</div>
-                    </div>`);
+            for (let b = 0; b < itemBoxes; b++) {
+                labels.push({
+                    key: `${item.id}-${b}`,
+                    transport: order.transport_name ?? '',
+                    destination: order.destination ?? '',
+                    party: order.company_name,
+                    boxNum: seq++,
+                    totalBoxes,
+                    brand: `${brand}${item.packing_size ? ' · ' + item.packing_size : ''}`,
+                    inBoxPcs: item.box_size ? String(item.box_size) : '',
+                    summary: summaryLines,
+                });
             }
         });
+        setLabelEditor({ order, labels });
+    };
 
-        win.document.write(`
-            <html><head><title>Box Labels — ${order.order_number}</title>
+    const updateLabelField = (idx: number, field: keyof Omit<EditableLabel, 'key' | 'boxNum' | 'totalBoxes'>, value: string) => {
+        setLabelEditor((prev) => {
+            if (!prev) return prev;
+            const labels = [...prev.labels];
+            labels[idx] = { ...labels[idx], [field]: value };
+            return { ...prev, labels };
+        });
+    };
+
+    const downloadLabelsPDF = () => {
+        if (!labelEditor) return;
+        const esc = (s: string) =>
+            s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const win = window.open('', '_blank', 'width=900,height=700');
+        if (!win) return;
+        const labelHtml = labelEditor.labels
+            .map(
+                (lbl) => `
+            <div class="label">
+                <div class="transport">${esc(lbl.transport || '—')}</div>
+                <div class="destination">${esc(lbl.destination || '—')}</div>
+                <div class="party">${esc(lbl.party || '—')}</div>
+                <div class="mid-row">
+                    <span class="box-num">${lbl.boxNum}</span>
+                    <span class="total-boxes">${lbl.totalBoxes} box</span>
+                </div>
+                <div class="brand-name">${esc(lbl.brand || '—')}</div>
+                ${lbl.inBoxPcs ? `<div class="inbox">In-box pcs: <b>${esc(lbl.inBoxPcs)}</b></div>` : ''}
+                <div class="summary">${esc(lbl.summary).replace(/\n/g, '<br>')}</div>
+            </div>`,
+            )
+            .join('');
+        win.document.write(`<html><head><title>Box Labels — ${labelEditor.order.order_number}</title>
             <style>
                 @page { size: 100mm 75mm; margin: 3mm; }
                 * { box-sizing: border-box; }
                 body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
-                .label {
-                    width: 100mm;
-                    height: 75mm;
-                    padding: 4mm 5mm;
-                    border: 0.5px solid #000;
-                    page-break-after: always;
-                    display: flex;
-                    flex-direction: column;
-                    overflow: hidden;
-                }
-                .label:last-child { page-break-after: avoid; }
-                .transport { font-size: 22pt; font-weight: 900; line-height: 1.1; margin-bottom: 1mm; }
-                .destination { font-size: 9pt; color: #444; margin-bottom: 1mm; }
-                .party { font-size: 13pt; font-weight: 700; margin-bottom: 2mm; }
-                .mid-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2mm; }
-                .box-num { font-size: 24pt; font-weight: 900; }
-                .total-boxes { font-size: 20pt; font-weight: 900; }
-                .brand-name { font-size: 11pt; font-weight: 700; margin-bottom: 1mm; }
-                .inbox { font-size: 9pt; color: #333; margin-bottom: 1mm; }
-                .summary { font-size: 8pt; color: #555; border-top: 0.5px solid #bbb; padding-top: 1mm; margin-top: auto; line-height: 1.4; }
-                [contenteditable]:focus { outline: 2px solid #2563eb; outline-offset: 1px; border-radius: 2px; }
-                .toolbar {
-                    position: sticky; top: 0; z-index: 10;
-                    background: #1e293b; color: #fff; padding: 10px 16px;
-                    display: flex; align-items: center; gap: 12px; font-size: 14px;
-                }
-                .toolbar button {
-                    background: #2563eb; color: #fff; border: 0; border-radius: 6px;
-                    padding: 8px 18px; font-size: 14px; font-weight: 700; cursor: pointer;
-                }
-                .toolbar .hint { color: #cbd5e1; font-size: 12px; }
-                @media screen {
-                    body { background: #f0f0f0; }
-                    .sheet { padding: 10px; }
-                    .label { margin: 10px auto; border: 1px dashed #888; border-radius: 4px; background: #fff; }
-                }
-                @media print {
-                    .toolbar { display: none; }
-                    .sheet { padding: 0; }
-                    [contenteditable]:focus { outline: none; }
-                }
+                .label { width:100mm; height:75mm; padding:4mm 5mm; border:0.5px solid #000; page-break-after:always; display:flex; flex-direction:column; overflow:hidden; }
+                .label:last-child { page-break-after:avoid; }
+                .transport { font-size:22pt; font-weight:900; line-height:1.1; margin-bottom:1mm; }
+                .destination { font-size:9pt; color:#444; margin-bottom:1mm; }
+                .party { font-size:13pt; font-weight:700; margin-bottom:2mm; }
+                .mid-row { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2mm; }
+                .box-num { font-size:24pt; font-weight:900; }
+                .total-boxes { font-size:20pt; font-weight:900; }
+                .brand-name { font-size:11pt; font-weight:700; margin-bottom:1mm; }
+                .inbox { font-size:9pt; color:#333; margin-bottom:1mm; }
+                .summary { font-size:8pt; color:#555; border-top:0.5px solid #bbb; padding-top:1mm; margin-top:auto; line-height:1.4; }
+                .toolbar { position:sticky; top:0; z-index:10; background:#1e293b; color:#fff; padding:10px 16px; display:flex; align-items:center; gap:12px; }
+                .toolbar button { background:#2563eb; color:#fff; border:0; border-radius:6px; padding:8px 18px; font-size:14px; font-weight:700; cursor:pointer; }
+                .toolbar span { color:#cbd5e1; font-size:12px; }
+                @media screen { body { background:#f0f0f0; } .label { margin:10px auto; border:1px dashed #888; border-radius:4px; background:#fff; } }
+                @media print { .toolbar { display:none; } }
             </style></head>
-            <body>
-            <div class="toolbar">
-                <button type="button" onclick="window.print()">🖨 Print</button>
-                <span class="hint">Tip: click any text on a label to edit it before printing.</span>
-            </div>
-            <div class="sheet">${labels.join('')}</div>
-            </body></html>`);
+            <body><div class="toolbar"><button onclick="window.print()">🖨 Save as PDF / Print</button><span>${labelEditor.labels.length} label(s) — ${labelEditor.order.order_number}</span></div>
+            ${labelHtml}</body></html>`);
         win.document.close();
     };
 
@@ -601,7 +612,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                             type="button"
                                             className="btn sm"
                                             style={{ marginLeft: 'auto', borderColor: '#d97706', color: '#d97706' }}
-                                            onClick={(e) => printBoxLabels(order, e)}
+                                            onClick={(e) => openLabelEditor(order, e)}
                                         >
                                             🏷 Box Labels
                                         </button>
@@ -899,6 +910,134 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                     {labelsSaving ? 'Saving…' : '✓ Save'}
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Box Label Editor Modal ── */}
+            {labelEditor && (
+                <div
+                    className="modal-overlay open"
+                    onClick={() => setLabelEditor(null)}
+                    style={{ zIndex: 9000, alignItems: 'flex-start', overflowY: 'auto', padding: '24px 16px' }}
+                >
+                    <div
+                        className="modal"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ maxWidth: '900px', width: '100%', margin: 'auto' }}
+                    >
+                        <div className="modal-header" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <h2 style={{ flex: 1 }}>🏷 Box Labels — {labelEditor.order.order_number}</h2>
+                            <button
+                                type="button"
+                                className="btn-primary"
+                                style={{ padding: '8px 18px', fontSize: '14px' }}
+                                onClick={downloadLabelsPDF}
+                            >
+                                ⬇ Download PDF
+                            </button>
+                            <button className="modal-close" onClick={() => setLabelEditor(null)}>✕</button>
+                        </div>
+                        <p style={{ fontSize: '13px', color: 'var(--tx-sub)', padding: '0 20px 12px', margin: 0 }}>
+                            Click any field on a label to edit it. Box numbers are assigned automatically.
+                        </p>
+                        <div
+                            style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                                gap: '16px',
+                                padding: '0 20px 20px',
+                            }}
+                        >
+                            {labelEditor.labels.map((lbl, idx) => (
+                                <div
+                                    key={lbl.key}
+                                    style={{
+                                        border: '1.5px solid #999',
+                                        borderRadius: '6px',
+                                        padding: '10px 12px',
+                                        background: '#fff',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '4px',
+                                        fontFamily: 'Arial, sans-serif',
+                                        minHeight: '180px',
+                                    }}
+                                >
+                                    {/* Transport */}
+                                    <input
+                                        value={lbl.transport}
+                                        onChange={(e) => updateLabelField(idx, 'transport', e.target.value)}
+                                        placeholder="Transport name"
+                                        style={{
+                                            border: 'none', borderBottom: '1px dashed #ccc', outline: 'none',
+                                            fontSize: '20px', fontWeight: 900, lineHeight: 1.1, padding: '2px 0',
+                                            width: '100%', background: 'transparent',
+                                        }}
+                                    />
+                                    {/* Destination */}
+                                    <input
+                                        value={lbl.destination}
+                                        onChange={(e) => updateLabelField(idx, 'destination', e.target.value)}
+                                        placeholder="Destination"
+                                        style={{
+                                            border: 'none', borderBottom: '1px dashed #ccc', outline: 'none',
+                                            fontSize: '11px', color: '#444', padding: '2px 0',
+                                            width: '100%', background: 'transparent',
+                                        }}
+                                    />
+                                    {/* Party */}
+                                    <input
+                                        value={lbl.party}
+                                        onChange={(e) => updateLabelField(idx, 'party', e.target.value)}
+                                        placeholder="Party name"
+                                        style={{
+                                            border: 'none', borderBottom: '1px dashed #ccc', outline: 'none',
+                                            fontSize: '14px', fontWeight: 700, padding: '2px 0',
+                                            width: '100%', background: 'transparent',
+                                        }}
+                                    />
+                                    {/* Box number row (auto) */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '4px 0' }}>
+                                        <span style={{ fontSize: '26px', fontWeight: 900, color: '#111' }}>{lbl.boxNum}</span>
+                                        <span style={{ fontSize: '22px', fontWeight: 900, color: '#111' }}>{lbl.totalBoxes} box</span>
+                                    </div>
+                                    {/* Brand */}
+                                    <input
+                                        value={lbl.brand}
+                                        onChange={(e) => updateLabelField(idx, 'brand', e.target.value)}
+                                        placeholder="Brand · packing"
+                                        style={{
+                                            border: 'none', borderBottom: '1px dashed #ccc', outline: 'none',
+                                            fontSize: '13px', fontWeight: 700, padding: '2px 0',
+                                            width: '100%', background: 'transparent',
+                                        }}
+                                    />
+                                    {/* In-box pcs */}
+                                    <input
+                                        value={lbl.inBoxPcs}
+                                        onChange={(e) => updateLabelField(idx, 'inBoxPcs', e.target.value)}
+                                        placeholder="In-box pcs"
+                                        style={{
+                                            border: 'none', borderBottom: '1px dashed #ccc', outline: 'none',
+                                            fontSize: '11px', color: '#333', padding: '2px 0',
+                                            width: '100%', background: 'transparent',
+                                        }}
+                                    />
+                                    {/* Summary */}
+                                    <textarea
+                                        value={lbl.summary}
+                                        onChange={(e) => updateLabelField(idx, 'summary', e.target.value)}
+                                        rows={2}
+                                        style={{
+                                            border: 'none', borderTop: '1px solid #ddd', outline: 'none',
+                                            fontSize: '10px', color: '#555', padding: '4px 0', marginTop: '4px',
+                                            width: '100%', background: 'transparent', resize: 'none', lineHeight: 1.4,
+                                        }}
+                                    />
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>
