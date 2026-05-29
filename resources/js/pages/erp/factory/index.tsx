@@ -311,37 +311,72 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
 
     const printBoxLabels = (order: Order, e: React.MouseEvent) => {
         e.stopPropagation();
-        const win = window.open('', '_blank', 'width=800,height=600');
+        const win = window.open('', '_blank', 'width=900,height=700');
         if (!win) return;
+
+        // Build summary lines: "Brand Packing · N box"
+        const summaryLines = order.items
+            .map((item) => {
+                const brand = item.party_brand || item.our_brand || '—';
+                const totalBoxes = boxesFor(item) ?? 1;
+                return `${brand}${item.packing_size ? ' ' + item.packing_size : ''} · ${totalBoxes} box`;
+            })
+            .join('<br>');
+
         const labels: string[] = [];
         order.items.forEach((item) => {
-            const boxes = boxesFor(item) ?? 1;
-            for (let b = 1; b <= boxes; b++) {
+            const totalBoxes = boxesFor(item) ?? 1;
+            const brand = item.party_brand || item.our_brand || '—';
+            for (let b = 1; b <= totalBoxes; b++) {
                 labels.push(`
                     <div class="label">
-                        <div class="brand">${item.our_brand ?? '—'}</div>
-                        ${item.party_brand ? `<div class="sub">${item.party_brand}</div>` : ''}
-                        <div class="row"><span>Packing</span><b>${item.packing_size ?? '—'}</b></div>
-                        <div class="row"><span>Box</span><b>${b} / ${boxes}</b></div>
-                        ${item.box_size ? `<div class="row"><span>Qty/Box</span><b>${item.box_size}</b></div>` : ''}
-                        <div class="ord">${order.order_number} · ${order.company_name}</div>
+                        <div class="transport">${order.transport_name ?? '—'}</div>
+                        <div class="destination">${order.destination ?? '—'}</div>
+                        <div class="party">${order.company_name}</div>
+                        <div class="mid-row">
+                            <span class="box-num">${b}</span>
+                            <span class="total-boxes">${totalBoxes} box</span>
+                        </div>
+                        <div class="brand-name">${brand}${item.packing_size ? ' · ' + item.packing_size : ''}</div>
+                        ${item.box_size ? `<div class="inbox">In-box pcs: <b>${item.box_size}</b></div>` : ''}
+                        <div class="summary">${summaryLines}</div>
                     </div>`);
             }
         });
+
         win.document.write(`
             <html><head><title>Box Labels — ${order.order_number}</title>
             <style>
-                body { font-family: system-ui, sans-serif; margin: 16px; }
-                .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-                .label { border: 1px dashed #888; border-radius: 8px; padding: 14px; }
-                .brand { font-size: 18px; font-weight: 800; }
-                .sub { color: #555; font-size: 13px; margin-bottom: 6px; }
-                .row { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; }
-                .ord { margin-top: 8px; font-size: 11px; color: #888; border-top: 1px solid #eee; padding-top: 6px; }
-                @media print { .grid { grid-template-columns: repeat(2, 1fr); } }
+                @page { size: 100mm 75mm; margin: 3mm; }
+                * { box-sizing: border-box; }
+                body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+                .label {
+                    width: 100mm;
+                    height: 75mm;
+                    padding: 4mm 5mm;
+                    border: 0.5px solid #000;
+                    page-break-after: always;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                }
+                .label:last-child { page-break-after: avoid; }
+                .transport { font-size: 22pt; font-weight: 900; line-height: 1.1; margin-bottom: 1mm; }
+                .destination { font-size: 9pt; color: #444; margin-bottom: 1mm; }
+                .party { font-size: 13pt; font-weight: 700; margin-bottom: 2mm; }
+                .mid-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2mm; }
+                .box-num { font-size: 24pt; font-weight: 900; }
+                .total-boxes { font-size: 20pt; font-weight: 900; }
+                .brand-name { font-size: 11pt; font-weight: 700; margin-bottom: 1mm; }
+                .inbox { font-size: 9pt; color: #333; margin-bottom: 1mm; }
+                .summary { font-size: 8pt; color: #555; border-top: 0.5px solid #bbb; padding-top: 1mm; margin-top: auto; line-height: 1.4; }
+                @media screen {
+                    body { background: #f0f0f0; padding: 10px; }
+                    .label { margin: 10px auto; border: 1px dashed #888; border-radius: 4px; background: #fff; }
+                }
             </style></head>
-            <body><div class="grid">${labels.join('')}</div>
-            <script>window.onload = () => window.print();</script>
+            <body>${labels.join('')}
+            <script>window.onload = () => window.print();<\/script>
             </body></html>`);
         win.document.close();
     };
