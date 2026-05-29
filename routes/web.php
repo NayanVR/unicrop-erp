@@ -38,7 +38,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['role:admin,office'])->group(function () {
         Route::get('orders/create', [OrderController::class, 'create'])->name('orders.create');
         Route::post('orders', [OrderController::class, 'store'])->name('orders.store');
+        Route::get('orders/{order}/edit', [OrderController::class, 'edit'])->name('orders.edit');
         Route::patch('orders/{order}', [OrderController::class, 'update'])->name('orders.update');
+        Route::delete('orders/{order}', [OrderController::class, 'destroy'])->name('orders.destroy');
         Route::post('orders/{order}/confirm', [OrderController::class, 'confirm'])->name('orders.confirm');
         Route::post('orders/{order}/send-to-design', [OrderController::class, 'sendToDesign'])->name('orders.send-to-design');
         Route::post('erp/settings/transports', [SettingsController::class, 'storeTransport'])->name('settings.transports.store');

@@ -282,8 +282,118 @@ class OrderController extends Controller
         return redirect()->back()->with('success', "Urgent order {$order->order_number} rejected.");
     }
 
+    public function edit(Request $request, Order $order): Response|RedirectResponse
+    {
+        $user = $request->user();
+        $user->loadMissing('roles');
+        $isAdmin = $user->roles->contains('slug', Role::ADMIN);
+
+        if (! in_array($order->status, ['draft', 'submitted'])) {
+            return redirect()->route('orders.index')->with('error', 'Cannot edit a confirmed order.');
+        }
+        if (! $isAdmin && $order->created_by !== $user->id) {
+            return redirect()->route('orders.index')->with('error', 'You can only edit orders you created.');
+        }
+
+        $salesUsers = User::query()
+            ->where('is_active', true)
+            ->whereHas('roles', fn ($query) => $query->whereIn('slug', [Role::ADMIN, Role::OFFICE]))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $order->loadMissing('items');
+
+        return Inertia::render('erp/orders/create', [
+            'pageTitle'    => 'Edit Order '.$order->order_number,
+            'salesUsers'   => $salesUsers,
+            'transports'   => Transport::transports()->orderBy('name')->get(['id', 'name']),
+            'couriers'     => Transport::couriers()->orderBy('name')->get(['id', 'name']),
+            'parties'      => Party::where('is_active', true)->orderBy('name')
+                ->with(['productRates' => fn ($q) => $q->where('is_active', true)->orderBy('our_brand')->orderBy('packing_size')])
+                ->get(['id', 'name', 'customer_name', 'gst_no', 'pan_no', 'phone', 'address', 'city', 'state', 'default_transport_type', 'default_transport_id']),
+            'currentUser'  => ['id' => $user?->id, 'name' => $user?->name],
+            'productPhotos' => ProductPhoto::orderBy('our_brand')->orderBy('packing_size')
+                ->get()
+                ->map(fn ($p) => [
+                    'id'           => $p->id,
+                    'party_id'     => $p->party_id,
+                    'our_brand'    => $p->our_brand,
+                    'party_brand'  => $p->party_brand,
+                    'packing_size' => $p->packing_size,
+                    'photo_url'    => $p->photo_url,
+                ]),
+            'editingOrder' => [
+                'id'               => $order->id,
+                'order_number'     => $order->order_number,
+                'party_id'         => $order->party_id,
+                'company_name'     => $order->company_name,
+                'customer_name'    => $order->customer_name,
+                'gst_no'           => $order->gst_no,
+                'pan_no'           => $order->pan_no,
+                'aadhaar_no'       => $order->aadhaar_no,
+                'sales_user_id'    => $order->sales_user_id,
+                'order_date'       => $order->order_date?->toDateString(),
+                'transport_type'   => $order->transport_type ?? 'transport',
+                'transport_name'   => $order->transport_name,
+                'destination'      => $order->destination,
+                'delivery_address' => $order->delivery_address,
+                'phone'            => $order->phone,
+                'priority'         => $order->priority ?? 'normal',
+                'notes'            => $order->notes,
+                'freight_amount'   => (string) ($order->freight_amount ?? '0'),
+                'courier_amount'   => (string) ($order->courier_amount ?? '0'),
+                'round_off'        => (string) ($order->round_off ?? '0'),
+                'items'            => $order->items->map(fn ($item) => [
+                    'our_brand'    => $item->our_brand,
+                    'party_brand'  => $item->party_brand,
+                    'packing_size' => $item->packing_size,
+                    'quantity'     => (string) $item->quantity,
+                    'rate'         => (string) $item->rate,
+                    'gst_percent'  => (string) $item->gst_percent,
+                    'type'         => $item->type,
+                    'shape'        => $item->shape,
+                    'cap_color'    => $item->cap_color,
+                ])->all(),
+            ],
+        ]);
+    }
+
+    public function destroy(Request $request, Order $order): RedirectResponse
+    {
+        $user = $request->user();
+        $user->loadMissing('roles');
+        $isAdmin = $user->roles->contains('slug', Role::ADMIN);
+
+        if (in_array($order->status, ['draft', 'submitted'])) {
+            if (! $isAdmin && $order->created_by !== $user->id) {
+                return redirect()->back()->with('error', 'You can only delete orders you created.');
+            }
+        } else {
+            // Confirmed or later — admin only
+            if (! $isAdmin) {
+                return redirect()->back()->with('error', 'Only admins can delete confirmed orders.');
+            }
+        }
+
+        $orderNumber = $order->order_number;
+        $order->delete(); // cascades to order_items, order_attachments
+
+        return redirect()->route('orders.index')->with('success', "Order {$orderNumber} deleted.");
+    }
+
     public function update(UpdateOrderRequest $request, Order $order): RedirectResponse
     {
+        $user = $request->user();
+        $user->loadMissing('roles');
+        $isAdmin = $user->roles->contains('slug', Role::ADMIN);
+
+        if (! in_array($order->status, ['draft', 'submitted'])) {
+            return redirect()->back()->with('error', 'Cannot edit a confirmed order.');
+        }
+        if (! $isAdmin && $order->created_by !== $user->id) {
+            return redirect()->back()->with('error', 'You can only edit orders you created.');
+        }
+
         $data = $request->validated();
         $itemsData = $data['items'] ?? [];
         $freight = (float) ($data['freight_amount'] ?? 0);

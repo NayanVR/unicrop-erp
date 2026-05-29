@@ -1,5 +1,5 @@
 import { advance as designAdvance, tracking as designTracking } from '@/routes/design';
-import { confirm as ordersConfirm, create as ordersCreate, sendToDesign as ordersSendToDesign } from '@/routes/orders';
+import { confirm as ordersConfirm, create as ordersCreate, destroy as ordersDestroy, edit as ordersEdit, sendToDesign as ordersSendToDesign } from '@/routes/orders';
 import { Head, Link, router } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
@@ -156,8 +156,18 @@ const priorityClassName = (priority?: string | null) =>
     `badge priority-${priority ?? 'normal'}`;
 
 export default function OrdersIndex({ orders, currentUserId, userRole, productPhotos = [] }: Props) {
-    const isDesign = userRole === 'design';
+    const isDesign   = userRole === 'design';
+    const isAdmin    = userRole === 'admin';
     const canConfirm = userRole === 'admin' || userRole === 'office';
+
+    const canEditOrder = (order: { status?: string | null; created_by?: number | null }) =>
+        ['draft', 'submitted'].includes(order.status ?? '') &&
+        (isAdmin || order.created_by === currentUserId);
+
+    const canDeleteOrder = (order: { status?: string | null; created_by?: number | null }) => {
+        if (isAdmin) return true;
+        return ['draft', 'submitted'].includes(order.status ?? '') && order.created_by === currentUserId;
+    };
 
     const [activeFilter, setActiveFilter] = useState<'all' | 'mine'>('all');
     const [openOrders, setOpenOrders] = useState<number[]>([]);
@@ -186,6 +196,12 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
 
     const toggleOrder = (id: number) =>
         setOpenOrders((cur) => cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
+
+    const deleteOrder = (order: Order, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!confirm(`Delete order ${order.order_number} for ${order.company_name}?\n\nThis cannot be undone.`)) return;
+        router.delete(ordersDestroy(order.id).url, { preserveScroll: true });
+    };
 
     const openConfirm = (order: Order, e: React.MouseEvent) => {
         e.stopPropagation();
@@ -663,6 +679,31 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* Edit / Delete — shown based on role and order status */}
+                                    {!isDesign && (canEditOrder(order) || canDeleteOrder(order)) && (
+                                        <div className="activity-row" style={{ gap: '6px' }}>
+                                            {canEditOrder(order) && (
+                                                <Link
+                                                    href={ordersEdit(order.id).url}
+                                                    className="btn sm"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    ✏️ Edit
+                                                </Link>
+                                            )}
+                                            {canDeleteOrder(order) && (
+                                                <button
+                                                    type="button"
+                                                    className="btn sm"
+                                                    style={{ color: 'var(--red, #dc2626)', borderColor: 'var(--red, #dc2626)' }}
+                                                    onClick={(e) => deleteOrder(order, e)}
+                                                >
+                                                    🗑 Delete
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
 
                                     {/* Activity attribution — who did what */}
                                     {(order.created_by_name || order.confirmed_by_name || (order.design_handlers?.length ?? 0) > 0) && (

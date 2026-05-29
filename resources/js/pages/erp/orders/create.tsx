@@ -1,4 +1,4 @@
-import { store } from '@/routes/orders';
+import { store, update } from '@/routes/orders';
 import { Head, useForm } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -36,6 +36,42 @@ type ProductPhoto = {
     photo_url: string;
 };
 
+type EditingOrderItem = {
+    our_brand: string | null;
+    party_brand: string | null;
+    packing_size: string | null;
+    quantity: string;
+    rate: string;
+    gst_percent: string;
+    type: string | null;
+    shape: string | null;
+    cap_color: string | null;
+};
+
+type EditingOrder = {
+    id: number;
+    order_number: string;
+    party_id: number | null;
+    company_name: string;
+    customer_name: string;
+    gst_no: string | null;
+    pan_no: string | null;
+    aadhaar_no: string | null;
+    sales_user_id: number | null;
+    order_date: string | null;
+    transport_type: 'transport' | 'courier';
+    transport_name: string | null;
+    destination: string | null;
+    delivery_address: string | null;
+    phone: string | null;
+    priority: 'normal' | 'high' | 'urgent';
+    notes: string | null;
+    freight_amount: string;
+    courier_amount: string;
+    round_off: string;
+    items: EditingOrderItem[];
+};
+
 type Props = {
     pageTitle: string;
     salesUsers: SalesUser[];
@@ -44,6 +80,7 @@ type Props = {
     parties: Party[];
     currentUser: { id: number; name: string };
     productPhotos: ProductPhoto[];
+    editingOrder?: EditingOrder | null;
 };
 
 // Pieces per box by normalized packing size
@@ -131,11 +168,33 @@ const toNumber = (value: string) => {
 
 const todayDate = () => new Date().toISOString().split('T')[0];
 
-export default function OrdersCreate({ salesUsers, transports, couriers, parties, currentUser, productPhotos }: Props) {
-    const [rows, setRows] = useState<ProductRow[]>([createRow()]);
-    const [showPan, setShowPan] = useState(false);
-    const [showAadhaar, setShowAadhaar] = useState(false);
-    const [partySearch, setPartySearch] = useState('');
+export default function OrdersCreate({ salesUsers, transports, couriers, parties, currentUser, productPhotos, editingOrder }: Props) {
+    const isEditing = !!editingOrder;
+
+    const [rows, setRows] = useState<ProductRow[]>(() => {
+        if (editingOrder?.items?.length) {
+            return editingOrder.items.map((item) => ({
+                our_brand:    item.our_brand    ?? '',
+                party_brand:  item.party_brand  ?? '',
+                packing_size: item.packing_size ?? '',
+                quantity:     item.quantity     ?? '',
+                rate:         item.rate         ?? '',
+                gst_percent:  item.gst_percent  ?? '18',
+                type:         item.type         ?? '',
+                shape:        item.shape        ?? '',
+                cap_color:    item.cap_color    ?? '',
+            }));
+        }
+        return [createRow()];
+    });
+    const [showPan, setShowPan]       = useState(!!editingOrder?.pan_no);
+    const [showAadhaar, setShowAadhaar] = useState(!!editingOrder?.aadhaar_no);
+    const [partySearch, setPartySearch] = useState(() => {
+        if (editingOrder?.party_id) {
+            return parties.find((p) => p.id === editingOrder.party_id)?.name ?? editingOrder.company_name ?? '';
+        }
+        return '';
+    });
     const [partyDropdownOpen, setPartyDropdownOpen] = useState(false);
     const partyRef = useRef<HTMLDivElement>(null);
 
@@ -149,7 +208,30 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         return () => document.removeEventListener('mousedown', handler);
     }, []);
 
-    const form = useForm<OrderFormData>({
+    const form = useForm<OrderFormData>(editingOrder ? {
+        party_id:        editingOrder.party_id ? String(editingOrder.party_id) : '',
+        company_name:    editingOrder.company_name    ?? '',
+        customer_name:   editingOrder.customer_name   ?? '',
+        gst_no:          editingOrder.gst_no          ?? '',
+        pan_no:          editingOrder.pan_no          ?? '',
+        aadhaar_no:      editingOrder.aadhaar_no      ?? '',
+        sales_user_id:   editingOrder.sales_user_id   ? String(editingOrder.sales_user_id) : String(currentUser.id),
+        order_date:      editingOrder.order_date      ?? todayDate(),
+        transport_type:  editingOrder.transport_type  ?? 'transport',
+        transport_name:  editingOrder.transport_name  ?? '',
+        destination:     editingOrder.destination     ?? '',
+        delivery_address:editingOrder.delivery_address?? '',
+        phone:           editingOrder.phone           ?? '',
+        priority:        editingOrder.priority        ?? 'normal',
+        notes:           editingOrder.notes           ?? '',
+        freight_amount:  editingOrder.freight_amount  ?? '0',
+        courier_amount:  editingOrder.courier_amount  ?? '0',
+        round_off:       editingOrder.round_off       ?? '0',
+        attachments:     null,
+        pan_file:        null,
+        aadhaar_file:    null,
+        save_as_draft:   false,
+    } : {
         party_id: '',
         company_name: '',
         customer_name: '',
@@ -358,18 +440,22 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                 gst_percent: toNumber(row.gst_percent),
             })),
         }));
-        form.post(store().url, { forceFormData: true, preserveScroll: true });
+        if (isEditing) {
+            form.patch(update(editingOrder!.id).url, { forceFormData: true, preserveScroll: true });
+        } else {
+            form.post(store().url, { forceFormData: true, preserveScroll: true });
+        }
     };
 
     const transportOptions = form.data.transport_type === 'courier' ? couriers : transports;
 
     return (
         <>
-            <Head title="New Order" />
+            <Head title={isEditing ? `Edit ${editingOrder!.order_number}` : 'New Order'} />
             <div id="view-order-create" className="view active">
                 <div className="page-header">
                     <div className="page-header-left">
-                        <h1>New Order</h1>
+                        <h1>{isEditing ? `Edit ${editingOrder!.order_number}` : 'New Order'}</h1>
                         <p>Capture customer requirements and generate a new order.</p>
                     </div>
                 </div>
@@ -835,7 +921,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                             Save as draft
                         </label>
                         <button type="submit" className="btn primary" disabled={form.processing}>
-                            {form.processing ? 'Submitting…' : 'Submit Order'}
+                            {form.processing ? 'Saving…' : isEditing ? 'Save Changes' : 'Submit Order'}
                         </button>
                     </div>
                 </form>
