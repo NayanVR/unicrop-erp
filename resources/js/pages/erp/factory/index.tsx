@@ -351,7 +351,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
         setLabelEditor({ order, labels });
     };
 
-    const updateLabelField = (idx: number, field: keyof Omit<EditableLabel, 'key' | 'boxNum' | 'totalBoxes' | 'itemBoxNum' | 'itemTotalBoxes'>, value: string) => {
+    const updateLabelField = (idx: number, field: keyof Omit<EditableLabel, 'key' | 'boxNum' | 'totalBoxes' | 'itemBoxNum' | 'itemTotalBoxes' | 'inBoxPcs'>, value: string) => {
         setLabelEditor((prev) => {
             if (!prev) return prev;
             const labels = [...prev.labels];
@@ -377,12 +377,12 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                     <span class="box-num">${lbl.boxNum}</span>
                     <span class="total-boxes">${lbl.totalBoxes} box</span>
                 </div>
+                <div class="auto-row2">
+                    <span class="inboxpcs">${lbl.inBoxPcs ? `In-box: <b>${esc(lbl.inBoxPcs)} pcs</b>` : '—'}</span>
+                    <span class="item-box-count">product box ${lbl.itemBoxNum}/${lbl.itemTotalBoxes}</span>
+                </div>
                 <div class="product-block">
                     <div class="brand-name">${esc(lbl.brand || '—')}</div>
-                    <div class="product-meta">
-                        ${lbl.inBoxPcs ? `<span>In-box: <b>${esc(lbl.inBoxPcs)} pcs</b></span>` : ''}
-                        <span class="item-box-count">Product box ${lbl.itemBoxNum} of ${lbl.itemTotalBoxes}</span>
-                    </div>
                 </div>
                 <div class="order-ref">${esc(lbl.orderRef)}</div>
             </div>`,
@@ -401,10 +401,11 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 .mid-row { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2mm; }
                 .box-num { font-size:24pt; font-weight:900; }
                 .total-boxes { font-size:20pt; font-weight:900; }
+                .auto-row2 { display:flex; justify-content:space-between; align-items:center; font-size:9pt; margin-bottom:1.5mm; }
+                .inboxpcs { font-weight:700; color:#222; }
+                .item-box-count { color:#666; font-style:italic; font-size:8pt; }
                 .product-block { border-top:0.5px solid #ccc; padding-top:1.5mm; margin-top:auto; }
-                .brand-name { font-size:12pt; font-weight:900; margin-bottom:1mm; }
-                .product-meta { display:flex; justify-content:space-between; font-size:8.5pt; color:#333; }
-                .item-box-count { color:#555; font-style:italic; }
+                .brand-name { font-size:12pt; font-weight:900; }
                 .order-ref { font-size:7.5pt; color:#888; margin-top:1mm; text-align:right; }
                 .toolbar { position:sticky; top:0; z-index:10; background:#1e293b; color:#fff; padding:10px 16px; display:flex; align-items:center; gap:12px; }
                 .toolbar button { background:#2563eb; color:#fff; border:0; border-radius:6px; padding:8px 18px; font-size:14px; font-weight:700; cursor:pointer; }
@@ -1005,10 +1006,19 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                             width: '100%', background: 'transparent',
                                         }}
                                     />
-                                    {/* Box number row (auto-numbered, read-only) */}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '4px 0' }}>
+                                    {/* Auto row: box number | total boxes */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '4px 0 2px' }}>
                                         <span style={{ fontSize: '26px', fontWeight: 900, color: '#111' }}>{lbl.boxNum}</span>
                                         <span style={{ fontSize: '22px', fontWeight: 900, color: '#111' }}>{lbl.totalBoxes} box</span>
+                                    </div>
+                                    {/* Auto row: in-box pcs | product box N/M */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#333' }}>
+                                            {lbl.inBoxPcs ? `In-box: ${lbl.inBoxPcs} pcs` : '—'}
+                                        </span>
+                                        <span style={{ fontSize: '10px', color: '#777', fontStyle: 'italic' }}>
+                                            product box {lbl.itemBoxNum}/{lbl.itemTotalBoxes}
+                                        </span>
                                     </div>
                                     {/* Product block */}
                                     <div style={{ borderTop: '1px solid #ddd', paddingTop: '6px', marginTop: '2px' }}>
@@ -1023,23 +1033,6 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                 width: '100%', background: 'transparent',
                                             }}
                                         />
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                                            {/* In-box pcs */}
-                                            <input
-                                                value={lbl.inBoxPcs}
-                                                onChange={(e) => updateLabelField(idx, 'inBoxPcs', e.target.value)}
-                                                placeholder="In-box pcs"
-                                                style={{
-                                                    border: 'none', outline: 'none',
-                                                    fontSize: '11px', color: '#333', padding: '0',
-                                                    width: '120px', background: 'transparent',
-                                                }}
-                                            />
-                                            {/* Per-product box count (auto) */}
-                                            <span style={{ fontSize: '10px', color: '#777', fontStyle: 'italic', whiteSpace: 'nowrap' }}>
-                                                product box {lbl.itemBoxNum}/{lbl.itemTotalBoxes}
-                                            </span>
-                                        </div>
                                     </div>
                                     {/* Order ref */}
                                     <input
