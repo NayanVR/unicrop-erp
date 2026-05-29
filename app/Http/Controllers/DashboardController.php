@@ -3,8 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\DesignOrder;
+use App\Models\FinishedGood;
 use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\RawMaterial;
 use App\Models\Role;
+use App\Models\UnitTransfer;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -20,6 +24,10 @@ class DashboardController extends Controller
 
         if ($role === Role::DESIGN) {
             return $this->designDashboard($currentUser);
+        }
+
+        if ($role === Role::FACTORY) {
+            return $this->factoryDashboard();
         }
 
         return $this->salesDashboard($currentUser);
@@ -79,6 +87,101 @@ class DashboardController extends Controller
             'activeOrders'       => $activeOrders,
             'recentlyCompleted'  => $recentlyCompleted,
             'completedThisWeek'  => $completedThisWeek,
+        ]);
+    }
+
+    private function factoryDashboard(): Response
+    {
+        // Production item stage breakdown (confirmed orders only)
+        $stageCounts = OrderItem::query()
+            ->whereHas('order', fn ($q) => $q->where('status', 'confirmed'))
+            ->selectRaw('COALESCE(status, \'pending\') as stage, COUNT(*) as count')
+            ->groupBy('stage')
+            ->pluck('count', 'stage')
+            ->toArray();
+
+        // Active confirmed orders with items for the production queue
+        $activeOrders = Order::query()
+            ->where('status', 'confirmed')
+            ->with(['items:id,order_id,our_brand,party_brand,packing_size,quantity,status', 'createdBy:id,name'])
+            ->orderByRaw("CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END")
+            ->orderByDesc('id')
+            ->limit(20)
+            ->get()
+            ->map(fn ($o) => [
+                'id'           => $o->id,
+                'order_number' => $o->order_number,
+                'company_name' => $o->company_name,
+                'priority'     => $o->priority ?? 'normal',
+                'order_date'   => $o->order_date?->toDateString(),
+                'items'        => $o->items->map(fn ($i) => [
+                    'id'           => $i->id,
+                    'our_brand'    => $i->our_brand,
+                    'party_brand'  => $i->party_brand,
+                    'packing_size' => $i->packing_size,
+                    'quantity'     => (float) $i->quantity,
+                    'status'       => $i->status ?? 'pending',
+                ]),
+            ]);
+
+        // Urgent orders awaiting factory approval
+        $urgentPending = Order::query()
+            ->where('status', 'submitted')
+            ->where('priority', 'urgent')
+            ->whereNull('urgent_approved')
+            ->count();
+
+        // Low stock materials
+        $lowStock = RawMaterial::query()
+            ->where('is_active', true)
+            ->whereColumn('stock_qty', '<=', 'min_stock')
+            ->orderBy('name')
+            ->get(['id', 'name', 'unit', 'stock_qty', 'min_stock', 'category'])
+            ->map(fn ($m) => [
+                'id'        => $m->id,
+                'name'      => $m->name,
+                'unit'      => $m->unit,
+                'stock_qty' => (float) $m->stock_qty,
+                'min_stock' => (float) $m->min_stock,
+                'category'  => $m->category,
+            ]);
+
+        // Pending unit transfers
+        $pendingTransfers = UnitTransfer::query()
+            ->where('status', 'pending')
+            ->count();
+
+        // Finished goods added this week
+        $finishedThisWeek = FinishedGood::query()
+            ->where('created_at', '>=', now()->startOfWeek())
+            ->count();
+
+        // Recently dispatched items (last 10)
+        $recentDispatched = OrderItem::query()
+            ->where('status', 'dispatched')
+            ->with('order:id,order_number,company_name')
+            ->orderBy('updated_at', 'desc')
+            ->limit(10)
+            ->get()
+            ->map(fn ($i) => [
+                'id'           => $i->id,
+                'order_number' => $i->order?->order_number,
+                'company_name' => $i->order?->company_name,
+                'our_brand'    => $i->our_brand,
+                'packing_size' => $i->packing_size,
+                'quantity'     => (float) $i->quantity,
+                'dispatched_at'=> $i->updated_at?->diffForHumans(),
+            ]);
+
+        return Inertia::render('erp/factory-dashboard', [
+            'pageTitle'        => 'Dashboard',
+            'stageCounts'      => $stageCounts,
+            'activeOrders'     => $activeOrders,
+            'urgentPending'    => $urgentPending,
+            'lowStock'         => $lowStock,
+            'pendingTransfers' => $pendingTransfers,
+            'finishedThisWeek' => $finishedThisWeek,
+            'recentDispatched' => $recentDispatched,
         ]);
     }
 
