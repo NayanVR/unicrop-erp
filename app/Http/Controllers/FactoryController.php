@@ -160,6 +160,59 @@ class FactoryController extends Controller
     }
 
     /**
+     * Set an item directly to any stage (factory user may pick any option,
+     * not only the next/previous step).
+     */
+    public function setStage(Request $request, OrderItem $item): RedirectResponse
+    {
+        $stages = array_keys(self::STAGE_FLOW);
+        $stages[] = 'dispatched';
+
+        $data = $request->validate([
+            'stage' => 'required|string|in:' . implode(',', $stages),
+        ]);
+
+        $user = $request->user();
+        $currentStage = $item->status ?? 'pending';
+        $targetStage = $data['stage'];
+
+        if ($targetStage === $currentStage) {
+            return redirect()->back();
+        }
+
+        // Determine if this is a backward move (for the history "revert" marker).
+        $isBackward = array_search($targetStage, $stages, true) < array_search($currentStage, $stages, true);
+
+        $stageLog = (array) ($item->stage_log ?? []);
+        $stageLog[] = array_filter([
+            'from' => $currentStage,
+            'to' => $targetStage,
+            'by' => $user?->id,
+            'name' => $user?->name,
+            'at' => now()->toISOString(),
+            'revert' => $isBackward ?: null,
+        ], fn ($v) => $v !== null);
+
+        $item->update([
+            'status' => $targetStage,
+            'stage_log' => $stageLog,
+        ]);
+
+        $order = $item->order;
+        if ($targetStage === 'dispatched') {
+            $allDispatched = $order->items()->where('status', '!=', 'dispatched')->doesntExist();
+            if ($allDispatched) {
+                $order->update(['status' => 'dispatched']);
+            }
+        } elseif ($order->status === 'dispatched') {
+            // Moving an item back out of dispatched re-opens the order.
+            $order->update(['status' => 'confirmed']);
+        }
+
+        return redirect()->back()->with('success', "Item set to {$targetStage}.");
+    }
+
+    /**
      * Record fill progress (filled pieces / box size) for an item.
      */
     public function recordFill(Request $request, OrderItem $item): RedirectResponse

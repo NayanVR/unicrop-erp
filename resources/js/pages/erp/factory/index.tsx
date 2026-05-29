@@ -1,4 +1,4 @@
-import { advance as itemAdvance, fill as itemFill, revert as itemRevert } from '@/routes/factory/items';
+import { fill as itemFill, setStage as itemSetStage } from '@/routes/factory/items';
 import { dispatch as orderDispatch, notes as orderNotes } from '@/routes/factory/orders';
 import { approveUrgent as ordersApproveUrgent, rejectUrgent as ordersRejectUrgent } from '@/routes/orders';
 import { index as unitTransferIndex } from '@/routes/unit-transfer';
@@ -71,7 +71,6 @@ type UrgentPendingOrder = {
 
 type Props = {
     orders: Order[];
-    stageFlow: Record<string, string>;
     urgentPending: UrgentPendingOrder[];
     canAdvance: boolean;
 };
@@ -85,15 +84,6 @@ const STAGE_LABELS: Record<string, string> = {
     labeling: 'Labeling',
     ready: 'Ready',
     dispatched: 'Dispatched',
-};
-
-// Label for the button that completes the *current* stage (advancing to the next).
-const STAGE_ADVANCE_LABEL: Record<string, string> = {
-    pending: '▶ Start Processing',
-    processing: '✓ Processing Done',
-    filling: '✓ Filling Done',
-    labeling: '✓ Labeling Done — Ready for Dispatch',
-    ready: '🚚 Dispatch',
 };
 
 const STAGE_CLASS: Record<string, string> = {
@@ -171,12 +161,11 @@ const boxesFor = (item: OrderItem): number | null => {
     return Math.ceil(Number(item.quantity) / item.box_size);
 };
 
-export default function FactoryIndex({ orders, stageFlow, urgentPending, canAdvance }: Props) {
+export default function FactoryIndex({ orders, urgentPending, canAdvance }: Props) {
     const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
     const [search, setSearch] = useState('');
     const [openOrders, setOpenOrders] = useState<number[]>([]);
-    const [advancing, setAdvancing] = useState<number | null>(null);
-    const [reverting, setReverting] = useState<number | null>(null);
+    const [stagingItem, setStagingItem] = useState<number | null>(null);
     const [dispatchingOrder, setDispatchingOrder] = useState<number | null>(null);
     const [approvingId, setApprovingId] = useState<number | null>(null);
     const [rejectingId, setRejectingId] = useState<number | null>(null);
@@ -207,15 +196,17 @@ export default function FactoryIndex({ orders, stageFlow, urgentPending, canAdva
     const toggleOrder = (orderId: number) =>
         setOpenOrders((curr) => (curr.includes(orderId) ? curr.filter((id) => id !== orderId) : [...curr, orderId]));
 
-    const advanceStage = (itemId: number) => {
-        setAdvancing(itemId);
-        router.post(itemAdvance(itemId).url, {}, { preserveScroll: true, onFinish: () => setAdvancing(null) });
-    };
-
-    const revertStage = (itemId: number) => {
-        if (!confirm('Revert this item to the previous stage?')) return;
-        setReverting(itemId);
-        router.post(itemRevert(itemId).url, {}, { preserveScroll: true, onFinish: () => setReverting(null) });
+    const setItemStage = (itemId: number, stage: string, current: string) => {
+        if (stage === current) return;
+        const targetIdx = STAGE_ORDER.indexOf(stage);
+        const currentIdx = STAGE_ORDER.indexOf(current);
+        if (targetIdx < currentIdx && !confirm(`Move this item back to "${STAGE_LABELS[stage] ?? stage}"?`)) return;
+        setStagingItem(itemId);
+        router.post(
+            itemSetStage(itemId).url,
+            { stage },
+            { preserveScroll: true, onFinish: () => setStagingItem(null) },
+        );
     };
 
     const dispatchReady = (order: Order, e: React.MouseEvent) => {
@@ -611,9 +602,7 @@ export default function FactoryIndex({ orders, stageFlow, urgentPending, canAdva
                                             </thead>
                                             <tbody>
                                                 {order.items.map((item) => {
-                                                    const nextStage = stageFlow[item.status];
                                                     const isDispatched = item.status === 'dispatched';
-                                                    const isPending = item.status === 'pending';
                                                     const boxes = boxesFor(item);
                                                     const total = Number(item.quantity);
                                                     const filled = item.filled_qty ?? null;
@@ -677,29 +666,39 @@ export default function FactoryIndex({ orders, stageFlow, urgentPending, canAdva
                                                                                 {short != null && short > 0 ? ` (${short} short)` : filled != null ? ' ✓' : ''}
                                                                             </span>
                                                                         )}
-                                                                        {canAdvance && !isDispatched && nextStage && (
-                                                                            <button
-                                                                                type="button"
-                                                                                className={`btn sm${nextStage === 'dispatched' ? ' primary' : ' teal'}`}
-                                                                                onClick={() => advanceStage(item.id)}
-                                                                                disabled={advancing === item.id}
-                                                                            >
-                                                                                {advancing === item.id ? '…' : (STAGE_ADVANCE_LABEL[item.status] ?? '▶ Next')}
-                                                                            </button>
+                                                                        {!canAdvance && isDispatched && (
+                                                                            <span style={{ fontSize: '12px', color: 'var(--tx-faint)' }}>✓ Completed</span>
                                                                         )}
-                                                                        {canAdvance && !isPending && !isDispatched && (
-                                                                            <button
-                                                                                type="button"
-                                                                                className="btn danger-xs"
-                                                                                onClick={() => revertStage(item.id)}
-                                                                                disabled={reverting === item.id}
-                                                                                title="Revert to previous stage"
-                                                                            >
-                                                                                {reverting === item.id ? '…' : '↩'}
-                                                                            </button>
-                                                                        )}
-                                                                        {isDispatched && <span style={{ fontSize: '12px', color: 'var(--tx-faint)' }}>✓ Completed</span>}
                                                                     </div>
+
+                                                                    {/* Stage selector — factory user can pick any stage */}
+                                                                    {canAdvance && (
+                                                                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                                                            {STAGE_ORDER.map((stage) => {
+                                                                                const isCurrent = item.status === stage;
+                                                                                return (
+                                                                                    <button
+                                                                                        key={stage}
+                                                                                        type="button"
+                                                                                        className={`badge ${isCurrent ? (STAGE_CLASS[stage] ?? 'gray') : 'gray'}`}
+                                                                                        onClick={() => setItemStage(item.id, stage, item.status)}
+                                                                                        disabled={stagingItem === item.id || isCurrent}
+                                                                                        title={isCurrent ? 'Current stage' : `Set to ${STAGE_LABELS[stage]}`}
+                                                                                        style={{
+                                                                                            cursor: isCurrent ? 'default' : 'pointer',
+                                                                                            border: isCurrent ? '2px solid var(--accent)' : '1px solid var(--border)',
+                                                                                            opacity: isCurrent ? 1 : 0.75,
+                                                                                            fontWeight: isCurrent ? 700 : 500,
+                                                                                        }}
+                                                                                    >
+                                                                                        {isCurrent ? '● ' : ''}
+                                                                                        {STAGE_LABELS[stage]}
+                                                                                    </button>
+                                                                                );
+                                                                            })}
+                                                                            {stagingItem === item.id && <span style={{ fontSize: '12px', color: 'var(--tx-muted)' }}>…</span>}
+                                                                        </div>
+                                                                    )}
 
                                                                     {/* Inline stage history */}
                                                                     {log.length > 0 && (
