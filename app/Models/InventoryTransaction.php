@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['raw_material_id', 'user_id', 'type', 'qty', 'cost_per_unit', 'reference', 'notes'])]
+#[Fillable(['raw_material_id', 'user_id', 'type', 'qty', 'previous_stock', 'new_stock', 'cost_per_unit', 'reference', 'notes'])]
 class InventoryTransaction extends Model
 {
     /**
@@ -17,6 +17,8 @@ class InventoryTransaction extends Model
         return [
             'qty' => 'decimal:3',
             'cost_per_unit' => 'decimal:2',
+            'previous_stock' => 'decimal:3',
+            'new_stock' => 'decimal:3',
         ];
     }
 
