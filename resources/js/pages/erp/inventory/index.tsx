@@ -238,7 +238,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     });
     const [billFile, setBillFile] = useState<File | null>(null);
     const [billRows, setBillRows] = useState<
-        { material_name: string; sku: string; category: string; hsn: string; qty: string; unit: string; rate: string; gst: string; amount: string }[]
+        { raw_material_id: string; material_name: string; sku: string; category: string; hsn: string; qty: string; unit: string; rate: string; gst: string; amount: string }[]
     >([]);
     const [billProcessing, setBillProcessing] = useState(false);
 
@@ -428,7 +428,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const addBillRow = () => {
         setBillRows((prev) => [
             ...prev,
-            { material_name: '', sku: '', category: '', hsn: '', qty: '', unit: 'kg', rate: '', gst: '18', amount: '' },
+            { raw_material_id: '', material_name: '', sku: '', category: '', hsn: '', qty: '', unit: 'kg', rate: '', gst: '18', amount: '' },
         ]);
     };
 
@@ -436,6 +436,14 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         setBillRows((prev) => {
             const rows = [...prev];
             rows[i] = { ...rows[i], [key]: val };
+            if (key === 'raw_material_id' && val) {
+                const mat = materials.find((m) => String(m.id) === val);
+                if (mat) {
+                    rows[i].unit = mat.unit;
+                    if (mat.gst) rows[i].gst = String(Number(mat.gst));
+                    if (mat.cost_per_unit && Number(mat.cost_per_unit) > 0) rows[i].rate = String(Number(mat.cost_per_unit));
+                }
+            }
             if (key === 'qty' || key === 'rate' || key === 'gst') {
                 const qty = Number(key === 'qty' ? val : rows[i].qty) || 0;
                 const rate = Number(key === 'rate' ? val : rows[i].rate) || 0;
@@ -469,7 +477,9 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         fd.append('total_amount', String(billTotal));
         if (billFile) fd.append('bill_file', billFile);
         billRows.forEach((row, i) => {
-            Object.entries(row).forEach(([k, v]) => fd.append(`items[${i}][${k}]`, String(v)));
+            const { raw_material_id, ...rest } = row;
+            if (raw_material_id) fd.append(`items[${i}][raw_material_id]`, raw_material_id);
+            Object.entries(rest).forEach(([k, v]) => fd.append(`items[${i}][${k}]`, String(v)));
         });
         setBillProcessing(true);
         router.post(ROUTES.storePurchaseBill, fd, {
@@ -1445,12 +1455,22 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                                             type="text"
                                                             value={row.material_name}
                                                             onChange={(e) => updateBillRow(i, 'material_name', e.target.value)}
-                                                            style={{ width: '100%', minWidth: 120 }}
-                                                            list="mat-names"
+                                                            style={{ width: '100%', minWidth: 130 }}
+                                                            placeholder="Name on bill"
                                                         />
-                                                        <datalist id="mat-names">
-                                                            {materials.map((m) => <option key={m.id} value={m.name} />)}
-                                                        </datalist>
+                                                        <select
+                                                            value={row.raw_material_id}
+                                                            onChange={(e) => updateBillRow(i, 'raw_material_id', e.target.value)}
+                                                            style={{ width: '100%', fontSize: 11, marginTop: 2, color: row.raw_material_id ? '#2563eb' : '#9ca3af' }}
+                                                            title="Link to master stock item"
+                                                        >
+                                                            <option value="">→ Stock: auto / new</option>
+                                                            {materials.map((m) => (
+                                                                <option key={m.id} value={String(m.id)}>
+                                                                    {m.name} ({m.unit})
+                                                                </option>
+                                                            ))}
+                                                        </select>
                                                     </td>
                                                     <td style={{ padding: '3px 4px' }}>
                                                         <input type="text" value={row.sku} onChange={(e) => updateBillRow(i, 'sku', e.target.value)} style={{ width: 80 }} />

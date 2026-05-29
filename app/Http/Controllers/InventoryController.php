@@ -172,16 +172,17 @@ class InventoryController extends Controller
             'total_amount'          => 'nullable|numeric|min:0',
             'bill_file'             => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'add_to_stock'          => 'boolean',
-            'items'                 => 'required|array|min:1',
-            'items.*.material_name' => 'required|string|max:255',
-            'items.*.sku'           => 'nullable|string|max:100',
-            'items.*.category'      => 'nullable|string|max:100',
-            'items.*.hsn'           => 'nullable|string|max:50',
-            'items.*.qty'           => 'required|numeric|min:0.001',
-            'items.*.unit'          => 'required|string|max:20',
-            'items.*.rate'          => 'nullable|numeric|min:0',
-            'items.*.gst'           => 'nullable|numeric|min:0|max:100',
-            'items.*.amount'        => 'nullable|numeric|min:0',
+            'items'                    => 'required|array|min:1',
+            'items.*.raw_material_id'  => 'nullable|exists:raw_materials,id',
+            'items.*.material_name'    => 'required|string|max:255',
+            'items.*.sku'              => 'nullable|string|max:100',
+            'items.*.category'         => 'nullable|string|max:100',
+            'items.*.hsn'              => 'nullable|string|max:50',
+            'items.*.qty'              => 'required|numeric|min:0.001',
+            'items.*.unit'             => 'required|string|max:20',
+            'items.*.rate'             => 'nullable|numeric|min:0',
+            'items.*.gst'              => 'nullable|numeric|min:0|max:100',
+            'items.*.amount'           => 'nullable|numeric|min:0',
         ]);
 
         $billNumber = $data['bill_number'] ?? null;
@@ -215,7 +216,9 @@ class InventoryController extends Controller
             foreach ($data['items'] as $item) {
                 $sku = $item['sku'] ?? null;
 
-                if ($sku) {
+                if (! empty($item['raw_material_id'])) {
+                    $material = RawMaterial::findOrFail($item['raw_material_id']);
+                } elseif ($sku) {
                     $material = RawMaterial::firstOrCreate(
                         ['sku' => $sku],
                         [
