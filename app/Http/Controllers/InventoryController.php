@@ -310,32 +310,13 @@ class InventoryController extends Controller
             return redirect()->back()->with('error', 'Already received.');
         }
 
-        DB::transaction(function () use ($reorder, $request) {
-            $material = RawMaterial::findOrFail($reorder->raw_material_id);
-            $previous = (float) $material->stock_qty;
-            $new = $previous + (float) $reorder->qty_ordered;
+        $reorder->update([
+            'status'      => 'received',
+            'received_at' => now(),
+            'received_by' => auth()->id(),
+        ]);
 
-            $material->update(['stock_qty' => $new]);
-
-            InventoryTransaction::create([
-                'raw_material_id' => $material->id,
-                'user_id'         => auth()->id(),
-                'type'            => 'purchase',
-                'qty'             => $reorder->qty_ordered,
-                'previous_stock'  => $previous,
-                'new_stock'       => $new,
-                'reference'       => 'Reorder #' . $reorder->id,
-                'notes'           => 'Received from reorder',
-            ]);
-
-            $reorder->update([
-                'status'      => 'received',
-                'received_at' => now(),
-                'received_by' => auth()->id(),
-            ]);
-        });
-
-        return redirect()->back()->with('success', 'Reorder marked as received. Stock updated.');
+        return redirect()->back()->with('success', 'Order marked as received. Please enter the purchase bill to update stock.');
     }
 
     public function receiveWithBill(Request $request, InventoryReorder $reorder): RedirectResponse
