@@ -10,14 +10,18 @@ declare global {
 
 window.Pusher = Pusher;
 
+const isHttps = window.location.protocol === 'https:';
+
 window.Echo = new Echo({
     broadcaster: 'reverb',
     key: import.meta.env.VITE_REVERB_APP_KEY as string,
-    // Use the current hostname so it works on any deployment automatically
+    // Connect over the same host + standard web port as the app.
+    // nginx proxies /app and /apps to the local Reverb server, so no
+    // separate port needs to be exposed in Dokploy.
     wsHost: window.location.hostname,
-    wsPort: Number(import.meta.env.VITE_REVERB_PORT ?? 8080),
-    wssPort: Number(import.meta.env.VITE_REVERB_PORT ?? 8080),
-    forceTLS: window.location.protocol === 'https:',
+    wsPort: isHttps ? 443 : 80,
+    wssPort: isHttps ? 443 : 80,
+    forceTLS: isHttps,
     enabledTransports: ['ws', 'wss'],
     disableStats: true,
 });
