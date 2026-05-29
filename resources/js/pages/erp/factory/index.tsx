@@ -160,9 +160,14 @@ const FILTERS: { key: FilterKey; label: string }[] = [
     { key: 'dispatched', label: 'Dispatched' },
 ];
 
+// An item is "new" (awaiting acceptance) when it has no status or the
+// legacy 'pending' status. The DB column is NOT NULL and defaults to
+// 'pending', so new order items arrive here as 'pending'.
+const isNewItem = (status?: string | null) => !status || status === 'pending';
+
 const stageIndex = (status?: string | null) => {
-    if (!status) return -1; // not yet accepted
-    const idx = STAGE_ORDER.indexOf(status);
+    if (isNewItem(status)) return -1; // not yet accepted
+    const idx = STAGE_ORDER.indexOf(status as string);
     return idx < 0 ? -1 : idx;
 };
 
@@ -186,7 +191,7 @@ const matchesFilter = (order: Order, filter: FilterKey) => {
     const statuses = order.items.map((i) => i.status ?? null);
     switch (filter) {
         case 'new':
-            return statuses.some((s) => !s);
+            return statuses.some((s) => isNewItem(s));
         case 'in-process':
             return statuses.some((s) => ['accepted', 'filling', 'labeling'].includes(s ?? ''));
         case 'ready':
@@ -792,10 +797,10 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                         <div className="prod-name">{item.our_brand ?? '—'}</div>
                                                                         {item.party_brand && <div className="prod-detail">{item.party_brand}</div>}
                                                                         <span
-                                                                            className={`badge ${item.status ? (STAGE_CLASS[item.status] ?? 'gray') : 's-pending'}`}
+                                                                            className={`badge ${isNewItem(item.status) ? 's-pending' : (STAGE_CLASS[item.status!] ?? 'gray')}`}
                                                                             style={{ marginTop: '4px', display: 'inline-block' }}
                                                                         >
-                                                                            {item.status ? (STAGE_LABELS[item.status] ?? item.status) : 'Awaiting Acceptance'}
+                                                                            {isNewItem(item.status) ? 'Awaiting Acceptance' : (STAGE_LABELS[item.status!] ?? item.status)}
                                                                         </span>
                                                                     </div>
                                                                 </div>
@@ -916,7 +921,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
                                                                             {STAGE_ORDER.map((stage) => {
                                                                                 const isCurrent = item.status === stage ||
-                                                                                    (!item.status && stage === 'accepted');
+                                                                                    (isNewItem(item.status) && stage === 'accepted');
                                                                                 const isActive = item.status === stage;
                                                                                 return (
                                                                                     <button

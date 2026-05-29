@@ -125,16 +125,19 @@ type Props = {
     productPhotos?: ProductPhoto[];
 };
 
-const PROD_STAGES = ['pending', 'processing', 'filling', 'labeling', 'ready', 'dispatched'];
+const PROD_STAGES = ['accepted', 'filling', 'labeling', 'ready', 'dispatched'];
 
 const PROD_STAGE_LABELS: Record<string, string> = {
-    pending: 'Pending',
-    processing: 'Processing',
+    accepted: 'Accepted',
     filling: 'Filling',
     labeling: 'Labeling',
     ready: 'Ready',
     dispatched: 'Dispatched',
 };
+
+// New / un-accepted items arrive as 'pending' (DB default) or null.
+const normalizeStage = (status?: string | null) =>
+    !status || status === 'pending' ? 'accepted' : status;
 
 const formatDate = (value?: string | null) => {
     if (!value) return '—';
@@ -791,8 +794,11 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                                         <td>{item.gst_percent}</td>
                                                                         <td>{formatAmount(item.amount)}</td>
                                                                         <td>
-                                                                            <span className={`badge s-${item.status ?? 'pending'}`}>
-                                                                                {(item.status ?? 'pending').toUpperCase()}
+                                                                            <span className={`badge s-${normalizeStage(item.status)}`}>
+                                                                                {(!item.status || item.status === 'pending'
+                                                                                    ? 'Awaiting Acceptance'
+                                                                                    : (PROD_STAGE_LABELS[item.status] ?? item.status)
+                                                                                ).toUpperCase()}
                                                                             </span>
                                                                             {lastStageActor(item) && (
                                                                                 <div className="prod-detail" style={{ marginTop: '2px' }}>
@@ -828,7 +834,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                             </thead>
                                                             <tbody>
                                                                 {order.items.map((item) => {
-                                                                    const stageIdx = PROD_STAGES.indexOf(item.status ?? 'pending');
+                                                                    const stageIdx = PROD_STAGES.indexOf(normalizeStage(item.status));
                                                                     return (
                                                                         <tr key={item.id}>
                                                                             <td>
