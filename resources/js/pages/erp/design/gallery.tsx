@@ -111,6 +111,20 @@ export default function DesignGallery() {
         : folders;
     const showOurBrand = !folderQuery || 'our brand'.includes(folderQuery);
 
+    // Cross-folder photo search — only active when there's a query
+    const crossFolderPhotos = folderQuery
+        ? photos.filter((p) =>
+            p.our_brand.toLowerCase().includes(folderQuery) ||
+            (p.party_brand ?? '').toLowerCase().includes(folderQuery) ||
+            (p.packing_size ?? '').toLowerCase().includes(folderQuery),
+          )
+        : [];
+
+    const folderLabelFor = (photo: Photo): string =>
+        photo.party_id === null
+            ? 'Our Brand'
+            : (folders.find((f) => f.party_id === photo.party_id)?.party_name ?? 'Unknown');
+
     const photoQuery = photoSearch.toLowerCase().trim();
     const filteredPhotos = photoQuery
         ? displayedPhotos.filter((p) =>
@@ -270,6 +284,56 @@ export default function DesignGallery() {
                         </div>
                     )}
                 </div>
+
+                {/* Cross-folder photo results */}
+                {crossFolderPhotos.length > 0 && (
+                    <div style={{ marginTop: '28px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--tx-muted)', marginBottom: '12px' }}>
+                            📷 Photos matching "{folderSearch}" — {crossFolderPhotos.length} result{crossFolderPhotos.length !== 1 ? 's' : ''}
+                        </div>
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                            gap: '14px',
+                        }}>
+                            {crossFolderPhotos.map((photo) => (
+                                <div
+                                    key={photo.id}
+                                    style={{ border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden', background: 'var(--bg-paper)', cursor: 'pointer' }}
+                                    onClick={() => setLightbox(photo)}
+                                >
+                                    <div style={{ width: '100%', paddingBottom: '80%', position: 'relative' }}>
+                                        <img
+                                            src={photo.photo_url}
+                                            alt={photo.party_brand ?? photo.our_brand}
+                                            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#fff', padding: '6px' }}
+                                        />
+                                    </div>
+                                    <div style={{ padding: '8px 10px 10px' }}>
+                                        <div style={{ fontWeight: 700, fontSize: '12px', color: 'var(--tx-head)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            {photo.party_brand ?? photo.our_brand}
+                                        </div>
+                                        {photo.party_brand && (
+                                            <div style={{ fontSize: '11px', color: 'var(--tx-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {photo.our_brand}
+                                            </div>
+                                        )}
+                                        {photo.packing_size && (
+                                            <div style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>{photo.packing_size}</div>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); goToFolder(photo.party_id ?? 'our-brand'); }}
+                                            style={{ marginTop: '5px', fontSize: '11px', color: 'var(--tx-sub)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', textDecoration: 'underline' }}
+                                        >
+                                            📁 {folderLabelFor(photo)}
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Create Folder modal */}
                 {showCreate && (
