@@ -1,7 +1,9 @@
-import { advance as itemAdvance, revert as itemRevert } from '@/routes/factory/items';
+import { advance as itemAdvance, fill as itemFill, revert as itemRevert } from '@/routes/factory/items';
+import { dispatch as orderDispatch, notes as orderNotes } from '@/routes/factory/orders';
 import { approveUrgent as ordersApproveUrgent, rejectUrgent as ordersRejectUrgent } from '@/routes/orders';
-import { Head, router } from '@inertiajs/react';
-import { useState } from 'react';
+import { index as unitTransferIndex } from '@/routes/unit-transfer';
+import { Head, Link, router } from '@inertiajs/react';
+import { useMemo, useState } from 'react';
 
 type StageLogEntry = {
     from: string;
@@ -18,6 +20,8 @@ type OrderItem = {
     our_brand?: string | null;
     party_brand?: string | null;
     packing_size?: string | null;
+    box_size?: number | null;
+    filled_qty?: number | null;
     quantity: string | number;
     rate: string | number;
     amount: string | number;
@@ -26,6 +30,13 @@ type OrderItem = {
     cap_color?: string | null;
     status: string;
     stage_log?: StageLogEntry[] | null;
+};
+
+type DesignStatus = {
+    stage: string;
+    label: string;
+    by?: string | null;
+    at?: string | null;
 };
 
 type Order = {
@@ -37,9 +48,13 @@ type Order = {
     transport_name?: string | null;
     order_date?: string | null;
     priority?: string | null;
+    status?: string | null;
     notes?: string | null;
-    sales_user?: { id: number; name: string } | null;
-    created_by_user?: { id: number; name: string } | null;
+    factory_notes?: string | null;
+    sales_user_name?: string | null;
+    created_by_name?: string | null;
+    design_status?: DesignStatus | null;
+    tax_docs_pending?: boolean;
     items: OrderItem[];
 };
 
@@ -72,12 +87,13 @@ const STAGE_LABELS: Record<string, string> = {
     dispatched: 'Dispatched',
 };
 
-const STAGE_NEXT_LABEL: Record<string, string> = {
+// Label for the button that completes the *current* stage (advancing to the next).
+const STAGE_ADVANCE_LABEL: Record<string, string> = {
     pending: '▶ Start Processing',
-    processing: '▶ Move to Filling',
-    filling: '▶ Move to Labeling',
-    labeling: '▶ Mark Ready',
-    ready: '✓ Dispatch',
+    processing: '✓ Processing Done',
+    filling: '✓ Filling Done',
+    labeling: '✓ Labeling Done — Ready for Dispatch',
+    ready: '🚚 Dispatch',
 };
 
 const STAGE_CLASS: Record<string, string> = {
@@ -89,6 +105,46 @@ const STAGE_CLASS: Record<string, string> = {
     dispatched: 's-dispatched',
 };
 
+type FilterKey = 'all' | 'pending' | 'in-process' | 'ready' | 'dispatched';
+
+const FILTERS: { key: FilterKey; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'pending', label: 'Pending' },
+    { key: 'in-process', label: 'In Process' },
+    { key: 'ready', label: 'Ready' },
+    { key: 'dispatched', label: 'Dispatched' },
+];
+
+const stageIndex = (status?: string | null) => {
+    const idx = STAGE_ORDER.indexOf(status ?? 'pending');
+    return idx < 0 ? 0 : idx;
+};
+
+const itemProgress = (item: OrderItem) => Math.round((stageIndex(item.status) / (STAGE_ORDER.length - 1)) * 100);
+
+const orderProgress = (order: Order) => {
+    if (order.items.length === 0) return 0;
+    const sum = order.items.reduce((acc, i) => acc + stageIndex(i.status) / (STAGE_ORDER.length - 1), 0);
+    return Math.round((sum / order.items.length) * 100);
+};
+
+const matchesFilter = (order: Order, filter: FilterKey) => {
+    if (filter === 'all') return true;
+    const statuses = order.items.map((i) => i.status ?? 'pending');
+    switch (filter) {
+        case 'pending':
+            return statuses.some((s) => s === 'pending');
+        case 'in-process':
+            return statuses.some((s) => ['processing', 'filling', 'labeling'].includes(s));
+        case 'ready':
+            return statuses.some((s) => s === 'ready');
+        case 'dispatched':
+            return order.status === 'dispatched' || statuses.some((s) => s === 'dispatched');
+        default:
+            return true;
+    }
+};
+
 const formatDate = (value?: string | null) => {
     if (!value) return '—';
     return new Date(`${value}T00:00:00`).toLocaleDateString('en-IN', {
@@ -98,75 +154,164 @@ const formatDate = (value?: string | null) => {
     });
 };
 
+const formatTime = (iso?: string | null) => {
+    if (!iso) return '';
+    return new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+};
+
+const formatDay = (iso?: string | null) => {
+    if (!iso) return '';
+    return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
 const priorityClass = (priority?: string | null) => `badge priority-${priority ?? 'normal'}`;
 
+const boxesFor = (item: OrderItem): number | null => {
+    if (!item.box_size || item.box_size <= 0) return null;
+    return Math.ceil(Number(item.quantity) / item.box_size);
+};
+
 export default function FactoryIndex({ orders, stageFlow, urgentPending, canAdvance }: Props) {
+    const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
+    const [search, setSearch] = useState('');
     const [openOrders, setOpenOrders] = useState<number[]>([]);
     const [advancing, setAdvancing] = useState<number | null>(null);
     const [reverting, setReverting] = useState<number | null>(null);
-    const [logItemId, setLogItemId] = useState<number | null>(null);
+    const [dispatchingOrder, setDispatchingOrder] = useState<number | null>(null);
     const [approvingId, setApprovingId] = useState<number | null>(null);
     const [rejectingId, setRejectingId] = useState<number | null>(null);
 
-    const toggleOrder = (orderId: number) => {
-        setOpenOrders((curr) =>
-            curr.includes(orderId) ? curr.filter((id) => id !== orderId) : [...curr, orderId],
-        );
-    };
+    // Factory notes (local editable copy, keyed by order id)
+    const [notesDraft, setNotesDraft] = useState<Record<number, string>>({});
+    const [savingNotes, setSavingNotes] = useState<number | null>(null);
+
+    // Fill modal
+    const [fillModal, setFillModal] = useState<{ item: OrderItem } | null>(null);
+    const [fillQty, setFillQty] = useState('');
+    const [fillBox, setFillBox] = useState('');
+    const [fillSaving, setFillSaving] = useState(false);
+
+    const visibleOrders = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return orders.filter((o) => {
+            if (!matchesFilter(o, activeFilter)) return false;
+            if (!q) return true;
+            return (
+                o.order_number.toLowerCase().includes(q) ||
+                o.company_name.toLowerCase().includes(q) ||
+                o.customer_name.toLowerCase().includes(q)
+            );
+        });
+    }, [orders, activeFilter, search]);
+
+    const toggleOrder = (orderId: number) =>
+        setOpenOrders((curr) => (curr.includes(orderId) ? curr.filter((id) => id !== orderId) : [...curr, orderId]));
 
     const advanceStage = (itemId: number) => {
         setAdvancing(itemId);
-        router.post(
-            itemAdvance(itemId).url,
-            {},
-            {
-                preserveScroll: true,
-                onFinish: () => setAdvancing(null),
-            },
-        );
+        router.post(itemAdvance(itemId).url, {}, { preserveScroll: true, onFinish: () => setAdvancing(null) });
     };
 
     const revertStage = (itemId: number) => {
         if (!confirm('Revert this item to the previous stage?')) return;
         setReverting(itemId);
-        router.post(
-            itemRevert(itemId).url,
-            {},
-            {
-                preserveScroll: true,
-                onFinish: () => setReverting(null),
-            },
-        );
+        router.post(itemRevert(itemId).url, {}, { preserveScroll: true, onFinish: () => setReverting(null) });
+    };
+
+    const dispatchReady = (order: Order, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const ready = order.items.filter((i) => i.status === 'ready').length;
+        if (ready === 0) return;
+        if (!confirm(`Dispatch ${ready} ready item(s) for ${order.order_number}?`)) return;
+        setDispatchingOrder(order.id);
+        router.post(orderDispatch(order.id).url, {}, { preserveScroll: true, onFinish: () => setDispatchingOrder(null) });
     };
 
     const approveUrgent = (orderId: number) => {
         setApprovingId(orderId);
-        router.post(
-            ordersApproveUrgent(orderId).url,
-            {},
-            {
-                preserveScroll: true,
-                onFinish: () => setApprovingId(null),
-            },
-        );
+        router.post(ordersApproveUrgent(orderId).url, {}, { preserveScroll: true, onFinish: () => setApprovingId(null) });
     };
 
     const rejectUrgent = (orderId: number) => {
         if (!confirm('Reject this urgent order? The office will need to address it.')) return;
         setRejectingId(orderId);
+        router.post(ordersRejectUrgent(orderId).url, {}, { preserveScroll: true, onFinish: () => setRejectingId(null) });
+    };
+
+    const saveNotes = (order: Order) => {
+        const value = notesDraft[order.id] ?? order.factory_notes ?? '';
+        setSavingNotes(order.id);
         router.post(
-            ordersRejectUrgent(orderId).url,
-            {},
+            orderNotes(order.id).url,
+            { factory_notes: value },
+            { preserveScroll: true, onFinish: () => setSavingNotes(null) },
+        );
+    };
+
+    const openFill = (item: OrderItem, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setFillModal({ item });
+        setFillQty(item.filled_qty != null ? String(item.filled_qty) : '');
+        setFillBox(item.box_size != null ? String(item.box_size) : '');
+    };
+
+    const submitFill = () => {
+        if (!fillModal) return;
+        const qty = parseInt(fillQty, 10);
+        if (isNaN(qty) || qty < 0) return;
+        setFillSaving(true);
+        router.post(
+            itemFill(fillModal.item.id).url,
+            { filled_qty: qty, box_size: fillBox ? parseInt(fillBox, 10) : null },
             {
                 preserveScroll: true,
-                onFinish: () => setRejectingId(null),
+                onFinish: () => {
+                    setFillSaving(false);
+                    setFillModal(null);
+                },
             },
         );
     };
 
-    const logItem = orders
-        .flatMap((o) => o.items)
-        .find((i) => i.id === logItemId);
+    const printBoxLabels = (order: Order, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const win = window.open('', '_blank', 'width=800,height=600');
+        if (!win) return;
+        const labels: string[] = [];
+        order.items.forEach((item) => {
+            const boxes = boxesFor(item) ?? 1;
+            for (let b = 1; b <= boxes; b++) {
+                labels.push(`
+                    <div class="label">
+                        <div class="brand">${item.our_brand ?? '—'}</div>
+                        ${item.party_brand ? `<div class="sub">${item.party_brand}</div>` : ''}
+                        <div class="row"><span>Packing</span><b>${item.packing_size ?? '—'}</b></div>
+                        <div class="row"><span>Box</span><b>${b} / ${boxes}</b></div>
+                        ${item.box_size ? `<div class="row"><span>Qty/Box</span><b>${item.box_size}</b></div>` : ''}
+                        <div class="ord">${order.order_number} · ${order.company_name}</div>
+                    </div>`);
+            }
+        });
+        win.document.write(`
+            <html><head><title>Box Labels — ${order.order_number}</title>
+            <style>
+                body { font-family: system-ui, sans-serif; margin: 16px; }
+                .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+                .label { border: 1px dashed #888; border-radius: 8px; padding: 14px; }
+                .brand { font-size: 18px; font-weight: 800; }
+                .sub { color: #555; font-size: 13px; margin-bottom: 6px; }
+                .row { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; }
+                .ord { margin-top: 8px; font-size: 11px; color: #888; border-top: 1px solid #eee; padding-top: 6px; }
+                @media print { .grid { grid-template-columns: repeat(2, 1fr); } }
+            </style></head>
+            <body><div class="grid">${labels.join('')}</div>
+            <script>window.onload = () => window.print();</script>
+            </body></html>`);
+        win.document.close();
+    };
+
+    const allLogEntries = orders.flatMap((o) => o.items);
+    void allLogEntries; // history is rendered inline per item below
 
     return (
         <>
@@ -179,12 +324,38 @@ export default function FactoryIndex({ orders, stageFlow, urgentPending, canAdva
                     </div>
                 </div>
 
+                {/* ── Filter bar + search ── */}
+                <div className="filter-bar" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                    <h2 style={{ marginRight: '4px' }}>Production Orders</h2>
+                    {FILTERS.map((f) => (
+                        <button
+                            key={f.key}
+                            type="button"
+                            className={`pill ${activeFilter === f.key ? 'active' : ''}`}
+                            onClick={() => setActiveFilter(f.key)}
+                        >
+                            {f.label}
+                        </button>
+                    ))}
+                    <div style={{ marginLeft: 'auto', minWidth: '220px', flex: '0 1 320px' }}>
+                        <input
+                            type="search"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="🔍 Search order, company, customer…"
+                            style={{ width: '100%' }}
+                        />
+                    </div>
+                </div>
+
                 {/* ── Urgent Approval Requests (factory/admin only) ── */}
                 {canAdvance && urgentPending.length > 0 && (
                     <div className="card" style={{ marginBottom: '20px', border: '2px solid #ef4444' }}>
                         <div className="card-title" style={{ color: '#ef4444' }}>
                             🚨 Urgent Approval Requests
-                            <span className="ct-badge" style={{ background: '#ef4444', color: '#fff' }}>{urgentPending.length} pending</span>
+                            <span className="ct-badge" style={{ background: '#ef4444', color: '#fff' }}>
+                                {urgentPending.length} pending
+                            </span>
                         </div>
                         <p style={{ fontSize: '13px', color: 'var(--tx-sub)', marginBottom: '14px' }}>
                             These urgent orders are waiting for your approval before office can confirm them for production.
@@ -220,9 +391,7 @@ export default function FactoryIndex({ orders, stageFlow, urgentPending, canAdva
                                         ))}
                                         {order.items.length > 2 && <div style={{ color: 'var(--tx-faint)' }}>+{order.items.length - 2} more</div>}
                                     </div>
-                                    {order.order_date && (
-                                        <div style={{ fontSize: '12px', color: 'var(--tx-muted)' }}>{formatDate(order.order_date)}</div>
-                                    )}
+                                    {order.order_date && <div style={{ fontSize: '12px', color: 'var(--tx-muted)' }}>{formatDate(order.order_date)}</div>}
                                     <div style={{ display: 'flex', gap: '8px' }}>
                                         <button
                                             type="button"
@@ -249,23 +418,24 @@ export default function FactoryIndex({ orders, stageFlow, urgentPending, canAdva
                     </div>
                 )}
 
-                {orders.length === 0 ? (
+                {visibleOrders.length === 0 ? (
                     <div className="empty-state">
                         <div className="icon">🏭</div>
-                        <p>No confirmed orders in production. Orders must be confirmed by office/admin first.</p>
+                        <p>
+                            {orders.length === 0
+                                ? 'No confirmed orders in production. Orders must be confirmed by office/admin first.'
+                                : 'No orders match this filter.'}
+                        </p>
                     </div>
                 ) : (
-                    orders.map((order) => {
+                    visibleOrders.map((order) => {
                         const isOpen = openOrders.includes(order.id);
-                        const totalItems = order.items.length;
-                        const doneItems = order.items.filter((i) => i.status === 'dispatched').length;
-                        const progress = totalItems ? Math.round((doneItems / totalItems) * 100) : 0;
+                        const progress = orderProgress(order);
+                        const readyCount = order.items.filter((i) => i.status === 'ready').length;
+                        const notesValue = notesDraft[order.id] ?? order.factory_notes ?? '';
 
                         return (
-                            <div
-                                key={order.id}
-                                className={`order-card${isOpen ? ' open' : ''}`}
-                            >
+                            <div key={order.id} className={`order-card${isOpen ? ' open' : ''}`}>
                                 <div
                                     className="order-card-header"
                                     onClick={() => toggleOrder(order.id)}
@@ -278,102 +448,160 @@ export default function FactoryIndex({ orders, stageFlow, urgentPending, canAdva
                                     <div className="o-id">{order.order_number}</div>
                                     <div style={{ flex: 1 }}>
                                         <div className="o-company">{order.company_name}</div>
-                                        <div className="o-customer">{order.customer_name}</div>
+                                        <div className="o-customer">
+                                            {order.customer_name} · {order.items.length} product(s)
+                                        </div>
                                     </div>
-                                    <div className="o-meta">
-                                        <div>{formatDate(order.order_date)}</div>
-                                        <span className={priorityClass(order.priority)}>
-                                            {(order.priority ?? 'normal').toUpperCase()}
-                                        </span>
+                                    <div className="o-meta" style={{ alignItems: 'flex-end' }}>
+                                        <div>
+                                            {formatDate(order.order_date)}
+                                            {order.sales_user_name ? ` · ${order.sales_user_name}` : ''}
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <div className="progress-bar" style={{ width: '90px' }}>
+                                                <div className="progress-fill" style={{ width: `${progress}%`, background: 'var(--accent)' }} />
+                                            </div>
+                                            <span style={{ fontSize: '12px', color: 'var(--tx-muted)', fontWeight: 600 }}>{progress}%</span>
+                                        </div>
+                                        <span className={priorityClass(order.priority)}>{(order.priority ?? 'normal').toUpperCase()}</span>
                                     </div>
                                     <div className="chevron">▶</div>
                                 </div>
 
                                 <div className="order-body">
+                                    {/* ── Action toolbar ── */}
                                     <div
                                         style={{
                                             display: 'flex',
-                                            gap: '12px',
+                                            gap: '8px',
                                             flexWrap: 'wrap',
-                                            marginBottom: '12px',
-                                            fontSize: '13px',
-                                            color: 'var(--tx-muted)',
-                                        }}
-                                    >
-                                        {order.destination && (
-                                            <span>📍 {order.destination}</span>
-                                        )}
-                                        {order.transport_name && (
-                                            <span>🚚 {order.transport_name}</span>
-                                        )}
-                                        {order.sales_user && (
-                                            <span>👤 {order.sales_user.name}</span>
-                                        )}
-                                    </div>
-
-                                    <div style={{ marginBottom: '14px' }}>
-                                        <div
-                                            style={{
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                                fontSize: '12px',
-                                                marginBottom: '5px',
-                                                color: 'var(--tx-muted)',
-                                            }}
-                                        >
-                                            <span>Production Progress</span>
-                                            <span>{doneItems}/{totalItems} dispatched ({progress}%)</span>
-                                        </div>
-                                        <div className="progress-bar">
-                                            <div
-                                                className="progress-fill"
-                                                style={{
-                                                    width: `${progress}%`,
-                                                    background: 'var(--accent)',
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div
-                                        style={{
-                                            display: 'flex',
-                                            gap: '6px',
-                                            flexWrap: 'wrap',
+                                            alignItems: 'center',
+                                            padding: '10px 12px',
+                                            background: 'var(--bg-page)',
+                                            border: '1px solid var(--border)',
+                                            borderRadius: 'var(--radius-sm)',
                                             marginBottom: '14px',
                                         }}
                                     >
-                                        {STAGE_ORDER.map((stage) => {
-                                            const count = order.items.filter((i) => i.status === stage).length;
-                                            return (
-                                                <span
-                                                    key={stage}
-                                                    style={{
-                                                        fontSize: '11px',
-                                                        padding: '3px 9px',
-                                                        borderRadius: '20px',
-                                                        background: count > 0 ? 'var(--accent)' : 'var(--bg-paper)',
-                                                        color: count > 0 ? '#fff' : 'var(--tx-faint)',
-                                                        border: '1px solid var(--border)',
-                                                        fontWeight: 600,
-                                                    }}
-                                                >
-                                                    {STAGE_LABELS[stage]}: {count}
-                                                </span>
-                                            );
-                                        })}
+                                        <button type="button" className="btn sm" onClick={() => toggleOrder(order.id)}>
+                                            👁 {isOpen ? 'Hide' : 'View'}
+                                        </button>
+                                        <button type="button" className="btn sm" onClick={() => window.print()}>
+                                            🖨 Print
+                                        </button>
+                                        {canAdvance && (
+                                            <button
+                                                type="button"
+                                                className={`btn sm${readyCount > 0 ? ' primary' : ''}`}
+                                                onClick={(e) => dispatchReady(order, e)}
+                                                disabled={readyCount === 0 || dispatchingOrder === order.id}
+                                                title={readyCount === 0 ? 'No items ready for dispatch' : `Dispatch ${readyCount} ready item(s)`}
+                                            >
+                                                {dispatchingOrder === order.id ? '…' : `📦 Dispatch${readyCount > 0 ? ` (${readyCount})` : ''}`}
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            className="btn sm"
+                                            style={{ marginLeft: 'auto', borderColor: '#d97706', color: '#d97706' }}
+                                            onClick={(e) => printBoxLabels(order, e)}
+                                        >
+                                            🏷 Box Labels
+                                        </button>
                                     </div>
 
+                                    {/* ── Design status banner ── */}
+                                    {order.design_status && (
+                                        <div
+                                            style={{
+                                                borderLeft: '3px solid var(--accent, #7c3aed)',
+                                                background: 'var(--accent-soft, #f5f3ff)',
+                                                borderRadius: '6px',
+                                                padding: '8px 12px',
+                                                marginBottom: '10px',
+                                                fontSize: '13px',
+                                            }}
+                                        >
+                                            <span style={{ fontWeight: 700, color: 'var(--accent, #7c3aed)' }}>
+                                                🎨 DESIGN: {order.design_status.label.toUpperCase()}
+                                            </span>
+                                            {order.design_status.by && <span style={{ color: 'var(--tx-muted)' }}> · {order.design_status.by}</span>}
+                                            {order.design_status.at && (
+                                                <span style={{ color: 'var(--tx-faint)' }}>
+                                                    {' · '}
+                                                    {formatTime(order.design_status.at)} · {formatDay(order.design_status.at)}
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* ── Tax documents banner ── */}
+                                    {order.tax_docs_pending && (
+                                        <div
+                                            style={{
+                                                background: 'var(--bg-yellow, #fefce8)',
+                                                border: '1px solid var(--border-yellow, #fde68a)',
+                                                borderRadius: '6px',
+                                                padding: '8px 12px',
+                                                marginBottom: '10px',
+                                                fontSize: '13px',
+                                                color: '#92400e',
+                                            }}
+                                        >
+                                            📄 Tax documents pending — accountant will upload invoice &amp; e-way bill
+                                        </div>
+                                    )}
+
+                                    {/* ── Factory notes ── */}
+                                    <div style={{ marginBottom: '14px' }}>
+                                        {canAdvance ? (
+                                            <>
+                                                <textarea
+                                                    value={notesValue}
+                                                    onChange={(e) => setNotesDraft((d) => ({ ...d, [order.id]: e.target.value }))}
+                                                    placeholder="Factory notes…"
+                                                    rows={2}
+                                                    style={{ width: '100%', resize: 'vertical' }}
+                                                />
+                                                {notesValue !== (order.factory_notes ?? '') && (
+                                                    <div style={{ marginTop: '6px', display: 'flex', gap: '8px' }}>
+                                                        <button
+                                                            type="button"
+                                                            className="btn sm primary"
+                                                            onClick={() => saveNotes(order)}
+                                                            disabled={savingNotes === order.id}
+                                                        >
+                                                            {savingNotes === order.id ? 'Saving…' : '💾 Save notes'}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="btn sm"
+                                                            onClick={() => setNotesDraft((d) => ({ ...d, [order.id]: order.factory_notes ?? '' }))}
+                                                            disabled={savingNotes === order.id}
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </>
+                                        ) : (
+                                            order.factory_notes && (
+                                                <div style={{ fontSize: '13px', color: 'var(--tx-muted)', fontStyle: 'italic' }}>
+                                                    🏭 {order.factory_notes}
+                                                </div>
+                                            )
+                                        )}
+                                    </div>
+
+                                    {/* ── Items table ── */}
                                     <div className="prod-wrap">
                                         <table className="prod-table">
                                             <thead>
                                                 <tr>
                                                     <th>Product</th>
-                                                    <th>Packing</th>
-                                                    <th>Qty</th>
-                                                    <th>Type / Shape</th>
-                                                    <th>Stage</th>
-                                                    <th>Actions</th>
+                                                    <th>Details</th>
+                                                    <th>Stage Actions</th>
+                                                    <th style={{ width: '150px' }}>Progress</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -381,97 +609,125 @@ export default function FactoryIndex({ orders, stageFlow, urgentPending, canAdva
                                                     const nextStage = stageFlow[item.status];
                                                     const isDispatched = item.status === 'dispatched';
                                                     const isPending = item.status === 'pending';
+                                                    const boxes = boxesFor(item);
+                                                    const total = Number(item.quantity);
+                                                    const filled = item.filled_qty ?? null;
+                                                    const short = filled != null ? total - filled : null;
+                                                    const showFill = filled != null || ['filling', 'labeling', 'ready', 'dispatched'].includes(item.status);
+                                                    const log = [...(item.stage_log ?? [])].reverse();
 
                                                     return (
                                                         <tr key={item.id}>
+                                                            {/* Product */}
                                                             <td>
-                                                                <div className="prod-name">
-                                                                    {item.our_brand ?? '—'}
-                                                                </div>
-                                                                {item.party_brand && (
-                                                                    <div className="prod-detail">
-                                                                        {item.party_brand}
-                                                                    </div>
-                                                                )}
-                                                            </td>
-                                                            <td>{item.packing_size ?? '—'}</td>
-                                                            <td>{item.quantity}</td>
-                                                            <td>
-                                                                <div>{item.type ?? '—'}</div>
-                                                                {item.shape && (
-                                                                    <div className="prod-detail">
-                                                                        {item.shape}
-                                                                        {item.cap_color
-                                                                            ? ` · ${item.cap_color}`
-                                                                            : ''}
-                                                                    </div>
-                                                                )}
-                                                            </td>
-                                                            <td>
-                                                                <span
-                                                                    className={`badge ${STAGE_CLASS[item.status] ?? 'gray'}`}
-                                                                >
+                                                                <div className="prod-name">{item.our_brand ?? '—'}</div>
+                                                                {item.party_brand && <div className="prod-detail">{item.party_brand}</div>}
+                                                                <span className={`badge ${STAGE_CLASS[item.status] ?? 'gray'}`} style={{ marginTop: '4px', display: 'inline-block' }}>
                                                                     {STAGE_LABELS[item.status] ?? item.status}
                                                                 </span>
                                                             </td>
+
+                                                            {/* Details */}
                                                             <td>
-                                                                <div
-                                                                    style={{
-                                                                        display: 'flex',
-                                                                        gap: '5px',
-                                                                        flexWrap: 'wrap',
-                                                                    }}
-                                                                >
-                                                                    {canAdvance && !isDispatched && nextStage && (
-                                                                        <button
-                                                                            type="button"
-                                                                            className={`btn sm${nextStage === 'dispatched' ? ' primary' : ''}`}
-                                                                            onClick={() => advanceStage(item.id)}
-                                                                            disabled={advancing === item.id}
-                                                                        >
-                                                                            {advancing === item.id
-                                                                                ? '…'
-                                                                                : (STAGE_NEXT_LABEL[item.status] ?? '▶ Next')}
-                                                                        </button>
+                                                                <div style={{ fontSize: '13px' }}>
+                                                                    {item.packing_size ? `${item.packing_size} · ` : ''}Qty: {item.quantity}
+                                                                </div>
+                                                                {boxes != null && (
+                                                                    <div className="prod-detail">
+                                                                        📦 {boxes} box{boxes !== 1 ? 'es' : ''} ({item.box_size}/box)
+                                                                    </div>
+                                                                )}
+                                                                {item.type && (
+                                                                    <div className="prod-detail" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                                        {item.type}
+                                                                        {item.cap_color && (
+                                                                            <span
+                                                                                title={item.cap_color}
+                                                                                style={{
+                                                                                    display: 'inline-block',
+                                                                                    width: '10px',
+                                                                                    height: '10px',
+                                                                                    borderRadius: '50%',
+                                                                                    border: '1px solid var(--border)',
+                                                                                    background: item.cap_color,
+                                                                                }}
+                                                                            />
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+
+                                                            {/* Stage actions */}
+                                                            <td>
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                                                        {showFill && (
+                                                                            <span
+                                                                                className={`badge ${short != null && short > 0 ? 'red' : 'green'}`}
+                                                                                style={{ cursor: canAdvance ? 'pointer' : 'default' }}
+                                                                                onClick={canAdvance ? (e) => openFill(item, e) : undefined}
+                                                                                title={canAdvance ? 'Record fill progress' : undefined}
+                                                                            >
+                                                                                🏷 {filled != null ? `${filled}/${total}` : `0/${total}`}
+                                                                                {short != null && short > 0 ? ` (${short} short)` : filled != null ? ' ✓' : ''}
+                                                                            </span>
+                                                                        )}
+                                                                        {canAdvance && !isDispatched && nextStage && (
+                                                                            <button
+                                                                                type="button"
+                                                                                className={`btn sm${nextStage === 'dispatched' ? ' primary' : ' teal'}`}
+                                                                                onClick={() => advanceStage(item.id)}
+                                                                                disabled={advancing === item.id}
+                                                                            >
+                                                                                {advancing === item.id ? '…' : (STAGE_ADVANCE_LABEL[item.status] ?? '▶ Next')}
+                                                                            </button>
+                                                                        )}
+                                                                        {canAdvance && !isPending && !isDispatched && (
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn danger-xs"
+                                                                                onClick={() => revertStage(item.id)}
+                                                                                disabled={reverting === item.id}
+                                                                                title="Revert to previous stage"
+                                                                            >
+                                                                                {reverting === item.id ? '…' : '↩'}
+                                                                            </button>
+                                                                        )}
+                                                                        {isDispatched && <span style={{ fontSize: '12px', color: 'var(--tx-faint)' }}>✓ Completed</span>}
+                                                                    </div>
+
+                                                                    {/* Inline stage history */}
+                                                                    {log.length > 0 && (
+                                                                        <div style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                                            {log.map((entry, idx) => (
+                                                                                <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'baseline', flexWrap: 'wrap' }}>
+                                                                                    <span>{entry.revert ? '↩' : '▶'}</span>
+                                                                                    <b>{STAGE_LABELS[entry.to] ?? entry.to}</b>
+                                                                                    {entry.name && <span style={{ color: 'var(--tx-muted)' }}>— {entry.name}</span>}
+                                                                                    <span style={{ color: 'var(--tx-faint)' }}>
+                                                                                        · {formatTime(entry.at)} · {formatDay(entry.at)}
+                                                                                    </span>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
                                                                     )}
-                                                                    {canAdvance && !isPending && !isDispatched && (
-                                                                        <button
-                                                                            type="button"
-                                                                            className="btn danger-xs"
-                                                                            onClick={() => revertStage(item.id)}
-                                                                            disabled={reverting === item.id}
-                                                                            title="Revert to previous stage"
-                                                                        >
-                                                                            {reverting === item.id ? '…' : '↩'}
-                                                                        </button>
-                                                                    )}
-                                                                    {item.stage_log && item.stage_log.length > 0 && (
-                                                                        <button
-                                                                            type="button"
-                                                                            className="btn sm"
-                                                                            onClick={() =>
-                                                                                setLogItemId(
-                                                                                    logItemId === item.id
-                                                                                        ? null
-                                                                                        : item.id,
-                                                                                )
-                                                                            }
-                                                                            title="View history"
-                                                                        >
-                                                                            📋
-                                                                        </button>
-                                                                    )}
-                                                                    {isDispatched && (
-                                                                        <span
-                                                                            style={{
-                                                                                fontSize: '12px',
-                                                                                color: 'var(--tx-faint)',
-                                                                            }}
-                                                                        >
-                                                                            Completed
-                                                                        </span>
+
+                                                                    {canAdvance && (
+                                                                        <div>
+                                                                            <Link href={unitTransferIndex()} className="btn sm" onClick={(e) => e.stopPropagation()}>
+                                                                                🔄 Transfer Unit
+                                                                            </Link>
+                                                                        </div>
                                                                     )}
                                                                 </div>
+                                                            </td>
+
+                                                            {/* Progress */}
+                                                            <td>
+                                                                <div className="progress-bar">
+                                                                    <div className="progress-fill" style={{ width: `${itemProgress(item)}%`, background: 'var(--accent)' }} />
+                                                                </div>
+                                                                <div className="prod-detail" style={{ marginTop: '4px' }}>{STAGE_LABELS[item.status] ?? item.status}</div>
                                                             </td>
                                                         </tr>
                                                     );
@@ -479,72 +735,45 @@ export default function FactoryIndex({ orders, stageFlow, urgentPending, canAdva
                                             </tbody>
                                         </table>
                                     </div>
-
-                                    {logItemId !== null &&
-                                        order.items.some((i) => i.id === logItemId) && (
-                                            <div
-                                                style={{
-                                                    marginTop: '12px',
-                                                    padding: '12px 14px',
-                                                    background: 'var(--bg-paper)',
-                                                    border: '1px solid var(--border)',
-                                                    borderRadius: 'var(--radius-sm)',
-                                                    fontSize: '12px',
-                                                }}
-                                            >
-                                                <div
-                                                    style={{
-                                                        fontWeight: 700,
-                                                        marginBottom: '8px',
-                                                        color: 'var(--tx-muted)',
-                                                        textTransform: 'uppercase',
-                                                        fontSize: '11px',
-                                                        letterSpacing: '.5px',
-                                                    }}
-                                                >
-                                                    Stage History
-                                                </div>
-                                                {(logItem?.stage_log ?? []).map((entry, idx) => (
-                                                    <div
-                                                        key={idx}
-                                                        style={{
-                                                            display: 'flex',
-                                                            gap: '8px',
-                                                            alignItems: 'center',
-                                                            padding: '4px 0',
-                                                            borderBottom: '1px solid var(--border)',
-                                                        }}
-                                                    >
-                                                        <span>
-                                                            {entry.revert ? '↩' : '→'}{' '}
-                                                            <b>{STAGE_LABELS[entry.from] ?? entry.from}</b>{' '}
-                                                            → <b>{STAGE_LABELS[entry.to] ?? entry.to}</b>
-                                                        </span>
-                                                        <span style={{ marginLeft: 'auto', display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                                            {entry.name && (
-                                                                <span style={{ color: 'var(--tx-muted)' }}>
-                                                                    by {entry.name}
-                                                                </span>
-                                                            )}
-                                                            <span style={{ color: 'var(--tx-faint)' }}>
-                                                                {new Date(entry.at).toLocaleString('en-IN', {
-                                                                    day: '2-digit',
-                                                                    month: 'short',
-                                                                    hour: '2-digit',
-                                                                    minute: '2-digit',
-                                                                })}
-                                                            </span>
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
                                 </div>
                             </div>
                         );
                     })
                 )}
             </div>
+
+            {/* ── Fill progress modal ── */}
+            {fillModal && (
+                <div className="modal-overlay open" onClick={() => !fillSaving && setFillModal(null)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '380px' }}>
+                        <div className="modal-header">
+                            <h2>🏷 Record Fill</h2>
+                            <button className="modal-close" onClick={() => setFillModal(null)} disabled={fillSaving}>✕</button>
+                        </div>
+                        <div className="modal-form">
+                            <p style={{ fontSize: '13px', color: 'var(--tx-muted)', marginBottom: '14px' }}>
+                                {fillModal.item.our_brand ?? '—'} · Total Qty {fillModal.item.quantity}
+                            </p>
+                            <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label>Filled Qty</label>
+                                    <input type="number" min={0} value={fillQty} onChange={(e) => setFillQty(e.target.value)} autoFocus disabled={fillSaving} />
+                                </div>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label>Qty per Box</label>
+                                    <input type="number" min={1} value={fillBox} onChange={(e) => setFillBox(e.target.value)} disabled={fillSaving} />
+                                </div>
+                            </div>
+                            <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
+                                <button type="button" className="btn-secondary" onClick={() => setFillModal(null)} disabled={fillSaving}>Cancel</button>
+                                <button type="button" className="btn-primary" onClick={submitFill} disabled={fillSaving || fillQty === ''}>
+                                    {fillSaving ? 'Saving…' : '✓ Save'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

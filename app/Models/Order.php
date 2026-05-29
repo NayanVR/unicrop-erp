@@ -39,6 +39,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'gst_total',
     'total_amount',
     'notes',
+    'factory_notes',
 ])]
 class Order extends Model
 {

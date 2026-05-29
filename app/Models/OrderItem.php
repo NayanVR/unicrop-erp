@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'our_brand',
     'party_brand',
     'packing_size',
+    'box_size',
+    'filled_qty',
     'quantity',
     'rate',
     'amount',
@@ -40,6 +42,8 @@ class OrderItem extends Model
             'amount' => 'decimal:2',
             'gst_percent' => 'decimal:2',
             'gst_amount' => 'decimal:2',
+            'box_size' => 'integer',
+            'filled_qty' => 'integer',
             'stage_log' => 'array',
         ];
     }

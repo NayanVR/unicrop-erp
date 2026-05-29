@@ -19,6 +19,16 @@ class FactoryController extends Controller
         'ready' => 'dispatched',
     ];
 
+    private const DESIGN_LABELS = [
+        'pending' => 'Pending Acceptance',
+        'accepted' => 'Accepted',
+        'design-ready' => 'Design Ready',
+        'approved-party' => 'Party Approved',
+        'sent-print' => 'Sent to Print',
+        'completed' => 'Completed',
+        'received-factory' => 'Received at Factory',
+    ];
+
     public function index(Request $request): Response
     {
         $user = $request->user();
@@ -28,10 +38,40 @@ class FactoryController extends Controller
 
         $orders = Order::query()
             ->where('status', 'confirmed')
-            ->with(['items', 'salesUser:id,name', 'createdBy:id,name'])
+            ->with([
+                'items',
+                'salesUser:id,name',
+                'createdBy:id,name',
+                'attachments:id,order_id,document_type',
+                'designOrders:id,order_id,assigned_to,status,updated_at',
+                'designOrders.assignee:id,name',
+            ])
             ->orderByRaw("CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END")
             ->orderByDesc('id')
             ->get();
+
+        $orders->each(function (Order $order) {
+            $order->sales_user_name = $order->salesUser?->name;
+            $order->created_by_name = $order->createdBy?->name;
+
+            // Latest design activity for the "DESIGN: …" banner.
+            $latestDesign = $order->designOrders->sortByDesc('updated_at')->first();
+            $order->design_status = $latestDesign ? [
+                'stage' => $latestDesign->status,
+                'label' => self::DESIGN_LABELS[$latestDesign->status] ?? $latestDesign->status,
+                'by'    => $latestDesign->assignee?->name,
+                'at'    => $latestDesign->updated_at?->toISOString(),
+            ] : null;
+
+            // Tax documents banner — pending until an invoice attachment exists.
+            $docTypes = $order->attachments->pluck('document_type')->filter()->map(fn ($t) => strtolower($t));
+            $order->tax_docs_pending = ! $docTypes->contains('invoice');
+
+            $order->unsetRelation('salesUser');
+            $order->unsetRelation('createdBy');
+            $order->unsetRelation('attachments');
+            $order->unsetRelation('designOrders');
+        });
 
         $urgentPending = $canAdvance ? Order::query()
             ->where('status', 'submitted')
@@ -117,5 +157,69 @@ class FactoryController extends Controller
         ]);
 
         return redirect()->back()->with('success', "Item reverted to {$prevStage}.");
+    }
+
+    /**
+     * Record fill progress (filled pieces / box size) for an item.
+     */
+    public function recordFill(Request $request, OrderItem $item): RedirectResponse
+    {
+        $data = $request->validate([
+            'filled_qty' => 'required|integer|min:0',
+            'box_size' => 'nullable|integer|min:1',
+        ]);
+
+        $item->update([
+            'filled_qty' => $data['filled_qty'],
+            'box_size' => $data['box_size'] ?? $item->box_size,
+        ]);
+
+        return redirect()->back()->with('success', 'Fill progress updated.');
+    }
+
+    /**
+     * Save free-text factory notes on an order.
+     */
+    public function saveNotes(Request $request, Order $order): RedirectResponse
+    {
+        $data = $request->validate([
+            'factory_notes' => 'nullable|string|max:2000',
+        ]);
+
+        $order->update(['factory_notes' => $data['factory_notes'] ?? null]);
+
+        return redirect()->back()->with('success', 'Factory notes saved.');
+    }
+
+    /**
+     * Dispatch every item that has reached the "ready" stage.
+     */
+    public function dispatchOrder(Request $request, Order $order): RedirectResponse
+    {
+        $user = $request->user();
+        $readyItems = $order->items()->where('status', 'ready')->get();
+
+        if ($readyItems->isEmpty()) {
+            return redirect()->back()->with('error', 'No items are ready for dispatch.');
+        }
+
+        foreach ($readyItems as $item) {
+            $stageLog = (array) ($item->stage_log ?? []);
+            $stageLog[] = [
+                'from' => 'ready',
+                'to' => 'dispatched',
+                'by' => $user?->id,
+                'name' => $user?->name,
+                'at' => now()->toISOString(),
+            ];
+            $item->update(['status' => 'dispatched', 'stage_log' => $stageLog]);
+        }
+
+        $allDispatched = $order->items()->where('status', '!=', 'dispatched')->doesntExist();
+        if ($allDispatched) {
+            $order->update(['status' => 'dispatched']);
+        }
+
+        return redirect()->back()->with('success', "Dispatched {$readyItems->count()} item(s).");
     }
 }
