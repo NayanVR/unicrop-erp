@@ -351,7 +351,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
         setLabelEditor({ order, labels });
     };
 
-    const updateLabelField = (idx: number, field: keyof Omit<EditableLabel, 'key' | 'boxNum' | 'totalBoxes' | 'itemBoxNum' | 'itemTotalBoxes' | 'inBoxPcs'>, value: string) => {
+    const updateLabelField = (idx: number, field: keyof Omit<EditableLabel, 'key' | 'boxNum' | 'totalBoxes' | 'itemBoxNum' | 'itemTotalBoxes'>, value: string) => {
         setLabelEditor((prev) => {
             if (!prev) return prev;
             const labels = [...prev.labels];
@@ -1011,11 +1011,24 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                         <span style={{ fontSize: '26px', fontWeight: 900, color: '#111' }}>{lbl.boxNum}</span>
                                         <span style={{ fontSize: '22px', fontWeight: 900, color: '#111' }}>{lbl.totalBoxes} box</span>
                                     </div>
-                                    {/* Auto row: in-box pcs | product box N/M */}
+                                    {/* In-box pcs (editable) | product box N/M (auto) */}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#333' }}>
-                                            {lbl.inBoxPcs ? `In-box: ${lbl.inBoxPcs} pcs` : '—'}
-                                        </span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <span style={{ fontSize: '11px', color: '#555' }}>In-box:</span>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                value={lbl.inBoxPcs}
+                                                onChange={(e) => updateLabelField(idx, 'inBoxPcs', e.target.value)}
+                                                placeholder="pcs"
+                                                style={{
+                                                    border: 'none', borderBottom: '1px dashed #ccc', outline: 'none',
+                                                    fontSize: '13px', fontWeight: 700, color: '#111',
+                                                    width: '60px', background: 'transparent', padding: '0 2px',
+                                                }}
+                                            />
+                                            <span style={{ fontSize: '11px', color: '#555' }}>pcs</span>
+                                        </div>
                                         <span style={{ fontSize: '10px', color: '#777', fontStyle: 'italic' }}>
                                             product box {lbl.itemBoxNum}/{lbl.itemTotalBoxes}
                                         </span>
