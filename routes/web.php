@@ -61,23 +61,29 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('factory/orders/{order}/notes', [FactoryController::class, 'saveNotes'])->name('factory.orders.notes');
         Route::post('factory/orders/{order}/dispatch', [FactoryController::class, 'dispatchOrder'])->name('factory.orders.dispatch');
 
-        Route::get('inventory', [InventoryController::class, 'index'])->name('inventory.index');
+        // Inventory — factory + admin only
         Route::post('inventory/materials', [InventoryController::class, 'storeMaterial'])->name('inventory.materials.store');
         Route::patch('inventory/materials/{material}', [InventoryController::class, 'updateMaterial'])->name('inventory.materials.update');
         Route::post('inventory/materials/{material}/transactions', [InventoryController::class, 'addTransaction'])->name('inventory.materials.transactions');
         Route::delete('inventory/materials/{material}', [InventoryController::class, 'destroyMaterial'])->name('inventory.materials.destroy');
-        Route::post('inventory/purchase-bills', [InventoryController::class, 'storePurchaseBill'])->name('inventory.purchase-bills.store');
-        Route::delete('inventory/purchase-bills/{bill}', [InventoryController::class, 'destroyPurchaseBill'])->name('inventory.purchase-bills.destroy');
         Route::post('inventory/reorders', [InventoryController::class, 'storeReorder'])->name('inventory.reorders.store');
         Route::post('inventory/reorders/{reorder}/receive', [InventoryController::class, 'receiveReorder'])->name('inventory.reorders.receive');
-        Route::post('inventory/reorders/{reorder}/receive-with-bill', [InventoryController::class, 'receiveWithBill'])->name('inventory.reorders.receive-with-bill');
         Route::delete('inventory/reorders/{reorder}', [InventoryController::class, 'destroyReorder'])->name('inventory.reorders.destroy');
 
         Route::get('bom', [BomRecipeController::class, 'webIndex'])->name('bom.index');
+
         Route::post('bom', [BomController::class, 'store'])->name('bom.store');
         Route::patch('bom/{bom}', [BomController::class, 'update'])->name('bom.update');
         Route::delete('bom/{bom}', [BomController::class, 'destroy'])->name('bom.destroy');
         Route::post('bom/{bom}/run', [BomController::class, 'runProduction'])->name('bom.run');
+    });
+
+    // Inventory — view + bill entry: factory, accountant, and admin
+    Route::middleware(['role:admin,factory,accountant'])->group(function () {
+        Route::get('inventory', [InventoryController::class, 'index'])->name('inventory.index');
+        Route::post('inventory/purchase-bills', [InventoryController::class, 'storePurchaseBill'])->name('inventory.purchase-bills.store');
+        Route::delete('inventory/purchase-bills/{bill}', [InventoryController::class, 'destroyPurchaseBill'])->name('inventory.purchase-bills.destroy');
+        Route::post('inventory/reorders/{reorder}/receive-with-bill', [InventoryController::class, 'receiveWithBill'])->name('inventory.reorders.receive-with-bill');
     });
 
     Route::middleware(['role:admin'])->group(function () {

@@ -181,7 +181,10 @@ function buildSku(catCode: string, size: string, shape: string): string {
 
 export default function InventoryIndex({ materials, recentTransactions, purchaseBills, reorders, stats }: Props) {
     const { auth } = usePage<{ auth: Auth }>().props;
-    const canSeeCost = auth.user?.role === 'admin' || auth.user?.cost_access === true;
+    const role = auth.user?.role ?? '';
+    const canSeeCost      = role === 'admin' || auth.user?.cost_access === true;
+    const canMarkReceived = role === 'admin' || role === 'factory';
+    const canEnterBill    = role === 'admin' || role === 'factory' || role === 'accountant';
 
     // Tab
     const [tab, setTab] = useState<'materials' | 'log' | 'bills' | 'reorders'>('materials');
@@ -616,10 +619,10 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     <p>Raw material stock levels &amp; transaction history</p>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <button className="btn sm" onClick={() => setScanModal(true)}>📸 Scan Bill</button>
-                    <button className="btn sm" onClick={() => setBillModal(true)}>📄 Purchase Bill</button>
-                    <button className="btn sm" onClick={openPackModal}>📦 Packaging</button>
-                    <button className="btn sm primary" onClick={openNewMat}>+ Add Material</button>
+                    {canEnterBill && <button className="btn sm" onClick={() => setScanModal(true)}>📸 Scan Bill</button>}
+                    {canEnterBill && <button className="btn sm" onClick={() => setBillModal(true)}>📄 Purchase Bill</button>}
+                    {canMarkReceived && <button className="btn sm" onClick={openPackModal}>📦 Packaging</button>}
+                    {canMarkReceived && <button className="btn sm primary" onClick={openNewMat}>+ Add Material</button>}
                 </div>
             </div>
 
@@ -904,7 +907,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                 <div className="card" style={{ marginTop: 16 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                         <div className="card-title">Purchase Bills</div>
-                        <button className="btn sm primary" onClick={() => setBillModal(true)}>+ New Bill</button>
+                        {canEnterBill && <button className="btn sm primary" onClick={() => setBillModal(true)}>+ New Bill</button>}
                     </div>
                     {purchaseBills.length === 0 ? (
                         <div className="empty-state">No purchase bills recorded.</div>
@@ -1032,7 +1035,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                             <td>
                                                 <div style={{ display: 'flex', gap: 4 }}>
                                                     {r.status === 'pending' && (
-                                                        <button className="btn sm primary" onClick={() => receiveReorder(r.id)}>✓ Mark Received</button>
+                                                        {canMarkReceived && <button className="btn sm primary" onClick={() => receiveReorder(r.id)}>✓ Mark Received</button>}
                                                     )}
                                                     <button className="btn danger sm" onClick={() => deleteReorder(r.id)}>🗑</button>
                                                 </div>
@@ -1929,7 +1932,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     )}
                     <div className="modal-footer">
                         <button className="btn" onClick={() => setViewReorder(null)}>Close</button>
-                        {viewReorder && (
+                        {viewReorder && canMarkReceived && (
                             <button
                                 className="btn primary"
                                 onClick={() => {
