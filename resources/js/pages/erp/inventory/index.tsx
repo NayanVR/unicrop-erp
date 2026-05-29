@@ -204,6 +204,13 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const [txnTarget, setTxnTarget] = useState<RawMaterial | null>(null);
     const [expandedBill, setExpandedBill] = useState<number | null>(null);
     const [viewReorder, setViewReorder] = useState<Reorder | null>(null);
+    const [receiveBillModal, setReceiveBillModal] = useState(false);
+    const [receiveBillForm, setReceiveBillForm] = useState({
+        vendor_name: '', bill_number: '', bill_date: '', rate: '', total_amount: '',
+    });
+    const [receiveBillFile, setReceiveBillFile] = useState<File | null>(null);
+    const [receiveBillProcessing, setReceiveBillProcessing] = useState(false);
+    const [receiveBillErrors, setReceiveBillErrors] = useState<Record<string, string>>({});
 
     // Packaging wizard
     const [packStep, setPackStep] = useState(1);
@@ -1926,16 +1933,138 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                             <button
                                 className="btn primary"
                                 onClick={() => {
-                                    if (!confirm('Mark as received and add to stock?')) return;
-                                    router.post(`/inventory/reorders/${viewReorder.id}/receive`, {}, {
-                                        preserveScroll: true,
-                                        onSuccess: () => setViewReorder(null),
+                                    setReceiveBillForm({
+                                        vendor_name: viewReorder.supplier ?? '',
+                                        bill_number: '',
+                                        bill_date: new Date().toISOString().slice(0, 10),
+                                        rate: '',
+                                        total_amount: '',
                                     });
+                                    setReceiveBillFile(null);
+                                    setReceiveBillErrors({});
+                                    setReceiveBillModal(true);
                                 }}
                             >
                                 ✓ Mark as Received
                             </button>
                         )}
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Receive With Bill Modal ───────────────────────────────────── */}
+            <div className={`modal-overlay${receiveBillModal ? ' open' : ''}`} onClick={() => !receiveBillProcessing && setReceiveBillModal(false)}>
+                <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480, width: '95%' }}>
+                    <div className="modal-header">
+                        <h3>📄 Enter Purchase Bill</h3>
+                        <button className="modal-close" onClick={() => setReceiveBillModal(false)} disabled={receiveBillProcessing}>×</button>
+                    </div>
+                    <div className="modal-body">
+                        {viewReorder && (
+                            <div style={{ padding: '8px 12px', background: '#eff6ff', borderRadius: 6, marginBottom: 16, fontSize: 13 }}>
+                                <strong>{viewReorder.raw_material?.name}</strong>
+                                {' — '}{fmt(viewReorder.qty_ordered)} {viewReorder.unit}
+                            </div>
+                        )}
+                        <div className="form-grid">
+                            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                <label>Vendor Name *</label>
+                                <input
+                                    type="text"
+                                    value={receiveBillForm.vendor_name}
+                                    onChange={(e) => setReceiveBillForm((p) => ({ ...p, vendor_name: e.target.value }))}
+                                    placeholder="Supplier / vendor name"
+                                />
+                                {receiveBillErrors.vendor_name && <div className="form-error">{receiveBillErrors.vendor_name}</div>}
+                            </div>
+                            <div className="form-group">
+                                <label>Bill Number</label>
+                                <input
+                                    type="text"
+                                    value={receiveBillForm.bill_number}
+                                    onChange={(e) => setReceiveBillForm((p) => ({ ...p, bill_number: e.target.value }))}
+                                    placeholder="Invoice / bill no."
+                                />
+                                {receiveBillErrors.bill_number && <div className="form-error">{receiveBillErrors.bill_number}</div>}
+                            </div>
+                            <div className="form-group">
+                                <label>Bill Date</label>
+                                <input
+                                    type="date"
+                                    value={receiveBillForm.bill_date}
+                                    onChange={(e) => setReceiveBillForm((p) => ({ ...p, bill_date: e.target.value }))}
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Rate / Unit (₹)</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={receiveBillForm.rate}
+                                    onChange={(e) => setReceiveBillForm((p) => ({ ...p, rate: e.target.value }))}
+                                    placeholder="Per unit cost"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Total Amount (₹)</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={
+                                        receiveBillForm.rate && viewReorder
+                                            ? String(Math.round(Number(receiveBillForm.rate) * Number(viewReorder.qty_ordered) * 100) / 100)
+                                            : receiveBillForm.total_amount
+                                    }
+                                    onChange={(e) => setReceiveBillForm((p) => ({ ...p, total_amount: e.target.value, rate: '' }))}
+                                    placeholder="Auto-calculated from rate"
+                                />
+                            </div>
+                            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                <label>Upload Bill (image / PDF)</label>
+                                <input
+                                    type="file"
+                                    accept="image/*,.pdf"
+                                    onChange={(e) => setReceiveBillFile(e.target.files?.[0] ?? null)}
+                                />
+                                {receiveBillFile && <div style={{ fontSize: 12, color: '#059669', marginTop: 4 }}>📎 {receiveBillFile.name}</div>}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="modal-footer">
+                        <button className="btn" onClick={() => setReceiveBillModal(false)} disabled={receiveBillProcessing}>Cancel</button>
+                        <button
+                            className="btn primary"
+                            disabled={receiveBillProcessing || !receiveBillForm.vendor_name.trim()}
+                            onClick={() => {
+                                if (!viewReorder) return;
+                                setReceiveBillProcessing(true);
+                                const fd = new FormData();
+                                fd.append('vendor_name', receiveBillForm.vendor_name);
+                                if (receiveBillForm.bill_number) fd.append('bill_number', receiveBillForm.bill_number);
+                                if (receiveBillForm.bill_date) fd.append('bill_date', receiveBillForm.bill_date);
+                                if (receiveBillForm.rate) fd.append('rate', receiveBillForm.rate);
+                                if (receiveBillForm.total_amount) fd.append('total_amount', receiveBillForm.total_amount);
+                                if (receiveBillFile) fd.append('bill_file', receiveBillFile);
+                                router.post(
+                                    `/inventory/reorders/${viewReorder.id}/receive-with-bill`,
+                                    fd,
+                                    {
+                                        forceFormData: true,
+                                        preserveScroll: true,
+                                        onSuccess: () => {
+                                            setReceiveBillModal(false);
+                                            setViewReorder(null);
+                                        },
+                                        onError: (errs) => setReceiveBillErrors(errs),
+                                        onFinish: () => setReceiveBillProcessing(false),
+                                    },
+                                );
+                            }}
+                        >
+                            {receiveBillProcessing ? 'Saving…' : '✓ Confirm Receipt'}
+                        </button>
                     </div>
                 </div>
             </div>

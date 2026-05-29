@@ -70,6 +70,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('inventory/purchase-bills/{bill}', [InventoryController::class, 'destroyPurchaseBill'])->name('inventory.purchase-bills.destroy');
         Route::post('inventory/reorders', [InventoryController::class, 'storeReorder'])->name('inventory.reorders.store');
         Route::post('inventory/reorders/{reorder}/receive', [InventoryController::class, 'receiveReorder'])->name('inventory.reorders.receive');
+        Route::post('inventory/reorders/{reorder}/receive-with-bill', [InventoryController::class, 'receiveWithBill'])->name('inventory.reorders.receive-with-bill');
         Route::delete('inventory/reorders/{reorder}', [InventoryController::class, 'destroyReorder'])->name('inventory.reorders.destroy');
 
         Route::get('bom', [BomRecipeController::class, 'webIndex'])->name('bom.index');

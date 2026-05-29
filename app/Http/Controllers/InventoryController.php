@@ -337,6 +337,100 @@ class InventoryController extends Controller
         return redirect()->back()->with('success', 'Reorder marked as received. Stock updated.');
     }
 
+    public function receiveWithBill(Request $request, InventoryReorder $reorder): RedirectResponse
+    {
+        if ($reorder->status === 'received') {
+            return redirect()->back()->with('error', 'Already received.');
+        }
+
+        $data = $request->validate([
+            'vendor_name'  => 'required|string|max:255',
+            'bill_number'  => 'nullable|string|max:100',
+            'bill_date'    => 'nullable|date',
+            'rate'         => 'nullable|numeric|min:0',
+            'total_amount' => 'nullable|numeric|min:0',
+            'bill_file'    => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
+        ]);
+
+        // Duplicate bill number check
+        if (! empty($data['bill_number'])) {
+            $exists = InventoryPurchaseBill::where('bill_number', $data['bill_number'])->exists();
+            if ($exists) {
+                return redirect()->back()->withErrors(['bill_number' => 'This bill number already exists.']);
+            }
+        }
+
+        $billFile = null;
+        $billName = null;
+        if ($request->hasFile('bill_file')) {
+            $billFile = $request->file('bill_file')->store('inventory/bills', 'public');
+            $billName = $request->file('bill_file')->getClientOriginalName();
+        }
+
+        DB::transaction(function () use ($data, $reorder, $billFile, $billName, $request) {
+            $material = RawMaterial::findOrFail($reorder->raw_material_id);
+            $qty      = (float) $reorder->qty_ordered;
+            $rate     = (float) ($data['rate'] ?? 0);
+            $amount   = $rate > 0 ? round($qty * $rate, 2) : (float) ($data['total_amount'] ?? 0);
+
+            // Create purchase bill
+            $bill = InventoryPurchaseBill::create([
+                'vendor_name'  => $data['vendor_name'],
+                'bill_number'  => $data['bill_number'] ?? null,
+                'bill_date'    => $data['bill_date'] ?? null,
+                'total_amount' => $amount,
+                'bill_file'    => $billFile,
+                'bill_name'    => $billName,
+                'add_to_stock' => true,
+                'user_id'      => auth()->id(),
+            ]);
+
+            // Create purchase bill item
+            InventoryPurchaseBillItem::create([
+                'inventory_purchase_bill_id' => $bill->id,
+                'raw_material_id'            => $material->id,
+                'material_name'              => $material->name,
+                'sku'                        => $material->sku,
+                'category'                   => $material->category,
+                'hsn'                        => $material->hsn,
+                'qty'                        => $qty,
+                'unit'                       => $reorder->unit,
+                'rate'                       => $rate,
+                'gst'                        => (float) ($material->gst ?? 0),
+                'amount'                     => $amount,
+            ]);
+
+            // Update stock
+            $previous = (float) $material->stock_qty;
+            $new      = $previous + $qty;
+            $material->stock_qty = $new;
+            if ($rate > 0) {
+                $material->cost_per_unit = $rate;
+            }
+            $material->save();
+
+            // Transaction log
+            InventoryTransaction::create([
+                'raw_material_id' => $material->id,
+                'user_id'         => auth()->id(),
+                'type'            => 'purchase',
+                'qty'             => $qty,
+                'previous_stock'  => $previous,
+                'new_stock'       => $new,
+                'reference'       => $data['bill_number'] ?? ('Reorder #' . $reorder->id),
+                'notes'           => 'Received — bill: ' . ($data['vendor_name']),
+            ]);
+
+            // Mark reorder done
+            $reorder->update([
+                'status'      => 'received',
+                'received_at' => now(),
+            ]);
+        });
+
+        return redirect()->back()->with('success', 'Received and purchase bill saved. Stock updated.');
+    }
+
     public function destroyReorder(InventoryReorder $reorder): RedirectResponse
     {
         $reorder->delete();
