@@ -125,6 +125,17 @@ type Props = {
     productPhotos?: ProductPhoto[];
 };
 
+const PROD_STAGES = ['pending', 'processing', 'filling', 'labeling', 'ready', 'dispatched'];
+
+const PROD_STAGE_LABELS: Record<string, string> = {
+    pending: 'Pending',
+    processing: 'Processing',
+    filling: 'Filling',
+    labeling: 'Labeling',
+    ready: 'Ready',
+    dispatched: 'Dispatched',
+};
+
 const formatDate = (value?: string | null) => {
     if (!value) return '—';
     return new Date(`${value}T00:00:00`).toLocaleDateString('en-IN', {
@@ -796,6 +807,57 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                     </tbody>
                                                 </table>
                                             </div>
+
+                                            {/* Production pipeline — visible for confirmed/dispatched orders */}
+                                            {(order.status === 'confirmed' || order.status === 'dispatched') && order.items.length > 0 && (
+                                                <div style={{ marginBottom: '14px' }}>
+                                                    <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)', marginBottom: '8px' }}>
+                                                        Production Progress
+                                                    </div>
+                                                    <div style={{ overflowX: 'auto' }}>
+                                                        <table className="prod-table" style={{ fontSize: '12px' }}>
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Product</th>
+                                                                    {PROD_STAGES.map((s) => (
+                                                                        <th key={s} style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                                                            {PROD_STAGE_LABELS[s]}
+                                                                        </th>
+                                                                    ))}
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {order.items.map((item) => {
+                                                                    const stageIdx = PROD_STAGES.indexOf(item.status ?? 'pending');
+                                                                    return (
+                                                                        <tr key={item.id}>
+                                                                            <td>
+                                                                                <div className="prod-name" style={{ fontSize: '12px' }}>{item.our_brand ?? '—'}</div>
+                                                                                {item.party_brand && <div className="prod-detail">{item.party_brand}</div>}
+                                                                            </td>
+                                                                            {PROD_STAGES.map((s, i) => {
+                                                                                const isPast = i < stageIdx;
+                                                                                const isCurrent = i === stageIdx;
+                                                                                return (
+                                                                                    <td key={s} style={{ textAlign: 'center' }}>
+                                                                                        {isPast ? (
+                                                                                            <span style={{ color: '#059669', fontSize: '14px' }}>✓</span>
+                                                                                        ) : isCurrent ? (
+                                                                                            <span className={`badge s-${s}`} style={{ fontSize: '10px' }}>●</span>
+                                                                                        ) : (
+                                                                                            <span style={{ color: 'var(--tx-faint)', fontSize: '12px' }}>○</span>
+                                                                                        )}
+                                                                                    </td>
+                                                                                );
+                                                                            })}
+                                                                        </tr>
+                                                                    );
+                                                                })}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            )}
 
                                             <div className="form-card" style={{ marginBottom: 0 }}>
                                                 <div className="form-card-title">Order Summary</div>
