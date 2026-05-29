@@ -52,7 +52,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('orders/{order}/approve-urgent', [OrderController::class, 'approveUrgent'])->name('orders.approve-urgent');
         Route::post('orders/{order}/reject-urgent', [OrderController::class, 'rejectUrgent'])->name('orders.reject-urgent');
 
-        Route::get('factory', [FactoryController::class, 'index'])->name('factory.index');
         Route::post('factory/items/{item}/advance', [FactoryController::class, 'advanceStage'])->name('factory.items.advance');
         Route::post('factory/items/{item}/revert', [FactoryController::class, 'revertStage'])->name('factory.items.revert');
 
@@ -67,6 +66,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('bom/{bom}', [BomController::class, 'destroy'])->name('bom.destroy');
         Route::post('bom/{bom}/run', [BomController::class, 'runProduction'])->name('bom.run');
     });
+
+    // Production orders view is open to all roles; action routes above are still factory/admin only
+    Route::get('factory', [FactoryController::class, 'index'])->name('factory.index');
 
     Route::middleware(['role:admin'])->group(function () {
         Route::get('erp/settings', [SettingsController::class, 'index'])->name('settings.index');

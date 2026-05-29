@@ -58,6 +58,7 @@ type Props = {
     orders: Order[];
     stageFlow: Record<string, string>;
     urgentPending: UrgentPendingOrder[];
+    canAdvance: boolean;
 };
 
 const STAGE_ORDER = ['pending', 'processing', 'filling', 'labeling', 'ready', 'dispatched'];
@@ -99,7 +100,7 @@ const formatDate = (value?: string | null) => {
 
 const priorityClass = (priority?: string | null) => `badge priority-${priority ?? 'normal'}`;
 
-export default function FactoryIndex({ orders, stageFlow, urgentPending }: Props) {
+export default function FactoryIndex({ orders, stageFlow, urgentPending, canAdvance }: Props) {
     const [openOrders, setOpenOrders] = useState<number[]>([]);
     const [advancing, setAdvancing] = useState<number | null>(null);
     const [reverting, setReverting] = useState<number | null>(null);
@@ -178,8 +179,8 @@ export default function FactoryIndex({ orders, stageFlow, urgentPending }: Props
                     </div>
                 </div>
 
-                {/* ── Urgent Approval Requests ── */}
-                {urgentPending.length > 0 && (
+                {/* ── Urgent Approval Requests (factory/admin only) ── */}
+                {canAdvance && urgentPending.length > 0 && (
                     <div className="card" style={{ marginBottom: '20px', border: '2px solid #ef4444' }}>
                         <div className="card-title" style={{ color: '#ef4444' }}>
                             🚨 Urgent Approval Requests
@@ -421,7 +422,7 @@ export default function FactoryIndex({ orders, stageFlow, urgentPending }: Props
                                                                         flexWrap: 'wrap',
                                                                     }}
                                                                 >
-                                                                    {!isDispatched && nextStage && (
+                                                                    {canAdvance && !isDispatched && nextStage && (
                                                                         <button
                                                                             type="button"
                                                                             className={`btn sm${nextStage === 'dispatched' ? ' primary' : ''}`}
@@ -433,7 +434,7 @@ export default function FactoryIndex({ orders, stageFlow, urgentPending }: Props
                                                                                 : (STAGE_NEXT_LABEL[item.status] ?? '▶ Next')}
                                                                         </button>
                                                                     )}
-                                                                    {!isPending && !isDispatched && (
+                                                                    {canAdvance && !isPending && !isDispatched && (
                                                                         <button
                                                                             type="button"
                                                                             className="btn danger-xs"

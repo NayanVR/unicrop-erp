@@ -19,8 +19,13 @@ class FactoryController extends Controller
         'ready' => 'dispatched',
     ];
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $user = $request->user();
+        $user->loadMissing('roles');
+        $role = $user->roles->first()?->slug;
+        $canAdvance = in_array($role, ['admin', 'factory']);
+
         $orders = Order::query()
             ->where('status', 'confirmed')
             ->with(['items', 'salesUser:id,name', 'createdBy:id,name'])
@@ -28,19 +33,20 @@ class FactoryController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        $urgentPending = Order::query()
+        $urgentPending = $canAdvance ? Order::query()
             ->where('status', 'submitted')
             ->where('priority', 'urgent')
             ->whereNull('urgent_approved')
             ->with(['items:id,order_id,our_brand,packing_size,quantity', 'salesUser:id,name', 'createdBy:id,name'])
             ->orderByDesc('id')
-            ->get();
+            ->get() : collect();
 
         return Inertia::render('erp/factory/index', [
             'pageTitle' => 'Production Orders',
             'orders' => $orders,
             'stageFlow' => self::STAGE_FLOW,
             'urgentPending' => $urgentPending,
+            'canAdvance' => $canAdvance,
         ]);
     }
 
