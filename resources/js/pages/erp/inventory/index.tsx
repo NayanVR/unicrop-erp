@@ -1597,19 +1597,31 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                 </div>
                             ) : (
                                 <div style={{ overflowX: 'auto' }}>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, tableLayout: 'fixed' }}>
+                                        <colgroup>
+                                            <col style={{ width: '22%' }} />
+                                            <col style={{ width: '8%' }} />
+                                            <col style={{ width: '11%' }} />
+                                            <col style={{ width: '7%' }} />
+                                            <col style={{ width: '7%' }} />
+                                            <col style={{ width: '7%' }} />
+                                            <col style={{ width: '9%' }} />
+                                            <col style={{ width: '8%' }} />
+                                            <col style={{ width: '9%' }} />
+                                            <col style={{ width: '3%' }} />
+                                        </colgroup>
                                         <thead>
                                             <tr style={{ background: '#f9fafb' }}>
-                                                <th style={{ padding: '6px 8px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', minWidth: 170 }}>Material / Item Name</th>
-                                                <th style={{ padding: '6px 8px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', minWidth: 80 }}>SKU</th>
-                                                <th style={{ padding: '6px 8px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', minWidth: 100 }}>Category</th>
-                                                <th style={{ padding: '6px 8px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', minWidth: 70 }}>HSN</th>
-                                                <th style={{ padding: '6px 8px', textAlign: 'right', borderBottom: '2px solid #e5e7eb', minWidth: 70 }}>Qty</th>
-                                                <th style={{ padding: '6px 8px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', minWidth: 65 }}>Unit</th>
-                                                <th style={{ padding: '6px 8px', textAlign: 'right', borderBottom: '2px solid #e5e7eb', minWidth: 80 }}>Rate (₹)</th>
-                                                <th style={{ padding: '6px 8px', textAlign: 'right', borderBottom: '2px solid #e5e7eb', minWidth: 70 }}>GST %</th>
-                                                <th style={{ padding: '6px 8px', textAlign: 'right', borderBottom: '2px solid #e5e7eb', minWidth: 90 }}>Amount</th>
-                                                <th style={{ padding: '6px 8px', borderBottom: '2px solid #e5e7eb', width: 32 }}></th>
+                                                <th style={{ padding: '5px 6px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Material / Item Name</th>
+                                                <th style={{ padding: '5px 6px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>SKU</th>
+                                                <th style={{ padding: '5px 6px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Category</th>
+                                                <th style={{ padding: '5px 6px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>HSN</th>
+                                                <th style={{ padding: '5px 6px', textAlign: 'right', borderBottom: '2px solid #e5e7eb' }}>Qty</th>
+                                                <th style={{ padding: '5px 6px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Unit</th>
+                                                <th style={{ padding: '5px 6px', textAlign: 'right', borderBottom: '2px solid #e5e7eb' }}>Rate (₹)</th>
+                                                <th style={{ padding: '5px 6px', textAlign: 'right', borderBottom: '2px solid #e5e7eb' }}>GST%</th>
+                                                <th style={{ padding: '5px 6px', textAlign: 'right', borderBottom: '2px solid #e5e7eb' }}>Amount</th>
+                                                <th style={{ borderBottom: '2px solid #e5e7eb' }}></th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1622,7 +1634,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                                     : [];
                                                 return (
                                                     <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                                                        <td style={{ padding: '4px 6px', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+                                                        <td style={{ padding: '3px 4px', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
                                                             <input
                                                                 type="text"
                                                                 value={row.matSearch || row.material_name}
@@ -1631,15 +1643,15 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                                                     setBillMatDropdown(i);
                                                                 }}
                                                                 onFocus={() => { if (row.matSearch || !row.raw_material_id) setBillMatDropdown(i); }}
-                                                                style={{ width: '100%', minWidth: 150 }}
-                                                                placeholder="Search or type material name"
+                                                                style={{ width: '100%', fontSize: 12 }}
+                                                                placeholder="Search or type name…"
                                                             />
                                                             {row.raw_material_id && (
-                                                                <div style={{ fontSize: 10, color: '#2563eb', marginTop: 2 }}>✓ Linked to stock</div>
+                                                                <div style={{ fontSize: 10, color: '#2563eb', marginTop: 1, lineHeight: 1.2 }}>✓ linked</div>
                                                             )}
                                                             {billMatDropdown === i && (matMatches.length > 0 || row.matSearch.trim().length >= 1) && (
                                                                 <div style={{
-                                                                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+                                                                    position: 'absolute', top: '100%', left: 0, zIndex: 100, minWidth: 240,
                                                                     background: '#fff', border: '1px solid #d1d5db', borderRadius: 6,
                                                                     boxShadow: '0 4px 16px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto',
                                                                 }}>
@@ -1647,7 +1659,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                                                         <div
                                                                             key={m.id}
                                                                             onMouseDown={(e) => { e.preventDefault(); selectBillRowMaterial(i, m); }}
-                                                                            style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #f3f4f6' }}
+                                                                            style={{ padding: '7px 10px', cursor: 'pointer', borderBottom: '1px solid #f3f4f6' }}
                                                                             onMouseEnter={(e) => (e.currentTarget.style.background = '#eff6ff')}
                                                                             onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
                                                                         >
@@ -1661,7 +1673,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                                                     {matMatches.length === 0 && row.matSearch.trim().length >= 1 && (
                                                                         <div
                                                                             onMouseDown={(e) => { e.preventDefault(); updateBillRow(i, 'material_name', row.matSearch); setBillMatDropdown(null); }}
-                                                                            style={{ padding: '8px 12px', cursor: 'pointer', color: '#2563eb', fontWeight: 600, fontSize: 13 }}
+                                                                            style={{ padding: '7px 10px', cursor: 'pointer', color: '#2563eb', fontWeight: 600, fontSize: 13 }}
                                                                             onMouseEnter={(e) => (e.currentTarget.style.background = '#eff6ff')}
                                                                             onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
                                                                         >
@@ -1671,36 +1683,36 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                                                 </div>
                                                             )}
                                                         </td>
-                                                        <td style={{ padding: '4px 6px' }}>
-                                                            <input type="text" value={row.sku} onChange={(e) => updateBillRow(i, 'sku', e.target.value)} style={{ width: 80 }} />
+                                                        <td style={{ padding: '3px 4px' }}>
+                                                            <input type="text" value={row.sku} onChange={(e) => updateBillRow(i, 'sku', e.target.value)} style={{ width: '100%', fontSize: 12 }} />
                                                         </td>
-                                                        <td style={{ padding: '4px 6px' }}>
-                                                            <select value={row.category} onChange={(e) => updateBillRow(i, 'category', e.target.value)} style={{ width: '100%', minWidth: 95 }}>
-                                                                <option value="">— None —</option>
+                                                        <td style={{ padding: '3px 4px' }}>
+                                                            <select value={row.category} onChange={(e) => updateBillRow(i, 'category', e.target.value)} style={{ width: '100%', fontSize: 12 }}>
+                                                                <option value="">—</option>
                                                                 {categories.map((c) => <option key={c} value={c}>{c}</option>)}
                                                                 {row.category && !categories.includes(row.category) && <option value={row.category}>{row.category}</option>}
                                                             </select>
                                                         </td>
-                                                        <td style={{ padding: '4px 6px' }}>
-                                                            <input type="text" value={row.hsn} onChange={(e) => updateBillRow(i, 'hsn', e.target.value)} style={{ width: 70 }} />
+                                                        <td style={{ padding: '3px 4px' }}>
+                                                            <input type="text" value={row.hsn} onChange={(e) => updateBillRow(i, 'hsn', e.target.value)} style={{ width: '100%', fontSize: 12 }} />
                                                         </td>
-                                                        <td style={{ padding: '4px 6px' }}>
-                                                            <input type="number" min="0" step="any" value={row.qty} onChange={(e) => updateBillRow(i, 'qty', e.target.value)} style={{ width: 70, textAlign: 'right' }} />
+                                                        <td style={{ padding: '3px 4px' }}>
+                                                            <input type="number" min="0" step="any" value={row.qty} onChange={(e) => updateBillRow(i, 'qty', e.target.value)} style={{ width: '100%', textAlign: 'right', fontSize: 12 }} />
                                                         </td>
-                                                        <td style={{ padding: '4px 6px' }}>
-                                                            <select value={row.unit} onChange={(e) => updateBillRow(i, 'unit', e.target.value)} style={{ width: 65 }}>
+                                                        <td style={{ padding: '3px 4px' }}>
+                                                            <select value={row.unit} onChange={(e) => updateBillRow(i, 'unit', e.target.value)} style={{ width: '100%', fontSize: 12 }}>
                                                                 {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
                                                             </select>
                                                         </td>
-                                                        <td style={{ padding: '4px 6px' }}>
-                                                            <input type="number" min="0" step="any" value={row.rate} onChange={(e) => updateBillRow(i, 'rate', e.target.value)} style={{ width: 85, textAlign: 'right' }} />
+                                                        <td style={{ padding: '3px 4px' }}>
+                                                            <input type="number" min="0" step="any" value={row.rate} onChange={(e) => updateBillRow(i, 'rate', e.target.value)} style={{ width: '100%', textAlign: 'right', fontSize: 12 }} />
                                                         </td>
-                                                        <td style={{ padding: '4px 6px' }}>
-                                                            <select value={row.gst} onChange={(e) => updateBillRow(i, 'gst', e.target.value)} style={{ width: 65 }}>
+                                                        <td style={{ padding: '3px 4px' }}>
+                                                            <select value={row.gst} onChange={(e) => updateBillRow(i, 'gst', e.target.value)} style={{ width: '100%', fontSize: 12 }}>
                                                                 {GST_OPTIONS.map((g) => <option key={g} value={g}>{g}%</option>)}
                                                             </select>
                                                         </td>
-                                                        <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                                        <td style={{ padding: '3px 4px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap', fontSize: 12 }}>
                                                             {row.amount ? fmtAmt(row.amount) : '—'}
                                                         </td>
                                                         <td style={{ padding: '4px 6px' }}>
