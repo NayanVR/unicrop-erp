@@ -272,6 +272,8 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const [matResults, setMatResults] = useState<MatSearchResult[]>([]);
     const [matSearching, setMatSearching] = useState(false);
     const matSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [matDropdownRect, setMatDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null);
+    const matInputRefs = useRef<(HTMLInputElement | null)[]>([]);
     const matSearchSeq = useRef(0);
 
     const runMaterialSearch = (q: string) => {
@@ -1672,62 +1674,32 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                             {billRows.map((row, i) => {
                                                 return (
                                                     <tr key={i}>
-                                                        <td style={{ padding: '3px 4px', position: 'relative', border: '1px solid #e5e7eb' }} onClick={(e) => e.stopPropagation()}>
+                                                        <td style={{ padding: '3px 4px', border: '1px solid #e5e7eb' }} onClick={(e) => e.stopPropagation()}>
                                                             <input
+                                                                ref={(el) => { matInputRefs.current[i] = el; }}
                                                                 type="text"
                                                                 value={row.matSearch || row.material_name}
                                                                 onChange={(e) => {
                                                                     updateBillRow(i, 'matSearch', e.target.value);
                                                                     setBillMatDropdown(i);
+                                                                    const rect = matInputRefs.current[i]?.getBoundingClientRect();
+                                                                    if (rect) setMatDropdownRect({ top: rect.bottom + window.scrollY, left: rect.left + window.scrollX, width: Math.max(rect.width, 260) });
                                                                     runMaterialSearch(e.target.value);
                                                                 }}
                                                                 onFocus={() => {
                                                                     if (row.matSearch || !row.raw_material_id) {
                                                                         setBillMatDropdown(i);
+                                                                        const rect = matInputRefs.current[i]?.getBoundingClientRect();
+                                                                        if (rect) setMatDropdownRect({ top: rect.bottom + window.scrollY, left: rect.left + window.scrollX, width: Math.max(rect.width, 260) });
                                                                         runMaterialSearch(row.matSearch || row.material_name);
                                                                     }
                                                                 }}
+                                                                onBlur={() => setTimeout(() => setBillMatDropdown(null), 150)}
                                                                 style={{ width: '100%', fontSize: 12 }}
                                                                 placeholder="Search or type name…"
                                                             />
                                                             {row.raw_material_id && (
                                                                 <div style={{ fontSize: 10, color: '#2563eb', marginTop: 1, lineHeight: 1.2 }}>✓ linked</div>
-                                                            )}
-                                                            {billMatDropdown === i && row.matSearch.trim().length >= 1 && (
-                                                                <div style={{
-                                                                    position: 'absolute', top: '100%', left: 0, zIndex: 100, minWidth: 240,
-                                                                    background: '#fff', border: '1px solid #d1d5db', borderRadius: 6,
-                                                                    boxShadow: '0 4px 16px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto',
-                                                                }}>
-                                                                    {matSearching && (
-                                                                        <div style={{ padding: '7px 10px', fontSize: 12, color: '#9ca3af' }}>Searching…</div>
-                                                                    )}
-                                                                    {matResults.map((m) => (
-                                                                        <div
-                                                                            key={m.id}
-                                                                            onMouseDown={(e) => { e.preventDefault(); selectBillRowMaterial(i, m); }}
-                                                                            style={{ padding: '7px 10px', cursor: 'pointer', borderBottom: '1px solid #f3f4f6' }}
-                                                                            onMouseEnter={(e) => (e.currentTarget.style.background = '#eff6ff')}
-                                                                            onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
-                                                                        >
-                                                                            <div style={{ fontWeight: 600, fontSize: 13 }}>{m.name}</div>
-                                                                            <div style={{ fontSize: 11, color: '#6b7280' }}>
-                                                                                {m.sku ? `SKU: ${m.sku} · ` : ''}{m.category ?? ''}{m.category ? ' · ' : ''}{m.unit}
-                                                                                {Number(m.cost_per_unit) > 0 ? ` · ₹${Number(m.cost_per_unit).toFixed(2)}` : ''}
-                                                                            </div>
-                                                                        </div>
-                                                                    ))}
-                                                                    {!matSearching && matResults.length === 0 && (
-                                                                        <div
-                                                                            onMouseDown={(e) => { e.preventDefault(); updateBillRow(i, 'material_name', row.matSearch); setBillMatDropdown(null); }}
-                                                                            style={{ padding: '7px 10px', cursor: 'pointer', color: '#2563eb', fontWeight: 600, fontSize: 13 }}
-                                                                            onMouseEnter={(e) => (e.currentTarget.style.background = '#eff6ff')}
-                                                                            onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
-                                                                        >
-                                                                            ➕ Add as new: "{row.matSearch}"
-                                                                        </div>
-                                                                    )}
-                                                                </div>
                                                             )}
                                                         </td>
                                                         <td style={{ padding: '3px 4px', border: '1px solid #e5e7eb' }}>
@@ -1860,6 +1832,59 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     </div>
                 </div>
             </div>
+
+            {/* ── Material search dropdown (fixed, outside table overflow) ─── */}
+            {billMatDropdown !== null && matDropdownRect && (() => {
+                const row = billRows[billMatDropdown];
+                if (!row || row.matSearch.trim().length < 1) return null;
+                return (
+                    <div
+                        style={{
+                            position: 'fixed',
+                            top: matDropdownRect.top,
+                            left: matDropdownRect.left,
+                            width: matDropdownRect.width,
+                            zIndex: 9999,
+                            background: '#fff',
+                            border: '1px solid #d1d5db',
+                            borderRadius: 6,
+                            boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                            maxHeight: 220,
+                            overflowY: 'auto',
+                        }}
+                        onMouseDown={(e) => e.preventDefault()}
+                    >
+                        {matSearching && (
+                            <div style={{ padding: '7px 10px', fontSize: 12, color: '#9ca3af' }}>Searching…</div>
+                        )}
+                        {matResults.map((m) => (
+                            <div
+                                key={m.id}
+                                onMouseDown={(e) => { e.preventDefault(); selectBillRowMaterial(billMatDropdown, m); }}
+                                style={{ padding: '7px 10px', cursor: 'pointer', borderBottom: '1px solid #f3f4f6' }}
+                                onMouseEnter={(e) => (e.currentTarget.style.background = '#eff6ff')}
+                                onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
+                            >
+                                <div style={{ fontWeight: 600, fontSize: 13 }}>{m.name}</div>
+                                <div style={{ fontSize: 11, color: '#6b7280' }}>
+                                    {m.sku ? `SKU: ${m.sku} · ` : ''}{m.category ?? ''}{m.category ? ' · ' : ''}{m.unit}
+                                    {Number(m.cost_per_unit) > 0 ? ` · ₹${Number(m.cost_per_unit).toFixed(2)}` : ''}
+                                </div>
+                            </div>
+                        ))}
+                        {!matSearching && matResults.length === 0 && (
+                            <div
+                                onMouseDown={(e) => { e.preventDefault(); updateBillRow(billMatDropdown, 'material_name', row.matSearch); setBillMatDropdown(null); }}
+                                style={{ padding: '7px 10px', cursor: 'pointer', color: '#2563eb', fontWeight: 600, fontSize: 13 }}
+                                onMouseEnter={(e) => (e.currentTarget.style.background = '#eff6ff')}
+                                onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
+                            >
+                                ➕ Add as new: "{row.matSearch}"
+                            </div>
+                        )}
+                    </div>
+                );
+            })()}
 
             {/* ── Reorder Modal ─────────────────────────────────────────────── */}
             <div className={`modal-overlay${reorderModal ? ' open' : ''}`} onClick={() => setReorderModal(false)}>
