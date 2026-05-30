@@ -65,6 +65,8 @@ type PurchaseBill = {
     bill_number: string | null;
     bill_date: string | null;
     total_amount: string | number;
+    freight_charges: string | number;
+    round_off: string | number;
     bill_file: string | null;
     bill_name: string | null;
     add_to_stock: boolean;
@@ -97,12 +99,19 @@ type Stats = {
     totalStockValue: number;
 };
 
+type Vendor = {
+    id: number;
+    name: string;
+    gst_no: string | null;
+};
+
 type Props = {
     materials: RawMaterial[];
     recentTransactions: Transaction[];
     purchaseBills: PurchaseBill[];
     reorders: Reorder[];
     stats: Stats;
+    vendors: Vendor[];
 };
 
 // ── Route constants ───────────────────────────────────────────────────────────
@@ -180,7 +189,7 @@ function buildSku(catCode: string, size: string, shape: string): string {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function InventoryIndex({ materials, recentTransactions, purchaseBills, reorders, stats }: Props) {
+export default function InventoryIndex({ materials, recentTransactions, purchaseBills, reorders, stats, vendors }: Props) {
     const { auth } = usePage<{ auth: Auth }>().props;
     const role = auth.user?.role ?? '';
     const canSeeCost      = role === 'admin' || auth.user?.cost_access === true;
@@ -231,16 +240,20 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
 
     // Bill form (local state for dynamic rows)
     const [billForm, setBillForm] = useState({
+        party_id: '',
         vendor_name: '',
         bill_number: '',
         bill_date: '',
+        freight_charges: '0',
+        round_off: '0',
         add_to_stock: true,
     });
     const [billFile, setBillFile] = useState<File | null>(null);
     const [billRows, setBillRows] = useState<
-        { raw_material_id: string; material_name: string; sku: string; category: string; hsn: string; qty: string; unit: string; rate: string; gst: string; amount: string }[]
+        { raw_material_id: string; material_name: string; matSearch: string; sku: string; category: string; hsn: string; qty: string; unit: string; rate: string; gst: string; amount: string }[]
     >([]);
     const [billProcessing, setBillProcessing] = useState(false);
+    const [billMatDropdown, setBillMatDropdown] = useState<number | null>(null);
 
     // Material form
     const matForm = useForm({
@@ -428,21 +441,45 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const addBillRow = () => {
         setBillRows((prev) => [
             ...prev,
-            { raw_material_id: '', material_name: '', sku: '', category: '', hsn: '', qty: '', unit: 'kg', rate: '', gst: '18', amount: '' },
+            { raw_material_id: '', material_name: '', matSearch: '', sku: '', category: '', hsn: '', qty: '', unit: 'pcs', rate: '', gst: '18', amount: '' },
         ]);
+    };
+
+    const selectBillRowMaterial = (i: number, mat: RawMaterial) => {
+        setBillRows((prev) => {
+            const rows = [...prev];
+            rows[i] = {
+                ...rows[i],
+                raw_material_id: String(mat.id),
+                material_name: mat.name,
+                matSearch: mat.name,
+                sku: mat.sku ?? '',
+                category: mat.category ?? '',
+                hsn: mat.hsn ?? '',
+                unit: mat.unit,
+                gst: mat.gst ? String(Number(mat.gst)) : '18',
+                rate: mat.cost_per_unit && Number(mat.cost_per_unit) > 0 ? String(Number(mat.cost_per_unit)) : rows[i].rate,
+            };
+            // recalc amount
+            const qty = Number(rows[i].qty) || 0;
+            const rate = Number(rows[i].rate) || 0;
+            const gst = Number(rows[i].gst) || 0;
+            if (qty && rate) {
+                const base = qty * rate;
+                rows[i].amount = (base + (base * gst) / 100).toFixed(2);
+            }
+            return rows;
+        });
+        setBillMatDropdown(null);
     };
 
     const updateBillRow = (i: number, key: string, val: string) => {
         setBillRows((prev) => {
             const rows = [...prev];
             rows[i] = { ...rows[i], [key]: val };
-            if (key === 'raw_material_id' && val) {
-                const mat = materials.find((m) => String(m.id) === val);
-                if (mat) {
-                    rows[i].unit = mat.unit;
-                    if (mat.gst) rows[i].gst = String(Number(mat.gst));
-                    if (mat.cost_per_unit && Number(mat.cost_per_unit) > 0) rows[i].rate = String(Number(mat.cost_per_unit));
-                }
+            if (key === 'matSearch') {
+                rows[i].material_name = val;
+                rows[i].raw_material_id = '';
             }
             if (key === 'qty' || key === 'rate' || key === 'gst') {
                 const qty = Number(key === 'qty' ? val : rows[i].qty) || 0;
@@ -460,24 +497,38 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         setBillRows((prev) => prev.filter((_, idx) => idx !== i));
     };
 
-    const billTotal = billRows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+    const billSubtotal = billRows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+    const billFreight = Number(billForm.freight_charges) || 0;
+    const billRoundOff = Number(billForm.round_off) || 0;
+    const billTotal = billSubtotal + billFreight + billRoundOff;
+
+    // Auto-calculate round off when subtotal or freight changes
+    const autoRoundOff = (subtotal: number, freight: number) => {
+        const raw = subtotal + freight;
+        const rounded = Math.round(raw);
+        return (rounded - raw).toFixed(2);
+    };
 
     const resetBillForm = () => {
-        setBillForm({ vendor_name: '', bill_number: '', bill_date: '', add_to_stock: true });
+        setBillForm({ party_id: '', vendor_name: '', bill_number: '', bill_date: '', freight_charges: '0', round_off: '0', add_to_stock: true });
         setBillFile(null);
         setBillRows([]);
+        setBillMatDropdown(null);
     };
 
     const submitBill = () => {
         const fd = new FormData();
-        fd.append('vendor_name', billForm.vendor_name);
+        if (billForm.party_id) fd.append('party_id', billForm.party_id);
+        fd.append('vendor_name', billForm.vendor_name || vendors.find((v) => String(v.id) === billForm.party_id)?.name || '');
         fd.append('bill_number', billForm.bill_number);
         fd.append('bill_date', billForm.bill_date);
+        fd.append('freight_charges', billForm.freight_charges || '0');
+        fd.append('round_off', billForm.round_off || '0');
         fd.append('add_to_stock', billForm.add_to_stock ? '1' : '0');
         fd.append('total_amount', String(billTotal));
         if (billFile) fd.append('bill_file', billFile);
         billRows.forEach((row, i) => {
-            const { raw_material_id, ...rest } = row;
+            const { raw_material_id, matSearch: _ms, ...rest } = row;
             if (raw_material_id) fd.append(`items[${i}][raw_material_id]`, raw_material_id);
             Object.entries(rest).forEach(([k, v]) => fd.append(`items[${i}][${k}]`, String(v)));
         });
@@ -1052,8 +1103,8 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                             </td>
                                             <td>
                                                 <div style={{ display: 'flex', gap: 4 }}>
-                                                    {r.status === 'pending' && (
-                                                        {canMarkReceived && <button className="btn sm primary" onClick={() => receiveReorder(r.id)}>✓ Mark Received</button>}
+                                                    {r.status === 'pending' && canMarkReceived && (
+                                                        <button className="btn sm primary" onClick={() => receiveReorder(r.id)}>✓ Mark Received</button>
                                                     )}
                                                     <button className="btn danger sm" onClick={() => deleteReorder(r.id)}>🗑</button>
                                                 </div>
@@ -1365,36 +1416,64 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             </div>
 
             {/* ── Purchase Bill Modal ───────────────────────────────────────── */}
-            <div className={`modal-overlay${billModal ? ' open' : ''}`} onClick={() => setBillModal(false)}>
-                <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 900, width: '98%' }}>
+            <div className={`modal-overlay${billModal ? ' open' : ''}`} onClick={() => { setBillModal(false); resetBillForm(); }}>
+                <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 1000, width: '98%' }}>
                     <div className="modal-header">
-                        <h3>New Purchase Bill</h3>
-                        <button className="modal-close" onClick={() => setBillModal(false)}>×</button>
+                        <h3>📄 New Purchase Bill</h3>
+                        <button className="modal-close" onClick={() => { setBillModal(false); resetBillForm(); }}>×</button>
                     </div>
-                    <div className="modal-body">
-                        <div className="form-grid">
+                    <div className="modal-body" onClick={() => setBillMatDropdown(null)}>
+                        {/* Row 1: Bill Number + Vendor/Supplier */}
+                        <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
                             <div className="form-group">
-                                <label>Vendor Name *</label>
-                                <input
-                                    type="text"
-                                    value={billForm.vendor_name}
-                                    onChange={(e) => setBillForm((p) => ({ ...p, vendor_name: e.target.value }))}
-                                    required
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>Bill Number</label>
+                                <label>Bill / Invoice Number</label>
                                 <input
                                     type="text"
                                     value={billForm.bill_number}
                                     onChange={(e) => setBillForm((p) => ({ ...p, bill_number: e.target.value }))}
+                                    placeholder="e.g. INV-2024-001"
                                 />
                                 {isDuplicateBillNumber && (
                                     <div className="form-error">⚠ This bill number already exists.</div>
                                 )}
                             </div>
                             <div className="form-group">
-                                <label>Bill Date</label>
+                                <label>Vendor / Supplier *</label>
+                                {vendors.length > 0 ? (
+                                    <select
+                                        value={billForm.party_id}
+                                        onChange={(e) => {
+                                            const v = vendors.find((x) => String(x.id) === e.target.value);
+                                            setBillForm((p) => ({ ...p, party_id: e.target.value, vendor_name: v?.name ?? '' }));
+                                        }}
+                                    >
+                                        <option value="">— Select supplier —</option>
+                                        {vendors.map((v) => (
+                                            <option key={v.id} value={String(v.id)}>{v.name}{v.gst_no ? ` · ${v.gst_no}` : ''}</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={billForm.vendor_name}
+                                        onChange={(e) => setBillForm((p) => ({ ...p, vendor_name: e.target.value }))}
+                                        placeholder="Supplier name"
+                                    />
+                                )}
+                                {vendors.length > 0 && !billForm.party_id && (
+                                    <input
+                                        type="text"
+                                        value={billForm.vendor_name}
+                                        onChange={(e) => setBillForm((p) => ({ ...p, vendor_name: e.target.value }))}
+                                        placeholder="Or type manually if not in list"
+                                        style={{ marginTop: 4, fontSize: 12 }}
+                                    />
+                                )}
+                            </div>
+
+                            {/* Row 2: Purchase Date + Bill Upload */}
+                            <div className="form-group">
+                                <label>Purchase Date</label>
                                 <input
                                     type="date"
                                     value={billForm.bill_date}
@@ -1402,118 +1481,222 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                 />
                             </div>
                             <div className="form-group">
-                                <label>Upload Bill (Image / PDF)</label>
+                                <label>Bill Photo / PDF Upload</label>
                                 <input
                                     type="file"
                                     accept="image/*,.pdf"
                                     onChange={(e) => setBillFile(e.target.files?.[0] ?? null)}
                                 />
-                            </div>
-                            <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                <input
-                                    type="checkbox"
-                                    id="addToStock"
-                                    checked={billForm.add_to_stock}
-                                    onChange={(e) => setBillForm((p) => ({ ...p, add_to_stock: e.target.checked }))}
-                                />
-                                <label htmlFor="addToStock" style={{ margin: 0, cursor: 'pointer' }}>
-                                    Add items to stock automatically
-                                </label>
+                                {billFile && <div style={{ fontSize: 11, color: '#059669', marginTop: 4 }}>✓ {billFile.name}</div>}
                             </div>
                         </div>
 
-                        {/* Line items */}
-                        <div style={{ marginTop: 16 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                <strong>Line Items</strong>
-                                <button type="button" className="btn sm" onClick={addBillRow}>+ Add Row</button>
+                        {/* Line Items */}
+                        <div style={{ marginTop: 20 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                <strong style={{ fontSize: 14 }}>Items</strong>
+                                <button type="button" className="btn sm primary" onClick={addBillRow}>+ Add Item</button>
                             </div>
                             {billRows.length === 0 ? (
-                                <div style={{ color: '#6b7280', fontSize: 13, padding: '12px 0' }}>No items added. Click "+ Add Row" to begin.</div>
+                                <div style={{ color: '#9ca3af', fontSize: 13, padding: '20px 0', textAlign: 'center', border: '1px dashed #e5e7eb', borderRadius: 8 }}>
+                                    No items yet. Click "+ Add Item" to begin.
+                                </div>
                             ) : (
                                 <div style={{ overflowX: 'auto' }}>
                                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                                         <thead>
-                                            <tr>
-                                                <th style={{ padding: '4px 6px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>Material Name</th>
-                                                <th style={{ padding: '4px 6px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>SKU</th>
-                                                <th style={{ padding: '4px 6px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>Category</th>
-                                                <th style={{ padding: '4px 6px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>HSN</th>
-                                                <th style={{ padding: '4px 6px', textAlign: 'right', borderBottom: '1px solid #e5e7eb' }}>Qty</th>
-                                                <th style={{ padding: '4px 6px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>Unit</th>
-                                                <th style={{ padding: '4px 6px', textAlign: 'right', borderBottom: '1px solid #e5e7eb' }}>Rate (₹)</th>
-                                                <th style={{ padding: '4px 6px', textAlign: 'right', borderBottom: '1px solid #e5e7eb' }}>GST %</th>
-                                                <th style={{ padding: '4px 6px', textAlign: 'right', borderBottom: '1px solid #e5e7eb' }}>Amount</th>
-                                                <th style={{ padding: '4px 6px', borderBottom: '1px solid #e5e7eb' }}></th>
+                                            <tr style={{ background: '#f9fafb' }}>
+                                                <th style={{ padding: '6px 8px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', minWidth: 160 }}>Material / Item Name</th>
+                                                <th style={{ padding: '6px 8px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', minWidth: 80 }}>SKU</th>
+                                                <th style={{ padding: '6px 8px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', minWidth: 100 }}>Category</th>
+                                                <th style={{ padding: '6px 8px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', minWidth: 70 }}>HSN</th>
+                                                <th style={{ padding: '6px 8px', textAlign: 'right', borderBottom: '2px solid #e5e7eb', minWidth: 70 }}>Qty</th>
+                                                <th style={{ padding: '6px 8px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', minWidth: 60 }}>Unit</th>
+                                                <th style={{ padding: '6px 8px', textAlign: 'right', borderBottom: '2px solid #e5e7eb', minWidth: 80 }}>Rate (₹)</th>
+                                                <th style={{ padding: '6px 8px', textAlign: 'right', borderBottom: '2px solid #e5e7eb', minWidth: 70 }}>GST %</th>
+                                                <th style={{ padding: '6px 8px', textAlign: 'right', borderBottom: '2px solid #e5e7eb', minWidth: 90 }}>Amount</th>
+                                                <th style={{ padding: '6px 8px', borderBottom: '2px solid #e5e7eb', width: 30 }}></th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {billRows.map((row, i) => (
-                                                <tr key={i}>
-                                                    <td style={{ padding: '3px 4px' }}>
-                                                        <input
-                                                            type="text"
-                                                            value={row.material_name}
-                                                            onChange={(e) => updateBillRow(i, 'material_name', e.target.value)}
-                                                            style={{ width: '100%', minWidth: 130 }}
-                                                            placeholder="Name on bill"
-                                                        />
-                                                        <select
-                                                            value={row.raw_material_id}
-                                                            onChange={(e) => updateBillRow(i, 'raw_material_id', e.target.value)}
-                                                            style={{ width: '100%', fontSize: 11, marginTop: 2, color: row.raw_material_id ? '#2563eb' : '#9ca3af' }}
-                                                            title="Link to master stock item"
-                                                        >
-                                                            <option value="">→ Stock: auto / new</option>
-                                                            {materials.map((m) => (
-                                                                <option key={m.id} value={String(m.id)}>
-                                                                    {m.name} ({m.unit})
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    </td>
-                                                    <td style={{ padding: '3px 4px' }}>
-                                                        <input type="text" value={row.sku} onChange={(e) => updateBillRow(i, 'sku', e.target.value)} style={{ width: 80 }} />
-                                                    </td>
-                                                    <td style={{ padding: '3px 4px' }}>
-                                                        <input type="text" value={row.category} onChange={(e) => updateBillRow(i, 'category', e.target.value)} style={{ width: 90 }} />
-                                                    </td>
-                                                    <td style={{ padding: '3px 4px' }}>
-                                                        <input type="text" value={row.hsn} onChange={(e) => updateBillRow(i, 'hsn', e.target.value)} style={{ width: 70 }} />
-                                                    </td>
-                                                    <td style={{ padding: '3px 4px' }}>
-                                                        <input type="number" min="0" step="any" value={row.qty} onChange={(e) => updateBillRow(i, 'qty', e.target.value)} style={{ width: 70, textAlign: 'right' }} />
-                                                    </td>
-                                                    <td style={{ padding: '3px 4px' }}>
-                                                        <select value={row.unit} onChange={(e) => updateBillRow(i, 'unit', e.target.value)} style={{ width: 60 }}>
-                                                            {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-                                                        </select>
-                                                    </td>
-                                                    <td style={{ padding: '3px 4px' }}>
-                                                        <input type="number" min="0" step="any" value={row.rate} onChange={(e) => updateBillRow(i, 'rate', e.target.value)} style={{ width: 80, textAlign: 'right' }} />
-                                                    </td>
-                                                    <td style={{ padding: '3px 4px' }}>
-                                                        <select value={row.gst} onChange={(e) => updateBillRow(i, 'gst', e.target.value)} style={{ width: 60 }}>
-                                                            {GST_OPTIONS.map((g) => <option key={g} value={g}>{g}%</option>)}
-                                                        </select>
-                                                    </td>
-                                                    <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                                                        {row.amount ? fmtAmt(row.amount) : '—'}
-                                                    </td>
-                                                    <td style={{ padding: '3px 4px' }}>
-                                                        <button type="button" className="btn danger sm" onClick={() => removeBillRow(i)}>×</button>
-                                                    </td>
-                                                </tr>
-                                            ))}
+                                            {billRows.map((row, i) => {
+                                                const matMatches = row.matSearch.trim().length > 0
+                                                    ? materials.filter((m) =>
+                                                        m.name.toLowerCase().includes(row.matSearch.toLowerCase()) ||
+                                                        (m.sku ?? '').toLowerCase().includes(row.matSearch.toLowerCase())
+                                                    ).slice(0, 8)
+                                                    : [];
+                                                return (
+                                                    <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                                                        <td style={{ padding: '4px 6px', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+                                                            <input
+                                                                type="text"
+                                                                value={row.matSearch || row.material_name}
+                                                                onChange={(e) => {
+                                                                    updateBillRow(i, 'matSearch', e.target.value);
+                                                                    setBillMatDropdown(i);
+                                                                }}
+                                                                onFocus={() => setBillMatDropdown(i)}
+                                                                style={{ width: '100%', minWidth: 150 }}
+                                                                placeholder="Search or type material name"
+                                                            />
+                                                            {row.raw_material_id && (
+                                                                <div style={{ fontSize: 10, color: '#2563eb', marginTop: 2 }}>✓ Linked to stock</div>
+                                                            )}
+                                                            {billMatDropdown === i && (
+                                                                <div style={{
+                                                                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+                                                                    background: '#fff', border: '1px solid #d1d5db', borderRadius: 6,
+                                                                    boxShadow: '0 4px 16px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto',
+                                                                }}>
+                                                                    {matMatches.length > 0 ? matMatches.map((m) => (
+                                                                        <div
+                                                                            key={m.id}
+                                                                            onMouseDown={(e) => { e.preventDefault(); selectBillRowMaterial(i, m); }}
+                                                                            style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #f3f4f6' }}
+                                                                            onMouseEnter={(e) => (e.currentTarget.style.background = '#eff6ff')}
+                                                                            onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
+                                                                        >
+                                                                            <div style={{ fontWeight: 600, fontSize: 13 }}>{m.name}</div>
+                                                                            <div style={{ fontSize: 11, color: '#6b7280' }}>
+                                                                                {m.sku ? `SKU: ${m.sku} · ` : ''}{m.category ?? ''} · {m.unit}
+                                                                                {Number(m.cost_per_unit) > 0 ? ` · ₹${Number(m.cost_per_unit).toFixed(2)}` : ''}
+                                                                            </div>
+                                                                        </div>
+                                                                    )) : row.matSearch.trim().length > 0 ? (
+                                                                        <div
+                                                                            onMouseDown={(e) => { e.preventDefault(); updateBillRow(i, 'material_name', row.matSearch); setBillMatDropdown(null); }}
+                                                                            style={{ padding: '8px 12px', cursor: 'pointer', color: '#2563eb', fontWeight: 600, fontSize: 13 }}
+                                                                            onMouseEnter={(e) => (e.currentTarget.style.background = '#eff6ff')}
+                                                                            onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
+                                                                        >
+                                                                            ➕ Add as new material: "{row.matSearch}"
+                                                                        </div>
+                                                                    ) : null}
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                        <td style={{ padding: '4px 6px' }}>
+                                                            <input type="text" value={row.sku} onChange={(e) => updateBillRow(i, 'sku', e.target.value)} style={{ width: 80 }} />
+                                                        </td>
+                                                        <td style={{ padding: '4px 6px' }}>
+                                                            <select
+                                                                value={row.category}
+                                                                onChange={(e) => updateBillRow(i, 'category', e.target.value)}
+                                                                style={{ width: '100%', minWidth: 90 }}
+                                                            >
+                                                                <option value="">— None —</option>
+                                                                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                                                                {row.category && !categories.includes(row.category) && (
+                                                                    <option value={row.category}>{row.category}</option>
+                                                                )}
+                                                            </select>
+                                                        </td>
+                                                        <td style={{ padding: '4px 6px' }}>
+                                                            <input type="text" value={row.hsn} onChange={(e) => updateBillRow(i, 'hsn', e.target.value)} style={{ width: 70 }} />
+                                                        </td>
+                                                        <td style={{ padding: '4px 6px' }}>
+                                                            <input type="number" min="0" step="any" value={row.qty} onChange={(e) => updateBillRow(i, 'qty', e.target.value)} style={{ width: 70, textAlign: 'right' }} />
+                                                        </td>
+                                                        <td style={{ padding: '4px 6px' }}>
+                                                            <select value={row.unit} onChange={(e) => updateBillRow(i, 'unit', e.target.value)} style={{ width: 65 }}>
+                                                                {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                                                            </select>
+                                                        </td>
+                                                        <td style={{ padding: '4px 6px' }}>
+                                                            <input type="number" min="0" step="any" value={row.rate} onChange={(e) => updateBillRow(i, 'rate', e.target.value)} style={{ width: 85, textAlign: 'right' }} />
+                                                        </td>
+                                                        <td style={{ padding: '4px 6px' }}>
+                                                            <select value={row.gst} onChange={(e) => updateBillRow(i, 'gst', e.target.value)} style={{ width: 65 }}>
+                                                                {GST_OPTIONS.map((g) => <option key={g} value={g}>{g}%</option>)}
+                                                            </select>
+                                                        </td>
+                                                        <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                                            {row.amount ? fmtAmt(row.amount) : '—'}
+                                                        </td>
+                                                        <td style={{ padding: '4px 6px' }}>
+                                                            <button type="button" className="btn danger sm" onClick={() => removeBillRow(i)}>×</button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
                             )}
-                            {billRows.length > 0 && (
-                                <div style={{ textAlign: 'right', marginTop: 8, fontWeight: 700, fontSize: 15 }}>
-                                    Total: {fmtAmt(billTotal)}
+                        </div>
+
+                        {/* Totals section */}
+                        {billRows.length > 0 && (
+                            <div style={{ marginTop: 16, borderTop: '1px solid #e5e7eb', paddingTop: 12 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 14 }}>
+                                        <span style={{ color: '#6b7280', minWidth: 200, textAlign: 'right' }}>Items Subtotal:</span>
+                                        <span style={{ fontWeight: 600, minWidth: 100, textAlign: 'right' }}>{fmtAmt(billSubtotal)}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 14 }}>
+                                        <label style={{ color: '#6b7280', minWidth: 200, textAlign: 'right' }}>Courier / Freight / Handling:</label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                            <span style={{ color: '#6b7280' }}>₹</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={billForm.freight_charges}
+                                                onChange={(e) => {
+                                                    const newFreight = e.target.value;
+                                                    setBillForm((p) => ({
+                                                        ...p,
+                                                        freight_charges: newFreight,
+                                                        round_off: autoRoundOff(billSubtotal, Number(newFreight) || 0),
+                                                    }));
+                                                }}
+                                                style={{ width: 100, textAlign: 'right' }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 14 }}>
+                                        <label style={{ color: '#6b7280', minWidth: 200, textAlign: 'right' }}>
+                                            Round Off
+                                            <button
+                                                type="button"
+                                                onClick={() => setBillForm((p) => ({ ...p, round_off: autoRoundOff(billSubtotal, billFreight) }))}
+                                                style={{ marginLeft: 6, fontSize: 11, padding: '1px 6px', border: '1px solid #d1d5db', borderRadius: 4, background: '#f9fafb', cursor: 'pointer' }}
+                                                title="Auto-calculate"
+                                            >auto</button>:
+                                        </label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                            <span style={{ color: '#6b7280' }}>₹</span>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={billForm.round_off}
+                                                onChange={(e) => setBillForm((p) => ({ ...p, round_off: e.target.value }))}
+                                                style={{ width: 100, textAlign: 'right' }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 16, borderTop: '2px solid #e5e7eb', paddingTop: 8, marginTop: 4 }}>
+                                        <span style={{ fontWeight: 700, minWidth: 200, textAlign: 'right' }}>Grand Total:</span>
+                                        <span style={{ fontWeight: 800, minWidth: 100, textAlign: 'right', color: '#1e40af', fontSize: 18 }}>{fmtAmt(billTotal)}</span>
+                                    </div>
                                 </div>
-                            )}
+                            </div>
+                        )}
+
+                        {/* Add to stock checkbox */}
+                        <div style={{ marginTop: 16, padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <input
+                                type="checkbox"
+                                id="addToStock"
+                                checked={billForm.add_to_stock}
+                                onChange={(e) => setBillForm((p) => ({ ...p, add_to_stock: e.target.checked }))}
+                                style={{ width: 16, height: 16, cursor: 'pointer' }}
+                            />
+                            <label htmlFor="addToStock" style={{ margin: 0, cursor: 'pointer', fontWeight: 600, color: '#059669' }}>
+                                📦 Add Qty to Inventory Stock
+                            </label>
+                            <span style={{ fontSize: 12, color: '#6b7280' }}>— automatically update stock for all items in this bill</span>
                         </div>
                     </div>
                     <div className="modal-footer">
@@ -1522,7 +1705,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                             type="button"
                             className="btn primary"
                             onClick={submitBill}
-                            disabled={billProcessing || !billForm.vendor_name.trim()}
+                            disabled={billProcessing || (!billForm.vendor_name.trim() && !billForm.party_id) || billRows.length === 0}
                         >
                             {billProcessing ? 'Saving...' : 'Save Bill'}
                         </button>
