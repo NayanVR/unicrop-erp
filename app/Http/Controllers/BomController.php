@@ -19,7 +19,7 @@ class BomController extends Controller
     public function index(): Response
     {
         $boms = Bom::query()
-            ->with(['product:id,name', 'items.rawMaterial:id,name,unit,stock_qty,cost_per_unit'])
+            ->with(['product:id,name', 'items.rawMaterial:id,name,unit,stock_qty,cost_per_unit', 'outputMaterial:id,name,unit'])
             ->orderBy('name')
             ->get();
 
@@ -44,26 +44,28 @@ class BomController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'product_id' => 'nullable|exists:products,id',
-            'packing_size' => 'nullable|string|max:50',
-            'batch_size' => 'required|numeric|min:0.001',
-            'batch_unit' => 'required|string|max:20',
-            'notes' => 'nullable|string|max:1000',
-            'items' => 'array',
+            'name'                   => 'required|string|max:255',
+            'product_id'             => 'nullable|exists:products,id',
+            'packing_size'           => 'nullable|string|max:50',
+            'batch_size'             => 'required|numeric|min:0.001',
+            'batch_unit'             => 'required|string|max:20',
+            'output_raw_material_id' => 'nullable|exists:raw_materials,id',
+            'notes'                  => 'nullable|string|max:1000',
+            'items'                  => 'array',
             'items.*.raw_material_id' => 'required|exists:raw_materials,id',
-            'items.*.qty_per_batch' => 'required|numeric|min:0.001',
-            'items.*.unit' => 'nullable|string|max:20',
+            'items.*.qty_per_batch'  => 'required|numeric|min:0.001',
+            'items.*.unit'           => 'nullable|string|max:20',
         ]);
 
         return DB::transaction(function () use ($data) {
             $bom = Bom::create([
-                'name'         => $data['name'],
-                'product_id'   => $data['product_id'] ?? null,
-                'packing_size' => $data['packing_size'] ?? null,
-                'batch_size'   => $data['batch_size'],
-                'batch_unit'   => $data['batch_unit'],
-                'notes'        => $data['notes'] ?? null,
+                'name'                   => $data['name'],
+                'product_id'             => $data['product_id'] ?? null,
+                'packing_size'           => $data['packing_size'] ?? null,
+                'batch_size'             => $data['batch_size'],
+                'batch_unit'             => $data['batch_unit'],
+                'output_raw_material_id' => $data['output_raw_material_id'] ?? null,
+                'notes'                  => $data['notes'] ?? null,
             ]);
 
             foreach ($data['items'] ?? [] as $item) {
@@ -81,28 +83,30 @@ class BomController extends Controller
     public function update(Request $request, Bom $bom): RedirectResponse
     {
         $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'product_id' => 'nullable|exists:products,id',
-            'packing_size' => 'nullable|string|max:50',
-            'batch_size' => 'required|numeric|min:0.001',
-            'batch_unit' => 'required|string|max:20',
-            'notes' => 'nullable|string|max:1000',
-            'is_active' => 'boolean',
-            'items' => 'array',
+            'name'                   => 'required|string|max:255',
+            'product_id'             => 'nullable|exists:products,id',
+            'packing_size'           => 'nullable|string|max:50',
+            'batch_size'             => 'required|numeric|min:0.001',
+            'batch_unit'             => 'required|string|max:20',
+            'output_raw_material_id' => 'nullable|exists:raw_materials,id',
+            'notes'                  => 'nullable|string|max:1000',
+            'is_active'              => 'boolean',
+            'items'                  => 'array',
             'items.*.raw_material_id' => 'required|exists:raw_materials,id',
-            'items.*.qty_per_batch' => 'required|numeric|min:0.001',
-            'items.*.unit' => 'nullable|string|max:20',
+            'items.*.qty_per_batch'  => 'required|numeric|min:0.001',
+            'items.*.unit'           => 'nullable|string|max:20',
         ]);
 
         return DB::transaction(function () use ($data, $bom) {
             $bom->update([
-                'name'         => $data['name'],
-                'product_id'   => $data['product_id'] ?? null,
-                'packing_size' => $data['packing_size'] ?? null,
-                'batch_size'   => $data['batch_size'],
-                'batch_unit'   => $data['batch_unit'],
-                'notes'        => $data['notes'] ?? null,
-                'is_active'    => $data['is_active'] ?? true,
+                'name'                   => $data['name'],
+                'product_id'             => $data['product_id'] ?? null,
+                'packing_size'           => $data['packing_size'] ?? null,
+                'batch_size'             => $data['batch_size'],
+                'batch_unit'             => $data['batch_unit'],
+                'output_raw_material_id' => $data['output_raw_material_id'] ?? null,
+                'notes'                  => $data['notes'] ?? null,
+                'is_active'              => $data['is_active'] ?? true,
             ]);
 
             $bom->items()->delete();
@@ -210,6 +214,8 @@ class BomController extends Controller
             ]);
 
             // Add produced quantity to finished goods (semi-finished stock)
+            $yieldTotal = (float) $bom->batch_size * $batchCount;
+
             FinishedGood::create([
                 'product_id'   => $bom->product_id,
                 'bom_id'       => $bom->id,
@@ -217,13 +223,42 @@ class BomController extends Controller
                 'name'         => $bom->name,
                 'packing_size' => $bom->packing_size,
                 'batch_ref'    => $batchNumber,
-                'quantity'     => (float) $bom->batch_size * $batchCount,
+                'quantity'     => $yieldTotal,
                 'unit'         => $bom->batch_unit,
                 'notes'        => $data['notes'] ?? null,
                 'source'       => 'production',
             ]);
 
-            return redirect()->back()->with('success', "Production run {$batchNumber} completed. Raw materials deducted.");
+            // Also add output to inventory stock if linked
+            if ($bom->output_raw_material_id) {
+                $output = \App\Models\RawMaterial::find($bom->output_raw_material_id);
+                if ($output) {
+                    $prevStock   = (float) $output->stock_qty;
+                    $newStock    = $prevStock + $yieldTotal;
+                    $costPerUnit = $yieldTotal > 0 ? round($totalCost / $yieldTotal, 4) : 0;
+
+                    $output->stock_qty = $newStock;
+                    if ($costPerUnit > 0) {
+                        $output->cost_per_unit = $costPerUnit;
+                    }
+                    $output->save();
+
+                    InventoryTransaction::create([
+                        'raw_material_id' => $output->id,
+                        'user_id'         => $request->user()?->id,
+                        'type'            => 'purchase',
+                        'qty'             => $yieldTotal,
+                        'previous_stock'  => $prevStock,
+                        'new_stock'       => $newStock,
+                        'cost_per_unit'   => $costPerUnit > 0 ? $costPerUnit : null,
+                        'reference'       => "BOM Run: {$batchNumber}",
+                        'notes'           => $data['notes'] ?? null,
+                    ]);
+                }
+            }
+
+            return redirect()->back()->with('success', "Production run {$batchNumber} completed. Raw materials deducted." .
+                ($bom->output_raw_material_id ? " Output added to inventory." : ''));
         });
     }
 

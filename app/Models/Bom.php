@@ -6,8 +6,9 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\RawMaterial;
 
-#[Fillable(['product_id', 'name', 'packing_size', 'batch_size', 'batch_unit', 'notes', 'is_active'])]
+#[Fillable(['product_id', 'name', 'packing_size', 'batch_size', 'batch_unit', 'output_raw_material_id', 'notes', 'is_active'])]
 class Bom extends Model
 {
     /**
@@ -35,5 +36,13 @@ class Bom extends Model
     public function items(): HasMany
     {
         return $this->hasMany(BomItem::class);
+    }
+
+    /**
+     * @return BelongsTo<RawMaterial, Bom>
+     */
+    public function outputMaterial(): BelongsTo
+    {
+        return $this->belongsTo(RawMaterial::class, 'output_raw_material_id');
     }
 }

@@ -30,6 +30,8 @@ type Bom = {
     packing_size?: string | null;
     batch_size: string | number;
     batch_unit: string;
+    output_raw_material_id?: number | null;
+    output_material?: { id: number; name: string; unit: string } | null;
     notes?: string | null;
     is_active: boolean;
     product?: { id: number; name: string } | null;
@@ -51,6 +53,7 @@ type BomFormData = {
     packing_size: string;
     batch_size: string;
     batch_unit: string;
+    output_raw_material_id: string;
     notes: string;
     is_active: boolean;
     items: { raw_material_id: string; qty_per_batch: string; unit: string }[];
@@ -176,7 +179,7 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
 
     const form = useForm<BomFormData>({
         name: '', product_id: '', packing_size: '', batch_size: '1',
-        batch_unit: 'kg', notes: '', is_active: true, items: [],
+        batch_unit: 'kg', output_raw_material_id: '', notes: '', is_active: true, items: [],
     });
     const runForm = useForm<RunFormData>({ batch_number: '', batch_count: '1', notes: '' });
 
@@ -191,6 +194,7 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
             packing_size: bom.packing_size ?? '',
             batch_size: String(bom.batch_size),
             batch_unit: bom.batch_unit,
+            output_raw_material_id: bom.output_raw_material_id ? String(bom.output_raw_material_id) : '',
             notes: bom.notes ?? '',
             is_active: bom.is_active,
             items: bom.items.map((i) => ({
@@ -504,6 +508,13 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
                                         )}
                                     </div>
 
+                                    {/* Output inventory link */}
+                                    {bom.output_material && (
+                                        <div style={{ fontSize: 12, color: '#15803d', fontWeight: 600, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 4, padding: '2px 8px', display: 'inline-block' }}>
+                                            📦 Output → {bom.output_material.name} ({bom.output_material.unit})
+                                        </div>
+                                    )}
+
                                     {/* Description / notes */}
                                     {bom.notes && (
                                         <div style={{ fontSize: 13, color: 'var(--tx-sub)' }}>{bom.notes}</div>
@@ -684,6 +695,25 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
                                 <label>Batch Unit *</label>
                                 <select value={form.data.batch_unit} onChange={(e) => form.setData('batch_unit', e.target.value)}>
                                     {BATCH_UNITS.map((u) => <option key={u}>{u}</option>)}
+                                </select>
+                            </div>
+                            <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                                <label>
+                                    📦 Output Product in Inventory
+                                    <span style={{ fontWeight: 400, color: 'var(--tx-muted)', marginLeft: 6, fontSize: 11 }}>
+                                        (stock will be added here when BOM is run)
+                                    </span>
+                                </label>
+                                <select
+                                    value={form.data.output_raw_material_id}
+                                    onChange={(e) => form.setData('output_raw_material_id', e.target.value)}
+                                >
+                                    <option value="">— Not linked (won't update inventory stock) —</option>
+                                    {materials.map((m) => (
+                                        <option key={m.id} value={m.id}>
+                                            {m.name} ({m.unit}) — Stock: {formatQty(m.stock_qty)}
+                                        </option>
+                                    ))}
                                 </select>
                             </div>
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
