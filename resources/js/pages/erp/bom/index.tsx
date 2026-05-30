@@ -88,18 +88,18 @@ type ProductionRunRecord = {
     created_at: string;
 };
 
-const BATCH_UNITS = ['kg', 'L', 'g', 'mL', 'pcs'];
+const BATCH_UNITS = ['kg', 'L', 'g', 'ml', 'pcs'];
 
 const formatQty = (v: string | number) =>
     Number(v).toLocaleString('en-IN', { maximumFractionDigits: 3 });
 
 function bomType(unit: string): 'liquid' | 'powder' | 'other' {
-    if (['L', 'mL'].includes(unit)) return 'liquid';
+    if (['L', 'ml'].includes(unit)) return 'liquid';
     if (['kg', 'g'].includes(unit)) return 'powder';
     return 'other';
 }
 
-// Convert qty from one unit to another (weight: kg/g/mg; volume: L/mL)
+// Convert qty from one unit to another (weight: kg/g/mg; volume: L/ml)
 // Returns original qty if units are the same or incompatible dimensions.
 function convertQty(qty: number, fromUnit: string, toUnit: string): number {
     const from = fromUnit.trim().toLowerCase();
@@ -133,7 +133,7 @@ const TYPE_CONFIG = {
 // Normalize unit strings to their canonical display form
 function normalizeUnitDisplay(unit: string): string {
     const u = unit.trim().toLowerCase();
-    if (['ml', 'milliliter', 'millilitre', 'milliliters', 'millilitres'].includes(u)) return 'mL';
+    if (['ml', 'milliliter', 'millilitre', 'milliliters', 'millilitres'].includes(u)) return 'ml';
     if (['l', 'ltr', 'liter', 'litre', 'liters', 'litres'].includes(u)) return 'L';
     if (['kg', 'kgs', 'kilogram', 'kilograms'].includes(u)) return 'kg';
     if (['g', 'gm', 'gram', 'grams'].includes(u)) return 'gm';
@@ -141,7 +141,7 @@ function normalizeUnitDisplay(unit: string): string {
     return unit;
 }
 
-// Auto-upgrade to larger unit when qty reaches 1000 (gm→kg, mL→L, mg→gm/kg)
+// Auto-upgrade to larger unit when qty reaches 1000 (gm→kg, ml→L, mg→gm/kg)
 function smartUnit(qty: number, unit: string): { qty: number; unit: string } {
     const u = unit.trim().toLowerCase();
     if (['gm', 'g', 'gram', 'grams'].includes(u) && qty >= 1000)
@@ -702,7 +702,7 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
                                     <input type="number" placeholder="Qty" value={item.qty_per_batch} onChange={(e) => updateItem(idx, 'qty_per_batch', e.target.value)} step="0.001" min="0" />
                                     <select value={item.unit} onChange={(e) => updateItem(idx, 'unit', e.target.value)}>
                                         <option value="">— unit —</option>
-                                        {['kg', 'gm', 'g', 'mg', 'L', 'mL', 'pcs', 'nos'].map((u) => <option key={u} value={u}>{u}</option>)}
+                                        {['kg', 'gm', 'g', 'mg', 'L', 'ml', 'pcs', 'nos'].map((u) => <option key={u} value={u}>{u}</option>)}
                                     </select>
                                     <button type="button" className="btn danger-xs" onClick={() => removeItem(idx)} style={{ padding: '0 8px', height: 32 }}>✕</button>
                                 </div>

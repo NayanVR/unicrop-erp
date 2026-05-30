@@ -148,7 +148,7 @@ const ROUTES = {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const UNITS = ['kg', 'g', 'L', 'mL', 'pcs', 'bags', 'drums', 'bottles'];
+const UNITS = ['kg', 'g', 'L', 'ml', 'pcs', 'bags', 'drums', 'bottles'];
 const GST_OPTIONS = ['0', '5', '12', '18', '28'];
 
 const PACKAGING_CATEGORIES = [
