@@ -5,7 +5,7 @@ import {
 } from '@/routes/inventory/materials';
 import type { Auth } from '@/types/auth';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -256,6 +256,23 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const [billMatDropdown, setBillMatDropdown] = useState<number | null>(null);
     const [billVendorSearch, setBillVendorSearch] = useState('');
     const [billVendorOpen, setBillVendorOpen] = useState(false);
+
+    // Add Supplier mini-modal
+    const [addSupplierModal, setAddSupplierModal] = useState(false);
+    const [addSupplierForm, setAddSupplierForm] = useState({ name: '', phone: '', gst_no: '', type: 'supplier' });
+    const [addSupplierProcessing, setAddSupplierProcessing] = useState(false);
+    const pendingSupplierName = useRef<string | null>(null);
+
+    // Auto-select newly created supplier once vendors list refreshes
+    useEffect(() => {
+        if (!pendingSupplierName.current) return;
+        const match = vendors.find((v) => v.name === pendingSupplierName.current);
+        if (match) {
+            setBillForm((p) => ({ ...p, party_id: String(match.id), vendor_name: match.name }));
+            setBillVendorSearch(match.name);
+            pendingSupplierName.current = null;
+        }
+    }, [vendors]);
 
     // Material form
     const matForm = useForm({
@@ -516,6 +533,25 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         setBillMatDropdown(null);
         setBillVendorSearch('');
         setBillVendorOpen(false);
+    };
+
+    const submitAddSupplier = () => {
+        if (!addSupplierForm.name.trim()) return;
+        setAddSupplierProcessing(true);
+        pendingSupplierName.current = addSupplierForm.name.trim();
+        router.post('/parties', addSupplierForm, {
+            preserveState: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                setAddSupplierModal(false);
+                setAddSupplierForm({ name: '', phone: '', gst_no: '', type: 'supplier' });
+                setAddSupplierProcessing(false);
+            },
+            onError: () => {
+                pendingSupplierName.current = null;
+                setAddSupplierProcessing(false);
+            },
+        });
     };
 
     const submitBill = () => {
@@ -1441,20 +1477,33 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                             </div>
                             <div className="form-group" style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
                                 <label>Vendor / Supplier *</label>
-                                <input
-                                    type="text"
-                                    value={billVendorSearch}
-                                    onChange={(e) => {
-                                        setBillVendorSearch(e.target.value);
-                                        setBillVendorOpen(true);
-                                        if (!e.target.value.trim()) {
-                                            setBillForm((p) => ({ ...p, party_id: '', vendor_name: '' }));
-                                        }
-                                    }}
-                                    onFocus={() => setBillVendorOpen(true)}
-                                    placeholder="Search supplier..."
-                                    autoComplete="off"
-                                />
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                    <input
+                                        type="text"
+                                        value={billVendorSearch}
+                                        onChange={(e) => {
+                                            setBillVendorSearch(e.target.value);
+                                            setBillVendorOpen(true);
+                                            if (!e.target.value.trim()) {
+                                                setBillForm((p) => ({ ...p, party_id: '', vendor_name: '' }));
+                                            }
+                                        }}
+                                        onFocus={() => setBillVendorOpen(true)}
+                                        placeholder="Search supplier..."
+                                        autoComplete="off"
+                                        style={{ flex: 1 }}
+                                    />
+                                    <button
+                                        type="button"
+                                        title="Add new supplier"
+                                        onClick={() => {
+                                            setAddSupplierForm((p) => ({ ...p, name: billVendorSearch.trim() }));
+                                            setAddSupplierModal(true);
+                                            setBillVendorOpen(false);
+                                        }}
+                                        style={{ flexShrink: 0, width: 34, height: 34, border: '1px solid #d1d5db', borderRadius: 6, background: '#f0fdf4', color: '#059669', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}
+                                    >+</button>
+                                </div>
                                 {billForm.party_id && (
                                     <div style={{ fontSize: 11, color: '#2563eb', marginTop: 3 }}>
                                         ✓ {vendors.find((v) => String(v.id) === billForm.party_id)?.name}
@@ -2215,6 +2264,66 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                 ✓ Mark as Received
                             </button>
                         )}
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Add Supplier Mini Modal ──────────────────────────────────── */}
+            <div className={`modal-overlay${addSupplierModal ? ' open' : ''}`} onClick={() => setAddSupplierModal(false)} style={{ zIndex: 1100 }}>
+                <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420, width: '95%' }}>
+                    <div className="modal-header">
+                        <h3>➕ Add New Supplier</h3>
+                        <button className="modal-close" onClick={() => setAddSupplierModal(false)}>×</button>
+                    </div>
+                    <div className="modal-body">
+                        <div className="form-grid">
+                            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                <label>Name *</label>
+                                <input
+                                    type="text"
+                                    value={addSupplierForm.name}
+                                    onChange={(e) => setAddSupplierForm((p) => ({ ...p, name: e.target.value }))}
+                                    placeholder="Supplier / company name"
+                                    autoFocus
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Phone</label>
+                                <input
+                                    type="text"
+                                    value={addSupplierForm.phone}
+                                    onChange={(e) => setAddSupplierForm((p) => ({ ...p, phone: e.target.value }))}
+                                    placeholder="Mobile / landline"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>GST Number</label>
+                                <input
+                                    type="text"
+                                    value={addSupplierForm.gst_no}
+                                    onChange={(e) => setAddSupplierForm((p) => ({ ...p, gst_no: e.target.value.toUpperCase() }))}
+                                    placeholder="22AAAAA0000A1Z5"
+                                />
+                            </div>
+                            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                <label>Type</label>
+                                <select value={addSupplierForm.type} onChange={(e) => setAddSupplierForm((p) => ({ ...p, type: e.target.value }))}>
+                                    <option value="supplier">Supplier only</option>
+                                    <option value="both">Supplier + Customer</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="modal-footer">
+                        <button type="button" className="btn" onClick={() => setAddSupplierModal(false)}>Cancel</button>
+                        <button
+                            type="button"
+                            className="btn primary"
+                            onClick={submitAddSupplier}
+                            disabled={addSupplierProcessing || !addSupplierForm.name.trim()}
+                        >
+                            {addSupplierProcessing ? 'Adding...' : 'Add Supplier'}
+                        </button>
                     </div>
                 </div>
             </div>
