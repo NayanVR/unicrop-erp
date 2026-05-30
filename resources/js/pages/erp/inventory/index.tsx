@@ -218,6 +218,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const canSeeCost      = role === 'admin' || auth.user?.cost_access === true;
     const canMarkReceived = role === 'admin' || role === 'factory';
     const canEnterBill    = role === 'admin' || role === 'factory' || role === 'accountant';
+    const isSales         = role === 'sales';
 
     // Tab
     const [tab, setTab] = useState<'materials' | 'log' | 'bills' | 'reorders' | 'categories'>('materials');
@@ -940,7 +941,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
 
             {/* Tabs */}
             <div className="filter-bar" style={{ marginBottom: 0, borderBottom: '1px solid #e5e7eb' }}>
-                {(['materials', 'log', 'bills', 'reorders', 'categories'] as const).map((t) => (
+                {(['materials', 'log', 'bills', 'reorders', 'categories'] as const).filter((t) => !isSales || t === 'materials').map((t) => (
                     <button
                         key={t}
                         className={`pill${tab === t ? ' active' : ''}`}
@@ -1004,12 +1005,12 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                         <th>Material / SKU</th>
                                         <th>Category</th>
                                         <th>Stock</th>
-                                        <th>Min</th>
+                                        {!isSales && <th>Min</th>}
                                         <th>Status</th>
                                         {canSeeCost && <th>Cost/Unit</th>}
                                         {canSeeCost && <th>Value</th>}
                                         <th>Selling Rate</th>
-                                        <th>Actions</th>
+                                        {!isSales && <th>Actions</th>}
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1026,18 +1027,20 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                             </td>
                                             <td>{m.category ?? <span style={{ color: '#9ca3af' }}>—</span>}</td>
                                             <td>{fmt(m.stock_qty)} {m.unit}</td>
-                                            <td>{fmt(m.min_stock)}</td>
+                                            {!isSales && <td>{fmt(m.min_stock)}</td>}
                                             <td><StatusBadge m={m} /></td>
                                             {canSeeCost && <td>{fmtAmt(m.cost_per_unit)}</td>}
                                             {canSeeCost && <td>{fmtAmt(Number(m.stock_qty) * Number(m.cost_per_unit))}</td>}
                                             <td>{fmtAmt(m.selling_rate)}</td>
-                                            <td>
-                                                <div style={{ display: 'flex', gap: 4 }}>
-                                                    <button className="btn sm primary" onClick={() => openTxn(m)}>+ Stock</button>
-                                                    <button className="btn sm" onClick={() => openEditMat(m)}>Edit</button>
-                                                    <button className="btn danger sm" onClick={() => deleteMaterial(m.id)}>🗑</button>
-                                                </div>
-                                            </td>
+                                            {!isSales && (
+                                                <td>
+                                                    <div style={{ display: 'flex', gap: 4 }}>
+                                                        <button className="btn sm primary" onClick={() => openTxn(m)}>+ Stock</button>
+                                                        <button className="btn sm" onClick={() => openEditMat(m)}>Edit</button>
+                                                        <button className="btn danger sm" onClick={() => deleteMaterial(m.id)}>🗑</button>
+                                                    </div>
+                                                </td>
+                                            )}
                                         </tr>
                                     ))}
                                 </tbody>
