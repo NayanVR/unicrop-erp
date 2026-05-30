@@ -129,7 +129,8 @@ class BomController extends Controller
             $shortfalls = [];
 
             foreach ($bom->items()->with('rawMaterial')->get() as $item) {
-                $required = (float) $item->qty_per_batch * $batchCount;
+                $itemUnit  = $item->unit ?: $item->rawMaterial->unit;
+                $required  = $this->convertQty((float) $item->qty_per_batch * $batchCount, $itemUnit, $item->rawMaterial->unit);
                 $available = (float) $item->rawMaterial->stock_qty;
 
                 if ($available < $required) {
@@ -142,7 +143,8 @@ class BomController extends Controller
             }
 
             foreach ($bom->items()->with('rawMaterial')->get() as $item) {
-                $qty = (float) $item->qty_per_batch * $batchCount;
+                $itemUnit = $item->unit ?: $item->rawMaterial->unit;
+                $qty      = $this->convertQty((float) $item->qty_per_batch * $batchCount, $itemUnit, $item->rawMaterial->unit);
 
                 $item->rawMaterial->decrement('stock_qty', $qty);
 
@@ -158,5 +160,21 @@ class BomController extends Controller
 
             return redirect()->back()->with('success', "Production run of {$batchCount} batch(es) completed. Raw materials deducted.");
         });
+    }
+
+    // Convert qty between compatible units (weight: kg/g/mg; volume: L/mL).
+    private function convertQty(float $qty, string $fromUnit, string $toUnit): float
+    {
+        $from = strtolower(trim($fromUnit));
+        $to   = strtolower(trim($toUnit));
+        if ($from === $to || $from === '' || $to === '') return $qty;
+
+        $weight = ['kg' => 1, 'kgs' => 1, 'g' => 1e-3, 'gm' => 1e-3, 'gram' => 1e-3, 'grams' => 1e-3, 'mg' => 1e-6, 'milligram' => 1e-6, 'milligrams' => 1e-6];
+        $volume = ['l' => 1, 'ltr' => 1, 'liter' => 1, 'litre' => 1, 'liters' => 1, 'litres' => 1, 'ml' => 1e-3, 'milliliter' => 1e-3, 'millilitre' => 1e-3, 'milliliters' => 1e-3, 'millilitres' => 1e-3];
+
+        if (isset($weight[$from], $weight[$to])) return $qty * ($weight[$from] / $weight[$to]);
+        if (isset($volume[$from], $volume[$to])) return $qty * ($volume[$from] / $volume[$to]);
+
+        return $qty;
     }
 }

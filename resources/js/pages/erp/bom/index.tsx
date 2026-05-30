@@ -68,6 +68,31 @@ function bomType(unit: string): 'liquid' | 'powder' | 'other' {
     return 'other';
 }
 
+// Convert qty from one unit to another (weight: kg/g/mg; volume: L/mL)
+// Returns original qty if units are the same or incompatible dimensions.
+function convertQty(qty: number, fromUnit: string, toUnit: string): number {
+    const from = fromUnit.trim().toLowerCase();
+    const to   = toUnit.trim().toLowerCase();
+    if (from === to || !from || !to) return qty;
+
+    const weightFactor: Record<string, number> = {
+        kg: 1, kgs: 1,
+        g: 1e-3, gm: 1e-3, gram: 1e-3, grams: 1e-3,
+        mg: 1e-6, milligram: 1e-6, milligrams: 1e-6,
+    };
+    const volumeFactor: Record<string, number> = {
+        l: 1, ltr: 1, liter: 1, litre: 1, liters: 1, litres: 1,
+        ml: 1e-3, milliliter: 1e-3, millilitre: 1e-3, milliliters: 1e-3, millilitres: 1e-3,
+    };
+
+    if (weightFactor[from] !== undefined && weightFactor[to] !== undefined)
+        return qty * (weightFactor[from] / weightFactor[to]);
+    if (volumeFactor[from] !== undefined && volumeFactor[to] !== undefined)
+        return qty * (volumeFactor[from] / volumeFactor[to]);
+
+    return qty; // incompatible dimensions — no conversion
+}
+
 const TYPE_CONFIG = {
     liquid: { label: 'LIQUID', color: '#2563eb', bg: '#eff6ff', border: '#2563eb' },
     powder: { label: 'POWDER', color: '#d97706', bg: '#fffbeb', border: '#d97706' },
@@ -161,13 +186,19 @@ export default function BomIndex({ boms, products, materials }: Props) {
     const calcCost = (bom: Bom, batches = 1) =>
         bom.items.reduce((sum, item) => {
             const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
-            return sum + (mat ? Number(item.qty_per_batch) * Number(mat.cost_per_unit) * batches : 0);
+            if (!mat) return sum;
+            const itemUnit = item.unit || mat.unit;
+            const qtyInMatUnit = convertQty(Number(item.qty_per_batch), itemUnit, mat.unit);
+            return sum + qtyInMatUnit * Number(mat.cost_per_unit) * batches;
         }, 0);
 
     const canRun = (bom: Bom, batches = 1) =>
         bom.items.every((item) => {
             const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
-            return mat && Number(mat.stock_qty) >= Number(item.qty_per_batch) * batches;
+            if (!mat) return false;
+            const itemUnit = item.unit || mat.unit;
+            const needed = convertQty(Number(item.qty_per_batch) * batches, itemUnit, mat.unit);
+            return Number(mat.stock_qty) >= needed;
         });
 
     const printBom = (bom: Bom) => {
@@ -311,18 +342,19 @@ export default function BomIndex({ boms, products, materials }: Props) {
                                     <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 5 }}>
                                         {bom.items.map((item, idx) => {
                                             const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
-                                            const needed = Number(item.qty_per_batch);
+                                            const matUnit = mat?.unit ?? '';
+                                            const itemUnit = item.unit || matUnit;
+                                            const neededInMatUnit = mat ? convertQty(Number(item.qty_per_batch), itemUnit, matUnit) : Number(item.qty_per_batch);
                                             const inStock = mat ? Number(mat.stock_qty) : 0;
-                                            const sufficient = inStock >= needed;
-                                            const unit = item.unit ?? mat?.unit ?? '';
+                                            const sufficient = inStock >= neededInMatUnit;
                                             return (
                                                 <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14, gap: 8 }}>
                                                     <span style={{ color: sufficient ? 'var(--tx-body)' : 'var(--danger)', flex: 1 }}>
                                                         {mat?.name ?? `Material #${item.raw_material_id}`}
                                                     </span>
                                                     <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
-                                                        {formatQty(needed)}{' '}
-                                                        <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 12 }}>{unit}</span>
+                                                        {formatQty(item.qty_per_batch)}{' '}
+                                                        <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 12 }}>{itemUnit}</span>
                                                     </span>
                                                     <span style={{
                                                         fontSize: 11, whiteSpace: 'nowrap',
@@ -330,7 +362,7 @@ export default function BomIndex({ boms, products, materials }: Props) {
                                                         background: sufficient ? '#d1fae5' : '#fee2e2',
                                                         padding: '1px 7px', borderRadius: 10, fontWeight: 600,
                                                     }}>
-                                                        Stock: {mat ? `${formatQty(inStock)} ${unit}` : '—'}
+                                                        Stock: {mat ? `${formatQty(inStock)} ${matUnit}` : '—'}
                                                     </span>
                                                 </div>
                                             );
