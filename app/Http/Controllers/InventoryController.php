@@ -451,19 +451,28 @@ class InventoryController extends Controller
     /** GET /api/v1/inventory/search?q=humic */
     public function search(Request $request): JsonResponse
     {
-        $q = (string) $request->query('q', '');
+        $q = trim((string) $request->query('q', ''));
 
         $materials = RawMaterial::query()
             ->where('is_active', true)
-            ->when(strlen($q) >= 1, fn ($query) => $query->where('name', 'like', "%{$q}%"))
+            ->when(strlen($q) >= 1, fn ($query) => $query->where(function ($sub) use ($q) {
+                $sub->where('name', 'like', "%{$q}%")
+                    ->orWhere('sku', 'like', "%{$q}%");
+            }))
             ->orderBy('name')
             ->limit(15)
-            ->get(['id', 'name', 'unit', 'cost_per_unit'])
+            ->get(['id', 'name', 'sku', 'hsn', 'gst', 'category', 'unit', 'cost_per_unit'])
             ->map(fn ($m) => [
-                'id'   => (string) $m->id,
-                'name' => $m->name,
-                'unit' => $m->unit,
-                'cost' => (float) $m->cost_per_unit,
+                'id'            => (int) $m->id,
+                'name'          => $m->name,
+                'sku'           => $m->sku,
+                'hsn'           => $m->hsn,
+                'gst'           => (float) $m->gst,
+                'category'      => $m->category,
+                'unit'          => $m->unit,
+                'cost_per_unit' => (float) $m->cost_per_unit,
+                // kept for backward-compatibility with any older consumer
+                'cost'          => (float) $m->cost_per_unit,
             ]);
 
         return response()->json($materials);

@@ -81,6 +81,17 @@ type Vendor = {
     gst_no: string | null;
 };
 
+type MatSearchResult = {
+    id: number;
+    name: string;
+    sku: string | null;
+    hsn: string | null;
+    gst: string | number;
+    category: string | null;
+    unit: string;
+    cost_per_unit: string | number;
+};
+
 type Reorder = {
     id: number;
     raw_material_id: number;
@@ -256,6 +267,39 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const [billMatDropdown, setBillMatDropdown] = useState<number | null>(null);
     const [billVendorSearch, setBillVendorSearch] = useState('');
     const [billVendorOpen, setBillVendorOpen] = useState(false);
+
+    // Server-side material search (for the open bill row)
+    const [matResults, setMatResults] = useState<MatSearchResult[]>([]);
+    const [matSearching, setMatSearching] = useState(false);
+    const matSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const matSearchSeq = useRef(0);
+
+    const runMaterialSearch = (q: string) => {
+        if (matSearchTimer.current) clearTimeout(matSearchTimer.current);
+        const query = q.trim();
+        if (query.length < 1) {
+            setMatResults([]);
+            setMatSearching(false);
+            return;
+        }
+        setMatSearching(true);
+        const seq = ++matSearchSeq.current;
+        matSearchTimer.current = setTimeout(async () => {
+            try {
+                const res = await fetch(`/api/inventory/search?q=${encodeURIComponent(query)}`, {
+                    headers: { Accept: 'application/json' },
+                    credentials: 'same-origin',
+                });
+                if (res.ok && seq === matSearchSeq.current) {
+                    setMatResults(await res.json());
+                }
+            } catch {
+                if (seq === matSearchSeq.current) setMatResults([]);
+            } finally {
+                if (seq === matSearchSeq.current) setMatSearching(false);
+            }
+        }, 250);
+    };
 
     // Add Supplier mini-modal
     const [addSupplierModal, setAddSupplierModal] = useState(false);
@@ -464,7 +508,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         ]);
     };
 
-    const selectBillRowMaterial = (i: number, mat: RawMaterial) => {
+    const selectBillRowMaterial = (i: number, mat: MatSearchResult) => {
         setBillRows((prev) => {
             const rows = [...prev];
             const rate = mat.cost_per_unit && Number(mat.cost_per_unit) > 0 ? String(Number(mat.cost_per_unit)) : rows[i].rate;
@@ -1626,12 +1670,6 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                         </thead>
                                         <tbody>
                                             {billRows.map((row, i) => {
-                                                const matMatches = row.matSearch.trim().length >= 1
-                                                    ? materials.filter((m) =>
-                                                        m.name.toLowerCase().includes(row.matSearch.toLowerCase()) ||
-                                                        (m.sku ?? '').toLowerCase().includes(row.matSearch.toLowerCase())
-                                                    ).slice(0, 8)
-                                                    : [];
                                                 return (
                                                     <tr key={i}>
                                                         <td style={{ padding: '3px 4px', position: 'relative', border: '1px solid #e5e7eb' }} onClick={(e) => e.stopPropagation()}>
@@ -1641,21 +1679,30 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                                                 onChange={(e) => {
                                                                     updateBillRow(i, 'matSearch', e.target.value);
                                                                     setBillMatDropdown(i);
+                                                                    runMaterialSearch(e.target.value);
                                                                 }}
-                                                                onFocus={() => { if (row.matSearch || !row.raw_material_id) setBillMatDropdown(i); }}
+                                                                onFocus={() => {
+                                                                    if (row.matSearch || !row.raw_material_id) {
+                                                                        setBillMatDropdown(i);
+                                                                        runMaterialSearch(row.matSearch || row.material_name);
+                                                                    }
+                                                                }}
                                                                 style={{ width: '100%', fontSize: 12 }}
                                                                 placeholder="Search or type name…"
                                                             />
                                                             {row.raw_material_id && (
                                                                 <div style={{ fontSize: 10, color: '#2563eb', marginTop: 1, lineHeight: 1.2 }}>✓ linked</div>
                                                             )}
-                                                            {billMatDropdown === i && (matMatches.length > 0 || row.matSearch.trim().length >= 1) && (
+                                                            {billMatDropdown === i && row.matSearch.trim().length >= 1 && (
                                                                 <div style={{
                                                                     position: 'absolute', top: '100%', left: 0, zIndex: 100, minWidth: 240,
                                                                     background: '#fff', border: '1px solid #d1d5db', borderRadius: 6,
                                                                     boxShadow: '0 4px 16px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto',
                                                                 }}>
-                                                                    {matMatches.map((m) => (
+                                                                    {matSearching && (
+                                                                        <div style={{ padding: '7px 10px', fontSize: 12, color: '#9ca3af' }}>Searching…</div>
+                                                                    )}
+                                                                    {matResults.map((m) => (
                                                                         <div
                                                                             key={m.id}
                                                                             onMouseDown={(e) => { e.preventDefault(); selectBillRowMaterial(i, m); }}
@@ -1670,7 +1717,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                                                             </div>
                                                                         </div>
                                                                     ))}
-                                                                    {matMatches.length === 0 && row.matSearch.trim().length >= 1 && (
+                                                                    {!matSearching && matResults.length === 0 && (
                                                                         <div
                                                                             onMouseDown={(e) => { e.preventDefault(); updateBillRow(i, 'material_name', row.matSearch); setBillMatDropdown(null); }}
                                                                             style={{ padding: '7px 10px', cursor: 'pointer', color: '#2563eb', fontWeight: 600, fontSize: 13 }}
