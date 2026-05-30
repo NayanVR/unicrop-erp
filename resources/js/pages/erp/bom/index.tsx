@@ -382,10 +382,6 @@ export default function BomIndex({ boms, products, materials }: Props) {
                                 {form.errors.name && <div className="form-error">{form.errors.name}</div>}
                             </div>
                             <div className="form-group">
-                                <label>Packing Size</label>
-                                <input type="text" value={form.data.packing_size} onChange={(e) => form.setData('packing_size', e.target.value)} placeholder="e.g. 1L, 500mL" />
-                            </div>
-                            <div className="form-group">
                                 <label>Batch Size *</label>
                                 <input type="number" value={form.data.batch_size} onChange={(e) => form.setData('batch_size', e.target.value)} step="0.001" min="0.001" />
                             </div>
