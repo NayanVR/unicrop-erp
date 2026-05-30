@@ -699,7 +699,7 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
                         </div>
                         {runTarget && !canRun(runTarget, Number(runForm.data.batch_count) || 1) && (
                             <div style={{ marginBottom: 12, padding: '8px 12px', background: 'var(--danger-lt)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-sm)', fontSize: 12, color: 'var(--danger)' }}>
-                                ⚠️ Insufficient stock for {runForm.data.batch_count} batch(es).
+                                ⚠️ Insufficient stock for this qty.
                             </div>
                         )}
                         <div className="form-grid">
@@ -708,8 +708,13 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
                                 <input type="text" value={runForm.data.batch_number} onChange={(e) => runForm.setData('batch_number', e.target.value)} placeholder="e.g. BATCH-20260530-001" />
                             </div>
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
-                                <label>Number of Batches *</label>
+                                <label>Batch Qty ({runTarget?.batch_unit}) *</label>
                                 <input type="number" value={runForm.data.batch_count} onChange={(e) => runForm.setData('batch_count', e.target.value)} min="0.001" step="0.001" />
+                                {runTarget && Number(runForm.data.batch_count) > 0 && (
+                                    <div style={{ fontSize: 12, color: 'var(--tx-muted)', marginTop: 4 }}>
+                                        {runForm.data.batch_count} × {formatQty(runTarget.batch_size)} {runTarget.batch_unit} = <strong>{(Number(runForm.data.batch_count) * Number(runTarget.batch_size)).toLocaleString('en-IN', { maximumFractionDigits: 3 })} {runTarget.batch_unit}</strong> total yield
+                                    </div>
+                                )}
                             </div>
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                 <label>Notes</label>
@@ -724,7 +729,7 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
                             onClick={submitRun}
                             disabled={runForm.processing || (runTarget ? !canRun(runTarget, Number(runForm.data.batch_count) || 1) : true)}
                         >
-                            ▶ Run {runForm.data.batch_count} Batch(es)
+                            ▶ Run {runForm.data.batch_count} {runTarget?.batch_unit}
                         </button>
                     </div>
                 </div>
