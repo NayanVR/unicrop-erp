@@ -273,6 +273,9 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
 
     const [photoLightbox, setPhotoLightbox] = useState<string | null>(null);
     const [labelEditor, setLabelEditor] = useState<{ order: Order; labels: EditableLabel[] } | null>(null);
+    const [labelFS, setLabelFS] = useState({ transport: 44, totalBoxes: 54, brand: 24, boxNum: 24, party: 13 });
+    const adjFS = (key: keyof typeof labelFS, delta: number) =>
+        setLabelFS((prev) => ({ ...prev, [key]: Math.max(6, prev[key] + delta) }));
     const [boxSizeDraft, setBoxSizeDraft] = useState<Record<number, string>>({});
     const [savingBoxSize, setSavingBoxSize] = useState<number | null>(null);
 
@@ -455,17 +458,17 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
                 .label { width:100mm; min-height:75mm; padding:4mm 5mm; border:0.5px solid #000; page-break-after:always; display:flex; flex-direction:column; }
                 .label:last-child { page-break-after:avoid; }
-                .transport { font-size:44pt; font-weight:900; line-height:1.1; margin-bottom:1mm; }
+                .transport { font-size:${labelFS.transport}pt; font-weight:900; line-height:1.1; margin-bottom:1mm; }
                 .destination { font-size:9pt; color:#444; margin-bottom:1mm; }
-                .party { font-size:13pt; font-weight:700; margin-bottom:2mm; }
+                .party { font-size:${labelFS.party}pt; font-weight:700; margin-bottom:2mm; }
                 .mid-row { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2mm; }
-                .box-num { font-size:24pt; font-weight:900; }
-                .total-boxes { font-size:54pt; font-weight:900; }
+                .box-num { font-size:${labelFS.boxNum}pt; font-weight:900; }
+                .total-boxes { font-size:${labelFS.totalBoxes}pt; font-weight:900; }
                 .auto-row2 { display:flex; justify-content:space-between; align-items:center; font-size:9pt; margin-bottom:1.5mm; }
                 .inboxpcs { font-weight:700; color:#222; }
                 .item-box-count { color:#666; font-style:italic; font-size:8pt; }
                 .product-block { border-top:0.5px solid #ccc; padding-top:1.5mm; margin-top:auto; }
-                .brand-name { font-size:24pt; font-weight:900; word-break:break-word; white-space:normal; line-height:1.15; }
+                .brand-name { font-size:${labelFS.brand}pt; font-weight:900; word-break:break-word; white-space:normal; line-height:1.15; }
                 .order-ref { font-size:7.5pt; color:#888; margin-top:1mm; text-align:right; }
                 .printed-by { font-size:7pt; color:#555; margin-top:0.5mm; text-align:right; }
                 .toolbar { position:sticky; top:0; z-index:10; background:#1e293b; color:#fff; padding:10px 16px; display:flex; align-items:center; gap:12px; }
@@ -1063,9 +1066,24 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                             </button>
                             <button className="modal-close" onClick={() => setLabelEditor(null)}>✕</button>
                         </div>
-                        <p style={{ fontSize: '13px', color: 'var(--tx-sub)', padding: '0 20px 12px', margin: 0 }}>
-                            Click any field on a label to edit it. Box numbers are assigned automatically.
-                        </p>
+                        {/* Font size controls */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', padding: '0 20px 12px', alignItems: 'center' }}>
+                            <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600, marginRight: 2 }}>Font size:</span>
+                            {([
+                                { key: 'transport', label: 'Transport' },
+                                { key: 'party',     label: 'Party' },
+                                { key: 'totalBoxes',label: 'Total boxes' },
+                                { key: 'boxNum',    label: 'Box no.' },
+                                { key: 'brand',     label: 'Product' },
+                            ] as { key: keyof typeof labelFS; label: string }[]).map(({ key, label }) => (
+                                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#f1f5f9', borderRadius: '6px', padding: '3px 6px' }}>
+                                    <span style={{ fontSize: '11px', color: '#475569', minWidth: 60 }}>{label}</span>
+                                    <button type="button" onClick={() => adjFS(key, -2)} style={{ width: 22, height: 22, border: '1px solid #cbd5e1', borderRadius: 4, background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 14, lineHeight: 1 }}>−</button>
+                                    <span style={{ fontSize: '12px', fontWeight: 700, minWidth: 28, textAlign: 'center' }}>{labelFS[key]}pt</span>
+                                    <button type="button" onClick={() => adjFS(key, 2)} style={{ width: 22, height: 22, border: '1px solid #cbd5e1', borderRadius: 4, background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 14, lineHeight: 1 }}>+</button>
+                                </div>
+                            ))}
+                        </div>
                         <div
                             style={{
                                 display: 'grid',
@@ -1099,7 +1117,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                         placeholder="Transport name"
                                         style={{
                                             border: 'none', borderBottom: '1px dashed #ccc', outline: 'none',
-                                            fontSize: '40px', fontWeight: 900, lineHeight: 1.1, padding: '2px 0',
+                                            fontSize: `${Math.round(labelFS.transport * 1.33)}px`, fontWeight: 900, lineHeight: 1.1, padding: '2px 0',
                                             width: '100%', background: 'transparent',
                                         }}
                                     />
@@ -1121,14 +1139,14 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                         placeholder="Party name"
                                         style={{
                                             border: 'none', borderBottom: '1px dashed #ccc', outline: 'none',
-                                            fontSize: '14px', fontWeight: 700, padding: '2px 0',
+                                            fontSize: `${Math.round(labelFS.party * 1.33)}px`, fontWeight: 700, padding: '2px 0',
                                             width: '100%', background: 'transparent',
                                         }}
                                     />
                                     {/* Auto row: box number | total boxes */}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '4px 0 2px' }}>
-                                        <span style={{ fontSize: '26px', fontWeight: 900, color: '#111' }}>{lbl.boxNum}</span>
-                                        <span style={{ fontSize: '60px', fontWeight: 900, color: '#111' }}>{lbl.totalBoxes} box</span>
+                                        <span style={{ fontSize: `${Math.round(labelFS.boxNum * 1.33)}px`, fontWeight: 900, color: '#111' }}>{lbl.boxNum}</span>
+                                        <span style={{ fontSize: `${Math.round(labelFS.totalBoxes * 1.33)}px`, fontWeight: 900, color: '#111' }}>{lbl.totalBoxes} box</span>
                                     </div>
                                     {/* In-box pcs (editable) | product box N/M (auto) */}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
@@ -1162,7 +1180,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                             rows={2}
                                             style={{
                                                 border: 'none', borderBottom: '1px dashed #ccc', outline: 'none',
-                                                fontSize: '26px', fontWeight: 900, padding: '2px 0',
+                                                fontSize: `${Math.round(labelFS.brand * 1.33)}px`, fontWeight: 900, padding: '2px 0',
                                                 width: '100%', background: 'transparent',
                                                 resize: 'none', overflow: 'hidden',
                                                 wordBreak: 'break-word', whiteSpace: 'pre-wrap',
