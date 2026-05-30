@@ -130,7 +130,18 @@ const TYPE_CONFIG = {
     other:  { label: 'OTHER',  color: '#6b7280', bg: '#f9fafb', border: '#9ca3af' },
 };
 
-// Auto-upgrade to larger unit when qty reaches 1000 (gm→kg, ml→L, mg→gm/kg)
+// Normalize unit strings to their canonical display form
+function normalizeUnitDisplay(unit: string): string {
+    const u = unit.trim().toLowerCase();
+    if (['ml', 'milliliter', 'millilitre', 'milliliters', 'millilitres'].includes(u)) return 'mL';
+    if (['l', 'ltr', 'liter', 'litre', 'liters', 'litres'].includes(u)) return 'L';
+    if (['kg', 'kgs', 'kilogram', 'kilograms'].includes(u)) return 'kg';
+    if (['g', 'gm', 'gram', 'grams'].includes(u)) return 'gm';
+    if (['mg', 'milligram', 'milligrams'].includes(u)) return 'mg';
+    return unit;
+}
+
+// Auto-upgrade to larger unit when qty reaches 1000 (gm→kg, mL→L, mg→gm/kg)
 function smartUnit(qty: number, unit: string): { qty: number; unit: string } {
     const u = unit.trim().toLowerCase();
     if (['gm', 'g', 'gram', 'grams'].includes(u) && qty >= 1000)
@@ -141,7 +152,7 @@ function smartUnit(qty: number, unit: string): { qty: number; unit: string } {
         if (qty >= 1_000_000) return { qty: qty / 1_000_000, unit: 'kg' };
         if (qty >= 1000)      return { qty: qty / 1000,       unit: 'gm' };
     }
-    return { qty, unit };
+    return { qty, unit: normalizeUnitDisplay(unit) };
 }
 
 function fmtSmart(qty: number, unit: string): string {
@@ -298,8 +309,8 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
             const same = it.itemUnit.toLowerCase() === it.matUnit.toLowerCase();
             return `<tr>
                 <td style="padding:6px 10px;border-bottom:1px solid #eee">${it.name}</td>
-                <td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;font-weight:700">${it.qtyUsed.toLocaleString('en-IN', { maximumFractionDigits: 6 })} ${it.itemUnit}</td>
-                ${hasDiffUnit ? `<td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;color:#555">${same ? '—' : `${it.qtyDeducted.toLocaleString('en-IN', { maximumFractionDigits: 6 })} ${it.matUnit}`}</td>` : ''}
+                <td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;font-weight:700">${it.qtyUsed.toLocaleString('en-IN', { maximumFractionDigits: 6 })} ${normalizeUnitDisplay(it.itemUnit)}</td>
+                ${hasDiffUnit ? `<td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;color:#555">${same ? '—' : `${it.qtyDeducted.toLocaleString('en-IN', { maximumFractionDigits: 6 })} ${normalizeUnitDisplay(it.matUnit)}`}</td>` : ''}
                 ${costCol ? `<td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right">₹${it.cost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>` : ''}
             </tr>`;
         }).join('');
@@ -357,7 +368,7 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
             return `<tr>
                 <td style="padding:6px 10px;border-bottom:1px solid #eee">${mat?.name ?? `Material #${item.raw_material_id}`}</td>
                 <td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;font-weight:700">${formatQty(item.qty_per_batch)}</td>
-                <td style="padding:6px 10px;border-bottom:1px solid #eee;color:#666">${item.unit ?? mat?.unit ?? ''}</td>
+                <td style="padding:6px 10px;border-bottom:1px solid #eee;color:#666">${normalizeUnitDisplay(item.unit ?? mat?.unit ?? '')}</td>
             </tr>`;
         }).join('');
         const win = window.open('', '_blank', 'width=600,height=700');
@@ -510,7 +521,7 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
                                                     </span>
                                                     <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
                                                         {formatQty(item.qty_per_batch)}{' '}
-                                                        <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 12 }}>{itemUnit}</span>
+                                                        <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 12 }}>{normalizeUnitDisplay(itemUnit)}</span>
                                                     </span>
                                                     <span style={{
                                                         fontSize: 11, whiteSpace: 'nowrap',
@@ -518,7 +529,7 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
                                                         background: sufficient ? '#d1fae5' : '#fee2e2',
                                                         padding: '1px 7px', borderRadius: 10, fontWeight: 600,
                                                     }}>
-                                                        Stock: {mat ? `${formatQty(inStock)} ${matUnit}` : '—'}
+                                                        Stock: {mat ? `${formatQty(inStock)} ${normalizeUnitDisplay(matUnit)}` : '—'}
                                                     </span>
                                                 </div>
                                             );
@@ -820,11 +831,11 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
                                             <tr key={i}>
                                                 <td style={{ padding: '6px 10px', borderBottom: '1px solid var(--border)' }}>{it.name}</td>
                                                 <td style={{ padding: '6px 10px', borderBottom: '1px solid var(--border)', textAlign: 'right', fontWeight: 700 }}>
-                                                    {Number(it.qtyUsed.toFixed(6)).toLocaleString('en-IN', { maximumFractionDigits: 6 })} <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 11 }}>{it.itemUnit}</span>
+                                                    {Number(it.qtyUsed.toFixed(6)).toLocaleString('en-IN', { maximumFractionDigits: 6 })} <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 11 }}>{normalizeUnitDisplay(it.itemUnit)}</span>
                                                 </td>
                                                 {showDeductedCol && (
                                                     <td style={{ padding: '6px 10px', borderBottom: '1px solid var(--border)', textAlign: 'right', color: 'var(--tx-muted)' }}>
-                                                        {sameUnit ? '—' : `${Number(it.qtyDeducted.toFixed(6)).toLocaleString('en-IN', { maximumFractionDigits: 6 })} ${it.matUnit}`}
+                                                        {sameUnit ? '—' : `${Number(it.qtyDeducted.toFixed(6)).toLocaleString('en-IN', { maximumFractionDigits: 6 })} ${normalizeUnitDisplay(it.matUnit)}`}
                                                     </td>
                                                 )}
                                                 {canSeeCost && (
