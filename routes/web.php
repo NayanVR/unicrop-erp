@@ -81,9 +81,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('bom/{bom}/run', [BomController::class, 'runProduction'])->name('bom.run');
     });
 
-    // Inventory — view + bill entry: factory, accountant, and admin
-    Route::middleware(['role:admin,factory,accountant'])->group(function () {
+    // Inventory — view only: sales can see materials with limited columns
+    Route::middleware(['role:admin,factory,accountant,sales'])->group(function () {
         Route::get('inventory', [InventoryController::class, 'index'])->name('inventory.index');
+    });
+
+    // Inventory — bill entry: factory, accountant, and admin
+    Route::middleware(['role:admin,factory,accountant'])->group(function () {
         Route::post('inventory/purchase-bills', [InventoryController::class, 'storePurchaseBill'])->name('inventory.purchase-bills.store');
         Route::delete('inventory/purchase-bills/{bill}', [InventoryController::class, 'destroyPurchaseBill'])->name('inventory.purchase-bills.destroy');
         Route::post('inventory/reorders/{reorder}/receive-with-bill', [InventoryController::class, 'receiveWithBill'])->name('inventory.reorders.receive-with-bill');
