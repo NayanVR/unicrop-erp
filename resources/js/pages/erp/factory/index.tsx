@@ -460,7 +460,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 .party { font-size:13pt; font-weight:700; margin-bottom:2mm; }
                 .mid-row { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2mm; }
                 .box-num { font-size:24pt; font-weight:900; }
-                .total-boxes { font-size:40pt; font-weight:900; }
+                .total-boxes { font-size:54pt; font-weight:900; }
                 .auto-row2 { display:flex; justify-content:space-between; align-items:center; font-size:9pt; margin-bottom:1.5mm; }
                 .inboxpcs { font-weight:700; color:#222; }
                 .item-box-count { color:#666; font-style:italic; font-size:8pt; }
@@ -1128,7 +1128,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                     {/* Auto row: box number | total boxes */}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '4px 0 2px' }}>
                                         <span style={{ fontSize: '26px', fontWeight: 900, color: '#111' }}>{lbl.boxNum}</span>
-                                        <span style={{ fontSize: '44px', fontWeight: 900, color: '#111' }}>{lbl.totalBoxes} box</span>
+                                        <span style={{ fontSize: '60px', fontWeight: 900, color: '#111' }}>{lbl.totalBoxes} box</span>
                                     </div>
                                     {/* In-box pcs (editable) | product box N/M (auto) */}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
