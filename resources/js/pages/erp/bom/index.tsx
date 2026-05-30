@@ -258,6 +258,9 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
         const batchCount  = Number(runForm.data.batch_count) || 1;
         const batchNumber = runForm.data.batch_number.trim();
         const notes       = runForm.data.notes;
+        const totalYield  = (Number(bom.batch_size) * batchCount).toLocaleString('en-IN', { maximumFractionDigits: 3 });
+        const msg = `Confirm Production Run\n\nBatch No.: ${batchNumber || '(auto)'}\nBOM: ${bom.name}\nBatches: ${batchCount}\nTotal yield: ${totalYield} ${bom.batch_unit}\n\nThis will deduct raw materials from stock and add to finished goods. Proceed?`;
+        if (!window.confirm(msg)) return;
         runForm.post(bomRun(bom.id).url, {
             preserveScroll: true,
             onSuccess: () => {
