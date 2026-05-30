@@ -1597,7 +1597,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                 </div>
                             ) : (
                                 <div style={{ overflowX: 'auto' }}>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, tableLayout: 'fixed' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, tableLayout: 'fixed', border: '1px solid #e5e7eb' }}>
                                         <colgroup>
                                             <col style={{ width: '22%' }} />
                                             <col style={{ width: '8%' }} />
@@ -1611,17 +1611,17 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                             <col style={{ width: '3%' }} />
                                         </colgroup>
                                         <thead>
-                                            <tr style={{ background: '#f9fafb' }}>
-                                                <th style={{ padding: '5px 6px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Material / Item Name</th>
-                                                <th style={{ padding: '5px 6px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>SKU</th>
-                                                <th style={{ padding: '5px 6px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Category</th>
-                                                <th style={{ padding: '5px 6px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>HSN</th>
-                                                <th style={{ padding: '5px 6px', textAlign: 'right', borderBottom: '2px solid #e5e7eb' }}>Qty</th>
-                                                <th style={{ padding: '5px 6px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Unit</th>
-                                                <th style={{ padding: '5px 6px', textAlign: 'right', borderBottom: '2px solid #e5e7eb' }}>Rate (₹)</th>
-                                                <th style={{ padding: '5px 6px', textAlign: 'right', borderBottom: '2px solid #e5e7eb' }}>GST%</th>
-                                                <th style={{ padding: '5px 6px', textAlign: 'right', borderBottom: '2px solid #e5e7eb' }}>Amount</th>
-                                                <th style={{ borderBottom: '2px solid #e5e7eb' }}></th>
+                                            <tr style={{ background: '#f3f4f6' }}>
+                                                <th style={{ padding: '5px 6px', textAlign: 'left', border: '1px solid #d1d5db' }}>Material / Item Name</th>
+                                                <th style={{ padding: '5px 6px', textAlign: 'left', border: '1px solid #d1d5db' }}>SKU</th>
+                                                <th style={{ padding: '5px 6px', textAlign: 'left', border: '1px solid #d1d5db' }}>Category</th>
+                                                <th style={{ padding: '5px 6px', textAlign: 'left', border: '1px solid #d1d5db' }}>HSN</th>
+                                                <th style={{ padding: '5px 6px', textAlign: 'right', border: '1px solid #d1d5db' }}>Qty</th>
+                                                <th style={{ padding: '5px 6px', textAlign: 'left', border: '1px solid #d1d5db' }}>Unit</th>
+                                                <th style={{ padding: '5px 6px', textAlign: 'right', border: '1px solid #d1d5db' }}>Rate (₹)</th>
+                                                <th style={{ padding: '5px 6px', textAlign: 'right', border: '1px solid #d1d5db' }}>GST%</th>
+                                                <th style={{ padding: '5px 6px', textAlign: 'right', border: '1px solid #d1d5db' }}>Amount</th>
+                                                <th style={{ border: '1px solid #d1d5db' }}></th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1633,8 +1633,8 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                                     ).slice(0, 8)
                                                     : [];
                                                 return (
-                                                    <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                                                        <td style={{ padding: '3px 4px', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+                                                    <tr key={i}>
+                                                        <td style={{ padding: '3px 4px', position: 'relative', border: '1px solid #e5e7eb' }} onClick={(e) => e.stopPropagation()}>
                                                             <input
                                                                 type="text"
                                                                 value={row.matSearch || row.material_name}
@@ -1683,39 +1683,39 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                                                 </div>
                                                             )}
                                                         </td>
-                                                        <td style={{ padding: '3px 4px' }}>
+                                                        <td style={{ padding: '3px 4px', border: '1px solid #e5e7eb' }}>
                                                             <input type="text" value={row.sku} onChange={(e) => updateBillRow(i, 'sku', e.target.value)} style={{ width: '100%', fontSize: 12 }} />
                                                         </td>
-                                                        <td style={{ padding: '3px 4px' }}>
+                                                        <td style={{ padding: '3px 4px', border: '1px solid #e5e7eb' }}>
                                                             <select value={row.category} onChange={(e) => updateBillRow(i, 'category', e.target.value)} style={{ width: '100%', fontSize: 12 }}>
                                                                 <option value="">—</option>
                                                                 {categories.map((c) => <option key={c} value={c}>{c}</option>)}
                                                                 {row.category && !categories.includes(row.category) && <option value={row.category}>{row.category}</option>}
                                                             </select>
                                                         </td>
-                                                        <td style={{ padding: '3px 4px' }}>
+                                                        <td style={{ padding: '3px 4px', border: '1px solid #e5e7eb' }}>
                                                             <input type="text" value={row.hsn} onChange={(e) => updateBillRow(i, 'hsn', e.target.value)} style={{ width: '100%', fontSize: 12 }} />
                                                         </td>
-                                                        <td style={{ padding: '3px 4px' }}>
+                                                        <td style={{ padding: '3px 4px', border: '1px solid #e5e7eb' }}>
                                                             <input type="number" min="0" step="any" value={row.qty} onChange={(e) => updateBillRow(i, 'qty', e.target.value)} style={{ width: '100%', textAlign: 'right', fontSize: 12 }} />
                                                         </td>
-                                                        <td style={{ padding: '3px 4px' }}>
+                                                        <td style={{ padding: '3px 4px', border: '1px solid #e5e7eb' }}>
                                                             <select value={row.unit} onChange={(e) => updateBillRow(i, 'unit', e.target.value)} style={{ width: '100%', fontSize: 12 }}>
                                                                 {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
                                                             </select>
                                                         </td>
-                                                        <td style={{ padding: '3px 4px' }}>
+                                                        <td style={{ padding: '3px 4px', border: '1px solid #e5e7eb' }}>
                                                             <input type="number" min="0" step="any" value={row.rate} onChange={(e) => updateBillRow(i, 'rate', e.target.value)} style={{ width: '100%', textAlign: 'right', fontSize: 12 }} />
                                                         </td>
-                                                        <td style={{ padding: '3px 4px' }}>
+                                                        <td style={{ padding: '3px 4px', border: '1px solid #e5e7eb' }}>
                                                             <select value={row.gst} onChange={(e) => updateBillRow(i, 'gst', e.target.value)} style={{ width: '100%', fontSize: 12 }}>
                                                                 {GST_OPTIONS.map((g) => <option key={g} value={g}>{g}%</option>)}
                                                             </select>
                                                         </td>
-                                                        <td style={{ padding: '3px 4px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap', fontSize: 12 }}>
+                                                        <td style={{ padding: '3px 4px', border: '1px solid #e5e7eb', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap', fontSize: 12 }}>
                                                             {row.amount ? fmtAmt(row.amount) : '—'}
                                                         </td>
-                                                        <td style={{ padding: '4px 6px' }}>
+                                                        <td style={{ padding: '4px 6px', border: '1px solid #e5e7eb', textAlign: 'center' }}>
                                                             <button type="button" className="btn danger sm" onClick={() => removeBillRow(i)}>×</button>
                                                         </td>
                                                     </tr>
