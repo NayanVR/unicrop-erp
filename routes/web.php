@@ -79,6 +79,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('bom/{bom}', [BomController::class, 'update'])->name('bom.update');
         Route::delete('bom/{bom}', [BomController::class, 'destroy'])->name('bom.destroy');
         Route::post('bom/{bom}/run', [BomController::class, 'runProduction'])->name('bom.run');
+        Route::delete('bom/runs/{run}', [BomController::class, 'destroyRun'])->name('bom.runs.destroy');
     });
 
     // Inventory — view only: sales can see materials with limited columns

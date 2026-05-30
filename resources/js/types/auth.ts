@@ -21,6 +21,7 @@ export type User = {
     company_access?: string[] | null;
     roles?: Role[];
     role?: string | null;
+    password_plain?: string | null;
     [key: string]: unknown;
 };
 

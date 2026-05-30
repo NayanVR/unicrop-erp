@@ -645,7 +645,11 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
                                                 <td style={{ padding: '8px 12px', color: 'var(--tx-muted)', fontSize: 12, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.notes ?? '—'}</td>
                                                 <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
                                                     <button className="btn sm" onClick={() => setRunSummary(normalizeRun(r))} style={{ marginRight: 4 }}>Details</button>
-                                                    <button className="btn sm" onClick={() => printRunSummary(normalizeRun(r))}>🖨</button>
+                                                    <button className="btn sm" onClick={() => printRunSummary(normalizeRun(r))} style={{ marginRight: 4 }}>🖨</button>
+                                                    <button className="btn sm danger" onClick={() => {
+                                                        if (!confirm(`Delete run ${r.batch_number ?? r.id}?\n\nThis will reverse the stock deduction for all materials used in this run.`)) return;
+                                                        router.delete(`/bom/runs/${r.id}`, { preserveScroll: true });
+                                                    }}>Delete</button>
                                                 </td>
                                             </tr>
                                         ))}

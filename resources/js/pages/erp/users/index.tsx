@@ -49,6 +49,8 @@ const userStatusLabel = (isActive?: boolean) =>
 export default function UsersIndex({ users, roles, companies }: Props) {
     const [modalOpen, setModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
+    const [revealedPwd, setRevealedPwd] = useState<Set<number>>(new Set());
+    const togglePwd = (id: number) => setRevealedPwd((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
 
     const form = useForm<UserFormData>({
         name: '',
@@ -222,6 +224,20 @@ export default function UsersIndex({ users, roles, companies }: Props) {
                                                 </span>
                                             ) : null}
                                         </div>
+                                        {user.password_plain && (
+                                            <div style={{ marginTop: 4, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <span style={{ color: 'var(--tx-muted)' }}>Password:</span>
+                                                <span style={{ fontFamily: 'monospace', letterSpacing: '.5px' }}>
+                                                    {revealedPwd.has(user.id) ? user.password_plain : '••••••••'}
+                                                </span>
+                                                <button
+                                                    onClick={() => togglePwd(user.id)}
+                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', fontSize: 12, color: 'var(--tx-muted)' }}
+                                                >
+                                                    {revealedPwd.has(user.id) ? '🙈' : '👁'}
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="user-card-actions">

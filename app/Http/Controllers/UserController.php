@@ -19,7 +19,7 @@ class UserController extends Controller
             'users' => User::query()
                 ->with('roles')
                 ->orderBy('name')
-                ->get(),
+                ->get(['id', 'name', 'email', 'phone', 'notes', 'is_active', 'cost_access', 'modules', 'permissions', 'company_access', 'password_plain', 'created_at', 'updated_at']),
             'roles' => Role::query()
                 ->orderBy('name')
                 ->get(['id', 'name', 'slug']),
@@ -35,6 +35,7 @@ class UserController extends Controller
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => $data['password'],
+            'password_plain' => $data['password'],
             'phone' => $data['phone'] ?? null,
             'notes' => $data['notes'] ?? null,
             'is_active' => $data['status'] === 'active',
@@ -67,6 +68,7 @@ class UserController extends Controller
 
         if (! empty($data['password'])) {
             $user->password = $data['password'];
+            $user->password_plain = $data['password'];
         }
 
         $user->save();

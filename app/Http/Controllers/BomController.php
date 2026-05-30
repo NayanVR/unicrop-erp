@@ -227,6 +227,40 @@ class BomController extends Controller
         });
     }
 
+    public function destroyRun(ProductionRun $run): RedirectResponse
+    {
+        DB::transaction(function () use ($run) {
+            // Reverse stock deductions
+            foreach ($run->items as $item) {
+                $material = \App\Models\RawMaterial::find(
+                    \App\Models\RawMaterial::where('name', $item['name'])->value('id')
+                );
+                if ($material) {
+                    $material->increment('stock_qty', $item['qty_deducted']);
+
+                    InventoryTransaction::create([
+                        'raw_material_id' => $material->id,
+                        'user_id'         => request()->user()?->id,
+                        'type'            => 'receive',
+                        'qty'             => $item['qty_deducted'],
+                        'reference'       => "Reversed: BOM Run {$run->batch_number}",
+                        'notes'           => "Production run deleted — stock restored",
+                    ]);
+                }
+            }
+
+            // Remove linked finished good entry
+            \App\Models\FinishedGood::where('batch_ref', $run->batch_number)
+                ->where('bom_id', $run->bom_id)
+                ->where('source', 'production')
+                ->delete();
+
+            $run->delete();
+        });
+
+        return redirect()->back()->with('success', "Production run {$run->batch_number} deleted and stock reversed.");
+    }
+
     // Convert qty between compatible units (weight: kg/g/mg; volume: L/mL).
     private function convertQty(float $qty, string $fromUnit, string $toUnit): float
     {
