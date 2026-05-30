@@ -730,6 +730,28 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
                         <button className="modal-close" onClick={() => setRunModal(false)}>✕</button>
                     </div>
                     <div className="modal-body">
+                        {/* Today's runs for this BOM */}
+                        {runTarget && (() => {
+                            const today = new Date().toDateString();
+                            const todayRuns = productionRuns.filter(
+                                (r) => r.bom_id === runTarget.id && new Date(r.created_at).toDateString() === today
+                            );
+                            if (todayRuns.length === 0) return null;
+                            return (
+                                <div style={{ marginBottom: 14, padding: '10px 12px', background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 'var(--radius-sm)', fontSize: 13, color: '#92400e' }}>
+                                    <strong>⚠ Aaj aa product nu production aagal levayu che:</strong>
+                                    <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                                        {todayRuns.map((r) => (
+                                            <li key={r.id}>
+                                                {new Date(r.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} —{' '}
+                                                <strong>{r.batch_count} × {r.batch_size} {normalizeUnitDisplay(r.batch_unit)} = {(r.batch_count * r.batch_size).toLocaleString('en-IN', { maximumFractionDigits: 3 })} {normalizeUnitDisplay(r.batch_unit)}</strong>
+                                                {r.batch_number ? ` (${r.batch_number})` : ''}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            );
+                        })()}
                         <div className="form-grid">
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                 <label>Batch Number <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 12 }}>(auto-generated, you can change)</span></label>
