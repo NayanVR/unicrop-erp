@@ -17,7 +17,7 @@ class BomController extends Controller
     public function index(): Response
     {
         $boms = Bom::query()
-            ->with(['product:id,name', 'items.rawMaterial:id,name,unit,stock_qty'])
+            ->with(['product:id,name', 'items.rawMaterial:id,name,unit,stock_qty,cost_per_unit'])
             ->orderBy('name')
             ->get();
 

@@ -311,16 +311,26 @@ export default function BomIndex({ boms, products, materials }: Props) {
                                     <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 5 }}>
                                         {bom.items.map((item, idx) => {
                                             const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
-                                            const sufficient = mat ? Number(mat.stock_qty) >= Number(item.qty_per_batch) : true;
+                                            const needed = Number(item.qty_per_batch);
+                                            const inStock = mat ? Number(mat.stock_qty) : 0;
+                                            const sufficient = inStock >= needed;
+                                            const unit = item.unit ?? mat?.unit ?? '';
                                             return (
-                                                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14 }}>
-                                                    <span style={{ color: sufficient ? 'var(--tx-body)' : 'var(--danger)' }}>
+                                                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14, gap: 8 }}>
+                                                    <span style={{ color: sufficient ? 'var(--tx-body)' : 'var(--danger)', flex: 1 }}>
                                                         {mat?.name ?? `Material #${item.raw_material_id}`}
-                                                        {!sufficient && <span style={{ fontSize: 11, marginLeft: 4, color: 'var(--danger)' }}>[Low]</span>}
                                                     </span>
-                                                    <span style={{ fontWeight: 700, whiteSpace: 'nowrap', marginLeft: 8 }}>
-                                                        {formatQty(item.qty_per_batch)}{' '}
-                                                        <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 12 }}>{item.unit ?? mat?.unit ?? ''}</span>
+                                                    <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                                        {formatQty(needed)}{' '}
+                                                        <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 12 }}>{unit}</span>
+                                                    </span>
+                                                    <span style={{
+                                                        fontSize: 11, whiteSpace: 'nowrap',
+                                                        color: sufficient ? '#059669' : '#dc2626',
+                                                        background: sufficient ? '#d1fae5' : '#fee2e2',
+                                                        padding: '1px 7px', borderRadius: 10, fontWeight: 600,
+                                                    }}>
+                                                        Stock: {mat ? `${formatQty(inStock)} ${unit}` : '—'}
                                                     </span>
                                                 </div>
                                             );
