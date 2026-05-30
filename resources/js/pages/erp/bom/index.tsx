@@ -4,7 +4,8 @@ import {
     store as bomStore,
     update as bomUpdate,
 } from '@/routes/bom';
-import { Head, router, useForm } from '@inertiajs/react';
+import type { Auth } from '@/types/auth';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
 type RawMaterial = {
@@ -74,6 +75,9 @@ const TYPE_CONFIG = {
 };
 
 export default function BomIndex({ boms, products, materials }: Props) {
+    const { auth } = usePage<{ auth: Auth }>().props;
+    const canSeeCost = auth.user?.role === 'admin' || auth.user?.cost_access === true;
+
     const [search, setSearch]         = useState('');
     const [typeFilter, setTypeFilter] = useState<'all' | 'liquid' | 'powder' | 'other'>('all');
     const [editModal, setEditModal]   = useState(false);
@@ -325,6 +329,21 @@ export default function BomIndex({ boms, products, materials }: Props) {
                                             <div style={{ fontSize: 13, color: 'var(--tx-faint)' }}>No ingredients added.</div>
                                         )}
                                     </div>
+
+                                    {/* Cost info — admin / cost_access only */}
+                                    {canSeeCost && (
+                                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', padding: '8px 0', borderTop: '1px solid var(--border)' }}>
+                                            {[
+                                                { label: `Per ${bom.batch_unit}`, value: `₹${Number(bom.batch_size) > 0 ? (calcCost(bom) / Number(bom.batch_size)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}` },
+                                                { label: `Total batch (${formatQty(bom.batch_size)} ${bom.batch_unit})`, value: `₹${calcCost(bom).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+                                            ].map((c) => (
+                                                <div key={c.label} style={{ background: 'var(--bg-paper)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 10px', fontSize: 12 }}>
+                                                    <span style={{ color: 'var(--tx-muted)' }}>{c.label}: </span>
+                                                    <strong>{c.value}</strong>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
 
                                     {/* Actions */}
                                     <div style={{ display: 'flex', gap: 6, borderTop: '1px solid var(--border)', paddingTop: 10, flexWrap: 'wrap' }}>
