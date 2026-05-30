@@ -278,7 +278,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
 
     const visibleOrders = useMemo(() => {
         const q = search.trim().toLowerCase();
-        return orders.filter((o) => {
+        const filtered = orders.filter((o) => {
             if (!matchesFilter(o, activeFilter)) return false;
             if (!q) return true;
             return (
@@ -286,6 +286,13 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 o.company_name.toLowerCase().includes(q) ||
                 o.customer_name.toLowerCase().includes(q)
             );
+        });
+
+        return [...filtered].sort((a, b) => {
+            const aHasNew = a.items.some((i) => isNewItem(i.status));
+            const bHasNew = b.items.some((i) => isNewItem(i.status));
+            if (aHasNew !== bHasNew) return aHasNew ? -1 : 1;
+            return b.id - a.id;
         });
     }, [orders, activeFilter, search]);
 
