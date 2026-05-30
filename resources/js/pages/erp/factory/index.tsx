@@ -153,11 +153,11 @@ type EditableLabel = {
 type FilterKey = 'all' | 'new' | 'in-process' | 'ready' | 'dispatched';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
-    { key: 'all', label: 'All' },
     { key: 'new', label: 'New' },
     { key: 'in-process', label: 'In Process' },
     { key: 'ready', label: 'Ready' },
     { key: 'dispatched', label: 'Dispatched' },
+    { key: 'all', label: 'All' },
 ];
 
 // An item is "new" (awaiting acceptance) when it has no status or the
@@ -473,16 +473,18 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
         <>
             <Head title="Production Orders" />
             <div id="view-factory" className="view active">
-                <div className="page-header">
-                    <div className="page-header-left">
-                        <h1>Production Orders</h1>
-                        <p>Manage item stage progression for confirmed orders.</p>
-                    </div>
-                </div>
-
-                {/* ── Filter bar + search ── */}
-                <div className="filter-bar" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                    <h2 style={{ marginRight: '4px' }}>Production Orders</h2>
+                {/* ── Header: title · search · filters ── */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                    <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--tx-head)', whiteSpace: 'nowrap' }}>
+                        Production Orders
+                    </h1>
+                    <input
+                        type="search"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="🔍 Search order, company, customer…"
+                        style={{ width: '220px', flexShrink: 1 }}
+                    />
                     {FILTERS.map((f) => (
                         <button
                             key={f.key}
@@ -493,15 +495,6 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                             {f.label}
                         </button>
                     ))}
-                    <div style={{ marginLeft: 'auto', minWidth: '220px', flex: '0 1 320px' }}>
-                        <input
-                            type="search"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="🔍 Search order, company, customer…"
-                            style={{ width: '100%' }}
-                        />
-                    </div>
                 </div>
 
                 {/* ── Urgent Approval Requests (factory/admin only) ── */}
