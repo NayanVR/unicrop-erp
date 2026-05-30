@@ -252,7 +252,7 @@ const boxesFor = (item: OrderItem): number | null => {
 };
 
 export default function FactoryIndex({ orders, urgentPending, canAdvance, productPhotos = [] }: Props) {
-    const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
+    const [activeFilter, setActiveFilter] = useState<FilterKey>('new');
     const [search, setSearch] = useState('');
     const [openOrders, setOpenOrders] = useState<number[]>([]);
     const [stagingItem, setStagingItem] = useState<number | null>(null);
