@@ -254,6 +254,8 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     >([]);
     const [billProcessing, setBillProcessing] = useState(false);
     const [billMatDropdown, setBillMatDropdown] = useState<number | null>(null);
+    const [billVendorSearch, setBillVendorSearch] = useState('');
+    const [billVendorOpen, setBillVendorOpen] = useState(false);
 
     // Material form
     const matForm = useForm({
@@ -512,6 +514,8 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         setBillFile(null);
         setBillRows([]);
         setBillMatDropdown(null);
+        setBillVendorSearch('');
+        setBillVendorOpen(false);
     };
 
     const submitBill = () => {
@@ -1420,7 +1424,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                         <h3>📄 New Purchase Bill</h3>
                         <button className="modal-close" onClick={() => { setBillModal(false); resetBillForm(); }}>×</button>
                     </div>
-                    <div className="modal-body" onClick={() => setBillMatDropdown(null)}>
+                    <div className="modal-body" onClick={() => { setBillMatDropdown(null); setBillVendorOpen(false); }}>
                         {/* Row 1: Bill Number + Vendor/Supplier */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px', marginBottom: 12 }}>
                             <div className="form-group">
@@ -1435,29 +1439,81 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                     <div className="form-error">⚠ This bill number already exists.</div>
                                 )}
                             </div>
-                            <div className="form-group">
+                            <div className="form-group" style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
                                 <label>Vendor / Supplier *</label>
-                                <select
-                                    value={billForm.party_id}
+                                <input
+                                    type="text"
+                                    value={billVendorSearch}
                                     onChange={(e) => {
-                                        const v = vendors.find((x) => String(x.id) === e.target.value);
-                                        setBillForm((p) => ({ ...p, party_id: e.target.value, vendor_name: v?.name ?? p.vendor_name }));
+                                        setBillVendorSearch(e.target.value);
+                                        setBillVendorOpen(true);
+                                        if (!e.target.value.trim()) {
+                                            setBillForm((p) => ({ ...p, party_id: '', vendor_name: '' }));
+                                        }
                                     }}
-                                >
-                                    <option value="">— Select supplier —</option>
-                                    {vendors.map((v) => (
-                                        <option key={v.id} value={String(v.id)}>{v.name}{v.gst_no ? ` · ${v.gst_no}` : ''}</option>
-                                    ))}
-                                </select>
-                                {!billForm.party_id && (
-                                    <input
-                                        type="text"
-                                        value={billForm.vendor_name}
-                                        onChange={(e) => setBillForm((p) => ({ ...p, vendor_name: e.target.value }))}
-                                        placeholder={vendors.length > 0 ? 'Or type manually if not in list' : 'Supplier name'}
-                                        style={{ marginTop: 6, fontSize: 13 }}
-                                    />
+                                    onFocus={() => setBillVendorOpen(true)}
+                                    placeholder="Search supplier..."
+                                    autoComplete="off"
+                                />
+                                {billForm.party_id && (
+                                    <div style={{ fontSize: 11, color: '#2563eb', marginTop: 3 }}>
+                                        ✓ {vendors.find((v) => String(v.id) === billForm.party_id)?.name}
+                                        {vendors.find((v) => String(v.id) === billForm.party_id)?.gst_no
+                                            ? ` · GST: ${vendors.find((v) => String(v.id) === billForm.party_id)?.gst_no}`
+                                            : ''}
+                                        <button
+                                            type="button"
+                                            onClick={() => { setBillForm((p) => ({ ...p, party_id: '', vendor_name: '' })); setBillVendorSearch(''); }}
+                                            style={{ marginLeft: 8, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12 }}
+                                        >✕ clear</button>
+                                    </div>
                                 )}
+                                {billVendorOpen && (() => {
+                                    const q = billVendorSearch.toLowerCase();
+                                    const matches = vendors.filter((v) =>
+                                        v.name.toLowerCase().includes(q) ||
+                                        (v.gst_no ?? '').toLowerCase().includes(q)
+                                    );
+                                    return (matches.length > 0 || billVendorSearch.trim().length > 0) ? (
+                                        <div style={{
+                                            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200,
+                                            background: '#fff', border: '1px solid #d1d5db', borderRadius: 6,
+                                            boxShadow: '0 4px 16px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto',
+                                        }}>
+                                            {matches.map((v) => (
+                                                <div
+                                                    key={v.id}
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        setBillForm((p) => ({ ...p, party_id: String(v.id), vendor_name: v.name }));
+                                                        setBillVendorSearch(v.name);
+                                                        setBillVendorOpen(false);
+                                                    }}
+                                                    style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #f3f4f6' }}
+                                                    onMouseEnter={(e) => (e.currentTarget.style.background = '#eff6ff')}
+                                                    onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
+                                                >
+                                                    <div style={{ fontWeight: 600, fontSize: 13 }}>{v.name}</div>
+                                                    {v.gst_no && <div style={{ fontSize: 11, color: '#6b7280' }}>GST: {v.gst_no}</div>}
+                                                </div>
+                                            ))}
+                                            {matches.length === 0 && billVendorSearch.trim().length > 0 && (
+                                                <div
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        setBillForm((p) => ({ ...p, party_id: '', vendor_name: billVendorSearch }));
+                                                        setBillVendorOpen(false);
+                                                    }}
+                                                    style={{ padding: '8px 12px', cursor: 'pointer', color: '#2563eb', fontWeight: 600, fontSize: 13 }}
+                                                    onMouseEnter={(e) => (e.currentTarget.style.background = '#eff6ff')}
+                                                    onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
+                                                >
+                                                    ➕ Use "{billVendorSearch}" as manual vendor
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : null;
+                                })()}
                             </div>
 
                             {/* Row 2: Purchase Date + Bill Upload */}
