@@ -159,6 +159,25 @@
                 </div>
             </div>
 
+            {{-- Output Product (Inventory Link) --}}
+            <div class="mb-4 relative">
+                <label class="block text-xs font-semibold text-gray-600 mb-1">
+                    Output Product in Inventory
+                    <span class="text-gray-400 font-normal">(stock will be added here when BOM is run)</span>
+                </label>
+                <div class="relative">
+                    <input id="formOutputSearch" type="text" placeholder="Search inventory item to link as output…"
+                        autocomplete="off"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                        oninput="searchOutputInv(this.value)"
+                        onfocus="if(this.value.trim()) searchOutputInv(this.value)">
+                    <input id="formOutputInvId" type="hidden" value="">
+                    <div id="formOutputClear" class="hidden absolute right-2 top-2 cursor-pointer text-gray-400 hover:text-red-500 text-xs" onclick="clearOutputInv()">✕ clear</div>
+                </div>
+                <div id="formOutputDropdown" class="hidden absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg w-full mt-1 max-h-48 overflow-y-auto"></div>
+                <div id="formOutputLinked" class="hidden mt-1 text-xs text-green-700 font-medium"></div>
+            </div>
+
             {{-- Notes --}}
             <div class="mb-4">
                 <label class="block text-xs font-semibold text-gray-600 mb-1">Notes</label>
@@ -443,6 +462,14 @@ function showDetail(id) {
                 </div>
             </div>
 
+            ${bom.output_material_name ? `
+            <div class="mb-4 flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-sm">
+                <span class="text-green-600 font-bold">📦 Output →</span>
+                <span class="font-semibold text-green-800">${esc(bom.output_material_name)}</span>
+                <span class="text-green-600 text-xs">(${esc(bom.output_material_unit || '')})</span>
+                <span class="text-green-500 text-xs ml-auto">Stock will be added to inventory on each run</span>
+            </div>` : ''}
+
             <h3 class="text-sm font-bold text-gray-700 mb-2">Ingredients Breakdown</h3>
             <div class="border border-gray-200 rounded-lg overflow-hidden mb-4">
                 <table class="w-full text-sm">
@@ -502,6 +529,9 @@ function openCreate() {
     document.getElementById('formYieldQty').value   = '';
     document.getElementById('formYieldUnit').value  = 'ltr';
     document.getElementById('formNotes').value      = '';
+    document.getElementById('formOutputSearch').value = '';
+    document.getElementById('formOutputInvId').value  = '';
+    updateOutputLinked(null);
     document.getElementById('ingredientRows').innerHTML = '';
     addIngredientRow({});
     calcTotal();
@@ -519,6 +549,17 @@ function openEdit(id) {
     document.getElementById('formYieldQty').value  = bom.yield_qty;
     document.getElementById('formYieldUnit').value = bom.yield_unit;
     document.getElementById('formNotes').value     = bom.notes || '';
+
+    // Output inventory link
+    if (bom.output_raw_material_id && bom.output_material_name) {
+        document.getElementById('formOutputSearch').value = bom.output_material_name;
+        document.getElementById('formOutputInvId').value  = bom.output_raw_material_id;
+        updateOutputLinked({ name: bom.output_material_name, unit: bom.output_material_unit || '' });
+    } else {
+        document.getElementById('formOutputSearch').value = '';
+        document.getElementById('formOutputInvId').value  = '';
+        updateOutputLinked(null);
+    }
 
     document.getElementById('ingredientRows').innerHTML = '';
     const ings = bom.ingredients || [];
@@ -564,7 +605,15 @@ async function submitForm() {
         return;
     }
 
-    const payload = { name, yield_qty: yieldQty, yield_unit: yieldUnit, ingredients, notes: notes || null };
+    const outputInvId = document.getElementById('formOutputInvId').value.trim();
+    const payload = {
+        name,
+        yield_qty: yieldQty,
+        yield_unit: yieldUnit,
+        output_raw_material_id: outputInvId ? parseInt(outputInvId) : null,
+        ingredients,
+        notes: notes || null,
+    };
     const btn = document.getElementById('saveBtn');
 
     try {
@@ -720,7 +769,68 @@ document.addEventListener('click', e => {
     document.querySelectorAll('.ing-dropdown').forEach(d => {
         if (!d.parentElement.contains(e.target)) d.classList.add('hidden');
     });
+    const od = document.getElementById('formOutputDropdown');
+    const os = document.getElementById('formOutputSearch');
+    if (od && os && !od.contains(e.target) && e.target !== os) od.classList.add('hidden');
 });
+
+/* ── Output Inventory Search ─────────────────────────────────── */
+let _outputSearchTimer = null;
+
+async function searchOutputInv(q) {
+    clearTimeout(_outputSearchTimer);
+    const dropdown = document.getElementById('formOutputDropdown');
+    const invId    = document.getElementById('formOutputInvId');
+    invId.value    = '';
+    updateOutputLinked(null);
+
+    if (!q.trim()) { dropdown.classList.add('hidden'); return; }
+
+    _outputSearchTimer = setTimeout(async () => {
+        try {
+            const results = await apiFetch(`/api/v1/inventory/search?q=${encodeURIComponent(q.trim())}`);
+            dropdown.innerHTML = '';
+            if (results.length === 0) {
+                dropdown.innerHTML = `<div class="px-3 py-2 text-xs text-gray-500">No matching inventory items found.</div>`;
+            } else {
+                results.forEach(item => {
+                    const el = document.createElement('div');
+                    el.className = 'px-3 py-2 text-sm hover:bg-green-50 cursor-pointer border-b border-gray-50 last:border-0 flex items-center justify-between';
+                    el.innerHTML = `<span class="font-medium">${esc(item.name)}</span><span class="text-xs text-gray-400 ml-2">${esc(item.unit)}</span>`;
+                    el.addEventListener('click', () => selectOutputInv(item));
+                    dropdown.appendChild(el);
+                });
+            }
+            dropdown.classList.remove('hidden');
+        } catch (_) {}
+    }, 280);
+}
+
+function selectOutputInv(item) {
+    document.getElementById('formOutputSearch').value = item.name;
+    document.getElementById('formOutputInvId').value  = item.id;
+    document.getElementById('formOutputDropdown').classList.add('hidden');
+    updateOutputLinked(item);
+}
+
+function updateOutputLinked(item) {
+    const el    = document.getElementById('formOutputLinked');
+    const clear = document.getElementById('formOutputClear');
+    if (item) {
+        el.textContent = `✓ Linked: ${item.name} (${item.unit}) — stock will increase on run`;
+        el.classList.remove('hidden');
+        clear.classList.remove('hidden');
+    } else {
+        el.classList.add('hidden');
+        clear.classList.add('hidden');
+    }
+}
+
+function clearOutputInv() {
+    document.getElementById('formOutputSearch').value = '';
+    document.getElementById('formOutputInvId').value  = '';
+    updateOutputLinked(null);
+}
 
 /* ── Delete / Duplicate ──────────────────────────────────────── */
 async function deleteBom(id, name) {

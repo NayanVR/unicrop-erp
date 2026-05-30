@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\RawMaterial;
 
 class BomRecipe extends Model
 {
@@ -14,6 +16,7 @@ class BomRecipe extends Model
         'name',
         'yield_qty',
         'yield_unit',
+        'output_raw_material_id',
         'ingredients',
         'notes',
         'created_by',
@@ -25,6 +28,11 @@ class BomRecipe extends Model
             'ingredients' => 'array',
             'yield_qty'   => 'float',
         ];
+    }
+
+    public function outputMaterial(): BelongsTo
+    {
+        return $this->belongsTo(RawMaterial::class, 'output_raw_material_id');
     }
 
     public function getTotalCostAttribute(): float
