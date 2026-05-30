@@ -455,7 +455,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
                 .label { width:100mm; height:75mm; padding:4mm 5mm; border:0.5px solid #000; page-break-after:always; display:flex; flex-direction:column; overflow:hidden; }
                 .label:last-child { page-break-after:avoid; }
-                .transport { font-size:22pt; font-weight:900; line-height:1.1; margin-bottom:1mm; }
+                .transport { font-size:44pt; font-weight:900; line-height:1.1; margin-bottom:1mm; }
                 .destination { font-size:9pt; color:#444; margin-bottom:1mm; }
                 .party { font-size:13pt; font-weight:700; margin-bottom:2mm; }
                 .mid-row { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2mm; }
@@ -1099,7 +1099,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                         placeholder="Transport name"
                                         style={{
                                             border: 'none', borderBottom: '1px dashed #ccc', outline: 'none',
-                                            fontSize: '20px', fontWeight: 900, lineHeight: 1.1, padding: '2px 0',
+                                            fontSize: '40px', fontWeight: 900, lineHeight: 1.1, padding: '2px 0',
                                             width: '100%', background: 'transparent',
                                         }}
                                     />
