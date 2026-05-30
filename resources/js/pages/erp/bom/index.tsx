@@ -130,6 +130,25 @@ const TYPE_CONFIG = {
     other:  { label: 'OTHER',  color: '#6b7280', bg: '#f9fafb', border: '#9ca3af' },
 };
 
+// Auto-upgrade to larger unit when qty reaches 1000 (gm→kg, ml→L, mg→gm/kg)
+function smartUnit(qty: number, unit: string): { qty: number; unit: string } {
+    const u = unit.trim().toLowerCase();
+    if (['gm', 'g', 'gram', 'grams'].includes(u) && qty >= 1000)
+        return { qty: qty / 1000, unit: 'kg' };
+    if (['ml', 'milliliter', 'millilitre', 'milliliters', 'millilitres'].includes(u) && qty >= 1000)
+        return { qty: qty / 1000, unit: 'L' };
+    if (['mg', 'milligram', 'milligrams'].includes(u)) {
+        if (qty >= 1_000_000) return { qty: qty / 1_000_000, unit: 'kg' };
+        if (qty >= 1000)      return { qty: qty / 1000,       unit: 'gm' };
+    }
+    return { qty, unit };
+}
+
+function fmtSmart(qty: number, unit: string): string {
+    const s = smartUnit(qty, unit);
+    return `${s.qty.toLocaleString('en-IN', { maximumFractionDigits: 4 })} ${s.unit}`;
+}
+
 export default function BomIndex({ boms, products, materials, productionRuns }: Props) {
     const { auth } = usePage<{ auth: Auth }>().props;
     const canSeeCost = auth.user?.role === 'admin' || auth.user?.cost_access === true;
@@ -729,8 +748,8 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
                                             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 12px', borderBottom: i < runTarget.items.length - 1 ? '1px solid var(--border)' : undefined, fontSize: 13, gap: 8 }}>
                                                 <span style={{ flex: 1, color: ok ? 'var(--tx-body)' : '#dc2626' }}>{mat?.name ?? `Material #${item.raw_material_id}`}</span>
                                                 <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
-                                                    {needed.toLocaleString('en-IN', { maximumFractionDigits: 6 })} <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--tx-muted)' }}>{itemUnit}</span>
-                                                    {!ok && <span style={{ marginLeft: 8, fontSize: 11, color: '#dc2626', background: '#fee2e2', padding: '1px 6px', borderRadius: 8 }}>⚠ short by {(neededInMatUnit - inStock).toLocaleString('en-IN', { maximumFractionDigits: 6 })} {matUnit}</span>}
+                                                    {fmtSmart(needed, itemUnit)}
+                                                    {!ok && <span style={{ marginLeft: 8, fontSize: 11, color: '#dc2626', background: '#fee2e2', padding: '1px 6px', borderRadius: 8 }}>⚠ short by {fmtSmart(neededInMatUnit - inStock, matUnit)}</span>}
                                                     {ok && <span style={{ marginLeft: 8, fontSize: 11, color: '#059669', background: '#d1fae5', padding: '1px 6px', borderRadius: 8 }}>✓</span>}
                                                 </span>
                                             </div>
