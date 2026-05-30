@@ -6,6 +6,7 @@ use App\Models\InventoryPurchaseBill;
 use App\Models\InventoryPurchaseBillItem;
 use App\Models\InventoryReorder;
 use App\Models\InventoryTransaction;
+use App\Models\Party;
 use App\Models\RawMaterial;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -41,6 +42,12 @@ class InventoryController extends Controller
             ->orderByDesc('id')
             ->get();
 
+        $vendors = Party::query()
+            ->where('is_active', true)
+            ->whereIn('type', ['supplier', 'both'])
+            ->orderBy('name')
+            ->get(['id', 'name', 'gst_no']);
+
         $activeMaterials = $materials->where('is_active', true);
 
         $stats = [
@@ -57,7 +64,7 @@ class InventoryController extends Controller
         ];
 
         return Inertia::render('erp/inventory/index', array_merge(
-            compact('materials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats'),
+            compact('materials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats', 'vendors'),
             ['pageTitle' => 'Inventory']
         ));
     }
@@ -166,10 +173,13 @@ class InventoryController extends Controller
     public function storePurchaseBill(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'vendor_name'           => 'required|string|max:255',
+            'vendor_name'           => 'nullable|string|max:255',
+            'party_id'              => 'nullable|exists:parties,id',
             'bill_number'           => 'nullable|string|max:100',
             'bill_date'             => 'nullable|date',
             'total_amount'          => 'nullable|numeric|min:0',
+            'freight_charges'       => 'nullable|numeric|min:0',
+            'round_off'             => 'nullable|numeric',
             'bill_file'             => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'add_to_stock'          => 'boolean',
             'items'                    => 'required|array|min:1',
@@ -185,6 +195,17 @@ class InventoryController extends Controller
             'items.*.amount'           => 'nullable|numeric|min:0',
         ]);
 
+        if (empty($data['vendor_name']) && empty($data['party_id'])) {
+            return redirect()->back()->withErrors(['vendor_name' => 'Vendor/Supplier is required.']);
+        }
+
+        // Resolve vendor name from party if not supplied directly
+        $vendorName = $data['vendor_name'] ?? null;
+        if (! $vendorName && ! empty($data['party_id'])) {
+            $party = Party::find($data['party_id']);
+            $vendorName = $party?->name ?? '';
+        }
+
         $billNumber = $data['bill_number'] ?? null;
 
         if ($billNumber && InventoryPurchaseBill::where('bill_number', $billNumber)->exists()) {
@@ -199,16 +220,19 @@ class InventoryController extends Controller
             $billFileName = $request->file('bill_file')->getClientOriginalName();
         }
 
-        DB::transaction(function () use ($data, $billNumber, $billFilePath, $billFileName, $request) {
+        DB::transaction(function () use ($data, $billNumber, $billFilePath, $billFileName, $request, $vendorName) {
             $bill = InventoryPurchaseBill::create([
-                'vendor_name'  => $data['vendor_name'],
-                'bill_number'  => $billNumber,
-                'bill_date'    => $data['bill_date'] ?? null,
-                'total_amount' => $data['total_amount'] ?? 0,
-                'bill_file'    => $billFilePath,
-                'bill_name'    => $billFileName,
-                'add_to_stock' => $data['add_to_stock'] ?? false,
-                'user_id'      => $request->user()?->id,
+                'vendor_name'     => $vendorName,
+                'party_id'        => $data['party_id'] ?? null,
+                'bill_number'     => $billNumber,
+                'bill_date'       => $data['bill_date'] ?? null,
+                'total_amount'    => $data['total_amount'] ?? 0,
+                'freight_charges' => $data['freight_charges'] ?? 0,
+                'round_off'       => $data['round_off'] ?? 0,
+                'bill_file'       => $billFilePath,
+                'bill_name'       => $billFileName,
+                'add_to_stock'    => $data['add_to_stock'] ?? false,
+                'user_id'         => $request->user()?->id,
             ]);
 
             $addToStock = (bool) ($data['add_to_stock'] ?? false);
