@@ -14,21 +14,6 @@ use Inertia\Response;
 
 class BomController extends Controller
 {
-    public function show(Bom $bom): Response
-    {
-        $bom->load(['product:id,name', 'items.rawMaterial:id,name,unit,stock_qty,cost_per_unit']);
-
-        $products  = Product::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
-        $materials = RawMaterial::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'unit', 'stock_qty', 'cost_per_unit']);
-
-        return Inertia::render('erp/bom/show', [
-            'pageTitle' => $bom->name,
-            'bom'       => $bom,
-            'products'  => $products,
-            'materials' => $materials,
-        ]);
-    }
-
     public function index(): Response
     {
         $boms = Bom::query()

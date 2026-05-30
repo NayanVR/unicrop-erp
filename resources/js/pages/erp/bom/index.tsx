@@ -1,5 +1,8 @@
 import {
+    destroy as bomDestroy,
+    run as bomRun,
     store as bomStore,
+    update as bomUpdate,
 } from '@/routes/bom';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
@@ -51,36 +54,56 @@ type BomFormData = {
     items: { raw_material_id: string; qty_per_batch: string; unit: string }[];
 };
 
+type RunFormData = { batch_count: string; notes: string };
+
 const BATCH_UNITS = ['kg', 'L', 'g', 'mL', 'pcs'];
 
 const formatQty = (v: string | number) =>
     Number(v).toLocaleString('en-IN', { maximumFractionDigits: 3 });
 
 export default function BomIndex({ boms, products, materials }: Props) {
-    const [createModal, setCreateModal] = useState(false);
+    const [detailBom, setDetailBom]   = useState<Bom | null>(null);
+    const [editModal, setEditModal]   = useState(false);
+    const [runModal, setRunModal]     = useState(false);
+    const [editingBom, setEditingBom] = useState<Bom | null>(null);
+    const [runTarget, setRunTarget]   = useState<Bom | null>(null);
 
     const form = useForm<BomFormData>({
-        name: '',
-        product_id: '',
-        packing_size: '',
-        batch_size: '1',
-        batch_unit: 'kg',
-        notes: '',
-        is_active: true,
-        items: [],
+        name: '', product_id: '', packing_size: '', batch_size: '1',
+        batch_unit: 'kg', notes: '', is_active: true, items: [],
     });
+
+    const runForm = useForm<RunFormData>({ batch_count: '1', notes: '' });
 
     const openNew = () => {
         form.reset();
         form.clearErrors();
-        setCreateModal(true);
+        setEditingBom(null);
+        setEditModal(true);
+    };
+
+    const openEdit = (bom: Bom) => {
+        form.setData({
+            name: bom.name,
+            product_id: bom.product?.id ? String(bom.product.id) : '',
+            packing_size: bom.packing_size ?? '',
+            batch_size: String(bom.batch_size),
+            batch_unit: bom.batch_unit,
+            notes: bom.notes ?? '',
+            is_active: bom.is_active,
+            items: bom.items.map((i) => ({
+                raw_material_id: String(i.raw_material_id),
+                qty_per_batch: String(i.qty_per_batch),
+                unit: i.unit ?? '',
+            })),
+        });
+        form.clearErrors();
+        setEditingBom(bom);
+        setEditModal(true);
     };
 
     const addItem = () => {
-        form.setData('items', [
-            ...form.data.items,
-            { raw_material_id: '', qty_per_batch: '', unit: '' },
-        ]);
+        form.setData('items', [...form.data.items, { raw_material_id: '', qty_per_batch: '', unit: '' }]);
     };
 
     const removeItem = (idx: number) => {
@@ -98,22 +121,53 @@ export default function BomIndex({ boms, products, materials }: Props) {
     };
 
     const saveBom = () => {
-        form.post(bomStore().url, {
+        if (editingBom) {
+            form.patch(bomUpdate(editingBom.id).url, {
+                preserveScroll: true,
+                onSuccess: () => { setEditModal(false); form.reset(); setEditingBom(null); },
+            });
+        } else {
+            form.post(bomStore().url, {
+                preserveScroll: true,
+                onSuccess: () => { setEditModal(false); form.reset(); },
+            });
+        }
+    };
+
+    const deleteBom = (bom: Bom) => {
+        if (!confirm(`Delete BOM "${bom.name}"?`)) return;
+        router.delete(bomDestroy(bom.id).url, {
             preserveScroll: true,
-            onSuccess: () => { setCreateModal(false); form.reset(); },
+            onSuccess: () => setDetailBom(null),
         });
     };
 
-    const calcBomCost = (bom: Bom) =>
+    const openRun = (bom: Bom) => {
+        runForm.reset();
+        setRunTarget(bom);
+        setRunModal(true);
+    };
+
+    const submitRun = () => {
+        if (!runTarget) return;
+        runForm.post(bomRun(runTarget.id).url, {
+            preserveScroll: true,
+            onSuccess: () => { setRunModal(false); runForm.reset(); setRunTarget(null); },
+        });
+    };
+
+    const calcBomCost = (bom: Bom, batches = 1) =>
         bom.items.reduce((sum, item) => {
-            const mat = materials.find((m) => m.id === item.raw_material_id);
-            return sum + (mat ? Number(item.qty_per_batch) * Number(mat.cost_per_unit) : 0);
+            const mat = materials.find((m) => m.id === item.raw_material_id)
+                     ?? item.raw_material;
+            return sum + (mat ? Number(item.qty_per_batch) * Number(mat.cost_per_unit) * batches : 0);
         }, 0);
 
-    const canRun = (bom: Bom) =>
+    const canRun = (bom: Bom, batches = 1) =>
         bom.items.every((item) => {
-            const mat = materials.find((m) => m.id === item.raw_material_id);
-            return mat && Number(mat.stock_qty) >= Number(item.qty_per_batch);
+            const mat = materials.find((m) => m.id === item.raw_material_id)
+                     ?? item.raw_material;
+            return mat && Number(mat.stock_qty) >= Number(item.qty_per_batch) * batches;
         });
 
     return (
@@ -125,9 +179,7 @@ export default function BomIndex({ boms, products, materials }: Props) {
                         <h1>Bill of Materials</h1>
                         <p>Define product formulations and run production batches</p>
                     </div>
-                    <button className="btn primary" onClick={openNew}>
-                        ＋ New BOM
-                    </button>
+                    <button className="btn primary" onClick={openNew}>＋ New BOM</button>
                 </div>
 
                 {boms.length === 0 ? (
@@ -139,17 +191,14 @@ export default function BomIndex({ boms, products, materials }: Props) {
                     boms.map((bom) => {
                         const estimatedCost = calcBomCost(bom);
                         const runnable = canRun(bom);
-
                         return (
                             <div key={bom.id} className="order-card">
                                 <div
                                     className="order-card-header"
-                                    onClick={() => router.visit(`/bom/${bom.id}/detail`)}
+                                    onClick={() => setDetailBom(bom)}
                                     role="button"
                                     tabIndex={0}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') router.visit(`/bom/${bom.id}/detail`);
-                                    }}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') setDetailBom(bom); }}
                                 >
                                     <div className="o-id">⚗️</div>
                                     <div style={{ flex: 1 }}>
@@ -179,23 +228,117 @@ export default function BomIndex({ boms, products, materials }: Props) {
                 )}
             </div>
 
-            {/* New BOM modal */}
-            <div className={`modal-overlay${createModal ? ' open' : ''}`}>
+            {/* ── BOM Detail Modal ─────────────────────────────────────────── */}
+            <div className={`modal-overlay${detailBom ? ' open' : ''}`} onClick={() => setDetailBom(null)}>
+                <div
+                    className="modal"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ maxWidth: 720, width: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+                >
+                    {detailBom && (
+                        <>
+                            <div className="modal-header">
+                                <h2>⚗️ {detailBom.name}</h2>
+                                <button className="modal-close" onClick={() => setDetailBom(null)}>✕</button>
+                            </div>
+                            <div className="modal-body" style={{ overflowY: 'auto', flex: 1 }}>
+                                {/* Meta */}
+                                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+                                    {[
+                                        { label: 'Product', value: detailBom.product?.name ?? '—' },
+                                        { label: 'Packing', value: detailBom.packing_size ?? '—' },
+                                        { label: 'Batch Size', value: `${formatQty(detailBom.batch_size)} ${detailBom.batch_unit}` },
+                                        { label: 'Est. Cost / Batch', value: `₹${calcBomCost(detailBom).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+                                    ].map((c) => (
+                                        <div key={c.label} style={{ background: 'var(--bg-paper)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 14px', minWidth: 100 }}>
+                                            <div style={{ fontSize: 10, color: 'var(--tx-muted)', textTransform: 'uppercase', letterSpacing: '.5px' }}>{c.label}</div>
+                                            <div style={{ fontSize: 15, fontWeight: 700 }}>{c.value}</div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Action buttons */}
+                                <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                                    <button
+                                        className={`btn sm${canRun(detailBom) ? ' primary' : ''}`}
+                                        onClick={() => openRun(detailBom)}
+                                        disabled={!canRun(detailBom)}
+                                        title={canRun(detailBom) ? '' : 'Insufficient stock'}
+                                    >
+                                        {canRun(detailBom) ? '▶ Run Production' : '⚠️ Insufficient Stock'}
+                                    </button>
+                                    <button className="btn sm" onClick={() => openEdit(detailBom)}>Edit BOM</button>
+                                    <button className="btn danger-xs" onClick={() => deleteBom(detailBom)}>Delete</button>
+                                    <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--tx-muted)', alignSelf: 'center' }}>
+                                        Est. cost: ₹{calcBomCost(detailBom).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / batch
+                                    </span>
+                                </div>
+
+                                {/* Ingredients table */}
+                                <div className="prod-wrap">
+                                    <table className="prod-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Ingredient</th>
+                                                <th>Qty / Batch</th>
+                                                <th>Unit</th>
+                                                <th>Current Stock</th>
+                                                <th>Cost / Batch</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {detailBom.items.map((item, idx) => {
+                                                const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id) ?? null;
+                                                const needed = Number(item.qty_per_batch);
+                                                const inStock = mat ? Number(mat.stock_qty) : 0;
+                                                const sufficient = inStock >= needed;
+                                                const cost = mat ? needed * Number(mat.cost_per_unit) : 0;
+                                                return (
+                                                    <tr key={idx}>
+                                                        <td><div className="prod-name">{mat?.name ?? `Material #${item.raw_material_id}`}</div></td>
+                                                        <td>{formatQty(item.qty_per_batch)}</td>
+                                                        <td>{item.unit ?? mat?.unit ?? '—'}</td>
+                                                        <td>
+                                                            <span style={{ color: sufficient ? 'var(--accent)' : 'var(--danger)', fontWeight: 600 }}>
+                                                                {mat ? `${formatQty(mat.stock_qty)} ${mat.unit}` : '—'}
+                                                            </span>
+                                                        </td>
+                                                        <td>₹{cost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                                                        <td><span className={`badge ${sufficient ? 'teal' : 'amber'}`}>{sufficient ? '✓ OK' : '⚠️ Low'}</span></td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {detailBom.notes && (
+                                    <div style={{ marginTop: 12, fontSize: 13, color: 'var(--tx-muted)', padding: '8px 12px', background: 'var(--bg-paper)', borderRadius: 'var(--radius-sm)' }}>
+                                        📝 {detailBom.notes}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="modal-footer">
+                                <button className="btn" onClick={() => setDetailBom(null)}>Close</button>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+
+            {/* ── BOM create/edit modal ────────────────────────────────────── */}
+            <div className={`modal-overlay${editModal ? ' open' : ''}`} style={{ zIndex: 1100 }}>
                 <div className="modal" style={{ maxWidth: 640, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
                     <div className="modal-header">
-                        <h2>New BOM</h2>
-                        <button className="modal-close" onClick={() => setCreateModal(false)}>✕</button>
+                        <h2>{editingBom ? 'Edit BOM' : 'New BOM'}</h2>
+                        <button className="modal-close" onClick={() => setEditModal(false)}>✕</button>
                     </div>
                     <div className="modal-body" style={{ overflowY: 'auto', flex: 1 }}>
                         <div className="form-grid">
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                 <label>BOM Name *</label>
-                                <input
-                                    type="text"
-                                    value={form.data.name}
-                                    onChange={(e) => form.setData('name', e.target.value)}
-                                    placeholder="e.g. Imidacloprid 17.8% SL - 1L"
-                                />
+                                <input type="text" value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} placeholder="e.g. Imidacloprid 17.8% SL - 1L" />
                             </div>
                             <div className="form-group">
                                 <label>Linked Product</label>
@@ -226,12 +369,9 @@ export default function BomIndex({ boms, products, materials }: Props) {
 
                         <div style={{ marginTop: 16 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)' }}>
-                                    ⚗️ Ingredients
-                                </div>
+                                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)' }}>⚗️ Ingredients</div>
                                 <button type="button" className="btn sm" onClick={addItem}>+ Add Ingredient</button>
                             </div>
-
                             {form.data.items.length === 0 ? (
                                 <div style={{ textAlign: 'center', padding: 16, color: 'var(--tx-faint)', fontSize: 13, border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)' }}>
                                     No ingredients added yet.
@@ -241,9 +381,7 @@ export default function BomIndex({ boms, products, materials }: Props) {
                                     <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 32px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
                                         <select value={item.raw_material_id} onChange={(e) => updateItem(idx, 'raw_material_id', e.target.value)}>
                                             <option value="">— Select material —</option>
-                                            {materials.map((m) => (
-                                                <option key={m.id} value={m.id}>{m.name} ({formatQty(m.stock_qty)} {m.unit})</option>
-                                            ))}
+                                            {materials.map((m) => <option key={m.id} value={m.id}>{m.name} ({formatQty(m.stock_qty)} {m.unit})</option>)}
                                         </select>
                                         <input type="number" placeholder="Qty" value={item.qty_per_batch} onChange={(e) => updateItem(idx, 'qty_per_batch', e.target.value)} step="0.001" min="0" />
                                         <input type="text" placeholder="Unit" value={item.unit} onChange={(e) => updateItem(idx, 'unit', e.target.value)} />
@@ -254,8 +392,51 @@ export default function BomIndex({ boms, products, materials }: Props) {
                         </div>
                     </div>
                     <div className="modal-footer">
-                        <button className="btn" onClick={() => setCreateModal(false)}>Cancel</button>
-                        <button className="btn primary" onClick={saveBom} disabled={form.processing}>Create BOM</button>
+                        <button className="btn" onClick={() => setEditModal(false)}>Cancel</button>
+                        <button className="btn primary" onClick={saveBom} disabled={form.processing}>
+                            {editingBom ? 'Update BOM' : 'Create BOM'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Run production modal ─────────────────────────────────────── */}
+            <div className={`modal-overlay${runModal ? ' open' : ''}`} style={{ zIndex: 1100 }}>
+                <div className="modal" style={{ maxWidth: 420 }}>
+                    <div className="modal-header">
+                        <h2>Run Production — {runTarget?.name}</h2>
+                        <button className="modal-close" onClick={() => setRunModal(false)}>✕</button>
+                    </div>
+                    <div className="modal-body">
+                        <div style={{ marginBottom: 14, padding: '10px 12px', background: 'var(--bg-paper)', borderRadius: 'var(--radius-sm)', fontSize: 13 }}>
+                            Batch size: <strong>{formatQty(runTarget?.batch_size ?? 0)} {runTarget?.batch_unit}</strong><br />
+                            Est. cost per batch: <strong>₹{runTarget ? calcBomCost(runTarget, 1).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</strong>
+                        </div>
+                        {runTarget && !canRun(runTarget, Number(runForm.data.batch_count) || 1) && (
+                            <div style={{ marginBottom: 12, padding: '8px 12px', background: 'var(--danger-lt)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-sm)', fontSize: 12, color: 'var(--danger)' }}>
+                                ⚠️ Insufficient stock for {runForm.data.batch_count} batch(es).
+                            </div>
+                        )}
+                        <div className="form-grid">
+                            <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                                <label>Number of Batches *</label>
+                                <input type="number" value={runForm.data.batch_count} onChange={(e) => runForm.setData('batch_count', e.target.value)} min="0.001" step="0.001" />
+                            </div>
+                            <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                                <label>Notes</label>
+                                <textarea value={runForm.data.notes} onChange={(e) => runForm.setData('notes', e.target.value)} rows={2} placeholder="Batch notes, lot number, etc." />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="modal-footer">
+                        <button className="btn" onClick={() => setRunModal(false)}>Cancel</button>
+                        <button
+                            className="btn primary"
+                            onClick={submitRun}
+                            disabled={runForm.processing || (runTarget ? !canRun(runTarget, Number(runForm.data.batch_count) || 1) : true)}
+                        >
+                            ▶ Run {runForm.data.batch_count} Batch(es)
+                        </button>
                     </div>
                 </div>
             </div>

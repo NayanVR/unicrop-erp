@@ -74,7 +74,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('inventory/categories/{category}', [InventoryController::class, 'destroyCategory'])->name('inventory.categories.destroy');
 
         Route::get('bom', [BomRecipeController::class, 'webIndex'])->name('bom.index');
-        Route::get('bom/{bom}/detail', [BomController::class, 'show'])->name('bom.show');
 
         Route::post('bom', [BomController::class, 'store'])->name('bom.store');
         Route::patch('bom/{bom}', [BomController::class, 'update'])->name('bom.update');
