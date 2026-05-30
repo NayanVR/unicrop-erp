@@ -2,21 +2,14 @@ import { Head } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
 type Ingredient = { name: string; qty: string; unit: string; rate: string };
-type PackingRow = {
-    size: string;
-    margin: string;
-    gst: string;
-    useManual: boolean;   // false = auto (margin-based), true = manual kimmat
-    manualRate: string;   // direct selling price (pre-GST) in manual mode
-    discount: string;     // takavari % applied on MRP
-};
+type PackingRow = { size: string; margin: string; gst: string };
 
 const DEFAULT_PACKINGS: PackingRow[] = [
-    { size: '100mL', margin: '30', gst: '18', useManual: false, manualRate: '', discount: '' },
-    { size: '250mL', margin: '30', gst: '18', useManual: false, manualRate: '', discount: '' },
-    { size: '500mL', margin: '28', gst: '18', useManual: false, manualRate: '', discount: '' },
-    { size: '1L',    margin: '25', gst: '18', useManual: false, manualRate: '', discount: '' },
-    { size: '5L',    margin: '20', gst: '18', useManual: false, manualRate: '', discount: '' },
+    { size: '100mL', margin: '30', gst: '18' },
+    { size: '250mL', margin: '30', gst: '18' },
+    { size: '500mL', margin: '28', gst: '18' },
+    { size: '1L', margin: '25', gst: '18' },
+    { size: '5L', margin: '20', gst: '18' },
 ];
 
 const formatAmt = (v: number) =>
@@ -61,7 +54,7 @@ export default function RateCalculator() {
     };
 
     const addPacking = () =>
-        setPackings((prev) => [...prev, { size: '', margin: '25', gst: '18', useManual: false, manualRate: '', discount: '' }]);
+        setPackings((prev) => [...prev, { size: '', margin: '25', gst: '18' }]);
 
     const removePacking = (idx: number) =>
         setPackings((prev) => prev.filter((_, i) => i !== idx));
@@ -69,37 +62,27 @@ export default function RateCalculator() {
     const updatePacking = (idx: number, field: keyof PackingRow, value: string) => {
         setPackings((prev) => {
             const next = [...prev];
-            next[idx] = { ...next[idx], [field]: field === 'useManual' ? value === 'true' : value } as PackingRow;
+            next[idx] = { ...next[idx], [field]: value };
             return next;
         });
     };
 
     const calcRate = (packing: PackingRow) => {
-        const sizeInL   = parseSizeToLiters(packing.size);
-        const gst       = parseFloat(packing.gst) || 0;
-        const discount  = parseFloat(packing.discount) || 0;
-
-        let baseRate: number;
-        if (packing.useManual) {
-            baseRate = parseFloat(packing.manualRate) || 0;
-        } else {
-            const cost   = costPerUnit * sizeInL;
-            const margin = parseFloat(packing.margin) || 0;
-            baseRate = margin >= 100 ? cost : cost / (1 - margin / 100);
-        }
-
-        const gstAmt      = baseRate * (gst / 100);
-        const mrp         = baseRate + gstAmt;
-        const afterDisc   = mrp * (1 - discount / 100);
-        return { baseRate, gstAmt, mrp, afterDisc, discount };
+        const sizeInL = parseSizeToLiters(packing.size);
+        const cost = costPerUnit * sizeInL;
+        const margin = parseFloat(packing.margin) || 0;
+        const gst = parseFloat(packing.gst) || 0;
+        const baseRate = cost / (1 - margin / 100);
+        const gstAmt = baseRate * (gst / 100);
+        return { baseRate, gstAmt, mrp: baseRate + gstAmt };
     };
 
     const copyRow = (idx: number) => {
         const p = packings[idx];
         const r = calcRate(p);
-        const parts = [`${p.size}`, `Base: ${formatAmt(r.baseRate)}`, `GST: ${formatAmt(r.gstAmt)}`, `MRP: ${formatAmt(r.mrp)}`];
-        if (r.discount > 0) parts.push(`Takavari (${r.discount}%): ${formatAmt(r.afterDisc)}`);
-        navigator.clipboard.writeText(parts.join('\t'));
+        navigator.clipboard.writeText(
+            `${p.size}\tBase: ${formatAmt(r.baseRate)}\tGST: ${formatAmt(r.gstAmt)}\tMRP: ${formatAmt(r.mrp)}`,
+        );
         setCopied(idx);
         setTimeout(() => setCopied(null), 1500);
     };
@@ -218,74 +201,22 @@ export default function RateCalculator() {
                                 const r = calcRate(p);
                                 return (
                                     <div key={idx} className="rc-packing-card">
-                                        {/* Row 1: size + mode toggle + remove */}
-                                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+                                        <div className="rc-packing-inputs">
                                             <input
                                                 type="text"
                                                 placeholder="Size"
                                                 value={p.size}
                                                 onChange={(e) => updatePacking(idx, 'size', e.target.value)}
-                                                style={{ flex: '0 0 80px' }}
                                             />
-                                            {/* Mode toggle */}
-                                            <div style={{ display: 'flex', flex: 1, border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', overflow: 'hidden', height: 30 }}>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => updatePacking(idx, 'useManual', 'false')}
-                                                    style={{
-                                                        flex: 1, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
-                                                        background: !p.useManual ? 'var(--accent)' : 'var(--bg-paper)',
-                                                        color: !p.useManual ? '#fff' : 'var(--tx-muted)',
-                                                    }}
-                                                >
-                                                    Auto
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => updatePacking(idx, 'useManual', 'true')}
-                                                    style={{
-                                                        flex: 1, border: 'none', borderLeft: '1px solid var(--border)', cursor: 'pointer', fontSize: 11, fontWeight: 600,
-                                                        background: p.useManual ? '#7c3aed' : 'var(--bg-paper)',
-                                                        color: p.useManual ? '#fff' : 'var(--tx-muted)',
-                                                    }}
-                                                >
-                                                    Kimmat
-                                                </button>
+                                            <div className="rc-field-wrap">
+                                                <input
+                                                    type="number"
+                                                    placeholder="Margin%"
+                                                    value={p.margin}
+                                                    onChange={(e) => updatePacking(idx, 'margin', e.target.value)}
+                                                />
+                                                <span className="rc-suffix">%</span>
                                             </div>
-                                            <button
-                                                type="button"
-                                                className="btn danger-xs"
-                                                onClick={() => removePacking(idx)}
-                                                style={{ padding: '0 6px', height: 30, flexShrink: 0 }}
-                                            >
-                                                ✕
-                                            </button>
-                                        </div>
-
-                                        {/* Row 2: margin or manual rate + GST + discount */}
-                                        <div className="rc-packing-inputs" style={{ marginBottom: 8 }}>
-                                            {p.useManual ? (
-                                                <div className="rc-field-wrap">
-                                                    <span className="rc-suffix" style={{ left: 8, right: 'auto', color: 'var(--tx-muted)', fontSize: 12 }}>₹</span>
-                                                    <input
-                                                        type="number"
-                                                        placeholder="Selling price"
-                                                        value={p.manualRate}
-                                                        onChange={(e) => updatePacking(idx, 'manualRate', e.target.value)}
-                                                        style={{ paddingLeft: 22 }}
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <div className="rc-field-wrap">
-                                                    <input
-                                                        type="number"
-                                                        placeholder="Margin%"
-                                                        value={p.margin}
-                                                        onChange={(e) => updatePacking(idx, 'margin', e.target.value)}
-                                                    />
-                                                    <span className="rc-suffix">%</span>
-                                                </div>
-                                            )}
                                             <div className="rc-field-wrap">
                                                 <input
                                                     type="number"
@@ -295,42 +226,32 @@ export default function RateCalculator() {
                                                 />
                                                 <span className="rc-suffix">%</span>
                                             </div>
-                                            <div className="rc-field-wrap">
-                                                <input
-                                                    type="number"
-                                                    placeholder="Takavari%"
-                                                    value={p.discount}
-                                                    onChange={(e) => updatePacking(idx, 'discount', e.target.value)}
-                                                />
-                                                <span className="rc-suffix">%</span>
-                                            </div>
+                                            <button
+                                                type="button"
+                                                className="btn danger-xs"
+                                                onClick={() => removePacking(idx)}
+                                                style={{ padding: '0 6px', height: '30px' }}
+                                            >
+                                                ✕
+                                            </button>
                                         </div>
 
-                                        {/* Output */}
                                         <div className="rc-rate-output">
                                             <div>
-                                                <div style={{ color: 'var(--tx-muted)', marginBottom: '2px', fontSize: 11 }}>Base Rate</div>
+                                                <div style={{ color: 'var(--tx-muted)', marginBottom: '2px' }}>Base Rate</div>
                                                 <div style={{ fontWeight: 700 }}>{formatAmt(r.baseRate)}</div>
                                             </div>
                                             <div>
-                                                <div style={{ color: 'var(--tx-muted)', marginBottom: '2px', fontSize: 11 }}>GST ({p.gst || 0}%)</div>
+                                                <div style={{ color: 'var(--tx-muted)', marginBottom: '2px' }}>GST</div>
                                                 <div style={{ fontWeight: 700 }}>{formatAmt(r.gstAmt)}</div>
                                             </div>
                                             <div>
-                                                <div style={{ color: 'var(--tx-muted)', marginBottom: '2px', fontSize: 11 }}>MRP</div>
+                                                <div style={{ color: 'var(--tx-muted)', marginBottom: '2px' }}>MRP</div>
                                                 <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--accent)' }}>
                                                     {formatAmt(r.mrp)}
                                                 </div>
                                             </div>
                                         </div>
-
-                                        {/* Takavari row */}
-                                        {r.discount > 0 && (
-                                            <div style={{ marginTop: 8, padding: '6px 10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 'var(--radius-sm)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13 }}>
-                                                <span style={{ color: '#166534' }}>Takavari ({r.discount}%) price</span>
-                                                <strong style={{ color: '#166534', fontSize: 14 }}>{formatAmt(r.afterDisc)}</strong>
-                                            </div>
-                                        )}
 
                                         <button
                                             type="button"
