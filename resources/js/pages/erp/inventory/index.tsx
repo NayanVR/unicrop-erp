@@ -518,12 +518,12 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         if (editingMat) {
             matForm.patch(matUpdate(editingMat.id).url, {
                 preserveScroll: true,
-                onSuccess: () => setMatModal(false),
+                onSuccess: () => { setMatModal(false); setEditingMat(null); matForm.reset(); },
             });
         } else {
             matForm.post(matStore().url, {
                 preserveScroll: true,
-                onSuccess: () => setMatModal(false),
+                onSuccess: () => { setMatModal(false); matForm.reset(); },
             });
         }
     };
