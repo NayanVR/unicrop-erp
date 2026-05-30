@@ -693,15 +693,6 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
                         <button className="modal-close" onClick={() => setRunModal(false)}>✕</button>
                     </div>
                     <div className="modal-body">
-                        <div style={{ marginBottom: 14, padding: '10px 12px', background: 'var(--bg-paper)', borderRadius: 'var(--radius-sm)', fontSize: 13 }}>
-                            Batch size: <strong>{formatQty(runTarget?.batch_size ?? 0)} {runTarget?.batch_unit}</strong><br />
-                            Est. cost / batch: <strong>₹{runTarget ? calcCost(runTarget).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</strong>
-                        </div>
-                        {runTarget && !canRun(runTarget, Number(runForm.data.batch_count) || 1) && (
-                            <div style={{ marginBottom: 12, padding: '8px 12px', background: 'var(--danger-lt)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-sm)', fontSize: 12, color: 'var(--danger)' }}>
-                                ⚠️ Insufficient stock for this qty.
-                            </div>
-                        )}
                         <div className="form-grid">
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                 <label>Batch Number <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 12 }}>(auto-generated, you can change)</span></label>
@@ -716,6 +707,40 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
                                     </div>
                                 )}
                             </div>
+                        </div>
+
+                        {/* Live material breakdown */}
+                        {runTarget && runTarget.items.length > 0 && Number(runForm.data.batch_count) > 0 && (() => {
+                            const qty = Number(runForm.data.batch_count);
+                            return (
+                                <div style={{ margin: '12px 0', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                                    <div style={{ padding: '7px 12px', background: 'var(--bg-paper)', fontSize: 12, fontWeight: 600, color: 'var(--tx-muted)', borderBottom: '1px solid var(--border)' }}>
+                                        Materials required for this run
+                                    </div>
+                                    {runTarget.items.map((item, i) => {
+                                        const mat      = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
+                                        const matUnit  = mat?.unit ?? '';
+                                        const itemUnit = item.unit || matUnit;
+                                        const needed   = Number(item.qty_per_batch) * qty;
+                                        const neededInMatUnit = mat ? convertQty(needed, itemUnit, matUnit) : needed;
+                                        const inStock  = mat ? Number(mat.stock_qty) : 0;
+                                        const ok       = inStock >= neededInMatUnit;
+                                        return (
+                                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 12px', borderBottom: i < runTarget.items.length - 1 ? '1px solid var(--border)' : undefined, fontSize: 13, gap: 8 }}>
+                                                <span style={{ flex: 1, color: ok ? 'var(--tx-body)' : '#dc2626' }}>{mat?.name ?? `Material #${item.raw_material_id}`}</span>
+                                                <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                                    {needed.toLocaleString('en-IN', { maximumFractionDigits: 6 })} <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--tx-muted)' }}>{itemUnit}</span>
+                                                    {!ok && <span style={{ marginLeft: 8, fontSize: 11, color: '#dc2626', background: '#fee2e2', padding: '1px 6px', borderRadius: 8 }}>⚠ short by {(neededInMatUnit - inStock).toLocaleString('en-IN', { maximumFractionDigits: 6 })} {matUnit}</span>}
+                                                    {ok && <span style={{ marginLeft: 8, fontSize: 11, color: '#059669', background: '#d1fae5', padding: '1px 6px', borderRadius: 8 }}>✓</span>}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })()}
+
+                        <div className="form-grid" style={{ marginTop: 4 }}>
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                 <label>Notes</label>
                                 <textarea value={runForm.data.notes} onChange={(e) => runForm.setData('notes', e.target.value)} rows={2} placeholder="Lot notes, operator, etc." />
