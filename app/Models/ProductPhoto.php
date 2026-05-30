@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'packing_size',
     'photo_path',
     'uploaded_by',
+    'updated_by',
 ])]
 class ProductPhoto extends Model
 {
@@ -24,6 +25,11 @@ class ProductPhoto extends Model
     public function uploader(): BelongsTo
     {
         return $this->belongsTo(User::class, 'uploaded_by');
+    }
+
+    public function updater(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
     }
 
     public function getPhotoUrlAttribute(): string

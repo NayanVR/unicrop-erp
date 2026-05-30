@@ -25,20 +25,23 @@ class ProductPhotoController extends Controller
 
     public function index(): Response
     {
-        $photos = ProductPhoto::with('party:id,name')
+        $photos = ProductPhoto::with(['party:id,name', 'uploader:id,name', 'updater:id,name'])
             ->orderBy('party_id')
             ->orderBy('our_brand')
             ->orderBy('party_brand')
             ->orderBy('packing_size')
             ->get()
             ->map(fn($p) => [
-                'id' => $p->id,
-                'party_id' => $p->party_id,
-                'party_name' => $p->party?->name,
-                'our_brand' => $p->our_brand,
-                'party_brand' => $p->party_brand,
-                'packing_size' => $p->packing_size,
-                'photo_url' => $p->photo_url,
+                'id'             => $p->id,
+                'party_id'       => $p->party_id,
+                'party_name'     => $p->party?->name,
+                'our_brand'      => $p->our_brand,
+                'party_brand'    => $p->party_brand,
+                'packing_size'   => $p->packing_size,
+                'photo_url'      => $p->photo_url,
+                'uploaded_by'    => $p->uploader?->name,
+                'updated_by'     => $p->updater?->name,
+                'updated_at'     => $p->updated_at?->toDateString(),
             ]);
 
         $folders = ProductPhotoFolder::with('party:id,name')
@@ -196,6 +199,7 @@ class ProductPhotoController extends Controller
         $photo->our_brand    = $data['our_brand'];
         $photo->party_brand  = $data['party_brand'] ?? null;
         $photo->packing_size = $data['packing_size'] ?? null;
+        $photo->updated_by   = auth()->id();
         $photo->save();
 
         return redirect()->back()->with('success', 'Photo updated successfully.');

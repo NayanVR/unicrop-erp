@@ -15,6 +15,9 @@ type Photo = {
     party_brand: string | null;
     packing_size: string | null;
     photo_url: string;
+    uploaded_by: string | null;
+    updated_by: string | null;
+    updated_at: string | null;
 };
 
 type PageProps = {
@@ -568,6 +571,14 @@ export default function DesignGallery() {
                                         Our brand: {lightbox.our_brand}
                                     </div>
                                 )}
+                                <div style={{ fontSize: '11px', color: 'var(--tx-muted)', marginTop: '4px' }}>
+                                    {lightbox.uploaded_by && <>Uploaded by {lightbox.uploaded_by}</>}
+                                    {lightbox.updated_by && (
+                                        <span style={{ marginLeft: lightbox.uploaded_by ? '10px' : 0 }}>
+                                            · Edited by {lightbox.updated_by}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <button
@@ -779,7 +790,14 @@ function PhotoCard({ photo, deleting, onView, onEdit, onDelete }: {
                 {photo.packing_size && (
                     <div style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>{photo.packing_size}</div>
                 )}
-                <div style={{ display: 'flex', gap: '12px', marginTop: '6px' }}>
+                <div style={{ fontSize: '10px', color: 'var(--tx-muted)', marginTop: '4px' }}>
+                    {photo.updated_by
+                        ? <>Edited by {photo.updated_by}</>
+                        : photo.uploaded_by
+                          ? <>By {photo.uploaded_by}</>
+                          : null}
+                </div>
+                <div style={{ display: 'flex', gap: '12px', marginTop: '5px' }}>
                     <button
                         type="button"
                         style={{ fontSize: '11px', color: 'var(--tx-sub)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
