@@ -363,13 +363,6 @@ export default function BomIndex({ boms, products, materials }: Props) {
                                 {form.errors.name && <div className="form-error">{form.errors.name}</div>}
                             </div>
                             <div className="form-group">
-                                <label>Linked Product</label>
-                                <select value={form.data.product_id} onChange={(e) => form.setData('product_id', e.target.value)}>
-                                    <option value="">— None —</option>
-                                    {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                </select>
-                            </div>
-                            <div className="form-group">
                                 <label>Packing Size</label>
                                 <input type="text" value={form.data.packing_size} onChange={(e) => form.setData('packing_size', e.target.value)} placeholder="e.g. 1L, 500mL" />
                             </div>
