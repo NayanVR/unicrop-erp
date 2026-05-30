@@ -162,6 +162,8 @@ const PACKAGING_CATEGORIES = [
     { label: 'Cap/Closure', icon: '🔩', code: 'CAP', unit: 'pcs' },
 ];
 
+type WizardCategory = { label: string; icon: string; code: string; unit: string; color?: string };
+
 const SHAPE_ABBR: Record<string, string> = {
     round: 'RND',
     square: 'SQ',
@@ -247,7 +249,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
 
     // Packaging wizard
     const [packStep, setPackStep] = useState(1);
-    const [packCat, setPackCat] = useState<(typeof PACKAGING_CATEGORIES)[0] | null>(null);
+    const [packCat, setPackCat] = useState<WizardCategory | null>(null);
     const [packForm, setPackForm] = useState({
         size: '',
         shape: '',
@@ -402,6 +404,20 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     // ── Derived data ──────────────────────────────────────────────────────────
 
     const categories = inventoryCategories.map((c) => c.name);
+
+    const packingHardcodedLabels = new Set(PACKAGING_CATEGORIES.map((c) => c.label.toLowerCase()));
+    const wizardCategories: WizardCategory[] = [
+        ...PACKAGING_CATEGORIES,
+        ...inventoryCategories
+            .filter((c) => !packingHardcodedLabels.has(c.name.toLowerCase()))
+            .map((c) => ({
+                label: c.name,
+                icon: '📁',
+                code: c.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase(),
+                unit: 'pcs',
+                color: c.color ?? undefined,
+            })),
+    ];
 
     const filteredMaterials = materials.filter((m) => {
         const s = stockStatus(m);
@@ -736,7 +752,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         setPackModal(true);
     };
 
-    const packSelectCat = (cat: (typeof PACKAGING_CATEGORIES)[0]) => {
+    const packSelectCat = (cat: WizardCategory) => {
         setPackCat(cat);
         setPackForm((prev) => ({ ...prev, unit: cat.unit }));
         setPackStep(2);
@@ -2148,7 +2164,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                             <div>
                                 <p style={{ color: '#6b7280', marginBottom: 16 }}>Select the type of packaging material:</p>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-                                    {PACKAGING_CATEGORIES.map((cat) => (
+                                    {wizardCategories.map((cat) => (
                                         <button
                                             key={cat.code}
                                             type="button"
@@ -2159,14 +2175,20 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                                 alignItems: 'center',
                                                 gap: 6,
                                                 padding: '14px 8px',
-                                                border: '2px solid #e5e7eb',
+                                                border: `2px solid ${cat.color ?? '#e5e7eb'}`,
                                                 borderRadius: 10,
-                                                background: '#fff',
+                                                background: cat.color ? cat.color + '11' : '#fff',
                                                 cursor: 'pointer',
-                                                transition: 'border-color 0.15s',
+                                                transition: 'border-color 0.15s, background 0.15s',
                                             }}
-                                            onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#2563eb')}
-                                            onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#e5e7eb')}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.borderColor = cat.color ?? '#2563eb';
+                                                e.currentTarget.style.background = cat.color ? cat.color + '22' : '#eff6ff';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.borderColor = cat.color ?? '#e5e7eb';
+                                                e.currentTarget.style.background = cat.color ? cat.color + '11' : '#fff';
+                                            }}
                                         >
                                             <span style={{ fontSize: 28 }}>{cat.icon}</span>
                                             <span style={{ fontSize: 12, fontWeight: 600, textAlign: 'center' }}>{cat.label}</span>
@@ -2179,7 +2201,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                         {/* Step 2: Size & Details */}
                         {packStep === 2 && packCat && (
                             <div className="form-grid">
-                                <div style={{ gridColumn: '1 / -1', marginBottom: 8, padding: '8px 12px', background: '#eff6ff', borderRadius: 8, fontWeight: 600, color: '#1e40af' }}>
+                                <div style={{ gridColumn: '1 / -1', marginBottom: 8, padding: '8px 12px', background: packCat.color ? packCat.color + '22' : '#eff6ff', border: `1px solid ${packCat.color ?? '#bfdbfe'}`, borderRadius: 8, fontWeight: 600, color: packCat.color ?? '#1e40af' }}>
                                     {packCat.icon} {packCat.label}
                                 </div>
                                 <div className="form-group">
