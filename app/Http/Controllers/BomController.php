@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Bom;
 use App\Models\FinishedGood;
+use App\Models\InventoryCategory;
 use App\Models\InventoryTransaction;
 use App\Models\Product;
 use App\Models\ProductionRun;
@@ -19,12 +20,13 @@ class BomController extends Controller
     public function index(): Response
     {
         $boms = Bom::query()
-            ->with(['product:id,name', 'items.rawMaterial:id,name,unit,stock_qty,cost_per_unit', 'outputMaterial:id,name,unit'])
+            ->with(['product:id,name', 'items.rawMaterial:id,name,unit,stock_qty,cost_per_unit', 'outputMaterial:id,name,unit,category'])
             ->orderBy('name')
             ->get();
 
-        $products  = Product::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
-        $materials = RawMaterial::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'unit', 'stock_qty', 'cost_per_unit']);
+        $products   = Product::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $materials  = RawMaterial::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'unit', 'stock_qty', 'cost_per_unit', 'category']);
+        $categories = InventoryCategory::orderBy('name')->pluck('name');
 
         $productionRuns = ProductionRun::query()
             ->with('user:id,name')
@@ -37,6 +39,7 @@ class BomController extends Controller
             'boms'           => $boms,
             'products'       => $products,
             'materials'      => $materials,
+            'categories'     => $categories,
             'productionRuns' => $productionRuns,
         ]);
     }
@@ -50,6 +53,7 @@ class BomController extends Controller
             'batch_size'             => 'required|numeric|min:0.001',
             'batch_unit'             => 'required|string|max:20',
             'output_raw_material_id' => 'nullable|exists:raw_materials,id',
+            'output_category'        => 'nullable|string|max:100',
             'notes'                  => 'nullable|string|max:1000',
             'items'                  => 'array',
             'items.*.raw_material_id' => 'required|exists:raw_materials,id',
@@ -67,6 +71,12 @@ class BomController extends Controller
                 'output_raw_material_id' => $data['output_raw_material_id'] ?? null,
                 'notes'                  => $data['notes'] ?? null,
             ]);
+
+            // Update output material's category if provided
+            if (! empty($data['output_raw_material_id']) && isset($data['output_category'])) {
+                RawMaterial::where('id', $data['output_raw_material_id'])
+                    ->update(['category' => $data['output_category'] ?: null]);
+            }
 
             foreach ($data['items'] ?? [] as $item) {
                 $bom->items()->create([
@@ -89,6 +99,7 @@ class BomController extends Controller
             'batch_size'             => 'required|numeric|min:0.001',
             'batch_unit'             => 'required|string|max:20',
             'output_raw_material_id' => 'nullable|exists:raw_materials,id',
+            'output_category'        => 'nullable|string|max:100',
             'notes'                  => 'nullable|string|max:1000',
             'is_active'              => 'boolean',
             'items'                  => 'array',
@@ -108,6 +119,12 @@ class BomController extends Controller
                 'notes'                  => $data['notes'] ?? null,
                 'is_active'              => $data['is_active'] ?? true,
             ]);
+
+            // Update output material's category if provided
+            if (! empty($data['output_raw_material_id']) && isset($data['output_category'])) {
+                RawMaterial::where('id', $data['output_raw_material_id'])
+                    ->update(['category' => $data['output_category'] ?: null]);
+            }
 
             $bom->items()->delete();
             foreach ($data['items'] ?? [] as $item) {

@@ -14,6 +14,7 @@ type RawMaterial = {
     unit: string;
     stock_qty: string | number;
     cost_per_unit: string | number;
+    category?: string | null;
 };
 
 type BomItem = {
@@ -31,7 +32,7 @@ type Bom = {
     batch_size: string | number;
     batch_unit: string;
     output_raw_material_id?: number | null;
-    output_material?: { id: number; name: string; unit: string } | null;
+    output_material?: { id: number; name: string; unit: string; category?: string | null } | null;
     notes?: string | null;
     is_active: boolean;
     product?: { id: number; name: string } | null;
@@ -44,6 +45,7 @@ type Props = {
     boms: Bom[];
     products: Product[];
     materials: RawMaterial[];
+    categories: string[];
     productionRuns: ProductionRunRecord[];
 };
 
@@ -54,6 +56,7 @@ type BomFormData = {
     batch_size: string;
     batch_unit: string;
     output_raw_material_id: string;
+    output_category: string;
     notes: string;
     is_active: boolean;
     items: { raw_material_id: string; qty_per_batch: string; unit: string }[];
@@ -163,7 +166,7 @@ function fmtSmart(qty: number, unit: string): string {
     return `${s.qty.toLocaleString('en-IN', { maximumFractionDigits: 4 })} ${s.unit}`;
 }
 
-export default function BomIndex({ boms, products, materials, productionRuns }: Props) {
+export default function BomIndex({ boms, products, materials, categories, productionRuns }: Props) {
     const { auth } = usePage<{ auth: Auth }>().props;
     const canSeeCost = auth.user?.role === 'admin' || auth.user?.cost_access === true;
 
@@ -179,7 +182,7 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
 
     const form = useForm<BomFormData>({
         name: '', product_id: '', packing_size: '', batch_size: '1',
-        batch_unit: 'kg', output_raw_material_id: '', notes: '', is_active: true, items: [],
+        batch_unit: 'kg', output_raw_material_id: '', output_category: '', notes: '', is_active: true, items: [],
     });
     const runForm = useForm<RunFormData>({ batch_number: '', batch_count: '1', notes: '' });
 
@@ -195,6 +198,7 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
             batch_size: String(bom.batch_size),
             batch_unit: bom.batch_unit,
             output_raw_material_id: bom.output_raw_material_id ? String(bom.output_raw_material_id) : '',
+            output_category: bom.output_material?.category ?? materials.find((m) => m.id === bom.output_raw_material_id)?.category ?? '',
             notes: bom.notes ?? '',
             is_active: bom.is_active,
             items: bom.items.map((i) => ({
@@ -704,17 +708,37 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
                                         (stock will be added here when BOM is run)
                                     </span>
                                 </label>
-                                <select
-                                    value={form.data.output_raw_material_id}
-                                    onChange={(e) => form.setData('output_raw_material_id', e.target.value)}
-                                >
-                                    <option value="">— Not linked (won't update inventory stock) —</option>
-                                    {materials.map((m) => (
-                                        <option key={m.id} value={m.id}>
-                                            {m.name} ({m.unit}) — Stock: {formatQty(m.stock_qty)}
-                                        </option>
-                                    ))}
-                                </select>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: 8 }}>
+                                    <select
+                                        value={form.data.output_raw_material_id}
+                                        onChange={(e) => {
+                                            const id = e.target.value;
+                                            form.setData('output_raw_material_id', id);
+                                            if (id) {
+                                                const mat = materials.find((m) => m.id === Number(id));
+                                                form.setData('output_category', mat?.category ?? '');
+                                            } else {
+                                                form.setData('output_category', '');
+                                            }
+                                        }}
+                                    >
+                                        <option value="">— Not linked (won't update inventory stock) —</option>
+                                        {materials.map((m) => (
+                                            <option key={m.id} value={m.id}>
+                                                {m.name} ({m.unit}) — Stock: {formatQty(m.stock_qty)}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <select
+                                        value={form.data.output_category}
+                                        onChange={(e) => form.setData('output_category', e.target.value)}
+                                        disabled={!form.data.output_raw_material_id}
+                                        title="Category for the output inventory item"
+                                    >
+                                        <option value="">— Category —</option>
+                                        {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
                             </div>
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                 <label>Description / Notes</label>
