@@ -69,6 +69,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('inventory/reorders', [InventoryController::class, 'storeReorder'])->name('inventory.reorders.store');
         Route::post('inventory/reorders/{reorder}/receive', [InventoryController::class, 'receiveReorder'])->name('inventory.reorders.receive');
         Route::delete('inventory/reorders/{reorder}', [InventoryController::class, 'destroyReorder'])->name('inventory.reorders.destroy');
+        Route::post('inventory/categories', [InventoryController::class, 'storeCategory'])->name('inventory.categories.store');
+        Route::patch('inventory/categories/{category}', [InventoryController::class, 'updateCategory'])->name('inventory.categories.update');
+        Route::delete('inventory/categories/{category}', [InventoryController::class, 'destroyCategory'])->name('inventory.categories.destroy');
 
         Route::get('bom', [BomRecipeController::class, 'webIndex'])->name('bom.index');
 

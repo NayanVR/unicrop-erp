@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\InventoryCategory;
 use App\Models\InventoryPurchaseBill;
 use App\Models\InventoryPurchaseBillItem;
 use App\Models\InventoryReorder;
@@ -63,8 +64,10 @@ class InventoryController extends Controller
             ),
         ];
 
+        $inventoryCategories = InventoryCategory::orderBy('name')->get();
+
         return Inertia::render('erp/inventory/index', array_merge(
-            compact('materials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats', 'vendors'),
+            compact('materials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats', 'vendors', 'inventoryCategories'),
             ['pageTitle' => 'Inventory']
         ));
     }
@@ -476,5 +479,31 @@ class InventoryController extends Controller
             ]);
 
         return response()->json($materials);
+    }
+
+    public function storeCategory(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'name'  => 'required|string|max:100|unique:inventory_categories,name',
+            'color' => 'nullable|string|max:20',
+        ]);
+        InventoryCategory::create($data);
+        return redirect()->back()->with('success', 'Category created.');
+    }
+
+    public function updateCategory(Request $request, InventoryCategory $category): RedirectResponse
+    {
+        $data = $request->validate([
+            'name'  => 'required|string|max:100|unique:inventory_categories,name,' . $category->id,
+            'color' => 'nullable|string|max:20',
+        ]);
+        $category->update($data);
+        return redirect()->back()->with('success', 'Category updated.');
+    }
+
+    public function destroyCategory(InventoryCategory $category): RedirectResponse
+    {
+        $category->delete();
+        return redirect()->back()->with('success', 'Category deleted.');
     }
 }

@@ -116,6 +116,12 @@ type Stats = {
     totalStockValue: number;
 };
 
+type InventoryCategory = {
+    id: number;
+    name: string;
+    color: string | null;
+};
+
 type Props = {
     materials: RawMaterial[];
     recentTransactions: Transaction[];
@@ -123,6 +129,7 @@ type Props = {
     reorders: Reorder[];
     stats: Stats;
     vendors: Vendor[];
+    inventoryCategories: InventoryCategory[];
 };
 
 // ── Route constants ───────────────────────────────────────────────────────────
@@ -134,6 +141,9 @@ const ROUTES = {
     storeReorder: '/inventory/reorders',
     receiveReorder: (id: number) => `/inventory/reorders/${id}/receive`,
     destroyReorder: (id: number) => `/inventory/reorders/${id}`,
+    storeCategory: '/inventory/categories',
+    updateCategory: (id: number) => `/inventory/categories/${id}`,
+    destroyCategory: (id: number) => `/inventory/categories/${id}`,
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -200,7 +210,7 @@ function buildSku(catCode: string, size: string, shape: string): string {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function InventoryIndex({ materials, recentTransactions, purchaseBills, reorders, stats, vendors }: Props) {
+export default function InventoryIndex({ materials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories }: Props) {
     const { auth } = usePage<{ auth: Auth }>().props;
     const role = auth.user?.role ?? '';
     const canSeeCost      = role === 'admin' || auth.user?.cost_access === true;
@@ -208,7 +218,13 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const canEnterBill    = role === 'admin' || role === 'factory' || role === 'accountant';
 
     // Tab
-    const [tab, setTab] = useState<'materials' | 'log' | 'bills' | 'reorders'>('materials');
+    const [tab, setTab] = useState<'materials' | 'log' | 'bills' | 'reorders' | 'categories'>('materials');
+
+    // Category management
+    const [catMgmtModal, setCatMgmtModal] = useState(false);
+    const [editingCat, setEditingCat] = useState<InventoryCategory | null>(null);
+    const [catForm, setCatForm] = useState({ name: '', color: '' });
+    const [catSaving, setCatSaving] = useState(false);
 
     // Filters
     const [search, setSearch] = useState('');
@@ -385,7 +401,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
 
     // ── Derived data ──────────────────────────────────────────────────────────
 
-    const categories = Array.from(new Set(materials.map((m) => m.category).filter(Boolean))) as string[];
+    const categories = inventoryCategories.map((c) => c.name);
 
     const filteredMaterials = materials.filter((m) => {
         const s = stockStatus(m);
@@ -417,6 +433,37 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         purchaseBills.some((b) => b.bill_number === billForm.bill_number.trim());
 
     // ── Handlers ──────────────────────────────────────────────────────────────
+
+    const openNewCat = () => {
+        setEditingCat(null);
+        setCatForm({ name: '', color: '' });
+        setCatMgmtModal(true);
+    };
+
+    const openEditCat = (cat: InventoryCategory) => {
+        setEditingCat(cat);
+        setCatForm({ name: cat.name, color: cat.color ?? '' });
+        setCatMgmtModal(true);
+    };
+
+    const submitCat = () => {
+        if (!catForm.name.trim()) return;
+        setCatSaving(true);
+        if (editingCat) {
+            router.patch(ROUTES.updateCategory(editingCat.id), catForm, {
+                onFinish: () => { setCatSaving(false); setCatMgmtModal(false); },
+            });
+        } else {
+            router.post(ROUTES.storeCategory, catForm, {
+                onFinish: () => { setCatSaving(false); setCatMgmtModal(false); },
+            });
+        }
+    };
+
+    const destroyCat = (cat: InventoryCategory) => {
+        if (!confirm(`Delete category "${cat.name}"? Materials in this category will keep the name but the category list will no longer include it.`)) return;
+        router.delete(ROUTES.destroyCategory(cat.id));
+    };
 
     const openNewMat = () => {
         matForm.reset();
@@ -877,7 +924,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
 
             {/* Tabs */}
             <div className="filter-bar" style={{ marginBottom: 0, borderBottom: '1px solid #e5e7eb' }}>
-                {(['materials', 'log', 'bills', 'reorders'] as const).map((t) => (
+                {(['materials', 'log', 'bills', 'reorders', 'categories'] as const).map((t) => (
                     <button
                         key={t}
                         className={`pill${tab === t ? ' active' : ''}`}
@@ -888,6 +935,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                         {t === 'log' && 'Transaction Log'}
                         {t === 'bills' && 'Purchase Bills'}
                         {t === 'reorders' && 'Reorders'}
+                        {t === 'categories' && 'Categories'}
                     </button>
                 ))}
             </div>
@@ -1202,6 +1250,61 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                 </div>
             )}
 
+            {/* ── Categories Tab ─────────────────────────────────────────────── */}
+            {tab === 'categories' && (
+                <div style={{ padding: '20px 0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Material Categories</h3>
+                        <button className="btn primary sm" onClick={openNewCat}>+ Add Category</button>
+                    </div>
+                    {inventoryCategories.length === 0 ? (
+                        <div style={{ color: '#9ca3af', textAlign: 'center', padding: '40px 0' }}>
+                            No categories yet. Click "+ Add Category" to create one.
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                            {inventoryCategories.map((cat) => (
+                                <div
+                                    key={cat.id}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 8,
+                                        background: cat.color ? cat.color + '22' : '#f3f4f6',
+                                        border: `1.5px solid ${cat.color ?? '#d1d5db'}`,
+                                        borderRadius: 8,
+                                        padding: '6px 12px',
+                                        fontSize: 14,
+                                    }}
+                                >
+                                    {cat.color && (
+                                        <span style={{ width: 12, height: 12, borderRadius: '50%', background: cat.color, display: 'inline-block', flexShrink: 0 }} />
+                                    )}
+                                    <span style={{ fontWeight: 500 }}>{cat.name}</span>
+                                    <span style={{ color: '#6b7280', fontSize: 12 }}>
+                                        ({materials.filter((m) => m.category === cat.name).length} items)
+                                    </span>
+                                    <button
+                                        className="btn sm"
+                                        style={{ padding: '1px 8px', fontSize: 12, marginLeft: 4 }}
+                                        onClick={() => openEditCat(cat)}
+                                    >
+                                        Edit
+                                    </button>
+                                    <button
+                                        className="btn danger sm"
+                                        style={{ padding: '1px 8px', fontSize: 12 }}
+                                        onClick={() => destroyCat(cat)}
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* ════════════════════════════════════════════════════════════════
                 MODALS
             ════════════════════════════════════════════════════════════════ */}
@@ -1239,15 +1342,13 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                 </div>
                                 <div className="form-group">
                                     <label>Category</label>
-                                    <input
-                                        type="text"
+                                    <select
                                         value={matForm.data.category}
                                         onChange={(e) => matForm.setData('category', e.target.value)}
-                                        list="mat-cats"
-                                    />
-                                    <datalist id="mat-cats">
-                                        {categories.map((c) => <option key={c} value={c} />)}
-                                    </datalist>
+                                    >
+                                        <option value="">— None —</option>
+                                        {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                                    </select>
                                     {matForm.errors.category && <div className="form-error">{matForm.errors.category}</div>}
                                 </div>
                                 <div className="form-group">
@@ -2455,6 +2556,56 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     </div>
                     <div className="modal-footer">
                         <button type="button" className="btn" onClick={() => setScanModal(false)}>Close</button>
+                    </div>
+                </div>
+            </div>
+            {/* ── Category Add/Edit Modal ───────────────────────────────────── */}
+            <div className={`modal-overlay${catMgmtModal ? ' open' : ''}`} onClick={() => setCatMgmtModal(false)}>
+                <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400, width: '95%' }}>
+                    <div className="modal-header">
+                        <h3>{editingCat ? 'Edit Category' : 'Add Category'}</h3>
+                        <button className="modal-close" onClick={() => setCatMgmtModal(false)}>×</button>
+                    </div>
+                    <div className="modal-body">
+                        <div className="form-group">
+                            <label>Category Name *</label>
+                            <input
+                                type="text"
+                                value={catForm.name}
+                                onChange={(e) => setCatForm((f) => ({ ...f, name: e.target.value }))}
+                                placeholder="e.g. Packaging, Raw, Chemical"
+                                autoFocus
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label>Color (optional)</label>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                <input
+                                    type="color"
+                                    value={catForm.color || '#6366f1'}
+                                    onChange={(e) => setCatForm((f) => ({ ...f, color: e.target.value }))}
+                                    style={{ width: 40, height: 36, padding: 2, border: '1px solid #d1d5db', borderRadius: 4, cursor: 'pointer' }}
+                                />
+                                <input
+                                    type="text"
+                                    value={catForm.color}
+                                    onChange={(e) => setCatForm((f) => ({ ...f, color: e.target.value }))}
+                                    placeholder="#6366f1 or leave blank"
+                                    style={{ flex: 1 }}
+                                />
+                                {catForm.color && (
+                                    <button type="button" className="btn sm" onClick={() => setCatForm((f) => ({ ...f, color: '' }))}>
+                                        Clear
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="modal-footer">
+                        <button type="button" className="btn" onClick={() => setCatMgmtModal(false)}>Cancel</button>
+                        <button type="button" className="btn primary" disabled={catSaving || !catForm.name.trim()} onClick={submitCat}>
+                            {catSaving ? 'Saving…' : editingCat ? 'Save Changes' : 'Add Category'}
+                        </button>
                     </div>
                 </div>
             </div>
