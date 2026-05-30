@@ -689,7 +689,10 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
                                         {materials.map((m) => <option key={m.id} value={m.id}>{m.name} ({formatQty(m.stock_qty)} {m.unit})</option>)}
                                     </select>
                                     <input type="number" placeholder="Qty" value={item.qty_per_batch} onChange={(e) => updateItem(idx, 'qty_per_batch', e.target.value)} step="0.001" min="0" />
-                                    <input type="text" placeholder="Unit" value={item.unit} onChange={(e) => updateItem(idx, 'unit', e.target.value)} />
+                                    <select value={item.unit} onChange={(e) => updateItem(idx, 'unit', e.target.value)}>
+                                        <option value="">— unit —</option>
+                                        {['kg', 'gm', 'g', 'mg', 'L', 'mL', 'pcs', 'nos'].map((u) => <option key={u} value={u}>{u}</option>)}
+                                    </select>
                                     <button type="button" className="btn danger-xs" onClick={() => removeItem(idx)} style={{ padding: '0 8px', height: 32 }}>✕</button>
                                 </div>
                             ))}
