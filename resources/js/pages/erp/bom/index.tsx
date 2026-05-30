@@ -238,7 +238,11 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
     const openRun = (bom: Bom) => {
         const today = new Date();
         const pad = (n: number) => String(n).padStart(2, '0');
-        const suggested = `BATCH-${today.getFullYear()}${pad(today.getMonth() + 1)}${pad(today.getDate())}`;
+        const words = bom.name.trim().split(/\s+/).filter(Boolean);
+        const prefix = words.length > 1
+            ? words.map((w) => w[0].toUpperCase()).join('')
+            : bom.name.slice(0, 3).toUpperCase();
+        const suggested = `${prefix}-${today.getFullYear()}${pad(today.getMonth() + 1)}${pad(today.getDate())}`;
         runForm.reset();
         runForm.setData('batch_number', suggested);
         setRunTarget(bom);
@@ -729,7 +733,7 @@ export default function BomIndex({ boms, products, materials, productionRuns }: 
                         <div className="form-grid">
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                 <label>Batch Number <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 12 }}>(auto-generated, you can change)</span></label>
-                                <input type="text" value={runForm.data.batch_number} onChange={(e) => runForm.setData('batch_number', e.target.value)} placeholder="e.g. BATCH-20260530-001" />
+                                <input type="text" value={runForm.data.batch_number} onChange={(e) => runForm.setData('batch_number', e.target.value)} placeholder="e.g. NO-20260530-001" />
                             </div>
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                 <label>Batch Qty ({runTarget?.batch_unit}) *</label>

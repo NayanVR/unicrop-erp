@@ -138,9 +138,13 @@ class BomController extends Controller
         // Auto-generate batch number if not provided
         $batchNumber = trim($data['batch_number'] ?? '');
         if ($batchNumber === '') {
-            $today       = now()->format('Ymd');
-            $todayCount  = ProductionRun::whereDate('created_at', now()->toDateString())->count();
-            $batchNumber = 'BATCH-' . $today . '-' . str_pad($todayCount + 1, 3, '0', STR_PAD_LEFT);
+            $words  = preg_split('/\s+/', trim($bom->name), -1, PREG_SPLIT_NO_EMPTY);
+            $prefix = count($words) > 1
+                ? strtoupper(implode('', array_map(fn ($w) => $w[0], $words)))
+                : strtoupper(substr($bom->name, 0, 3));
+            $today      = now()->format('Ymd');
+            $todayCount = ProductionRun::whereDate('created_at', now()->toDateString())->count();
+            $batchNumber = $prefix . '-' . $today . '-' . str_pad($todayCount + 1, 3, '0', STR_PAD_LEFT);
         }
 
         return DB::transaction(function () use ($bom, $batchCount, $batchNumber, $data, $request) {
