@@ -9,7 +9,6 @@ import { index as finishedGoodsIndex } from '@/routes/finished-goods';
 import { index as inventoryIndex } from '@/routes/inventory';
 import { create as ordersCreate, index as ordersIndex } from '@/routes/orders';
 import { index as partiesIndex } from '@/routes/parties';
-import { index as purchaseBillsIndex } from '@/routes/purchase-bills';
 import { index as rateCalcIndex } from '@/routes/rate-calculator';
 import { index as settingsIndex } from '@/routes/settings';
 import { index as unitTransferIndex } from '@/routes/unit-transfer';
@@ -49,7 +48,6 @@ const NAV_DEFS: Record<string, NavItem[]> = {
         { id: 'bom', label: 'Bill of Materials', icon: '⚗️', href: bomIndex() },
         { id: 'finished-goods', label: 'Finished Goods', icon: '✅', href: finishedGoodsIndex() },
         { id: 'inventory', label: 'Inventory', icon: '🗄️', href: inventoryIndex() },
-        { id: 'purchase-bills', label: 'Purchase Bills', icon: '🧾', href: purchaseBillsIndex() },
         { id: 'rate-calc', label: 'Rate Calculator', icon: '🧮', href: rateCalcIndex() },
         { id: 'unit-transfer', label: 'Unit Transfer', icon: '🔄', href: unitTransferIndex() },
         { id: 'design-orders', label: 'Design Orders', icon: '🎨', href: designIndex() },
@@ -75,7 +73,6 @@ const NAV_DEFS: Record<string, NavItem[]> = {
         { id: 'bom', label: 'Bill of Materials', icon: '⚗️', href: bomIndex() },
         { id: 'finished-goods', label: 'Finished Goods', icon: '✅', href: finishedGoodsIndex() },
         { id: 'inventory', label: 'Inventory', icon: '🗄️', href: inventoryIndex() },
-        { id: 'purchase-bills', label: 'Purchase Bills', icon: '🧾', href: purchaseBillsIndex() },
         { id: 'users', label: 'Factory Users', icon: '👥', href: usersIndex() },
     ],
     design: [
@@ -87,7 +84,6 @@ const NAV_DEFS: Record<string, NavItem[]> = {
     accountant: [
         { id: 'acct-dashboard', label: 'Dashboard', icon: '📊', href: dashboard() },
         { id: 'all-orders', label: 'Orders', icon: '📋', href: ordersIndex() },
-        { id: 'purchase-bills', label: 'Purchase Bills', icon: '🧾', href: purchaseBillsIndex() },
         { id: 'inventory', label: 'Inventory', icon: '🗄️', href: inventoryIndex() },
         { id: 'settings', label: 'Products & HSN', icon: '🌿', href: settingsIndex() },
     ],
@@ -198,6 +194,7 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
                                 key={item.id}
                                 href={item.href}
                                 className="nav-item"
+                                onClick={() => setIsMobileOpen(false)}
                             >
                                 <span className="nav-icon">{item.icon}</span>
                                 <span>{item.label}</span>
