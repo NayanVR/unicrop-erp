@@ -286,7 +286,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         const seq = ++matSearchSeq.current;
         matSearchTimer.current = setTimeout(async () => {
             try {
-                const res = await fetch(`/api/inventory/search?q=${encodeURIComponent(query)}`, {
+                const res = await fetch(`/api/v1/inventory/search?q=${encodeURIComponent(query)}`, {
                     headers: { Accept: 'application/json' },
                     credentials: 'same-origin',
                 });
