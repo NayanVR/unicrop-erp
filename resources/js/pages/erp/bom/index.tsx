@@ -42,6 +42,7 @@ type Props = {
     boms: Bom[];
     products: Product[];
     materials: RawMaterial[];
+    productionRuns: ProductionRunRecord[];
 };
 
 type BomFormData = {
@@ -55,25 +56,36 @@ type BomFormData = {
     items: { raw_material_id: string; qty_per_batch: string; unit: string }[];
 };
 
-type RunFormData = { batch_count: string; notes: string };
+type RunFormData = { batch_number: string; batch_count: string; notes: string };
 
-type RunSummaryItem = {
-    name: string;
-    qtyUsed: number;   // in item's own unit (for display)
-    itemUnit: string;
-    qtyDeducted: number; // converted to mat's base unit
-    matUnit: string;
-    cost: number;
-};
-type RunSummary = {
+type NormalizedRunItem = { name: string; qtyUsed: number; itemUnit: string; qtyDeducted: number; matUnit: string; cost: number };
+type NormalizedRun = {
+    id?: number;
+    batchNumber?: string | null;
     bomName: string;
     batchCount: number;
-    batchSize: string | number;
+    batchSize: number;
     batchUnit: string;
-    notes: string;
-    items: RunSummaryItem[];
-    totalCost: number;
+    notes: string | null;
+    totalCost: number | null;
     date: string;
+    user?: { id: number; name: string } | null;
+    items: NormalizedRunItem[];
+};
+
+type ProductionRunRecord = {
+    id: number;
+    batch_number: string | null;
+    bom_id: number;
+    bom_name: string;
+    user?: { id: number; name: string } | null;
+    batch_count: number;
+    batch_size: number;
+    batch_unit: string;
+    total_cost: number | null;
+    notes: string | null;
+    items: { name: string; qty_used: number; item_unit: string; qty_deducted: number; mat_unit: string; cost: number }[];
+    created_at: string;
 };
 
 const BATCH_UNITS = ['kg', 'L', 'g', 'mL', 'pcs'];
@@ -118,23 +130,25 @@ const TYPE_CONFIG = {
     other:  { label: 'OTHER',  color: '#6b7280', bg: '#f9fafb', border: '#9ca3af' },
 };
 
-export default function BomIndex({ boms, products, materials }: Props) {
+export default function BomIndex({ boms, products, materials, productionRuns }: Props) {
     const { auth } = usePage<{ auth: Auth }>().props;
     const canSeeCost = auth.user?.role === 'admin' || auth.user?.cost_access === true;
 
+    const [pageView, setPageView]     = useState<'boms' | 'history'>('boms');
     const [search, setSearch]         = useState('');
     const [typeFilter, setTypeFilter] = useState<'all' | 'liquid' | 'powder' | 'other'>('all');
+    const [histSearch, setHistSearch] = useState('');
     const [editModal, setEditModal]   = useState(false);
     const [runModal, setRunModal]     = useState(false);
     const [editingBom, setEditingBom] = useState<Bom | null>(null);
     const [runTarget, setRunTarget]   = useState<Bom | null>(null);
-    const [runSummary, setRunSummary] = useState<RunSummary | null>(null);
+    const [runSummary, setRunSummary] = useState<NormalizedRun | null>(null);
 
     const form = useForm<BomFormData>({
         name: '', product_id: '', packing_size: '', batch_size: '1',
         batch_unit: 'kg', notes: '', is_active: true, items: [],
     });
-    const runForm = useForm<RunFormData>({ batch_count: '1', notes: '' });
+    const runForm = useForm<RunFormData>({ batch_number: '', batch_count: '1', notes: '' });
 
     const openNew = () => {
         form.reset(); form.clearErrors(); setEditingBom(null); setEditModal(true);
@@ -192,11 +206,31 @@ export default function BomIndex({ boms, products, materials }: Props) {
     };
 
     const openRun = (bom: Bom) => {
-        runForm.reset(); setRunTarget(bom); setRunModal(true);
+        const today = new Date();
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const suggested = `BATCH-${today.getFullYear()}${pad(today.getMonth() + 1)}${pad(today.getDate())}`;
+        runForm.reset();
+        runForm.setData('batch_number', suggested);
+        setRunTarget(bom);
+        setRunModal(true);
     };
 
-    const buildRunSummary = (bom: Bom, batchCount: number, notes: string): RunSummary => {
-        const items: RunSummaryItem[] = bom.items.map((item) => {
+    const normalizeRun = (r: ProductionRunRecord): NormalizedRun => ({
+        id: r.id,
+        batchNumber: r.batch_number,
+        bomName: r.bom_name,
+        batchCount: r.batch_count,
+        batchSize: r.batch_size,
+        batchUnit: r.batch_unit,
+        notes: r.notes,
+        totalCost: r.total_cost,
+        user: r.user,
+        date: new Date(r.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        items: r.items.map((it) => ({ name: it.name, qtyUsed: it.qty_used, itemUnit: it.item_unit, qtyDeducted: it.qty_deducted, matUnit: it.mat_unit, cost: it.cost })),
+    });
+
+    const buildRunSummary = (bom: Bom, batchCount: number, batchNumber: string, notes: string): NormalizedRun => {
+        const items: NormalizedRunItem[] = bom.items.map((item) => {
             const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
             const matUnit  = mat?.unit ?? '';
             const itemUnit = item.unit || matUnit;
@@ -206,78 +240,69 @@ export default function BomIndex({ boms, products, materials }: Props) {
             return { name: mat?.name ?? `Material #${item.raw_material_id}`, qtyUsed, itemUnit, qtyDeducted, matUnit, cost };
         });
         return {
+            batchNumber: batchNumber || null,
             bomName: bom.name,
             batchCount,
-            batchSize: bom.batch_size,
+            batchSize: Number(bom.batch_size),
             batchUnit: bom.batch_unit,
-            notes,
-            items,
+            notes: notes || null,
             totalCost: items.reduce((s, i) => s + i.cost, 0),
-            date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+            date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+            items,
         };
     };
 
     const submitRun = () => {
         if (!runTarget) return;
-        const bom        = runTarget;
-        const batchCount = Number(runForm.data.batch_count) || 1;
-        const notes      = runForm.data.notes;
+        const bom         = runTarget;
+        const batchCount  = Number(runForm.data.batch_count) || 1;
+        const batchNumber = runForm.data.batch_number.trim();
+        const notes       = runForm.data.notes;
         runForm.post(bomRun(bom.id).url, {
             preserveScroll: true,
             onSuccess: () => {
                 setRunModal(false);
                 runForm.reset();
                 setRunTarget(null);
-                setRunSummary(buildRunSummary(bom, batchCount, notes));
+                setRunSummary(buildRunSummary(bom, batchCount, batchNumber, notes));
             },
         });
     };
 
-    const printRunSummary = (s: RunSummary) => {
-        const costCol = canSeeCost;
+    const printRunSummary = (s: NormalizedRun) => {
+        const costCol    = canSeeCost;
+        const hasDiffUnit = s.items.some((it) => it.itemUnit.toLowerCase() !== it.matUnit.toLowerCase());
         const rows = s.items.map((it) => {
-            const sameUnit = it.itemUnit.toLowerCase() === it.matUnit.toLowerCase();
-            const deductedCell = sameUnit ? '' : `<td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;color:#555">${Number(it.qtyDeducted.toFixed(6)).toLocaleString('en-IN', { maximumFractionDigits: 6 })} ${it.matUnit}</td>`;
-            const costCell = costCol ? `<td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right">₹${it.cost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>` : '';
+            const same = it.itemUnit.toLowerCase() === it.matUnit.toLowerCase();
             return `<tr>
                 <td style="padding:6px 10px;border-bottom:1px solid #eee">${it.name}</td>
-                <td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;font-weight:700">${Number(it.qtyUsed.toFixed(6)).toLocaleString('en-IN', { maximumFractionDigits: 6 })} ${it.itemUnit}</td>
-                ${sameUnit ? '' : deductedCell}
-                ${costCell}
+                <td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;font-weight:700">${it.qtyUsed.toLocaleString('en-IN', { maximumFractionDigits: 6 })} ${it.itemUnit}</td>
+                ${hasDiffUnit ? `<td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;color:#555">${same ? '—' : `${it.qtyDeducted.toLocaleString('en-IN', { maximumFractionDigits: 6 })} ${it.matUnit}`}</td>` : ''}
+                ${costCol ? `<td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right">₹${it.cost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>` : ''}
             </tr>`;
         }).join('');
-        const extraHeader = s.items.some((it) => it.itemUnit.toLowerCase() !== it.matUnit.toLowerCase())
-            ? '<th style="padding:6px 10px;background:#f5f5f5;text-align:right;white-space:nowrap">Deducted (inventory unit)</th>' : '';
-        const costHeader = costCol ? '<th style="padding:6px 10px;background:#f5f5f5;text-align:right">Cost (₹)</th>' : '';
-        const totalRow = costCol ? `<tr><td colspan="${2 + (extraHeader ? 1 : 0)}" style="padding:8px 10px;font-weight:700;text-align:right;border-top:2px solid #333">Total Batch Cost</td><td style="padding:8px 10px;font-weight:700;text-align:right;border-top:2px solid #333">₹${s.totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>` : '';
+        const totalRow = costCol && s.totalCost != null
+            ? `<tr><td colspan="${2 + (hasDiffUnit ? 1 : 0)}" style="padding:8px 10px;font-weight:700;text-align:right;border-top:2px solid #333">Total Batch Cost</td><td style="padding:8px 10px;font-weight:700;text-align:right;border-top:2px solid #333">₹${s.totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>` : '';
         const win = window.open('', '_blank', 'width=700,height=800');
         if (!win) return;
-        win.document.write(`<html><head><title>Production Run — ${s.bomName}</title>
-        <style>
-            body{font-family:Arial,sans-serif;padding:28px 32px;color:#111;font-size:14px}
-            h1{font-size:20px;margin:0 0 4px}
-            .meta{font-size:12px;color:#555;margin-bottom:20px}
-            table{width:100%;border-collapse:collapse;margin-top:16px}
-            th{text-align:left;font-size:12px;color:#555}
-            @media print{@page{size:A4;margin:15mm} button{display:none}}
-        </style></head><body>
+        win.document.write(`<html><head><title>Production Run — ${s.batchNumber ?? s.bomName}</title>
+        <style>body{font-family:Arial,sans-serif;padding:28px 32px;color:#111;font-size:14px}h1{font-size:20px;margin:0 0 4px}table{width:100%;border-collapse:collapse;margin-top:16px}th{text-align:left;font-size:12px;color:#555}@media print{@page{size:A4;margin:15mm}button{display:none}}</style>
+        </head><body>
         <h1>Production Run Report</h1>
-        <div class="meta">${s.date}</div>
+        <div style="font-size:12px;color:#555;margin-bottom:20px">${s.date}${s.user ? ' · ' + s.user.name : ''}</div>
         <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px">
+            ${s.batchNumber ? `<tr><td style="padding:3px 0;color:#555;width:130px">Batch No.</td><td style="font-weight:700;letter-spacing:.5px">${s.batchNumber}</td></tr>` : ''}
             <tr><td style="padding:3px 0;color:#555;width:130px">BOM</td><td style="font-weight:700">${s.bomName}</td></tr>
             <tr><td style="padding:3px 0;color:#555">Batches Run</td><td style="font-weight:700">${s.batchCount}</td></tr>
-            <tr><td style="padding:3px 0;color:#555">Batch Size</td><td>${Number(s.batchSize).toLocaleString('en-IN', { maximumFractionDigits: 3 })} ${s.batchUnit} × ${s.batchCount} = ${(Number(s.batchSize) * s.batchCount).toLocaleString('en-IN', { maximumFractionDigits: 3 })} ${s.batchUnit}</td></tr>
+            <tr><td style="padding:3px 0;color:#555">Batch Size</td><td>${s.batchSize.toLocaleString('en-IN', { maximumFractionDigits: 3 })} ${s.batchUnit} × ${s.batchCount} = ${(s.batchSize * s.batchCount).toLocaleString('en-IN', { maximumFractionDigits: 3 })} ${s.batchUnit}</td></tr>
             ${s.notes ? `<tr><td style="padding:3px 0;color:#555">Notes</td><td>${s.notes}</td></tr>` : ''}
         </table>
-        <table>
-            <thead><tr>
-                <th style="padding:6px 10px;background:#f5f5f5;text-align:left">Material</th>
-                <th style="padding:6px 10px;background:#f5f5f5;text-align:right;white-space:nowrap">Qty Used</th>
-                ${extraHeader}
-                ${costHeader}
-            </tr></thead>
-            <tbody>${rows}${totalRow}</tbody>
-        </table>
+        <table><thead><tr>
+            <th style="padding:6px 10px;background:#f5f5f5">Material</th>
+            <th style="padding:6px 10px;background:#f5f5f5;text-align:right;white-space:nowrap">Qty Used</th>
+            ${hasDiffUnit ? '<th style="padding:6px 10px;background:#f5f5f5;text-align:right;white-space:nowrap">Deducted (inv. unit)</th>' : ''}
+            ${costCol ? '<th style="padding:6px 10px;background:#f5f5f5;text-align:right">Cost (₹)</th>' : ''}
+        </tr></thead><tbody>${rows}${totalRow}</tbody></table>
         <div style="margin-top:20px;text-align:right"><button onclick="window.print()" style="padding:8px 20px;background:#111;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">🖨 Print</button></div>
         </body></html>`);
         win.document.close();
@@ -355,15 +380,23 @@ export default function BomIndex({ boms, products, materials }: Props) {
             <div id="view-bom" className="view active">
 
                 {/* Header */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
                     <div>
                         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Bill of Materials</h1>
                         <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--tx-sub)' }}>Define raw material recipes for liquid &amp; powder products</p>
                     </div>
-                    <button className="btn primary" onClick={openNew}>+ Add New BOM</button>
+                    {pageView === 'boms' && <button className="btn primary" onClick={openNew}>+ Add New BOM</button>}
                 </div>
 
-                {/* Search + filters */}
+                {/* Tab switcher */}
+                <div className="filter-bar" style={{ marginBottom: 20 }}>
+                    <button className={`pill${pageView === 'boms' ? ' active' : ''}`} onClick={() => setPageView('boms')} style={{ fontWeight: pageView === 'boms' ? 600 : 400 }}>⚗️ BOMs ({boms.length})</button>
+                    <button className={`pill${pageView === 'history' ? ' active' : ''}`} onClick={() => setPageView('history')} style={{ fontWeight: pageView === 'history' ? 600 : 400 }}>📋 Run History ({productionRuns.length})</button>
+                </div>
+
+                {/* ── BOMs view ────────────────────────────────────────────── */}
+                {pageView === 'boms' && <>
+                {/* Search + type filters */}
                 <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
                     <input
                         type="search"
@@ -508,6 +541,84 @@ export default function BomIndex({ boms, products, materials }: Props) {
                         })}
                     </div>
                 )}
+            </>}
+
+            {/* ── Run History view ─────────────────────────────────────────── */}
+            {pageView === 'history' && (
+                <div>
+                    <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
+                        <input
+                            type="search"
+                            value={histSearch}
+                            onChange={(e) => setHistSearch(e.target.value)}
+                            placeholder="🔍 Search by BOM name or notes..."
+                            style={{ width: 280 }}
+                        />
+                        <span style={{ fontSize: 13, color: 'var(--tx-muted)' }}>{productionRuns.length} run{productionRuns.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    {productionRuns.length === 0 ? (
+                        <div className="empty-state">
+                            <div className="icon">📋</div>
+                            <p>No production runs yet. Run a BOM to start recording history.</p>
+                        </div>
+                    ) : (
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                                <thead>
+                                    <tr style={{ background: 'var(--bg-paper)', borderBottom: '2px solid var(--border)' }}>
+                                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>Batch No.</th>
+                                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>Date &amp; Time</th>
+                                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>BOM</th>
+                                        <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>Batches</th>
+                                        <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>Total Yield</th>
+                                        {canSeeCost && <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>Total Cost</th>}
+                                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tx-muted)' }}>By</th>
+                                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tx-muted)' }}>Notes</th>
+                                        <th style={{ padding: '8px 12px' }}></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {productionRuns
+                                        .filter((r) => {
+                                            if (!histSearch.trim()) return true;
+                                            const q = histSearch.toLowerCase();
+                                            return r.bom_name.toLowerCase().includes(q)
+                                                || (r.batch_number ?? '').toLowerCase().includes(q)
+                                                || (r.notes ?? '').toLowerCase().includes(q);
+                                        })
+                                        .map((r) => (
+                                            <tr key={r.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                <td style={{ padding: '8px 12px', fontWeight: 600, letterSpacing: '.3px', fontSize: 12, whiteSpace: 'nowrap' }}>
+                                                    {r.batch_number ?? '—'}
+                                                </td>
+                                                <td style={{ padding: '8px 12px', whiteSpace: 'nowrap', color: 'var(--tx-muted)', fontSize: 12 }}>
+                                                    {new Date(r.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                </td>
+                                                <td style={{ padding: '8px 12px', fontWeight: 600 }}>{r.bom_name}</td>
+                                                <td style={{ padding: '8px 12px', textAlign: 'right' }}>{r.batch_count}</td>
+                                                <td style={{ padding: '8px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                                    {(r.batch_size * r.batch_count).toLocaleString('en-IN', { maximumFractionDigits: 3 })} {r.batch_unit}
+                                                </td>
+                                                {canSeeCost && (
+                                                    <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: '#059669' }}>
+                                                        {r.total_cost != null ? `₹${r.total_cost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                                                    </td>
+                                                )}
+                                                <td style={{ padding: '8px 12px', color: 'var(--tx-muted)', fontSize: 12 }}>{r.user?.name ?? '—'}</td>
+                                                <td style={{ padding: '8px 12px', color: 'var(--tx-muted)', fontSize: 12, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.notes ?? '—'}</td>
+                                                <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
+                                                    <button className="btn sm" onClick={() => setRunSummary(normalizeRun(r))} style={{ marginRight: 4 }}>Details</button>
+                                                    <button className="btn sm" onClick={() => printRunSummary(normalizeRun(r))}>🖨</button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            )}
+
             </div>
 
             {/* ── Create / Edit BOM modal ─────────────────────────────────── */}
@@ -590,12 +701,16 @@ export default function BomIndex({ boms, products, materials }: Props) {
                         )}
                         <div className="form-grid">
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                                <label>Batch Number <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 12 }}>(auto-generated, you can change)</span></label>
+                                <input type="text" value={runForm.data.batch_number} onChange={(e) => runForm.setData('batch_number', e.target.value)} placeholder="e.g. BATCH-20260530-001" />
+                            </div>
+                            <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                 <label>Number of Batches *</label>
                                 <input type="number" value={runForm.data.batch_count} onChange={(e) => runForm.setData('batch_count', e.target.value)} min="0.001" step="0.001" />
                             </div>
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                 <label>Notes</label>
-                                <textarea value={runForm.data.notes} onChange={(e) => runForm.setData('notes', e.target.value)} rows={2} placeholder="Batch notes, lot number, etc." />
+                                <textarea value={runForm.data.notes} onChange={(e) => runForm.setData('notes', e.target.value)} rows={2} placeholder="Lot notes, operator, etc." />
                             </div>
                         </div>
                     </div>
@@ -623,6 +738,7 @@ export default function BomIndex({ boms, products, materials }: Props) {
                         <div className="modal-body">
                             {/* Meta */}
                             <div style={{ background: 'var(--bg-paper)', borderRadius: 'var(--radius-sm)', padding: '10px 14px', marginBottom: 14, fontSize: 13, display: 'flex', flexWrap: 'wrap', gap: '4px 20px' }}>
+                                {runSummary.batchNumber && <span style={{ width: '100%' }}><span style={{ color: 'var(--tx-muted)' }}>Batch No.: </span><strong style={{ letterSpacing: '.3px' }}>{runSummary.batchNumber}</strong></span>}
                                 <span><span style={{ color: 'var(--tx-muted)' }}>BOM: </span><strong>{runSummary.bomName}</strong></span>
                                 <span><span style={{ color: 'var(--tx-muted)' }}>Batches: </span><strong>{runSummary.batchCount}</strong></span>
                                 <span><span style={{ color: 'var(--tx-muted)' }}>Total yield: </span><strong>{(Number(runSummary.batchSize) * runSummary.batchCount).toLocaleString('en-IN', { maximumFractionDigits: 3 })} {runSummary.batchUnit}</strong></span>
@@ -664,7 +780,7 @@ export default function BomIndex({ boms, products, materials }: Props) {
                                             </tr>
                                         );
                                     })}
-                                    {canSeeCost && (
+                                    {canSeeCost && runSummary.totalCost != null && (
                                         <tr style={{ background: 'var(--bg-paper)' }}>
                                             <td colSpan={2 + (runSummary.items.some((it) => it.itemUnit.toLowerCase() !== it.matUnit.toLowerCase()) ? 1 : 0)} style={{ padding: '8px 10px', fontWeight: 700, textAlign: 'right' }}>Total Batch Cost</td>
                                             <td style={{ padding: '8px 10px', fontWeight: 700, textAlign: 'right', color: '#059669' }}>
