@@ -453,7 +453,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 @page { size: 100mm 75mm; margin: 3mm; }
                 * { box-sizing: border-box; }
                 body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
-                .label { width:100mm; height:75mm; padding:4mm 5mm; border:0.5px solid #000; page-break-after:always; display:flex; flex-direction:column; overflow:hidden; }
+                .label { width:100mm; min-height:75mm; padding:4mm 5mm; border:0.5px solid #000; page-break-after:always; display:flex; flex-direction:column; }
                 .label:last-child { page-break-after:avoid; }
                 .transport { font-size:44pt; font-weight:900; line-height:1.1; margin-bottom:1mm; }
                 .destination { font-size:9pt; color:#444; margin-bottom:1mm; }
@@ -465,7 +465,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 .inboxpcs { font-weight:700; color:#222; }
                 .item-box-count { color:#666; font-style:italic; font-size:8pt; }
                 .product-block { border-top:0.5px solid #ccc; padding-top:1.5mm; margin-top:auto; }
-                .brand-name { font-size:24pt; font-weight:900; }
+                .brand-name { font-size:24pt; font-weight:900; word-break:break-word; white-space:normal; line-height:1.15; }
                 .order-ref { font-size:7.5pt; color:#888; margin-top:1mm; text-align:right; }
                 .printed-by { font-size:7pt; color:#555; margin-top:0.5mm; text-align:right; }
                 .toolbar { position:sticky; top:0; z-index:10; background:#1e293b; color:#fff; padding:10px 16px; display:flex; align-items:center; gap:12px; }
@@ -1155,14 +1155,18 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                     {/* Product block */}
                                     <div style={{ borderTop: '1px solid #ddd', paddingTop: '6px', marginTop: '2px' }}>
                                         {/* Brand */}
-                                        <input
+                                        <textarea
                                             value={lbl.brand}
                                             onChange={(e) => updateLabelField(idx, 'brand', e.target.value)}
                                             placeholder="Brand · packing"
+                                            rows={2}
                                             style={{
                                                 border: 'none', borderBottom: '1px dashed #ccc', outline: 'none',
                                                 fontSize: '26px', fontWeight: 900, padding: '2px 0',
                                                 width: '100%', background: 'transparent',
+                                                resize: 'none', overflow: 'hidden',
+                                                wordBreak: 'break-word', whiteSpace: 'pre-wrap',
+                                                fontFamily: 'inherit', lineHeight: 1.15,
                                             }}
                                         />
                                     </div>
