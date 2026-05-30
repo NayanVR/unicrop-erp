@@ -2,7 +2,8 @@ import { labels as itemLabels, setStage as itemSetStage } from '@/routes/factory
 import { dispatch as orderDispatch, notes as orderNotes } from '@/routes/factory/orders';
 import { approveUrgent as ordersApproveUrgent, rejectUrgent as ordersRejectUrgent } from '@/routes/orders';
 import { index as unitTransferIndex } from '@/routes/unit-transfer';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import type { Auth } from '@/types/auth';
 import { useMemo, useState } from 'react';
 
 type ProductPhoto = {
@@ -253,6 +254,7 @@ const boxesFor = (item: OrderItem): number | null => {
 
 export default function FactoryIndex({ orders, urgentPending, canAdvance, productPhotos = [] }: Props) {
     const [activeFilter, setActiveFilter] = useState<FilterKey>('new');
+    const { auth } = usePage<{ auth: Auth }>().props;
     const [search, setSearch] = useState('');
     const [openOrders, setOpenOrders] = useState<number[]>([]);
     const [stagingItem, setStagingItem] = useState<number | null>(null);
@@ -417,6 +419,8 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
 
     const downloadLabelsPDF = () => {
         if (!labelEditor) return;
+        const printedOn = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        const printedBy = auth.user?.name ?? '';
         const esc = (s: string) =>
             s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         const win = window.open('', '_blank', 'width=900,height=700');
@@ -440,6 +444,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                     <div class="brand-name">${esc(lbl.brand || '—')}</div>
                 </div>
                 <div class="order-ref">${esc(lbl.orderRef)}</div>
+                <div class="printed-by">Printed by: ${esc(printedBy)} · ${printedOn}</div>
             </div>`,
             )
             .join('');
@@ -462,6 +467,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 .product-block { border-top:0.5px solid #ccc; padding-top:1.5mm; margin-top:auto; }
                 .brand-name { font-size:12pt; font-weight:900; }
                 .order-ref { font-size:7.5pt; color:#888; margin-top:1mm; text-align:right; }
+                .printed-by { font-size:7pt; color:#555; margin-top:0.5mm; text-align:right; }
                 .toolbar { position:sticky; top:0; z-index:10; background:#1e293b; color:#fff; padding:10px 16px; display:flex; align-items:center; gap:12px; }
                 .toolbar button { background:#2563eb; color:#fff; border:0; border-radius:6px; padding:8px 18px; font-size:14px; font-weight:700; cursor:pointer; }
                 .toolbar span { color:#cbd5e1; font-size:12px; }
