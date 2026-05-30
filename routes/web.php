@@ -127,6 +127,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('design/gallery', [ProductPhotoController::class, 'index'])->name('design.gallery.index');
         Route::post('design/gallery/folders', [ProductPhotoController::class, 'storeFolder'])->name('design.gallery.folders.store');
         Route::post('design/gallery', [ProductPhotoController::class, 'store'])->name('design.gallery.store');
+        Route::patch('design/gallery/{photo}', [ProductPhotoController::class, 'update'])->name('design.gallery.update');
         Route::delete('design/gallery/{photo}', [ProductPhotoController::class, 'destroy'])->name('design.gallery.destroy');
     });
 

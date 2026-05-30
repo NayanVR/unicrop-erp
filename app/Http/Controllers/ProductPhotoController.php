@@ -150,6 +150,57 @@ class ProductPhotoController extends Controller
         return redirect()->back()->with('success', 'Photo uploaded successfully.');
     }
 
+    public function update(Request $request, ProductPhoto $photo): RedirectResponse
+    {
+        $data = $request->validate([
+            'our_brand'    => 'required|string|max:255',
+            'party_brand'  => 'nullable|string|max:255',
+            'packing_size' => 'nullable|string|max:100',
+            'photo'        => 'nullable|image|mimes:jpg,jpeg,png,webp|max:8192',
+        ]);
+
+        if ($request->hasFile('photo')) {
+            $disk = $this->storageDisk();
+
+            try {
+                Storage::disk($disk)->delete($photo->photo_path);
+            } catch (\Throwable $e) {
+                Log::warning('Old photo delete failed on update', ['path' => $photo->photo_path, 'error' => $e->getMessage()]);
+            }
+
+            if ($photo->party_id) {
+                $party = Party::find($photo->party_id);
+                $folderName = Str::slug($party?->name ?? 'party-' . $photo->party_id);
+            } else {
+                $folderName = 'our-brand';
+            }
+
+            $productLabel = !empty($data['party_brand']) ? $data['party_brand'] : $data['our_brand'];
+            $ext = $request->file('photo')->getClientOriginalExtension() ?: 'jpg';
+            $filename = Str::slug($productLabel) . '_' . Str::random(8) . '.' . strtolower($ext);
+            $path = 'product-photos/' . $folderName . '/' . $filename;
+
+            try {
+                Storage::disk($disk)->put(
+                    $path,
+                    file_get_contents($request->file('photo')->getRealPath()),
+                );
+            } catch (\Throwable $e) {
+                Log::error('Photo update upload failed', ['path' => $path, 'error' => $e->getMessage()]);
+                return redirect()->back()->with('error', 'Upload failed: ' . $e->getMessage());
+            }
+
+            $photo->photo_path = $path;
+        }
+
+        $photo->our_brand    = $data['our_brand'];
+        $photo->party_brand  = $data['party_brand'] ?? null;
+        $photo->packing_size = $data['packing_size'] ?? null;
+        $photo->save();
+
+        return redirect()->back()->with('success', 'Photo updated successfully.');
+    }
+
     public function storeFolder(Request $request): RedirectResponse
     {
         $request->validate([

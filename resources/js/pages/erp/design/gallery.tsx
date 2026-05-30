@@ -51,6 +51,12 @@ export default function DesignGallery() {
     const folderForm = useForm<FolderForm>({ party_id: '' });
     const fileRef    = useRef<HTMLInputElement | null>(null);
 
+    const [editingPhoto,   setEditingPhoto]   = useState<Photo | null>(null);
+    const [editForm,       setEditForm]       = useState({ our_brand: '', party_brand: '', packing_size: '' });
+    const [editFile,       setEditFile]       = useState<File | null>(null);
+    const [editProcessing, setEditProcessing] = useState(false);
+    const editFileRef = useRef<HTMLInputElement | null>(null);
+
     // ── Derived data ─────────────────────────────────────────────────────────
 
     const ourBrandPhotos = useMemo(
@@ -188,6 +194,39 @@ export default function DesignGallery() {
         router.delete(galleryDestroy(photo.id).url, {
             preserveScroll: true,
             onFinish: () => setDeletingId(null),
+        });
+    };
+
+    const openEdit = (photo: Photo) => {
+        setEditForm({
+            our_brand:    photo.our_brand,
+            party_brand:  photo.party_brand ?? '',
+            packing_size: photo.packing_size ?? '',
+        });
+        setEditFile(null);
+        setEditingPhoto(photo);
+        setLightbox(null);
+    };
+
+    const submitEdit = () => {
+        if (!editingPhoto) return;
+        const fd = new FormData();
+        fd.append('_method', 'PATCH');
+        fd.append('our_brand',    editForm.our_brand);
+        fd.append('party_brand',  editForm.party_brand);
+        fd.append('packing_size', editForm.packing_size);
+        if (editFile) fd.append('photo', editFile);
+        setEditProcessing(true);
+        router.post(`/design/gallery/${editingPhoto.id}`, fd, {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                setEditingPhoto(null);
+                setEditFile(null);
+                if (editFileRef.current) editFileRef.current.value = '';
+                setEditProcessing(false);
+            },
+            onError: () => setEditProcessing(false),
         });
     };
 
@@ -495,6 +534,7 @@ export default function DesignGallery() {
                                 photo={photo}
                                 deleting={deletingId === photo.id}
                                 onView={() => setLightbox(photo)}
+                                onEdit={() => openEdit(photo)}
                                 onDelete={() => handleDelete(photo)}
                             />
                         ))}
@@ -529,7 +569,17 @@ export default function DesignGallery() {
                                     </div>
                                 )}
                             </div>
-                            <button type="button" className="modal-close" onClick={() => setLightbox(null)}>✕</button>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <button
+                                    type="button"
+                                    className="btn secondary"
+                                    style={{ fontSize: '12px', padding: '4px 12px' }}
+                                    onClick={() => openEdit(lightbox)}
+                                >
+                                    ✎ Edit
+                                </button>
+                                <button type="button" className="modal-close" onClick={() => setLightbox(null)}>✕</button>
+                            </div>
                         </div>
                         <img
                             src={lightbox.photo_url}
@@ -552,6 +602,83 @@ export default function DesignGallery() {
                     onClose={() => { setShowUpload(false); uploadForm.reset(); }}
                     onSubmit={submitUpload}
                 />
+            )}
+
+            {/* Edit modal */}
+            {editingPhoto && (
+                <div className="modal-overlay open" onClick={() => setEditingPhoto(null)}>
+                    <div className="modal" style={{ width: '460px' }} onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">✎ Edit Photo</h2>
+                            <button type="button" className="modal-close" onClick={() => setEditingPhoto(null)}>✕</button>
+                        </div>
+                        <div className="modal-body">
+                            {/* Current photo preview */}
+                            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+                                <img
+                                    src={editingPhoto.photo_url}
+                                    alt=""
+                                    style={{ maxHeight: '120px', maxWidth: '100%', objectFit: 'contain', borderRadius: '6px', border: '1px solid var(--border)', background: '#fff', padding: '6px' }}
+                                />
+                            </div>
+
+                            <div className="form-group" style={{ marginBottom: '14px' }}>
+                                <label>Our Brand / Product Name *</label>
+                                <input
+                                    type="text"
+                                    value={editForm.our_brand}
+                                    onChange={(e) => setEditForm((p) => ({ ...p, our_brand: e.target.value }))}
+                                />
+                            </div>
+
+                            {editingPhoto.party_id && (
+                                <div className="form-group" style={{ marginBottom: '14px' }}>
+                                    <label>Party Brand / Product Name</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.party_brand}
+                                        onChange={(e) => setEditForm((p) => ({ ...p, party_brand: e.target.value }))}
+                                        placeholder="Customer's label name"
+                                    />
+                                </div>
+                            )}
+
+                            <div className="form-group" style={{ marginBottom: '14px' }}>
+                                <label>Packing Size</label>
+                                <input
+                                    type="text"
+                                    value={editForm.packing_size}
+                                    onChange={(e) => setEditForm((p) => ({ ...p, packing_size: e.target.value }))}
+                                    placeholder="e.g. 500ml, 1ltr"
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label>Replace Photo (JPG, PNG, WEBP — max 8 MB)</label>
+                                <input
+                                    ref={editFileRef}
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp"
+                                    onChange={(e) => setEditFile(e.target.files?.[0] ?? null)}
+                                />
+                                <div style={{ fontSize: '11px', color: 'var(--tx-muted)', marginTop: '4px' }}>
+                                    Leave empty to keep the current photo.
+                                </div>
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button type="button" className="btn secondary" onClick={() => setEditingPhoto(null)}>Cancel</button>
+                            <button
+                                type="button"
+                                className="btn primary"
+                                onClick={submitEdit}
+                                disabled={editProcessing || !editForm.our_brand.trim()}
+                            >
+                                {editProcessing ? 'Saving…' : 'Save Changes'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
@@ -623,9 +750,9 @@ function FolderCard({
     );
 }
 
-function PhotoCard({ photo, deleting, onView, onDelete }: {
+function PhotoCard({ photo, deleting, onView, onEdit, onDelete }: {
     photo: Photo; deleting: boolean;
-    onView: () => void; onDelete: () => void;
+    onView: () => void; onEdit: () => void; onDelete: () => void;
 }) {
     const productName = photo.party_brand ?? photo.our_brand;
     return (
@@ -652,14 +779,23 @@ function PhotoCard({ photo, deleting, onView, onDelete }: {
                 {photo.packing_size && (
                     <div style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>{photo.packing_size}</div>
                 )}
-                <button
-                    type="button"
-                    style={{ marginTop: '6px', fontSize: '11px', color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
-                    disabled={deleting}
-                    onClick={onDelete}
-                >
-                    {deleting ? 'Deleting…' : '✕ Delete'}
-                </button>
+                <div style={{ display: 'flex', gap: '12px', marginTop: '6px' }}>
+                    <button
+                        type="button"
+                        style={{ fontSize: '11px', color: 'var(--tx-sub)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
+                        onClick={onEdit}
+                    >
+                        ✎ Edit
+                    </button>
+                    <button
+                        type="button"
+                        style={{ fontSize: '11px', color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
+                        disabled={deleting}
+                        onClick={onDelete}
+                    >
+                        {deleting ? 'Deleting…' : '✕ Delete'}
+                    </button>
+                </div>
             </div>
         </div>
     );
