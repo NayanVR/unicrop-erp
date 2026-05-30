@@ -57,6 +57,25 @@ type BomFormData = {
 
 type RunFormData = { batch_count: string; notes: string };
 
+type RunSummaryItem = {
+    name: string;
+    qtyUsed: number;   // in item's own unit (for display)
+    itemUnit: string;
+    qtyDeducted: number; // converted to mat's base unit
+    matUnit: string;
+    cost: number;
+};
+type RunSummary = {
+    bomName: string;
+    batchCount: number;
+    batchSize: string | number;
+    batchUnit: string;
+    notes: string;
+    items: RunSummaryItem[];
+    totalCost: number;
+    date: string;
+};
+
 const BATCH_UNITS = ['kg', 'L', 'g', 'mL', 'pcs'];
 
 const formatQty = (v: string | number) =>
@@ -109,6 +128,7 @@ export default function BomIndex({ boms, products, materials }: Props) {
     const [runModal, setRunModal]     = useState(false);
     const [editingBom, setEditingBom] = useState<Bom | null>(null);
     const [runTarget, setRunTarget]   = useState<Bom | null>(null);
+    const [runSummary, setRunSummary] = useState<RunSummary | null>(null);
 
     const form = useForm<BomFormData>({
         name: '', product_id: '', packing_size: '', batch_size: '1',
@@ -175,12 +195,93 @@ export default function BomIndex({ boms, products, materials }: Props) {
         runForm.reset(); setRunTarget(bom); setRunModal(true);
     };
 
+    const buildRunSummary = (bom: Bom, batchCount: number, notes: string): RunSummary => {
+        const items: RunSummaryItem[] = bom.items.map((item) => {
+            const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
+            const matUnit  = mat?.unit ?? '';
+            const itemUnit = item.unit || matUnit;
+            const qtyUsed     = Number(item.qty_per_batch) * batchCount;
+            const qtyDeducted = mat ? convertQty(qtyUsed, itemUnit, matUnit) : qtyUsed;
+            const cost        = mat ? qtyDeducted * Number(mat.cost_per_unit) : 0;
+            return { name: mat?.name ?? `Material #${item.raw_material_id}`, qtyUsed, itemUnit, qtyDeducted, matUnit, cost };
+        });
+        return {
+            bomName: bom.name,
+            batchCount,
+            batchSize: bom.batch_size,
+            batchUnit: bom.batch_unit,
+            notes,
+            items,
+            totalCost: items.reduce((s, i) => s + i.cost, 0),
+            date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        };
+    };
+
     const submitRun = () => {
         if (!runTarget) return;
-        runForm.post(bomRun(runTarget.id).url, {
+        const bom        = runTarget;
+        const batchCount = Number(runForm.data.batch_count) || 1;
+        const notes      = runForm.data.notes;
+        runForm.post(bomRun(bom.id).url, {
             preserveScroll: true,
-            onSuccess: () => { setRunModal(false); runForm.reset(); setRunTarget(null); },
+            onSuccess: () => {
+                setRunModal(false);
+                runForm.reset();
+                setRunTarget(null);
+                setRunSummary(buildRunSummary(bom, batchCount, notes));
+            },
         });
+    };
+
+    const printRunSummary = (s: RunSummary) => {
+        const costCol = canSeeCost;
+        const rows = s.items.map((it) => {
+            const sameUnit = it.itemUnit.toLowerCase() === it.matUnit.toLowerCase();
+            const deductedCell = sameUnit ? '' : `<td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;color:#555">${Number(it.qtyDeducted.toFixed(6)).toLocaleString('en-IN', { maximumFractionDigits: 6 })} ${it.matUnit}</td>`;
+            const costCell = costCol ? `<td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right">₹${it.cost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>` : '';
+            return `<tr>
+                <td style="padding:6px 10px;border-bottom:1px solid #eee">${it.name}</td>
+                <td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;font-weight:700">${Number(it.qtyUsed.toFixed(6)).toLocaleString('en-IN', { maximumFractionDigits: 6 })} ${it.itemUnit}</td>
+                ${sameUnit ? '' : deductedCell}
+                ${costCell}
+            </tr>`;
+        }).join('');
+        const extraHeader = s.items.some((it) => it.itemUnit.toLowerCase() !== it.matUnit.toLowerCase())
+            ? '<th style="padding:6px 10px;background:#f5f5f5;text-align:right;white-space:nowrap">Deducted (inventory unit)</th>' : '';
+        const costHeader = costCol ? '<th style="padding:6px 10px;background:#f5f5f5;text-align:right">Cost (₹)</th>' : '';
+        const totalRow = costCol ? `<tr><td colspan="${2 + (extraHeader ? 1 : 0)}" style="padding:8px 10px;font-weight:700;text-align:right;border-top:2px solid #333">Total Batch Cost</td><td style="padding:8px 10px;font-weight:700;text-align:right;border-top:2px solid #333">₹${s.totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>` : '';
+        const win = window.open('', '_blank', 'width=700,height=800');
+        if (!win) return;
+        win.document.write(`<html><head><title>Production Run — ${s.bomName}</title>
+        <style>
+            body{font-family:Arial,sans-serif;padding:28px 32px;color:#111;font-size:14px}
+            h1{font-size:20px;margin:0 0 4px}
+            .meta{font-size:12px;color:#555;margin-bottom:20px}
+            table{width:100%;border-collapse:collapse;margin-top:16px}
+            th{text-align:left;font-size:12px;color:#555}
+            @media print{@page{size:A4;margin:15mm} button{display:none}}
+        </style></head><body>
+        <h1>Production Run Report</h1>
+        <div class="meta">${s.date}</div>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px">
+            <tr><td style="padding:3px 0;color:#555;width:130px">BOM</td><td style="font-weight:700">${s.bomName}</td></tr>
+            <tr><td style="padding:3px 0;color:#555">Batches Run</td><td style="font-weight:700">${s.batchCount}</td></tr>
+            <tr><td style="padding:3px 0;color:#555">Batch Size</td><td>${Number(s.batchSize).toLocaleString('en-IN', { maximumFractionDigits: 3 })} ${s.batchUnit} × ${s.batchCount} = ${(Number(s.batchSize) * s.batchCount).toLocaleString('en-IN', { maximumFractionDigits: 3 })} ${s.batchUnit}</td></tr>
+            ${s.notes ? `<tr><td style="padding:3px 0;color:#555">Notes</td><td>${s.notes}</td></tr>` : ''}
+        </table>
+        <table>
+            <thead><tr>
+                <th style="padding:6px 10px;background:#f5f5f5;text-align:left">Material</th>
+                <th style="padding:6px 10px;background:#f5f5f5;text-align:right;white-space:nowrap">Qty Used</th>
+                ${extraHeader}
+                ${costHeader}
+            </tr></thead>
+            <tbody>${rows}${totalRow}</tbody>
+        </table>
+        <div style="margin-top:20px;text-align:right"><button onclick="window.print()" style="padding:8px 20px;background:#111;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">🖨 Print</button></div>
+        </body></html>`);
+        win.document.close();
+        win.focus();
     };
 
     const calcCost = (bom: Bom, batches = 1) =>
@@ -510,6 +611,77 @@ export default function BomIndex({ boms, products, materials }: Props) {
                     </div>
                 </div>
             </div>
+
+            {/* ── Run summary modal ────────────────────────────────────────── */}
+            {runSummary && (
+                <div className="modal-overlay open" onClick={() => setRunSummary(null)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
+                        <div className="modal-header">
+                            <h2>Production Run Complete</h2>
+                            <button className="modal-close" onClick={() => setRunSummary(null)}>✕</button>
+                        </div>
+                        <div className="modal-body">
+                            {/* Meta */}
+                            <div style={{ background: 'var(--bg-paper)', borderRadius: 'var(--radius-sm)', padding: '10px 14px', marginBottom: 14, fontSize: 13, display: 'flex', flexWrap: 'wrap', gap: '4px 20px' }}>
+                                <span><span style={{ color: 'var(--tx-muted)' }}>BOM: </span><strong>{runSummary.bomName}</strong></span>
+                                <span><span style={{ color: 'var(--tx-muted)' }}>Batches: </span><strong>{runSummary.batchCount}</strong></span>
+                                <span><span style={{ color: 'var(--tx-muted)' }}>Total yield: </span><strong>{(Number(runSummary.batchSize) * runSummary.batchCount).toLocaleString('en-IN', { maximumFractionDigits: 3 })} {runSummary.batchUnit}</strong></span>
+                                {runSummary.notes && <span style={{ width: '100%' }}><span style={{ color: 'var(--tx-muted)' }}>Notes: </span>{runSummary.notes}</span>}
+                            </div>
+
+                            {/* Materials table */}
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                                <thead>
+                                    <tr style={{ background: 'var(--bg-paper)' }}>
+                                        <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 600, borderBottom: '2px solid var(--border)' }}>Material</th>
+                                        <th style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 600, borderBottom: '2px solid var(--border)', whiteSpace: 'nowrap' }}>Qty Used</th>
+                                        {runSummary.items.some((it) => it.itemUnit.toLowerCase() !== it.matUnit.toLowerCase()) && (
+                                            <th style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 600, borderBottom: '2px solid var(--border)', whiteSpace: 'nowrap', color: 'var(--tx-muted)' }}>Deducted</th>
+                                        )}
+                                        {canSeeCost && <th style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 600, borderBottom: '2px solid var(--border)' }}>Cost (₹)</th>}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {runSummary.items.map((it, i) => {
+                                        const sameUnit = it.itemUnit.toLowerCase() === it.matUnit.toLowerCase();
+                                        const showDeductedCol = runSummary.items.some((x) => x.itemUnit.toLowerCase() !== x.matUnit.toLowerCase());
+                                        return (
+                                            <tr key={i}>
+                                                <td style={{ padding: '6px 10px', borderBottom: '1px solid var(--border)' }}>{it.name}</td>
+                                                <td style={{ padding: '6px 10px', borderBottom: '1px solid var(--border)', textAlign: 'right', fontWeight: 700 }}>
+                                                    {Number(it.qtyUsed.toFixed(6)).toLocaleString('en-IN', { maximumFractionDigits: 6 })} <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 11 }}>{it.itemUnit}</span>
+                                                </td>
+                                                {showDeductedCol && (
+                                                    <td style={{ padding: '6px 10px', borderBottom: '1px solid var(--border)', textAlign: 'right', color: 'var(--tx-muted)' }}>
+                                                        {sameUnit ? '—' : `${Number(it.qtyDeducted.toFixed(6)).toLocaleString('en-IN', { maximumFractionDigits: 6 })} ${it.matUnit}`}
+                                                    </td>
+                                                )}
+                                                {canSeeCost && (
+                                                    <td style={{ padding: '6px 10px', borderBottom: '1px solid var(--border)', textAlign: 'right' }}>
+                                                        ₹{it.cost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        );
+                                    })}
+                                    {canSeeCost && (
+                                        <tr style={{ background: 'var(--bg-paper)' }}>
+                                            <td colSpan={2 + (runSummary.items.some((it) => it.itemUnit.toLowerCase() !== it.matUnit.toLowerCase()) ? 1 : 0)} style={{ padding: '8px 10px', fontWeight: 700, textAlign: 'right' }}>Total Batch Cost</td>
+                                            <td style={{ padding: '8px 10px', fontWeight: 700, textAlign: 'right', color: '#059669' }}>
+                                                ₹{runSummary.totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn" onClick={() => setRunSummary(null)}>Close</button>
+                            <button className="btn primary" onClick={() => printRunSummary(runSummary)}>🖨 Print Report</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }
