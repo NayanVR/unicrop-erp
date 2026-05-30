@@ -432,32 +432,35 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
             .map(
                 (lbl) => `
             <div class="label">
-                <div class="transport">${esc(lbl.transport || '—')}</div>
-                <div class="destination">${esc(lbl.destination || '—')}</div>
-                <div class="party">${esc(lbl.party || '—')}</div>
-                <div class="mid-row">
-                    <span class="box-num">${lbl.boxNum}</span>
-                    <span class="total-boxes">${lbl.totalBoxes} box</span>
+                <div class="label-inner">
+                    <div class="transport">${esc(lbl.transport || '—')}</div>
+                    <div class="destination">${esc(lbl.destination || '—')}</div>
+                    <div class="party">${esc(lbl.party || '—')}</div>
+                    <div class="mid-row">
+                        <span class="box-num">${lbl.boxNum}</span>
+                        <span class="total-boxes">${lbl.totalBoxes} box</span>
+                    </div>
+                    <div class="auto-row2">
+                        <span class="inboxpcs">${lbl.inBoxPcs ? `In-box: <b>${esc(lbl.inBoxPcs)} pcs</b>` : '—'}</span>
+                        <span class="item-box-count">product box ${lbl.itemBoxNum}/${lbl.itemTotalBoxes}</span>
+                    </div>
+                    <div class="product-block">
+                        <div class="brand-name">${esc(lbl.brand || '—')}</div>
+                    </div>
+                    <div class="order-ref">${esc(lbl.orderRef)}</div>
+                    <div class="printed-by">Printed by: ${esc(printedBy)} · ${printedOn}</div>
                 </div>
-                <div class="auto-row2">
-                    <span class="inboxpcs">${lbl.inBoxPcs ? `In-box: <b>${esc(lbl.inBoxPcs)} pcs</b>` : '—'}</span>
-                    <span class="item-box-count">product box ${lbl.itemBoxNum}/${lbl.itemTotalBoxes}</span>
-                </div>
-                <div class="product-block">
-                    <div class="brand-name">${esc(lbl.brand || '—')}</div>
-                </div>
-                <div class="order-ref">${esc(lbl.orderRef)}</div>
-                <div class="printed-by">Printed by: ${esc(printedBy)} · ${printedOn}</div>
             </div>`,
             )
             .join('');
         win.document.write(`<html><head><title>Box Labels — ${labelEditor.order.order_number}</title>
             <style>
-                @page { size: 100mm 75mm; margin: 3mm; }
+                @page { size: 100mm 75mm; margin: 0; }
                 * { box-sizing: border-box; }
                 body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
-                .label { width:100mm; min-height:75mm; padding:4mm 5mm; border:0.5px solid #000; page-break-after:always; display:flex; flex-direction:column; }
+                .label { width:100mm; height:75mm; border:0.5px solid #000; page-break-after:always; overflow:hidden; position:relative; }
                 .label:last-child { page-break-after:avoid; }
+                .label-inner { padding:3mm 4mm; transform-origin:top left; }
                 .transport { font-size:${labelFS.transport}pt; font-weight:900; line-height:1.1; margin-bottom:1mm; }
                 .destination { font-size:9pt; color:#444; margin-bottom:1mm; }
                 .party { font-size:${labelFS.party}pt; font-weight:700; margin-bottom:2mm; }
@@ -467,7 +470,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 .auto-row2 { display:flex; justify-content:space-between; align-items:center; font-size:9pt; margin-bottom:1.5mm; }
                 .inboxpcs { font-weight:700; color:#222; }
                 .item-box-count { color:#666; font-style:italic; font-size:8pt; }
-                .product-block { border-top:0.5px solid #ccc; padding-top:1.5mm; margin-top:auto; }
+                .product-block { border-top:0.5px solid #ccc; padding-top:1.5mm; }
                 .brand-name { font-size:${labelFS.brand}pt; font-weight:900; word-break:break-word; white-space:normal; line-height:1.15; }
                 .order-ref { font-size:7.5pt; color:#888; margin-top:1mm; text-align:right; }
                 .printed-by { font-size:7pt; color:#555; margin-top:0.5mm; text-align:right; }
@@ -476,8 +479,32 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 .toolbar span { color:#cbd5e1; font-size:12px; }
                 @media screen { body { background:#f0f0f0; } .label { margin:10px auto; border:1px dashed #888; border-radius:4px; background:#fff; } }
                 @media print { .toolbar { display:none; } }
-            </style></head>
-            <body><div class="toolbar"><button onclick="window.print()">🖨 Save as PDF / Print</button><span>${labelEditor.labels.length} label(s) — ${labelEditor.order.order_number}</span></div>
+            </style>
+            <script>
+            function fitLabels() {
+                document.querySelectorAll('.label').forEach(function(label) {
+                    var inner = label.querySelector('.label-inner');
+                    if (!inner) return;
+                    inner.style.transform = '';
+                    inner.style.width = '';
+                    var labelH = label.offsetHeight;
+                    var labelW = label.offsetWidth;
+                    var innerH = inner.scrollHeight;
+                    var innerW = inner.scrollWidth;
+                    var scaleH = innerH > labelH ? labelH / innerH : 1;
+                    var scaleW = innerW > labelW ? labelW / innerW : 1;
+                    var scale = Math.min(scaleH, scaleW);
+                    if (scale < 0.999) {
+                        inner.style.transform = 'scale(' + scale.toFixed(4) + ')';
+                        inner.style.width = Math.ceil(100 / scale) + '%';
+                    }
+                });
+            }
+            window.addEventListener('load', fitLabels);
+            window.addEventListener('beforeprint', fitLabels);
+            <\/script>
+            </head>
+            <body><div class="toolbar"><button onclick="fitLabels();window.print()">🖨 Save as PDF / Print</button><span>${labelEditor.labels.length} label(s) — ${labelEditor.order.order_number}</span></div>
             ${labelHtml}</body></html>`);
         win.document.close();
     };
