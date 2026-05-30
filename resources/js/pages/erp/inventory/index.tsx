@@ -248,6 +248,12 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const [expandedBill, setExpandedBill] = useState<number | null>(null);
     const [viewReorder, setViewReorder] = useState<Reorder | null>(null);
 
+    // Selling rate mode for material form and packing form
+    const [matSellMode, setMatSellMode]   = useState<'manual' | 'profit'>('manual');
+    const [matProfitPct, setMatProfitPct] = useState('');
+    const [pkgSellMode, setPkgSellMode]   = useState<'manual' | 'profit'>('manual');
+    const [pkgProfitPct, setPkgProfitPct] = useState('');
+
     // Packaging wizard
     const [packStep, setPackStep] = useState(1);
     const [packCat, setPackCat] = useState<WizardCategory | null>(null);
@@ -486,6 +492,8 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         matForm.reset();
         matForm.clearErrors();
         setEditingMat(null);
+        setMatSellMode('manual');
+        setMatProfitPct('');
         setMatModal(true);
     };
 
@@ -750,6 +758,8 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         setPackStep(1);
         setPackCat(null);
         setPackForm({ size: '', shape: '', dim_l: '', dim_w: '', dim_h: '', hsn: '', gst: '18', sku: '', unit: 'pcs', supplier: '', stock: '0', cost_per_unit: '', selling_rate: '', notes: '' });
+        setPkgSellMode('manual');
+        setPkgProfitPct('');
         setPackModal(true);
     };
 
@@ -1438,14 +1448,45 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                     {matForm.errors.cost_per_unit && <div className="form-error">{matForm.errors.cost_per_unit}</div>}
                                 </div>
                                 <div className="form-group">
-                                    <label>Selling Rate (₹)</label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        step="any"
-                                        value={matForm.data.selling_rate}
-                                        onChange={(e) => matForm.setData('selling_rate', e.target.value)}
-                                    />
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span>Selling Rate (₹)</span>
+                                        <span style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden', fontSize: 11, height: 20 }}>
+                                            <button type="button" onClick={() => setMatSellMode('manual')} style={{ padding: '0 8px', border: 'none', cursor: 'pointer', background: matSellMode === 'manual' ? 'var(--accent)' : 'var(--bg-paper)', color: matSellMode === 'manual' ? '#fff' : 'var(--tx-muted)', fontWeight: 600 }}>Manual</button>
+                                            <button type="button" onClick={() => { setMatSellMode('profit'); if (matProfitPct) { const cost = Number(matForm.data.cost_per_unit) || 0; matForm.setData('selling_rate', String(cost * (1 + Number(matProfitPct) / 100))); } }} style={{ padding: '0 8px', border: 'none', borderLeft: '1px solid var(--border)', cursor: 'pointer', background: matSellMode === 'profit' ? '#059669' : 'var(--bg-paper)', color: matSellMode === 'profit' ? '#fff' : 'var(--tx-muted)', fontWeight: 600 }}>% Profit</button>
+                                        </span>
+                                    </label>
+                                    {matSellMode === 'manual' ? (
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="any"
+                                            value={matForm.data.selling_rate}
+                                            onChange={(e) => matForm.setData('selling_rate', e.target.value)}
+                                        />
+                                    ) : (
+                                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                            <div style={{ position: 'relative', flex: 1 }}>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.1"
+                                                    placeholder="Profit %"
+                                                    value={matProfitPct}
+                                                    onChange={(e) => {
+                                                        setMatProfitPct(e.target.value);
+                                                        const cost = Number(matForm.data.cost_per_unit) || 0;
+                                                        const pct  = Number(e.target.value) || 0;
+                                                        matForm.setData('selling_rate', String(cost * (1 + pct / 100)));
+                                                    }}
+                                                    style={{ paddingRight: 28 }}
+                                                />
+                                                <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--tx-muted)', fontSize: 13, pointerEvents: 'none' }}>%</span>
+                                            </div>
+                                            <span style={{ fontSize: 13, color: '#059669', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                                = ₹{(Number(matForm.data.cost_per_unit) * (1 + Number(matProfitPct || 0) / 100)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </span>
+                                        </div>
+                                    )}
                                     {matForm.errors.selling_rate && <div className="form-error">{matForm.errors.selling_rate}</div>}
                                 </div>
                                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
@@ -2348,14 +2389,45 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label>Selling Rate (₹)</label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        step="any"
-                                        value={packForm.selling_rate}
-                                        onChange={(e) => setPackForm((p) => ({ ...p, selling_rate: e.target.value }))}
-                                    />
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span>Selling Rate (₹)</span>
+                                        <span style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden', fontSize: 11, height: 20 }}>
+                                            <button type="button" onClick={() => setPkgSellMode('manual')} style={{ padding: '0 8px', border: 'none', cursor: 'pointer', background: pkgSellMode === 'manual' ? 'var(--accent)' : 'var(--bg-paper)', color: pkgSellMode === 'manual' ? '#fff' : 'var(--tx-muted)', fontWeight: 600 }}>Manual</button>
+                                            <button type="button" onClick={() => setPkgSellMode('profit')} style={{ padding: '0 8px', border: 'none', borderLeft: '1px solid var(--border)', cursor: 'pointer', background: pkgSellMode === 'profit' ? '#059669' : 'var(--bg-paper)', color: pkgSellMode === 'profit' ? '#fff' : 'var(--tx-muted)', fontWeight: 600 }}>% Profit</button>
+                                        </span>
+                                    </label>
+                                    {pkgSellMode === 'manual' ? (
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="any"
+                                            value={packForm.selling_rate}
+                                            onChange={(e) => setPackForm((p) => ({ ...p, selling_rate: e.target.value }))}
+                                        />
+                                    ) : (
+                                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                            <div style={{ position: 'relative', flex: 1 }}>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.1"
+                                                    placeholder="Profit %"
+                                                    value={pkgProfitPct}
+                                                    onChange={(e) => {
+                                                        setPkgProfitPct(e.target.value);
+                                                        const cost = Number(packForm.cost_per_unit) || 0;
+                                                        const pct  = Number(e.target.value) || 0;
+                                                        setPackForm((p) => ({ ...p, selling_rate: String(cost * (1 + pct / 100)) }));
+                                                    }}
+                                                    style={{ paddingRight: 28 }}
+                                                />
+                                                <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--tx-muted)', fontSize: 13, pointerEvents: 'none' }}>%</span>
+                                            </div>
+                                            <span style={{ fontSize: 13, color: '#059669', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                                = ₹{(Number(packForm.cost_per_unit) * (1 + Number(pkgProfitPct || 0) / 100)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                                     <label>Notes</label>
