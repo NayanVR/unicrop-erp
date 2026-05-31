@@ -130,8 +130,8 @@ type Props = {
     stats: Stats;
     vendors: Vendor[];
     inventoryCategories: InventoryCategory[];
-    bomMaterialIds: number[];
-    fillingMaterialIds: number[];
+    bomOutputMap: Record<string, string[]>;
+    fillingOutputMap: Record<string, string[]>;
 };
 
 // ── Route constants ───────────────────────────────────────────────────────────
@@ -214,7 +214,7 @@ function buildSku(catCode: string, size: string, shape: string): string {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function InventoryIndex({ materials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomMaterialIds, fillingMaterialIds }: Props) {
+export default function InventoryIndex({ materials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomOutputMap, fillingOutputMap }: Props) {
     const { auth } = usePage<{ auth: Auth }>().props;
     const role = auth.user?.role ?? '';
     const canSeeCost      = role === 'admin' || auth.user?.cost_access === true;
@@ -875,19 +875,33 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                 )}
             </div>
 
-            {/* Low Stock Alerts — split by BOM / Filling / Other */}
+            {/* Low Stock Alerts — BOM outputs / Filling outputs / Purchase needed */}
             {alertMaterials.length > 0 && (() => {
-                const bomAlerts     = alertMaterials.filter((m) => bomMaterialIds.includes(m.id));
-                const fillingAlerts = alertMaterials.filter((m) => fillingMaterialIds.includes(m.id));
-                const otherAlerts   = alertMaterials.filter((m) => !bomMaterialIds.includes(m.id) && !fillingMaterialIds.includes(m.id));
+                const bomOutputIds     = Object.keys(bomOutputMap).map(Number);
+                const fillingOutputIds = Object.keys(fillingOutputMap).map(Number);
 
-                const renderAlerts = (list: RawMaterial[]) => list.map((m) => {
+                const bomAlerts     = alertMaterials.filter((m) => bomOutputIds.includes(m.id));
+                const fillingAlerts = alertMaterials.filter((m) => fillingOutputIds.includes(m.id) && !bomOutputIds.includes(m.id));
+                const otherAlerts   = alertMaterials.filter((m) => !bomOutputIds.includes(m.id) && !fillingOutputIds.includes(m.id));
+
+                const renderProductionAlert = (m: RawMaterial, recipeNames: string[], accent: string) => {
                     const s = stockStatus(m);
                     return (
-                        <div
-                            key={m.id}
-                            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, border: `1px solid ${s === 'out' ? '#fca5a5' : '#fcd34d'}`, background: s === 'out' ? '#fef2f2' : '#fffbeb', fontSize: 13 }}
-                        >
+                        <div key={m.id} style={{ borderRadius: 8, border: `1px solid ${s === 'out' ? '#fca5a5' : '#fcd34d'}`, background: s === 'out' ? '#fef2f2' : '#fffbeb', padding: '8px 12px', fontSize: 13, minWidth: 200 }}>
+                            <div style={{ fontWeight: 700, color: s === 'out' ? '#dc2626' : '#d97706', marginBottom: 2, cursor: 'pointer' }} onClick={() => { setSearch(m.name); setTab('materials'); }}>
+                                {s === 'out' ? '🔴' : '🟡'} {m.name}: {fmt(m.stock_qty)} {m.unit}
+                            </div>
+                            <div style={{ fontSize: 11, color: accent, fontWeight: 600, marginTop: 2 }}>
+                                Run: {recipeNames.join(', ')}
+                            </div>
+                        </div>
+                    );
+                };
+
+                const renderPurchaseAlert = (m: RawMaterial) => {
+                    const s = stockStatus(m);
+                    return (
+                        <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, border: `1px solid ${s === 'out' ? '#fca5a5' : '#fcd34d'}`, background: s === 'out' ? '#fef2f2' : '#fffbeb', fontSize: 13 }}>
                             <span style={{ cursor: 'pointer', fontWeight: 600, color: s === 'out' ? '#dc2626' : '#d97706' }} onClick={() => { setSearch(m.name); setTab('materials'); }}>
                                 {s === 'out' ? '🔴' : '🟡'} {m.name}: {fmt(m.stock_qty)} {m.unit}
                             </span>
@@ -896,26 +910,30 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                             </button>
                         </div>
                     );
-                });
+                };
 
                 return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
                         {bomAlerts.length > 0 && (
                             <div className="card">
-                                <div className="card-title" style={{ marginBottom: 8 }}>⚗️ BOM — Low Stock ({bomAlerts.length})</div>
-                                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>{renderAlerts(bomAlerts)}</div>
+                                <div className="card-title" style={{ marginBottom: 8 }}>⚗️ BOM Production Required ({bomAlerts.length})</div>
+                                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                                    {bomAlerts.map((m) => renderProductionAlert(m, bomOutputMap[String(m.id)] ?? [], '#1e40af'))}
+                                </div>
                             </div>
                         )}
                         {fillingAlerts.length > 0 && (
                             <div className="card">
-                                <div className="card-title" style={{ marginBottom: 8 }}>🧪 Filling — Low Stock ({fillingAlerts.length})</div>
-                                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>{renderAlerts(fillingAlerts)}</div>
+                                <div className="card-title" style={{ marginBottom: 8 }}>🧪 Filling Production Required ({fillingAlerts.length})</div>
+                                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                                    {fillingAlerts.map((m) => renderProductionAlert(m, fillingOutputMap[String(m.id)] ?? [], '#065f46'))}
+                                </div>
                             </div>
                         )}
                         {otherAlerts.length > 0 && (
                             <div className="card">
-                                <div className="card-title" style={{ marginBottom: 8 }}>⚠ Low Stock ({otherAlerts.length})</div>
-                                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>{renderAlerts(otherAlerts)}</div>
+                                <div className="card-title" style={{ marginBottom: 8 }}>⚠ Purchase Required ({otherAlerts.length})</div>
+                                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>{otherAlerts.map(renderPurchaseAlert)}</div>
                             </div>
                         )}
                     </div>

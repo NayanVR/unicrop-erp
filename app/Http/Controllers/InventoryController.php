@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\BomItem;
-use App\Models\FillingRecipeItem;
+use App\Models\Bom;
+use App\Models\FillingRecipe;
 use App\Models\InventoryCategory;
 use App\Models\InventoryPurchaseBill;
 use App\Models\InventoryPurchaseBillItem;
@@ -68,11 +68,21 @@ class InventoryController extends Controller
 
         $inventoryCategories = InventoryCategory::orderBy('name')->get();
 
-        $bomMaterialIds     = BomItem::distinct()->pluck('raw_material_id')->toArray();
-        $fillingMaterialIds = FillingRecipeItem::distinct()->pluck('raw_material_id')->toArray();
+        // Output materials: produced internally, need production run not purchase order
+        $bomOutputMap = Bom::whereNotNull('output_raw_material_id')
+            ->where('is_active', true)
+            ->get(['output_raw_material_id', 'name'])
+            ->groupBy('output_raw_material_id')
+            ->map(fn ($g) => $g->pluck('name')->toArray());
+
+        $fillingOutputMap = FillingRecipe::whereNotNull('output_raw_material_id')
+            ->where('is_active', true)
+            ->get(['output_raw_material_id', 'name', 'packing_size'])
+            ->groupBy('output_raw_material_id')
+            ->map(fn ($g) => $g->map(fn ($r) => $r->name . ($r->packing_size ? " ({$r->packing_size})" : ''))->toArray());
 
         return Inertia::render('erp/inventory/index', array_merge(
-            compact('materials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats', 'vendors', 'inventoryCategories', 'bomMaterialIds', 'fillingMaterialIds'),
+            compact('materials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats', 'vendors', 'inventoryCategories', 'bomOutputMap', 'fillingOutputMap'),
             ['pageTitle' => 'Inventory']
         ));
     }
