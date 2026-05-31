@@ -64,6 +64,8 @@ class FillingController extends Controller
                     'unit'            => $item['unit'] ?? null,
                 ]);
             }
+
+            $this->syncOutputCost($recipe);
         });
 
         return redirect()->back()->with('success', 'Filling recipe created.');
@@ -92,6 +94,8 @@ class FillingController extends Controller
                     'unit'            => $item['unit'] ?? null,
                 ]);
             }
+
+            $this->syncOutputCost($recipe);
         });
 
         return redirect()->back()->with('success', 'Filling recipe updated.');
@@ -300,6 +304,26 @@ class FillingController extends Controller
         }
 
         return $request->validate($rules);
+    }
+
+    // Calculate cost per piece from recipe items and push to output inventory material.
+    private function syncOutputCost(FillingRecipe $recipe): void
+    {
+        if (! $recipe->output_raw_material_id) return;
+
+        $items = $recipe->items()->with('rawMaterial')->get();
+        $costPerPc = 0.0;
+
+        foreach ($items as $item) {
+            if (! $item->rawMaterial) continue;
+            $itemUnit  = $item->unit ?: $item->rawMaterial->unit;
+            $matUnit   = $item->rawMaterial->unit;
+            $qtyInMat  = $this->convertQty((float) $item->qty_per_unit, $itemUnit, $matUnit);
+            $costPerPc += $qtyInMat * (float) $item->rawMaterial->cost_per_unit;
+        }
+
+        RawMaterial::where('id', $recipe->output_raw_material_id)
+            ->update(['cost_per_unit' => round($costPerPc, 4)]);
     }
 
     // Convert qty between compatible units (weight: kg/g/mg; volume: L/mL).
