@@ -63,6 +63,32 @@ type RunFormData = { quantity: string; notes: string };
 const formatQty = (v: string | number) =>
     Number(v).toLocaleString('en-IN', { maximumFractionDigits: 3 });
 
+const BOX_SIZES: Record<string, number> = {
+    '5ltr': 2,   '5kg': 2,
+    '1ltr': 10,  '1kg': 10,
+    '500ml': 20, '500gm': 20,
+    '250ml': 40, '250gm': 40,
+    '100ml': 50, '100gm': 50,
+    '50ml': 100, '50gm': 100,
+    '20ml': 300, '20gm': 300,
+    '10ml': 600, '10gm': 600,
+    '5ml': 600,  '5gm': 600,
+    '10ltr': 1, '20ltr': 1, '50ltr': 1, '200ltr': 1,
+    '10kg': 1, '25kg': 1, '50kg': 1,
+};
+
+function normalizeSize(s: string): string {
+    return s.toLowerCase().replace(/\s+/g, '')
+        .replace(/litre|liter|litres|liters/g, 'ltr')
+        .replace(/kilogram|kilograms|kgs\b/g, 'kg')
+        .replace(/gram|grams\b/g, 'gm')
+        .replace(/millilitre|milliliter|millilitres|milliliters|mls\b/g, 'ml');
+}
+
+function getBoxQty(packingSize: string): number | null {
+    return BOX_SIZES[normalizeSize(packingSize)] ?? null;
+}
+
 // Convert qty from one unit to another (weight: kg/g/mg; volume: L/ml)
 function convertQty(qty: number, fromUnit: string, toUnit: string): number {
     const from = fromUnit.trim().toLowerCase();
@@ -287,9 +313,24 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                                         )}
                                     </div>
 
-                                    {/* Default fill qty + inactive badge */}
+                                    {/* Default fill qty + box count + inactive badge */}
                                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                                         <span style={{ fontSize: 12, color: 'var(--tx-sub)' }}>Default fill: <strong>{Math.round(Number(recipe.fill_quantity))} pcs</strong></span>
+                                        {(() => {
+                                            const pcsPerBox = recipe.packing_size ? getBoxQty(recipe.packing_size) : null;
+                                            if (!pcsPerBox) return null;
+                                            const boxes = qtyPreview / pcsPerBox;
+                                            const exact = Number.isInteger(boxes);
+                                            return (
+                                                <span style={{
+                                                    fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
+                                                    background: exact ? '#d1fae5' : '#fef3c7',
+                                                    color: exact ? '#065f46' : '#92400e',
+                                                }}>
+                                                    {exact ? `= ${boxes} box${boxes !== 1 ? 'es' : ''}` : `= ${boxes.toFixed(2)} boxes (${pcsPerBox}/box)`}
+                                                </span>
+                                            );
+                                        })()}
                                         {!recipe.is_active && <span className="badge gray" style={{ fontSize: 11 }}>Inactive</span>}
                                     </div>
 
@@ -511,7 +552,26 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                         <div className="form-grid">
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                 <label>Quantity to fill (pcs) *</label>
-                                <input type="number" value={runForm.data.quantity} onChange={(e) => runForm.setData('quantity', e.target.value)} min="0.001" step="1" />
+                                <input type="number" value={runForm.data.quantity} onChange={(e) => runForm.setData('quantity', e.target.value)} min="1" step="1" />
+                                {(() => {
+                                    const pcsPerBox = runTarget?.packing_size ? getBoxQty(runTarget.packing_size) : null;
+                                    const qty = Number(runForm.data.quantity);
+                                    if (!pcsPerBox || qty <= 0) return null;
+                                    const boxes = qty / pcsPerBox;
+                                    const exact = Number.isInteger(boxes);
+                                    return (
+                                        <div style={{
+                                            marginTop: 6, padding: '6px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                                            background: exact ? '#d1fae5' : '#fef3c7',
+                                            color: exact ? '#065f46' : '#92400e',
+                                            border: `1px solid ${exact ? '#6ee7b7' : '#fcd34d'}`,
+                                        }}>
+                                            {exact
+                                                ? `✓ ${boxes} box${boxes !== 1 ? 'es' : ''} (${pcsPerBox} pcs/box)`
+                                                : `⚠ ${boxes.toFixed(2)} boxes — ${pcsPerBox} pcs = 1 box`}
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
 
