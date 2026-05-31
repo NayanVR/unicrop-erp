@@ -19,12 +19,10 @@ type RecipeItem = {
     raw_material?: RawMaterial | null;
 };
 
-type Product = { id: number; name: string };
-
 type Recipe = {
     id: number;
-    product_id: number | null;
-    product?: Product | null;
+    output_raw_material_id: number | null;
+    output_material?: RawMaterial | null;
     name: string;
     packing_size?: string | null;
     fill_quantity: string | number;
@@ -46,14 +44,13 @@ type FillingRun = {
 
 type Props = {
     recipes: Recipe[];
-    products: Product[];
     materials: RawMaterial[];
+    finishedGoodMaterials: RawMaterial[];
     fillingRuns: FillingRun[];
 };
 
 type RecipeFormData = {
-    product_id: string;
-    name: string;
+    output_raw_material_id: string;
     packing_size: string;
     fill_quantity: string;
     notes: string;
@@ -98,7 +95,7 @@ function normalizeUnitDisplay(unit: string): string {
     return unit;
 }
 
-export default function FillingIndex({ recipes, products, materials, fillingRuns }: Props) {
+export default function FillingIndex({ recipes, materials, finishedGoodMaterials, fillingRuns }: Props) {
     const { auth } = usePage<{ auth: Auth }>().props;
     const isAdmin    = auth.user?.role === 'admin';
     const canSeeCost = isAdmin || auth.user?.cost_access === true;
@@ -113,7 +110,7 @@ export default function FillingIndex({ recipes, products, materials, fillingRuns
     const [runTarget, setRunTarget] = useState<Recipe | null>(null);
 
     const form = useForm<RecipeFormData>({
-        product_id: '', name: '', packing_size: '', fill_quantity: '1', notes: '', is_active: true, items: [],
+        output_raw_material_id: '', packing_size: '', fill_quantity: '1', notes: '', is_active: true, items: [],
     });
     const runForm = useForm<RunFormData>({ quantity: '1', notes: '' });
 
@@ -123,8 +120,7 @@ export default function FillingIndex({ recipes, products, materials, fillingRuns
 
     const openEdit = (recipe: Recipe) => {
         form.setData({
-            product_id: recipe.product_id ? String(recipe.product_id) : '',
-            name: recipe.name,
+            output_raw_material_id: recipe.output_raw_material_id ? String(recipe.output_raw_material_id) : '',
             packing_size: recipe.packing_size ?? '',
             fill_quantity: String(recipe.fill_quantity),
             notes: recipe.notes ?? '',
@@ -446,19 +442,15 @@ export default function FillingIndex({ recipes, products, materials, fillingRuns
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                 <label>Product Name *</label>
                                 <select
-                                    value={form.data.product_id}
-                                    onChange={(e) => {
-                                        const pid = e.target.value;
-                                        const prod = products.find((p) => p.id === Number(pid));
-                                        form.setData({ ...form.data, product_id: pid, name: prod?.name ?? '' });
-                                    }}
+                                    value={form.data.output_raw_material_id}
+                                    onChange={(e) => form.setData('output_raw_material_id', e.target.value)}
                                 >
-                                    <option value="">— Select product —</option>
-                                    {products.map((p) => (
-                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                    <option value="">— Select finished good —</option>
+                                    {finishedGoodMaterials.map((m) => (
+                                        <option key={m.id} value={m.id}>{m.name}</option>
                                     ))}
                                 </select>
-                                {form.errors.product_id && <div className="form-error">{form.errors.product_id}</div>}
+                                {form.errors.output_raw_material_id && <div className="form-error">{form.errors.output_raw_material_id}</div>}
                             </div>
                             <div className="form-group">
                                 <label>Packing Size</label>
@@ -501,7 +493,7 @@ export default function FillingIndex({ recipes, products, materials, fillingRuns
                     </div>
                     <div className="modal-footer">
                         <button className="btn" onClick={() => setEditModal(false)}>Cancel</button>
-                        <button className="btn primary" onClick={saveRecipe} disabled={form.processing || !form.data.product_id}>
+                        <button className="btn primary" onClick={saveRecipe} disabled={form.processing || !form.data.output_raw_material_id}>
                             {editingRecipe ? 'Update Product' : 'Create Product'}
                         </button>
                     </div>

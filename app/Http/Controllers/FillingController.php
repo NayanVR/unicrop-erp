@@ -6,7 +6,6 @@ use App\Models\FillingRecipe;
 use App\Models\FillingRun;
 use App\Models\FinishedGood;
 use App\Models\InventoryTransaction;
-use App\Models\Product;
 use App\Models\RawMaterial;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,16 +18,16 @@ class FillingController extends Controller
     public function index(): Response
     {
         $recipes = FillingRecipe::query()
-            ->with(['product:id,name', 'items.rawMaterial:id,name,unit,stock_qty,cost_per_unit'])
+            ->with(['outputMaterial:id,name,unit,stock_qty,category', 'items.rawMaterial:id,name,unit,stock_qty,cost_per_unit'])
             ->orderBy('name')
             ->get();
-
-        $products = Product::where('is_active', true)->orderBy('name')->get(['id', 'name']);
 
         $materials = RawMaterial::query()
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'unit', 'stock_qty', 'cost_per_unit', 'category']);
+
+        $finishedGoodMaterials = $materials->filter(fn ($m) => strtolower(trim($m->category ?? '')) === 'finished good')->values();
 
         $fillingRuns = FillingRun::with('user:id,name')
             ->latest()
@@ -36,11 +35,11 @@ class FillingController extends Controller
             ->get(['id', 'filling_recipe_id', 'our_brand', 'packing_size', 'quantity', 'user_id', 'items', 'created_at']);
 
         return Inertia::render('erp/filling/index', [
-            'pageTitle'   => 'Filling',
-            'recipes'     => $recipes,
-            'products'    => $products,
-            'materials'   => $materials,
-            'fillingRuns' => $fillingRuns,
+            'pageTitle'             => 'Filling',
+            'recipes'               => $recipes,
+            'materials'             => $materials,
+            'finishedGoodMaterials' => $finishedGoodMaterials,
+            'fillingRuns'           => $fillingRuns,
         ]);
     }
 
@@ -49,13 +48,13 @@ class FillingController extends Controller
         $data = $this->validateRecipe($request);
 
         DB::transaction(function () use ($data) {
-            $product = $data['product_id'] ? Product::find($data['product_id']) : null;
+            $outputMat = $data['output_raw_material_id'] ? RawMaterial::find($data['output_raw_material_id']) : null;
             $recipe = FillingRecipe::create([
-                'product_id'    => $product?->id,
-                'name'          => $product?->name ?? $data['name'],
-                'packing_size'  => $data['packing_size'] ?? null,
-                'fill_quantity' => $data['fill_quantity'] ?? 1,
-                'notes'         => $data['notes'] ?? null,
+                'output_raw_material_id' => $outputMat?->id,
+                'name'                   => $outputMat?->name ?? '',
+                'packing_size'           => $data['packing_size'] ?? null,
+                'fill_quantity'          => $data['fill_quantity'] ?? 1,
+                'notes'                  => $data['notes'] ?? null,
             ]);
 
             foreach ($data['items'] ?? [] as $item) {
@@ -75,14 +74,14 @@ class FillingController extends Controller
         $data = $this->validateRecipe($request, true);
 
         DB::transaction(function () use ($data, $recipe) {
-            $product = $data['product_id'] ? Product::find($data['product_id']) : null;
+            $outputMat = $data['output_raw_material_id'] ? RawMaterial::find($data['output_raw_material_id']) : null;
             $recipe->update([
-                'product_id'    => $product?->id,
-                'name'          => $product?->name ?? $data['name'],
-                'packing_size'  => $data['packing_size'] ?? null,
-                'fill_quantity' => $data['fill_quantity'] ?? 1,
-                'notes'         => $data['notes'] ?? null,
-                'is_active'     => $data['is_active'] ?? true,
+                'output_raw_material_id' => $outputMat?->id,
+                'name'                   => $outputMat?->name ?? '',
+                'packing_size'           => $data['packing_size'] ?? null,
+                'fill_quantity'          => $data['fill_quantity'] ?? 1,
+                'notes'                  => $data['notes'] ?? null,
+                'is_active'              => $data['is_active'] ?? true,
             ]);
 
             $recipe->items()->delete();
@@ -181,7 +180,6 @@ class FillingController extends Controller
             ]);
 
             FinishedGood::create([
-                'product_id'   => $recipe->product_id,
                 'created_by'   => $request->user()?->id,
                 'name'         => $recipe->name,
                 'packing_size' => $recipe->packing_size,
@@ -190,7 +188,29 @@ class FillingController extends Controller
                 'source'       => 'filling',
             ]);
 
-            return redirect()->back()->with('success', "Filling done for {$recipe->name} ({$qty} pcs). Materials deducted, added to finished goods.");
+            // Increment output material stock in inventory
+            if ($recipe->output_raw_material_id) {
+                $output = RawMaterial::find($recipe->output_raw_material_id);
+                if ($output) {
+                    $prevStock = (float) $output->stock_qty;
+                    $newStock  = $prevStock + $qty;
+                    $output->stock_qty = $newStock;
+                    $output->save();
+
+                    InventoryTransaction::create([
+                        'raw_material_id' => $output->id,
+                        'user_id'         => $request->user()?->id,
+                        'type'            => 'purchase',
+                        'qty'             => $qty,
+                        'previous_stock'  => $prevStock,
+                        'new_stock'       => $newStock,
+                        'reference'       => "Filling: {$recipe->name}" . ($recipe->packing_size ? " {$recipe->packing_size}" : '') . " × {$qty}",
+                        'notes'           => $data['notes'] ?? null,
+                    ]);
+                }
+            }
+
+            return redirect()->back()->with('success', "Filling done for {$recipe->name} ({$qty} pcs). Materials deducted, stock updated.");
         });
     }
 
@@ -223,6 +243,28 @@ class FillingController extends Controller
                 ->first();
             $fg?->delete();
 
+            // Reverse output material stock
+            $recipe = $run->fillingRecipe;
+            if ($recipe && $recipe->output_raw_material_id) {
+                $output = RawMaterial::find($recipe->output_raw_material_id);
+                if ($output) {
+                    $prev = (float) $output->stock_qty;
+                    $newStock = max(0, $prev - (float) $run->quantity);
+                    $output->stock_qty = $newStock;
+                    $output->save();
+
+                    InventoryTransaction::create([
+                        'raw_material_id' => $output->id,
+                        'user_id'         => request()->user()?->id,
+                        'type'            => 'issue',
+                        'qty'             => (float) $run->quantity,
+                        'previous_stock'  => $prev,
+                        'new_stock'       => $newStock,
+                        'reference'       => "Reversed filling: {$run->our_brand}" . ($run->packing_size ? " {$run->packing_size}" : ''),
+                    ]);
+                }
+            }
+
             $run->delete();
         });
 
@@ -235,8 +277,7 @@ class FillingController extends Controller
     private function validateRecipe(Request $request, bool $withActive = false): array
     {
         $rules = [
-            'product_id'              => 'required|exists:products,id',
-            'name'                    => 'nullable|string|max:255',
+            'output_raw_material_id'  => 'required|exists:raw_materials,id',
             'packing_size'            => 'nullable|string|max:50',
             'fill_quantity'           => 'nullable|numeric|min:0.001',
             'notes'                   => 'nullable|string|max:1000',

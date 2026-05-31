@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['product_id', 'name', 'packing_size', 'fill_quantity', 'notes', 'is_active'])]
+#[Fillable(['output_raw_material_id', 'name', 'packing_size', 'fill_quantity', 'notes', 'is_active'])]
 class FillingRecipe extends Model
 {
     /**
@@ -21,11 +21,11 @@ class FillingRecipe extends Model
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\App\Models\Product, FillingRecipe>
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\App\Models\RawMaterial, FillingRecipe>
      */
-    public function product(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function outputMaterial(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
-        return $this->belongsTo(\App\Models\Product::class);
+        return $this->belongsTo(\App\Models\RawMaterial::class, 'output_raw_material_id');
     }
 
     /**
