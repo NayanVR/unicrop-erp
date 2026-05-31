@@ -150,11 +150,12 @@ type EditableLabel = {
     orderRef: string;
 };
 
-type FilterKey = 'all' | 'new' | 'in-process' | 'ready' | 'dispatched';
+type FilterKey = 'all' | 'new' | 'in-process' | 'filling' | 'ready' | 'dispatched';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
     { key: 'new', label: 'New' },
     { key: 'in-process', label: 'In Process' },
+    { key: 'filling', label: 'Filling' },
     { key: 'ready', label: 'Ready' },
     { key: 'dispatched', label: 'Dispatched' },
     { key: 'all', label: 'All' },
@@ -194,6 +195,8 @@ const matchesFilter = (order: Order, filter: FilterKey) => {
             return statuses.some((s) => isNewItem(s));
         case 'in-process':
             return statuses.some((s) => ['accepted', 'filling', 'labeling'].includes(s ?? ''));
+        case 'filling':
+            return statuses.some((s) => s === 'filling');
         case 'ready':
             return statuses.some((s) => s === 'ready');
         case 'dispatched':
@@ -252,7 +255,12 @@ const boxesFor = (item: OrderItem): number | null => {
 };
 
 export default function FactoryIndex({ orders, urgentPending, canAdvance, productPhotos = [] }: Props) {
-    const [activeFilter, setActiveFilter] = useState<FilterKey>('new');
+    const initialFilter = (): FilterKey => {
+        const param = new URLSearchParams(window.location.search).get('filter');
+        const valid: FilterKey[] = ['all', 'new', 'in-process', 'filling', 'ready', 'dispatched'];
+        return valid.includes(param as FilterKey) ? (param as FilterKey) : 'new';
+    };
+    const [activeFilter, setActiveFilter] = useState<FilterKey>(initialFilter);
     const { auth } = usePage<{ auth: Auth }>().props;
     const [search, setSearch] = useState('');
     const [openOrders, setOpenOrders] = useState<number[]>([]);
