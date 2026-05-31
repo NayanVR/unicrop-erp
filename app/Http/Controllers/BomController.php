@@ -9,6 +9,7 @@ use App\Models\InventoryTransaction;
 use App\Models\Product;
 use App\Models\ProductionRun;
 use App\Models\RawMaterial;
+use App\Services\LowStockAlertService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -211,6 +212,9 @@ class BomController extends Controller
                     'reference'       => "BOM Run: {$bom->name} × {$batchCount}",
                     'notes'           => $data['notes'] ?? null,
                 ]);
+
+                $item->rawMaterial->refresh();
+                (new LowStockAlertService())->checkAndAlert($item->rawMaterial);
 
                 $runItems[] = [
                     'name'         => $item->rawMaterial->name,

@@ -8,7 +8,7 @@ import {
     store as transportStore,
     update as transportUpdate,
 } from '@/routes/settings/transports';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 
 type Product = {
@@ -28,9 +28,24 @@ type TransportEntry = {
     is_active: boolean;
 };
 
+type AlertSettings = {
+    alert_enabled: string;
+    alert_provider: string;
+    alert_phone_numbers: string;
+    alert_twilio_sid: string;
+    alert_twilio_token: string;
+    alert_twilio_from: string;
+    alert_twilio_channel: string;
+    alert_msg91_authkey: string;
+    alert_msg91_sender: string;
+    alert_msg91_template_id: string;
+    alert_cooldown_hours: string;
+};
+
 type Props = {
     products: Product[];
     transports: TransportEntry[];
+    alertSettings: AlertSettings;
 };
 
 type ProductForm = {
@@ -49,13 +64,59 @@ type TransportForm = {
 
 const GST_OPTIONS = ['0', '5', '12', '18', '28'];
 
-export default function SettingsIndex({ products, transports }: Props) {
+export default function SettingsIndex({ products, transports, alertSettings }: Props) {
     const [modalOpen, setModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
     const [transportModalOpen, setTransportModalOpen] = useState(false);
     const [editingTransport, setEditingTransport] = useState<TransportEntry | null>(null);
     const [transportTab, setTransportTab] = useState<'transport' | 'courier'>('transport');
+
+    const [alertSaving, setAlertSaving] = useState(false);
+    const [alertTesting, setAlertTesting] = useState(false);
+    const [alertTestResult, setAlertTestResult] = useState<{ ok: boolean; detail: string } | null>(null);
+    const [alert, setAlert] = useState<AlertSettings>({
+        alert_enabled:           alertSettings.alert_enabled ?? '0',
+        alert_provider:          alertSettings.alert_provider || 'twilio',
+        alert_phone_numbers:     alertSettings.alert_phone_numbers ?? '',
+        alert_twilio_sid:        alertSettings.alert_twilio_sid ?? '',
+        alert_twilio_token:      alertSettings.alert_twilio_token ?? '',
+        alert_twilio_from:       alertSettings.alert_twilio_from ?? '',
+        alert_twilio_channel:    alertSettings.alert_twilio_channel || 'whatsapp',
+        alert_msg91_authkey:     alertSettings.alert_msg91_authkey ?? '',
+        alert_msg91_sender:      alertSettings.alert_msg91_sender ?? '',
+        alert_msg91_template_id: alertSettings.alert_msg91_template_id ?? '',
+        alert_cooldown_hours:    alertSettings.alert_cooldown_hours || '6',
+    });
+
+    const saveAlertSettings = () => {
+        setAlertSaving(true);
+        router.post('/erp/settings/alert', { ...alert }, {
+            preserveScroll: true,
+            onFinish: () => setAlertSaving(false),
+        });
+    };
+
+    const testAlert = async () => {
+        setAlertTesting(true);
+        setAlertTestResult(null);
+        try {
+            const res = await fetch('/erp/settings/alert/test', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
+                    'Accept': 'application/json',
+                },
+            });
+            const data = await res.json();
+            setAlertTestResult(data);
+        } catch (e: unknown) {
+            setAlertTestResult({ ok: false, detail: String(e) });
+        } finally {
+            setAlertTesting(false);
+        }
+    };
 
     const form = useForm<ProductForm>({
         name: '',
@@ -275,6 +336,163 @@ export default function SettingsIndex({ products, transports }: Props) {
                             </table>
                         </div>
                     )}
+                </div>
+
+                {/* Low Stock Alert Settings */}
+                <div className="card" style={{ marginTop: '16px' }}>
+                    <div className="card-title" style={{ marginBottom: '12px' }}>
+                        🔔 Low Stock Alerts
+                        <span className={`ct-badge ${alert.alert_enabled === '1' ? 'teal' : ''}`}>
+                            {alert.alert_enabled === '1' ? 'Enabled' : 'Disabled'}
+                        </span>
+                    </div>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '18px' }}>
+                        Automatically send WhatsApp or SMS when a material's stock drops below its minimum level.
+                    </p>
+
+                    <div className="form-grid" style={{ maxWidth: '640px' }}>
+                        {/* Enable toggle */}
+                        <div className="form-group" style={{ gridColumn: '1/-1', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <label style={{ margin: 0, fontWeight: 600 }}>Enable Alerts</label>
+                            <button
+                                type="button"
+                                className={`pill${alert.alert_enabled === '1' ? ' active' : ''}`}
+                                style={{ fontSize: '13px' }}
+                                onClick={() => setAlert(a => ({ ...a, alert_enabled: a.alert_enabled === '1' ? '0' : '1' }))}
+                            >
+                                {alert.alert_enabled === '1' ? '✅ On' : '⬜ Off'}
+                            </button>
+                        </div>
+
+                        {/* Provider */}
+                        <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                            <label>Provider</label>
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                <button type="button" className={`pill${alert.alert_provider === 'twilio' ? ' active' : ''}`}
+                                    onClick={() => setAlert(a => ({ ...a, alert_provider: 'twilio' }))}>
+                                    📱 Twilio (WhatsApp / SMS)
+                                </button>
+                                <button type="button" className={`pill${alert.alert_provider === 'msg91' ? ' active' : ''}`}
+                                    onClick={() => setAlert(a => ({ ...a, alert_provider: 'msg91' }))}>
+                                    📨 MSG91 (SMS — India)
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Phone numbers */}
+                        <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                            <label>Phone Number(s)</label>
+                            <input
+                                type="text"
+                                value={alert.alert_phone_numbers}
+                                onChange={e => setAlert(a => ({ ...a, alert_phone_numbers: e.target.value }))}
+                                placeholder="e.g. 9876543210, 9123456789  (comma separated)"
+                            />
+                            <small style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>10-digit Indian numbers are accepted. Country code optional.</small>
+                        </div>
+
+                        {/* Cooldown */}
+                        <div className="form-group">
+                            <label>Alert Cooldown (hours)</label>
+                            <input
+                                type="number"
+                                min={1} max={168}
+                                value={alert.alert_cooldown_hours}
+                                onChange={e => setAlert(a => ({ ...a, alert_cooldown_hours: e.target.value }))}
+                                placeholder="6"
+                                style={{ maxWidth: '120px' }}
+                            />
+                            <small style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>Minimum hours between repeat alerts for the same material.</small>
+                        </div>
+
+                        {/* ── Twilio fields ── */}
+                        {alert.alert_provider === 'twilio' && (<>
+                            <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                                <div style={{ background: 'var(--bg-secondary)', borderRadius: '8px', padding: '12px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                    💡 <strong>Twilio setup:</strong> Create a free account at twilio.com, get your Account SID and Auth Token from the Console. For WhatsApp, use the Sandbox number <code>+14155238886</code> (send "join &lt;keyword&gt;" to activate). For production WhatsApp, register a WhatsApp Business number.
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label>Account SID</label>
+                                <input type="text" value={alert.alert_twilio_sid}
+                                    onChange={e => setAlert(a => ({ ...a, alert_twilio_sid: e.target.value }))}
+                                    placeholder="ACxxxxxxxxxxxx" />
+                            </div>
+                            <div className="form-group">
+                                <label>Auth Token</label>
+                                <input type="password" value={alert.alert_twilio_token}
+                                    onChange={e => setAlert(a => ({ ...a, alert_twilio_token: e.target.value }))}
+                                    placeholder="Your auth token" />
+                            </div>
+                            <div className="form-group">
+                                <label>From Number</label>
+                                <input type="text" value={alert.alert_twilio_from}
+                                    onChange={e => setAlert(a => ({ ...a, alert_twilio_from: e.target.value }))}
+                                    placeholder="+14155238886" />
+                                <small style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>For WhatsApp sandbox: +14155238886</small>
+                            </div>
+                            <div className="form-group">
+                                <label>Channel</label>
+                                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                    {(['whatsapp', 'sms', 'both'] as const).map(ch => (
+                                        <button key={ch} type="button" className={`pill${alert.alert_twilio_channel === ch ? ' active' : ''}`}
+                                            onClick={() => setAlert(a => ({ ...a, alert_twilio_channel: ch }))}>
+                                            {ch === 'whatsapp' ? '💬 WhatsApp' : ch === 'sms' ? '📩 SMS' : '🔀 Both'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </>)}
+
+                        {/* ── MSG91 fields ── */}
+                        {alert.alert_provider === 'msg91' && (<>
+                            <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                                <div style={{ background: 'var(--bg-secondary)', borderRadius: '8px', padding: '12px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                    💡 <strong>MSG91 setup:</strong> Register at msg91.com, go to API &gt; Auth Key to get your key. For transactional SMS in India, you need a DLT-registered sender ID and template ID. Use route 4 for transactional messages.
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label>Auth Key</label>
+                                <input type="password" value={alert.alert_msg91_authkey}
+                                    onChange={e => setAlert(a => ({ ...a, alert_msg91_authkey: e.target.value }))}
+                                    placeholder="Your MSG91 auth key" />
+                            </div>
+                            <div className="form-group">
+                                <label>Sender ID</label>
+                                <input type="text" value={alert.alert_msg91_sender}
+                                    onChange={e => setAlert(a => ({ ...a, alert_msg91_sender: e.target.value }))}
+                                    placeholder="UNICRP (6 chars)" maxLength={6} />
+                            </div>
+                            <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                                <label>DLT Template ID <small style={{ color: 'var(--text-secondary)' }}>(optional)</small></label>
+                                <input type="text" value={alert.alert_msg91_template_id}
+                                    onChange={e => setAlert(a => ({ ...a, alert_msg91_template_id: e.target.value }))}
+                                    placeholder="Template ID from DLT portal" />
+                            </div>
+                        </>)}
+
+                        {/* Actions */}
+                        <div className="form-group" style={{ gridColumn: '1/-1', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginTop: '4px' }}>
+                            <button className="btn primary" onClick={saveAlertSettings} disabled={alertSaving}>
+                                {alertSaving ? 'Saving…' : '💾 Save Alert Settings'}
+                            </button>
+                            <button className="btn" onClick={testAlert} disabled={alertTesting}>
+                                {alertTesting ? 'Sending…' : '🧪 Send Test Alert'}
+                            </button>
+                            {alertTestResult && (
+                                <span style={{
+                                    fontSize: '13px',
+                                    color: alertTestResult.ok ? 'var(--color-success, #16a34a)' : 'var(--color-danger, #dc2626)',
+                                    background: alertTestResult.ok ? '#f0fdf4' : '#fef2f2',
+                                    padding: '4px 10px',
+                                    borderRadius: '6px',
+                                    border: `1px solid ${alertTestResult.ok ? '#bbf7d0' : '#fecaca'}`,
+                                }}>
+                                    {alertTestResult.ok ? '✅ ' : '❌ '}{alertTestResult.detail}
+                                </span>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
 

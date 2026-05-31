@@ -11,6 +11,7 @@ use App\Models\InventoryReorder;
 use App\Models\InventoryTransaction;
 use App\Models\Party;
 use App\Models\RawMaterial;
+use App\Services\LowStockAlertService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -183,6 +184,9 @@ class InventoryController extends Controller
             if (! empty($data['cost_per_unit'])) {
                 $material->update(['cost_per_unit' => $data['cost_per_unit']]);
             }
+
+            $material->refresh();
+            (new LowStockAlertService())->checkAndAlert($material);
 
             return redirect()->back()->with('success', 'Stock updated.');
         });
