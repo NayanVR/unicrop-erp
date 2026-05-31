@@ -55,10 +55,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::get('factory', [FactoryController::class, 'index'])->name('factory.index');
         Route::get('filling', [FillingController::class, 'index'])->name('filling.index');
-        Route::post('filling/configs', [FillingController::class, 'saveConfig'])->name('filling.configs.save');
-        Route::delete('filling/configs/{config}', [FillingController::class, 'destroyConfig'])->name('filling.configs.destroy');
-        Route::post('filling/run', [FillingController::class, 'runFilling'])->name('filling.run');
+        Route::post('filling', [FillingController::class, 'store'])->name('filling.store');
         Route::delete('filling/runs/{run}', [FillingController::class, 'destroyRun'])->name('filling.runs.destroy');
+        Route::patch('filling/{recipe}', [FillingController::class, 'update'])->name('filling.update');
+        Route::delete('filling/{recipe}', [FillingController::class, 'destroy'])->name('filling.destroy');
+        Route::post('filling/{recipe}/run', [FillingController::class, 'runFilling'])->name('filling.run');
         Route::post('factory/items/{item}/advance', [FactoryController::class, 'advanceStage'])->name('factory.items.advance');
         Route::post('factory/items/{item}/revert', [FactoryController::class, 'revertStage'])->name('factory.items.revert');
         Route::post('factory/items/{item}/set-stage', [FactoryController::class, 'setStage'])->name('factory.items.set-stage');

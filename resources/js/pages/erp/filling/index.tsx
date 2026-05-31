@@ -1,51 +1,35 @@
 import type { Auth } from '@/types/auth';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
-type OrderItem = {
-    id: number;
-    order_id: number;
-    our_brand?: string | null;
-    party_brand?: string | null;
-    packing_size?: string | null;
-    quantity: string | number;
-    status: string;
-};
-
-type Order = {
-    id: number;
-    order_number: string;
-    company_name: string;
-    priority?: string | null;
-    items: OrderItem[];
-};
-
-type Material = {
+type RawMaterial = {
     id: number;
     name: string;
     unit: string;
     stock_qty: string | number;
+    cost_per_unit: string | number;
     category?: string | null;
 };
 
-type Config = {
-    id: number;
-    our_brand: string;
-    packing_size: string | null;
-    fill_material_id: number | null;
-    bottle_id: number | null;
-    label_id: number | null;
-    outer_box_id: number | null;
-    printed_box_id: number | null;
-    carton_size: number;
-    fill_material?: Material | null;
-    bottle?: Material | null;
-    label?: Material | null;
-    outer_box?: Material | null;
-    printed_box?: Material | null;
+type RecipeItem = {
+    id?: number;
+    raw_material_id: number;
+    qty_per_unit: string | number;
+    unit?: string | null;
+    raw_material?: RawMaterial | null;
 };
 
-type FillingRunItem = { role: string; raw_material_id: number; name: string; qty: number; unit: string };
+type Recipe = {
+    id: number;
+    name: string;
+    packing_size?: string | null;
+    fill_quantity: string | number;
+    notes?: string | null;
+    is_active: boolean;
+    items: RecipeItem[];
+};
+
+type FillingRunItem = { raw_material_id?: number; name: string; qty: number; unit: string };
 type FillingRun = {
     id: number;
     our_brand: string;
@@ -57,217 +41,181 @@ type FillingRun = {
 };
 
 type Props = {
-    orders: Order[];
-    configs: Config[];
-    materials: Material[];
+    recipes: Recipe[];
+    materials: RawMaterial[];
     fillingRuns: FillingRun[];
 };
 
-function packingToLiters(size: string | null | undefined): number | null {
-    if (!size) return null;
-    const s = size.toLowerCase().trim();
-    const num = parseFloat(s);
-    if (isNaN(num)) return null;
-    if (s.includes('ml')) return num / 1000;
-    if (s.includes('l')) return num;
-    return null;
-}
-
-function fillNeedFrontend(liters: number, unit: string): number {
-    const u = unit.toLowerCase().trim();
-    if (['ml', 'milliliter', 'millilitre', 'g', 'gm', 'gram', 'grams'].includes(u)) return liters * 1000;
-    return liters;
-}
-
-function fmtQty(n: number) {
-    return n.toLocaleString('en-IN', { maximumFractionDigits: 3 });
-}
-
-function StockBadge({ needed, stock, unit }: { needed: number; stock: number; unit: string }) {
-    const ok = stock >= needed;
-    return (
-        <span style={{
-            fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 10, whiteSpace: 'nowrap',
-            color: ok ? '#059669' : '#dc2626',
-            background: ok ? '#d1fae5' : '#fee2e2',
-        }}>
-            Stock: {fmtQty(stock)} {unit}
-        </span>
-    );
-}
-
-type MatRow = { icon: string; label: string; mat: Material | null | undefined; need: number; unit: string };
-
-function calculateNeeds(cfg: Config, qty: number): MatRow[] {
-    const liters = packingToLiters(cfg.packing_size);
-    const cartonQty = Math.max(1, cfg.carton_size ?? 12);
-    const rows: MatRow[] = [];
-
-    if (cfg.fill_material && liters != null) {
-        const raw  = qty * liters;
-        const need = fillNeedFrontend(raw, cfg.fill_material.unit);
-        rows.push({ icon: '🧪', label: 'Fill', mat: cfg.fill_material, need, unit: cfg.fill_material.unit });
-    }
-    if (cfg.bottle)      rows.push({ icon: '🍶', label: 'Bottle',      mat: cfg.bottle,      need: qty,                        unit: cfg.bottle.unit });
-    if (cfg.label)       rows.push({ icon: '🏷', label: 'Label',       mat: cfg.label,       need: qty,                        unit: cfg.label.unit });
-    if (cfg.outer_box)   rows.push({ icon: '📦', label: 'Outer Box',   mat: cfg.outer_box,   need: Math.ceil(qty / cartonQty), unit: cfg.outer_box.unit });
-    if (cfg.printed_box) rows.push({ icon: '🗃', label: 'Printed Box', mat: cfg.printed_box, need: qty,                        unit: cfg.printed_box.unit });
-
-    return rows;
-}
-
-const MATERIAL_DEFS = [
-    { key: 'fill_material_id', label: '🧪 Fill Material', hint: 'The liquid/powder to be filled' },
-    { key: 'bottle_id',        label: '🍶 Bottle',        hint: '1 pcs per unit' },
-    { key: 'label_id',         label: '🏷 Label',         hint: '1 pcs per unit' },
-    { key: 'outer_box_id',     label: '📦 Outer Box',     hint: 'Carton holding multiple bottles' },
-    { key: 'printed_box_id',   label: '🗃 Printed Box',   hint: '1 pcs per unit (retail box)' },
-] as const;
-
-const MAT_ICON: Record<string, string> = {
-    fill_material: '🧪', bottle: '🍶', label: '🏷', outer_box: '📦', printed_box: '🗃',
+type RecipeFormData = {
+    name: string;
+    packing_size: string;
+    fill_quantity: string;
+    notes: string;
+    is_active: boolean;
+    items: { raw_material_id: string; qty_per_unit: string; unit: string }[];
 };
-const MAT_KEYS = ['fill_material', 'bottle', 'label', 'outer_box', 'printed_box'] as const;
 
-export default function FillingIndex({ orders, configs, materials, fillingRuns }: Props) {
+type RunFormData = { quantity: string; notes: string };
+
+const formatQty = (v: string | number) =>
+    Number(v).toLocaleString('en-IN', { maximumFractionDigits: 3 });
+
+// Convert qty from one unit to another (weight: kg/g/mg; volume: L/ml)
+function convertQty(qty: number, fromUnit: string, toUnit: string): number {
+    const from = fromUnit.trim().toLowerCase();
+    const to   = toUnit.trim().toLowerCase();
+    if (from === to || !from || !to) return qty;
+
+    const weightFactor: Record<string, number> = {
+        kg: 1, kgs: 1, g: 1e-3, gm: 1e-3, gram: 1e-3, grams: 1e-3, mg: 1e-6, milligram: 1e-6, milligrams: 1e-6,
+    };
+    const volumeFactor: Record<string, number> = {
+        l: 1, ltr: 1, liter: 1, litre: 1, liters: 1, litres: 1,
+        ml: 1e-3, milliliter: 1e-3, millilitre: 1e-3, milliliters: 1e-3, millilitres: 1e-3,
+    };
+
+    if (weightFactor[from] !== undefined && weightFactor[to] !== undefined)
+        return qty * (weightFactor[from] / weightFactor[to]);
+    if (volumeFactor[from] !== undefined && volumeFactor[to] !== undefined)
+        return qty * (volumeFactor[from] / volumeFactor[to]);
+
+    return qty;
+}
+
+function normalizeUnitDisplay(unit: string): string {
+    const u = unit.trim().toLowerCase();
+    if (['ml', 'milliliter', 'millilitre', 'milliliters', 'millilitres'].includes(u)) return 'ml';
+    if (['l', 'ltr', 'liter', 'litre', 'liters', 'litres'].includes(u)) return 'L';
+    if (['kg', 'kgs', 'kilogram', 'kilograms'].includes(u)) return 'kg';
+    if (['g', 'gm', 'gram', 'grams'].includes(u)) return 'gm';
+    if (['mg', 'milligram', 'milligrams'].includes(u)) return 'mg';
+    return unit;
+}
+
+export default function FillingIndex({ recipes, materials, fillingRuns }: Props) {
     const { auth } = usePage<{ auth: Auth }>().props;
-    const isAdmin = auth.user?.role === 'admin';
+    const isAdmin    = auth.user?.role === 'admin';
+    const canSeeCost = isAdmin || auth.user?.cost_access === true;
+    const canManage  = isAdmin || (auth.user?.permissions ?? []).includes('filling');
 
-    const [pageView, setPageView] = useState<'recipes' | 'filling' | 'history'>('recipes');
+    const [pageView, setPageView]   = useState<'recipes' | 'history'>('recipes');
+    const [search, setSearch]       = useState('');
     const [histSearch, setHistSearch] = useState('');
-    const [recipeQtys, setRecipeQtys] = useState<Record<number, string>>({});
+    const [editModal, setEditModal] = useState(false);
+    const [runModal, setRunModal]   = useState(false);
+    const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
+    const [runTarget, setRunTarget] = useState<Recipe | null>(null);
 
-    // Config modal
-    const [configModal, setConfigModal] = useState(false);
-    const [editingConfig, setEditingConfig] = useState<Config | null>(null);
-    const [configForm, setConfigForm] = useState({
-        our_brand: '', packing_size: '',
-        fill_material_id: '', bottle_id: '', label_id: '',
-        outer_box_id: '', printed_box_id: '', carton_size: '12',
+    const form = useForm<RecipeFormData>({
+        name: '', packing_size: '', fill_quantity: '1', notes: '', is_active: true, items: [],
     });
-    const [saving, setSaving] = useState(false);
-    const [running, setRunning] = useState<string | null>(null);
+    const runForm = useForm<RunFormData>({ quantity: '1', notes: '' });
 
-    // Group filling-stage order items by brand
-    const brandMap = new Map<string, { sizes: Map<string, number>; orders: Set<string> }>();
-    for (const order of orders) {
-        for (const item of order.items) {
-            if (item.status !== 'filling') continue;
-            const brand = item.our_brand ?? '(unknown)';
-            const size  = item.packing_size ?? '—';
-            if (!brandMap.has(brand)) brandMap.set(brand, { sizes: new Map(), orders: new Set() });
-            const entry = brandMap.get(brand)!;
-            entry.sizes.set(size, (entry.sizes.get(size) ?? 0) + Number(item.quantity));
-            entry.orders.add(order.order_number);
-        }
-    }
-
-    // Get config for brand+size (exact first, then brand-level fallback)
-    const getConfig = (brand: string, size: string | null) =>
-        configs.find((c) => c.our_brand === brand && c.packing_size === size) ??
-        configs.find((c) => c.our_brand === brand && c.packing_size === null);
-
-    // Open modal for new recipe
-    const openNewRecipe = () => {
-        setEditingConfig(null);
-        setConfigForm({ our_brand: '', packing_size: '', fill_material_id: '', bottle_id: '', label_id: '', outer_box_id: '', printed_box_id: '', carton_size: '12' });
-        setConfigModal(true);
+    const openNew = () => {
+        form.reset(); form.clearErrors(); setEditingRecipe(null); setEditModal(true);
     };
 
-    // Open modal for editing existing config
-    const openEditConfig = (cfg: Config) => {
-        setEditingConfig(cfg);
-        setConfigForm({
-            our_brand:        cfg.our_brand,
-            packing_size:     cfg.packing_size ?? '',
-            fill_material_id: String(cfg.fill_material_id ?? ''),
-            bottle_id:        String(cfg.bottle_id ?? ''),
-            label_id:         String(cfg.label_id ?? ''),
-            outer_box_id:     String(cfg.outer_box_id ?? ''),
-            printed_box_id:   String(cfg.printed_box_id ?? ''),
-            carton_size:      String(cfg.carton_size ?? 12),
+    const openEdit = (recipe: Recipe) => {
+        form.setData({
+            name: recipe.name,
+            packing_size: recipe.packing_size ?? '',
+            fill_quantity: String(recipe.fill_quantity),
+            notes: recipe.notes ?? '',
+            is_active: recipe.is_active,
+            items: recipe.items.map((i) => ({
+                raw_material_id: String(i.raw_material_id),
+                qty_per_unit: String(i.qty_per_unit),
+                unit: i.unit ?? '',
+            })),
         });
-        setConfigModal(true);
+        form.clearErrors(); setEditingRecipe(recipe); setEditModal(true);
     };
 
-    // Open modal from order card ⚙ button
-    const openConfigFromOrder = (brand: string, size: string | null) => {
-        const existing = getConfig(brand, size);
-        if (existing) {
-            openEditConfig(existing);
+    const addItem = () => form.setData('items', [...form.data.items, { raw_material_id: '', qty_per_unit: '', unit: '' }]);
+
+    const removeItem = (idx: number) => form.setData('items', form.data.items.filter((_, i) => i !== idx));
+
+    const updateItem = (idx: number, field: string, value: string) => {
+        const items = [...form.data.items];
+        items[idx] = { ...items[idx], [field]: value };
+        if (field === 'raw_material_id') {
+            const mat = materials.find((m) => m.id === Number(value));
+            if (mat) items[idx].unit = mat.unit;
+        }
+        form.setData('items', items);
+    };
+
+    const saveRecipe = () => {
+        if (editingRecipe) {
+            form.patch(`/filling/${editingRecipe.id}`, {
+                preserveScroll: true,
+                onSuccess: () => { setEditModal(false); form.reset(); setEditingRecipe(null); },
+            });
         } else {
-            setEditingConfig(null);
-            setConfigForm({ our_brand: brand, packing_size: size ?? '', fill_material_id: '', bottle_id: '', label_id: '', outer_box_id: '', printed_box_id: '', carton_size: '12' });
-            setConfigModal(true);
+            form.post('/filling', {
+                preserveScroll: true,
+                onSuccess: () => { setEditModal(false); form.reset(); },
+            });
         }
     };
 
-    const saveConfig = () => {
-        setSaving(true);
-        router.post('/filling/configs', {
-            our_brand:        configForm.our_brand,
-            packing_size:     configForm.packing_size || null,
-            fill_material_id: configForm.fill_material_id || null,
-            bottle_id:        configForm.bottle_id || null,
-            label_id:         configForm.label_id || null,
-            outer_box_id:     configForm.outer_box_id || null,
-            printed_box_id:   configForm.printed_box_id || null,
-            carton_size:      configForm.carton_size || '12',
-        }, {
+    const deleteRecipe = (recipe: Recipe) => {
+        if (!confirm(`Delete filling product "${recipe.name}"?`)) return;
+        router.delete(`/filling/${recipe.id}`, { preserveScroll: true });
+    };
+
+    const openRun = (recipe: Recipe) => {
+        runForm.reset();
+        runForm.setData('quantity', String(recipe.fill_quantity || 1));
+        setRunTarget(recipe);
+        setRunModal(true);
+    };
+
+    // Cost per 1 pc for a recipe
+    const calcCostPerPc = (recipe: Recipe) =>
+        recipe.items.reduce((sum, item) => {
+            const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
+            if (!mat) return sum;
+            const itemUnit = item.unit || mat.unit;
+            const qtyInMatUnit = convertQty(Number(item.qty_per_unit), itemUnit, mat.unit);
+            return sum + qtyInMatUnit * Number(mat.cost_per_unit);
+        }, 0);
+
+    // Can we run `qty` pcs given current stock?
+    const canRun = (recipe: Recipe, qty: number) =>
+        recipe.items.length > 0 && recipe.items.every((item) => {
+            const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
+            if (!mat) return false;
+            const itemUnit = item.unit || mat.unit;
+            const needed = convertQty(Number(item.qty_per_unit) * qty, itemUnit, mat.unit);
+            return Number(mat.stock_qty) >= needed;
+        });
+
+    const submitRun = () => {
+        if (!runTarget) return;
+        const recipe = runTarget;
+        const qty    = Number(runForm.data.quantity) || 1;
+        const lines  = recipe.items.map((item) => {
+            const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
+            const itemUnit = item.unit || mat?.unit || '';
+            const need = Number(item.qty_per_unit) * qty;
+            return `  • ${mat?.name ?? 'Material'}: ${formatQty(need)} ${normalizeUnitDisplay(itemUnit)}`;
+        }).join('\n');
+        const msg = `Run Filling — ${recipe.name}${recipe.packing_size ? ` ${recipe.packing_size}` : ''} × ${qty} pcs\n\nThis will deduct from inventory:\n${lines}\n\nProceed?`;
+        if (!window.confirm(msg)) return;
+        runForm.post(`/filling/${recipe.id}/run`, {
             preserveScroll: true,
-            onFinish: () => setSaving(false),
-            onSuccess: () => setConfigModal(false),
+            onSuccess: () => { setRunModal(false); runForm.reset(); setRunTarget(null); },
         });
     };
 
-    const deleteConfig = (cfg: Config) => {
-        const label = cfg.our_brand + (cfg.packing_size ? ` ${cfg.packing_size}` : '');
-        if (!confirm(`Delete filling recipe "${label}"?\n\nThis only removes the recipe — it won't affect run history.`)) return;
-        router.delete(`/filling/configs/${cfg.id}`, { preserveScroll: true });
-    };
-
-    // Run filling from recipe card
-    const runFromRecipe = (cfg: Config, qty: number) => {
-        const rows = calculateNeeds(cfg, qty);
-        const label = cfg.our_brand + (cfg.packing_size ? ` ${cfg.packing_size}` : '');
-        if (rows.length === 0) {
-            alert('No materials configured for this recipe. Click Edit to set them up first.');
-            return;
-        }
-        const lines = rows.map((r) => `  ${r.icon} ${r.mat!.name}: ${fmtQty(r.need)} ${r.unit}`).join('\n');
-        if (!window.confirm(`Run Filling — ${label} × ${qty} pcs\n\nThis will deduct from inventory:\n${lines}\n\nProceed?`)) return;
-        const key = `r${cfg.id}`;
-        setRunning(key);
-        router.post('/filling/run', { our_brand: cfg.our_brand, packing_size: cfg.packing_size, quantity: qty }, {
-            preserveScroll: true,
-            onFinish: () => setRunning(null),
-            onSuccess: () => setRecipeQtys((q) => ({ ...q, [cfg.id]: '' })),
-        });
-    };
-
-    // Run filling from In Filling order card
-    const runFilling = (
-        brand: string,
-        size: string,
-        qty: number,
-        rows: MatRow[],
-    ) => {
-        const lines = rows
-            .filter((r) => r.mat)
-            .map((r) => `  ${r.icon} ${r.mat!.name}: ${fmtQty(r.need)} ${r.unit}`)
-            .join('\n');
-        if (!lines) {
-            alert('No materials configured for this product. Click ⚙ to set up first.');
-            return;
-        }
-        if (!window.confirm(`Run Filling — ${brand} ${size} × ${qty} pcs\n\nThis will deduct from inventory:\n${lines}\n\nProceed?`)) return;
-        const key = `o${brand}|${size}`;
-        setRunning(key);
-        router.post('/filling/run', { our_brand: brand, packing_size: size, quantity: qty }, {
-            preserveScroll: true,
-            onFinish: () => setRunning(null),
-        });
-    };
+    const filtered = recipes.filter((r) => {
+        if (!search.trim()) return true;
+        const q = search.toLowerCase();
+        return r.name.toLowerCase().includes(q)
+            || (r.packing_size ?? '').toLowerCase().includes(q)
+            || r.items.some((i) => (i.raw_material?.name ?? '').toLowerCase().includes(q));
+    });
 
     return (
         <>
@@ -276,292 +224,141 @@ export default function FillingIndex({ orders, configs, materials, fillingRuns }
 
                 {/* Header */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
-                    <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>🧪 Filling</h1>
-                    {pageView === 'recipes' && isAdmin && (
-                        <button className="btn primary" onClick={openNewRecipe} style={{ fontWeight: 600 }}>
-                            + Add New Filling Product
-                        </button>
-                    )}
+                    <div>
+                        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>🧪 Filling</h1>
+                        <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--tx-sub)' }}>Define filling recipes — materials needed per piece</p>
+                    </div>
+                    {pageView === 'recipes' && canManage && <button className="btn primary" onClick={openNew}>+ Add New Filling Product</button>}
                 </div>
 
                 {/* Tab switcher */}
                 <div className="filter-bar" style={{ marginBottom: 20 }}>
-                    <button className={`pill${pageView === 'recipes' ? ' active' : ''}`} onClick={() => setPageView('recipes')} style={{ fontWeight: pageView === 'recipes' ? 600 : 400 }}>
-                        🧾 Recipes ({configs.length})
-                    </button>
-                    <button className={`pill${pageView === 'filling' ? ' active' : ''}`} onClick={() => setPageView('filling')} style={{ fontWeight: pageView === 'filling' ? 600 : 400 }}>
-                        🧪 In Filling ({brandMap.size})
-                    </button>
-                    <button className={`pill${pageView === 'history' ? ' active' : ''}`} onClick={() => setPageView('history')} style={{ fontWeight: pageView === 'history' ? 600 : 400 }}>
-                        📋 Run History ({fillingRuns.length})
-                    </button>
+                    <button className={`pill${pageView === 'recipes' ? ' active' : ''}`} onClick={() => setPageView('recipes')} style={{ fontWeight: pageView === 'recipes' ? 600 : 400 }}>🧪 Products ({recipes.length})</button>
+                    <button className={`pill${pageView === 'history' ? ' active' : ''}`} onClick={() => setPageView('history')} style={{ fontWeight: pageView === 'history' ? 600 : 400 }}>📋 Run History ({fillingRuns.length})</button>
                 </div>
 
-                {/* ── Recipes tab ── */}
-                {pageView === 'recipes' && (
-                    configs.length === 0 ? (
-                        <div className="empty-state">
-                            <div className="icon">🧾</div>
-                            <p>No filling recipes yet.{isAdmin ? ' Click "Add New Filling Product" to create one.' : ''}</p>
-                        </div>
-                    ) : (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16 }}>
-                            {configs.map((cfg) => {
-                                const label      = cfg.our_brand + (cfg.packing_size ? ` ${cfg.packing_size}` : '');
-                                const inputQty   = Number(recipeQtys[cfg.id] ?? 0);
-                                const needs      = inputQty > 0 ? calculateNeeds(cfg, inputQty) : [];
-                                const hasMatCfg  = MAT_KEYS.some((k) => cfg[k]);
-                                const runKey     = `r${cfg.id}`;
+                {/* ── Recipes view ─────────────────────────────────────────── */}
+                {pageView === 'recipes' && <>
+                <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <input
+                        type="search"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="🔍 Search products..."
+                        style={{ width: 220 }}
+                    />
+                </div>
 
-                                return (
-                                    <div
-                                        key={cfg.id}
-                                        style={{
-                                            background: '#fff',
-                                            border: '1px solid var(--border)',
-                                            borderLeft: '4px solid #7c3aed',
-                                            borderRadius: 10,
-                                            padding: '16px 18px',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: 12,
-                                            boxShadow: '0 1px 4px rgba(0,0,0,.06)',
-                                        }}
-                                    >
-                                        {/* Card header */}
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                                            <div>
-                                                <div style={{ fontWeight: 700, fontSize: 17 }}>{cfg.our_brand}</div>
-                                                <div style={{ fontSize: 13, color: 'var(--tx-muted)', marginTop: 2 }}>
-                                                    {cfg.packing_size ?? <span style={{ fontStyle: 'italic', color: 'var(--tx-faint)' }}>all sizes</span>}
-                                                </div>
-                                            </div>
-                                            {isAdmin && (
-                                                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                                                    <button className="btn sm" onClick={() => openEditConfig(cfg)} style={{ fontSize: 11 }}>✏ Edit</button>
-                                                    <button className="btn sm danger" onClick={() => deleteConfig(cfg)} style={{ fontSize: 11 }}>Delete</button>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Materials list */}
-                                        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-                                            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)', marginBottom: 8 }}>
-                                                Materials
-                                            </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                                {MAT_KEYS.map((k) => {
-                                                    const mat  = cfg[k] as Material | null | undefined;
-                                                    const icon = MAT_ICON[k];
-                                                    const lbl  = k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-                                                    const needRow = needs.find((r) => r.mat?.id === mat?.id);
-                                                    return (
-                                                        <div
-                                                            key={k}
-                                                            style={{
-                                                                display: 'flex',
-                                                                justifyContent: 'space-between',
-                                                                alignItems: 'center',
-                                                                gap: 8,
-                                                                padding: '5px 10px',
-                                                                background: 'var(--bg-paper)',
-                                                                borderRadius: 6,
-                                                                border: '1px solid var(--border)',
-                                                                fontSize: 13,
-                                                            }}
-                                                        >
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
-                                                                <span>{icon}</span>
-                                                                <span style={{ color: 'var(--tx-muted)', fontSize: 11, width: 72, flexShrink: 0 }}>{lbl}</span>
-                                                                <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                                    {mat?.name ?? <span style={{ color: 'var(--tx-faint)', fontStyle: 'italic', fontWeight: 400 }}>not set</span>}
-                                                                </span>
-                                                            </div>
-                                                            {mat && needRow && (
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                                                                    <span style={{ fontWeight: 700, fontSize: 12 }}>{fmtQty(needRow.need)} {needRow.unit}</span>
-                                                                    <StockBadge needed={needRow.need} stock={Number(mat.stock_qty)} unit={needRow.unit} />
-                                                                </div>
-                                                            )}
-                                                            {mat && !needRow && (
-                                                                <span style={{ fontSize: 11, color: 'var(--tx-muted)' }}>
-                                                                    Stock: {fmtQty(Number(mat.stock_qty))} {mat.unit}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                                {cfg.packing_size && (
-                                                    <div style={{ fontSize: 11, color: 'var(--tx-muted)', padding: '2px 4px' }}>
-                                                        📦 Carton size: <strong>{cfg.carton_size}</strong> bottles per box
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* Run section */}
-                                        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-                                            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)', marginBottom: 8 }}>
-                                                Run Filling
-                                            </div>
-                                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                                <input
-                                                    type="number"
-                                                    min="1"
-                                                    placeholder="Quantity (pcs)"
-                                                    value={recipeQtys[cfg.id] ?? ''}
-                                                    onChange={(e) => setRecipeQtys((q) => ({ ...q, [cfg.id]: e.target.value }))}
-                                                    style={{ width: 150 }}
-                                                />
-                                                <button
-                                                    className="btn primary"
-                                                    disabled={!recipeQtys[cfg.id] || Number(recipeQtys[cfg.id]) < 1 || !hasMatCfg || running === runKey}
-                                                    title={!hasMatCfg ? 'Configure materials first (Edit)' : ''}
-                                                    onClick={() => runFromRecipe(cfg, inputQty)}
-                                                >
-                                                    {running === runKey ? '…' : '▶ Run Filling'}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )
-                )}
-
-                {/* ── In Filling tab ── */}
-                {pageView === 'filling' && (brandMap.size === 0 ? (
+                {filtered.length === 0 ? (
                     <div className="empty-state">
                         <div className="icon">🧪</div>
-                        <p>No orders are currently in the filling stage.</p>
+                        <p>{recipes.length === 0 ? 'No filling products yet. Create one to define a filling recipe.' : 'No products match your search.'}</p>
                     </div>
                 ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16 }}>
-                        {[...brandMap.entries()].map(([brand, { sizes, orders: orderNums }]) => (
-                            <div
-                                key={brand}
-                                style={{
-                                    background: '#fff',
-                                    border: '1px solid var(--border)',
-                                    borderLeft: '4px solid #2563eb',
-                                    borderRadius: 10,
-                                    padding: '16px 18px',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: 12,
-                                    boxShadow: '0 1px 4px rgba(0,0,0,.06)',
-                                }}
-                            >
-                                {/* Brand header */}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                    <div style={{ fontWeight: 700, fontSize: 17 }}>{brand}</div>
-                                    <div style={{ fontSize: 11, color: 'var(--tx-muted)', textAlign: 'right' }}>
-                                        {[...orderNums].join(', ')}
-                                    </div>
-                                </div>
-
-                                {/* Pack sizes */}
-                                <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-                                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)', marginBottom: 8 }}>Pack Sizes</div>
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                        {[...sizes.entries()]
-                                            .sort(([a], [b]) => (packingToLiters(b) ?? 0) - (packingToLiters(a) ?? 0))
-                                            .map(([size, qty]) => (
-                                                <div
-                                                    key={size}
-                                                    style={{
-                                                        background: '#eff6ff', border: '1px solid #bfdbfe',
-                                                        borderRadius: 8, padding: '6px 12px', textAlign: 'center', minWidth: 70,
-                                                    }}
-                                                >
-                                                    <div style={{ fontSize: 13, fontWeight: 700, color: '#1d4ed8' }}>{size}</div>
-                                                    <div style={{ fontSize: 18, fontWeight: 800, color: '#111' }}>{fmtQty(qty)}</div>
-                                                    <div style={{ fontSize: 10, color: '#6b7280' }}>pcs</div>
-                                                </div>
-                                            ))}
-                                    </div>
-                                </div>
-
-                                {/* Materials per size */}
-                                <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-                                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span>Materials Needed</span>
-                                        {isAdmin && (
-                                            <button className="btn sm" style={{ fontSize: 10, padding: '1px 8px' }} onClick={() => openConfigFromOrder(brand, null)}>
-                                                ⚙ Setup
-                                            </button>
+                        {filtered.map((recipe) => {
+                            const qtyPreview = Number(recipe.fill_quantity) || 1;
+                            const runnable = canRun(recipe, qtyPreview);
+                            return (
+                                <div
+                                    key={recipe.id}
+                                    style={{
+                                        background: '#fff',
+                                        border: '1px solid var(--border)',
+                                        borderLeft: '4px solid #2563eb',
+                                        borderRadius: 10,
+                                        padding: '16px 18px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: 10,
+                                        boxShadow: '0 1px 4px rgba(0,0,0,.06)',
+                                    }}
+                                >
+                                    {/* Top row: name + packing size */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                                        <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.3 }}>{recipe.name}</div>
+                                        {recipe.packing_size && (
+                                            <span style={{ flexShrink: 0, background: '#eff6ff', color: '#1d4ed8', fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 20, whiteSpace: 'nowrap' }}>
+                                                {recipe.packing_size}
+                                            </span>
                                         )}
                                     </div>
 
-                                    {[...sizes.entries()].map(([size, qty]) => {
-                                        const cfg    = getConfig(brand, size);
-                                        const rows: MatRow[] = cfg
-                                            ? calculateNeeds(cfg, qty)
-                                            : [
-                                                { icon: '🧪', label: 'Fill',        mat: null, need: qty, unit: '—' },
-                                                { icon: '🍶', label: 'Bottle',      mat: null, need: qty, unit: '—' },
-                                                { icon: '🏷', label: 'Label',       mat: null, need: qty, unit: '—' },
-                                                { icon: '📦', label: 'Outer Box',   mat: null, need: qty, unit: '—' },
-                                                { icon: '🗃', label: 'Printed Box', mat: null, need: qty, unit: '—' },
-                                            ];
-                                        const hasConfig = rows.some((r) => r.mat);
-                                        const runKey   = `o${brand}|${size}`;
+                                    {/* Default fill qty + inactive badge */}
+                                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                                        <span style={{ fontSize: 12, color: 'var(--tx-sub)' }}>Default fill: <strong>{formatQty(recipe.fill_quantity)} pcs</strong></span>
+                                        {!recipe.is_active && <span className="badge gray" style={{ fontSize: 11 }}>Inactive</span>}
+                                    </div>
 
-                                        return (
-                                            <div key={size} style={{ marginBottom: 10 }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                                                    <span style={{ fontSize: 12, fontWeight: 700, color: '#1d4ed8', background: '#eff6ff', padding: '1px 8px', borderRadius: 6 }}>{size}</span>
-                                                    {isAdmin && (
-                                                        <button className="btn sm" style={{ fontSize: 10, padding: '1px 6px' }} onClick={() => openConfigFromOrder(brand, size)}>⚙</button>
-                                                    )}
-                                                    <button
-                                                        className="btn sm primary"
-                                                        style={{ fontSize: 10, padding: '1px 8px', marginLeft: 'auto' }}
-                                                        disabled={!hasConfig || running === runKey}
-                                                        title={hasConfig ? '' : 'Configure materials first'}
-                                                        onClick={() => runFilling(brand, size, qty, rows)}
-                                                    >
-                                                        {running === runKey ? '…' : '▶ Run Filling'}
-                                                    </button>
+                                    {recipe.notes && <div style={{ fontSize: 13, color: 'var(--tx-sub)' }}>{recipe.notes}</div>}
+
+                                    {/* Materials (per pc) */}
+                                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)', marginBottom: 2 }}>Materials per piece</div>
+                                        {recipe.items.map((item, idx) => {
+                                            const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
+                                            const matUnit  = mat?.unit ?? '';
+                                            const itemUnit = item.unit || matUnit;
+                                            const neededPerPc = mat ? convertQty(Number(item.qty_per_unit), itemUnit, matUnit) : Number(item.qty_per_unit);
+                                            const inStock = mat ? Number(mat.stock_qty) : 0;
+                                            const sufficient = inStock >= neededPerPc * qtyPreview;
+                                            return (
+                                                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14, gap: 8 }}>
+                                                    <span style={{ color: sufficient ? 'var(--tx-body)' : 'var(--danger)', flex: 1 }}>
+                                                        {mat?.name ?? `Material #${item.raw_material_id}`}
+                                                    </span>
+                                                    <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                                        {formatQty(item.qty_per_unit)}{' '}
+                                                        <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 12 }}>{normalizeUnitDisplay(itemUnit)}/pc</span>
+                                                    </span>
+                                                    <span style={{
+                                                        fontSize: 11, whiteSpace: 'nowrap',
+                                                        color: sufficient ? '#059669' : '#dc2626',
+                                                        background: sufficient ? '#d1fae5' : '#fee2e2',
+                                                        padding: '1px 7px', borderRadius: 10, fontWeight: 600,
+                                                    }}>
+                                                        Stock: {mat ? `${formatQty(inStock)} ${normalizeUnitDisplay(matUnit)}` : '—'}
+                                                    </span>
                                                 </div>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                                    {rows.map((row) => (
-                                                        <div
-                                                            key={row.label}
-                                                            style={{
-                                                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                                                gap: 8, padding: '5px 10px',
-                                                                background: 'var(--bg-paper)', borderRadius: 6,
-                                                                border: '1px solid var(--border)', fontSize: 13,
-                                                            }}
-                                                        >
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
-                                                                <span>{row.icon}</span>
-                                                                <span style={{ color: 'var(--tx-muted)', fontSize: 11, width: 64, flexShrink: 0 }}>{row.label}</span>
-                                                                <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                                    {row.mat?.name ?? <span style={{ color: 'var(--tx-faint)', fontStyle: 'italic', fontWeight: 400 }}>not configured</span>}
-                                                                </span>
-                                                            </div>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                                                                <span style={{ fontWeight: 700 }}>{fmtQty(row.need)} {row.unit}</span>
-                                                                {row.mat && (
-                                                                    <StockBadge needed={row.need} stock={Number(row.mat.stock_qty)} unit={row.unit} />
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
+                                            );
+                                        })}
+                                        {recipe.items.length === 0 && (
+                                            <div style={{ fontSize: 13, color: 'var(--tx-faint)' }}>No materials added.</div>
+                                        )}
+                                    </div>
+
+                                    {/* Cost — admin / cost_access only */}
+                                    {canSeeCost && recipe.items.length > 0 && (
+                                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', padding: '8px 0', borderTop: '1px solid var(--border)' }}>
+                                            <div style={{ background: 'var(--bg-paper)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 10px', fontSize: 12 }}>
+                                                <span style={{ color: 'var(--tx-muted)' }}>Cost / pc: </span>
+                                                <strong>₹{calcCostPerPc(recipe).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
                                             </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ))}
+                                        </div>
+                                    )}
 
-                {/* ── Run History tab ── */}
+                                    {/* Actions */}
+                                    <div style={{ display: 'flex', gap: 6, borderTop: '1px solid var(--border)', paddingTop: 10, flexWrap: 'wrap' }}>
+                                        {canManage && <button className="btn sm" onClick={() => openEdit(recipe)} style={{ fontSize: 12 }}>✏ Edit</button>}
+                                        <button
+                                            className={`btn sm${runnable ? ' primary' : ''}`}
+                                            onClick={() => openRun(recipe)}
+                                            disabled={recipe.items.length === 0}
+                                            style={{ fontSize: 12 }}
+                                            title={recipe.items.length === 0 ? 'Add materials first' : ''}
+                                        >
+                                            ▶ Run Filling
+                                        </button>
+                                        {canManage && <button className="btn danger-xs" onClick={() => deleteRecipe(recipe)} style={{ marginLeft: 'auto', fontSize: 12 }}>Delete</button>}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+                </>}
+
+                {/* ── Run History view ─────────────────────────────────────── */}
                 {pageView === 'history' && (
                     <div>
                         <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
@@ -590,7 +387,7 @@ export default function FillingIndex({ orders, configs, materials, fillingRuns }
                                             <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>Qty (pcs)</th>
                                             <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>Materials Used</th>
                                             <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tx-muted)' }}>By</th>
-                                            {isAdmin && <th style={{ padding: '8px 12px' }}></th>}
+                                            {canManage && <th style={{ padding: '8px 12px' }}></th>}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -607,12 +404,12 @@ export default function FillingIndex({ orders, configs, materials, fillingRuns }
                                                     </td>
                                                     <td style={{ padding: '8px 12px', fontWeight: 600 }}>{r.our_brand}</td>
                                                     <td style={{ padding: '8px 12px' }}>{r.packing_size ?? '—'}</td>
-                                                    <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>{fmtQty(Number(r.quantity))}</td>
+                                                    <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>{formatQty(Number(r.quantity))}</td>
                                                     <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--tx-sub)', maxWidth: 320 }}>
-                                                        {(r.items ?? []).map((it) => `${it.name} (${fmtQty(it.qty)} ${it.unit})`).join(', ') || '—'}
+                                                        {(r.items ?? []).map((it) => `${it.name} (${formatQty(it.qty)} ${normalizeUnitDisplay(it.unit)})`).join(', ') || '—'}
                                                     </td>
                                                     <td style={{ padding: '8px 12px', color: 'var(--tx-muted)', fontSize: 12 }}>{r.user?.name ?? '—'}</td>
-                                                    {isAdmin && (
+                                                    {canManage && (
                                                         <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
                                                             <button className="btn sm danger" onClick={() => {
                                                                 if (!confirm(`Delete this filling run?\n\n${r.our_brand} ${r.packing_size ?? ''} × ${r.quantity} pcs\n\nThis will restore the deducted materials to stock.`)) return;
@@ -630,86 +427,133 @@ export default function FillingIndex({ orders, configs, materials, fillingRuns }
                 )}
             </div>
 
-            {/* Config / Recipe Modal */}
-            {configModal && (
-                <div className="modal-overlay open" onClick={() => setConfigModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
-                        <div className="modal-header">
-                            <h2>{editingConfig ? '✏ Edit Filling Recipe' : '+ Add New Filling Product'}</h2>
-                            <button className="modal-close" onClick={() => setConfigModal(false)}>✕</button>
+            {/* ── Create / Edit recipe modal ───────────────────────────────── */}
+            <div className={`modal-overlay${editModal ? ' open' : ''}`} onClick={() => setEditModal(false)}>
+                <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+                    <div className="modal-header">
+                        <h2>{editingRecipe ? 'Edit Filling Product' : 'New Filling Product'}</h2>
+                        <button className="modal-close" onClick={() => setEditModal(false)}>✕</button>
+                    </div>
+                    <div className="modal-body" style={{ overflowY: 'auto', flex: 1 }}>
+                        <div className="form-grid">
+                            <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                                <label>Product Name *</label>
+                                <input type="text" value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} placeholder="e.g. Ultra Gold" />
+                                {form.errors.name && <div className="form-error">{form.errors.name}</div>}
+                            </div>
+                            <div className="form-group">
+                                <label>Packing Size</label>
+                                <input type="text" value={form.data.packing_size} onChange={(e) => form.setData('packing_size', e.target.value)} placeholder="e.g. 500ml, 1L" />
+                            </div>
+                            <div className="form-group">
+                                <label>Default Fill Qty (pcs)</label>
+                                <input type="number" value={form.data.fill_quantity} onChange={(e) => form.setData('fill_quantity', e.target.value)} step="1" min="1" />
+                            </div>
+                            <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                                <label>Description / Notes</label>
+                                <textarea value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} rows={2} placeholder="Short description of this filling recipe" />
+                            </div>
                         </div>
-                        <div className="modal-body">
 
-                            {/* Product name */}
-                            <div className="form-group">
-                                <label>Product Name <span style={{ color: '#dc2626' }}>*</span></label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. Ultra Gold"
-                                    value={configForm.our_brand}
-                                    onChange={(e) => setConfigForm((f) => ({ ...f, our_brand: e.target.value }))}
-                                />
+                        <div style={{ marginTop: 16 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)' }}>🧪 Materials per piece</div>
+                                <button type="button" className="btn sm" onClick={addItem}>+ Add Material</button>
                             </div>
-
-                            {/* Packing size */}
-                            <div className="form-group">
-                                <label>
-                                    Packing Size
-                                    <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--tx-muted)' }}> — optional, e.g. 500ml, 1L, 5ltr</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    placeholder="Leave blank to apply to all sizes"
-                                    value={configForm.packing_size}
-                                    onChange={(e) => setConfigForm((f) => ({ ...f, packing_size: e.target.value }))}
-                                />
-                                {!configForm.packing_size && (
-                                    <div style={{ fontSize: 11, color: '#d97706', marginTop: 4 }}>
-                                        Without a size this will apply to all pack sizes unless a size-specific recipe exists.
-                                    </div>
-                                )}
-                            </div>
-
-                            <div style={{ height: 1, background: 'var(--border)', margin: '8px 0 16px' }} />
-
-                            {/* Material dropdowns */}
-                            {MATERIAL_DEFS.map(({ key, label, hint }) => (
-                                <div className="form-group" key={key}>
-                                    <label>{label} <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--tx-muted)' }}>— {hint}</span></label>
-                                    <select
-                                        value={configForm[key as keyof typeof configForm]}
-                                        onChange={(e) => setConfigForm((f) => ({ ...f, [key]: e.target.value }))}
-                                    >
-                                        <option value="">— Not configured —</option>
-                                        {materials.map((m) => (
-                                            <option key={m.id} value={m.id}>
-                                                {m.name} ({fmtQty(Number(m.stock_qty))} {m.unit} in stock)
-                                            </option>
-                                        ))}
+                            {form.data.items.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: 16, color: 'var(--tx-faint)', fontSize: 13, border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                                    No materials added yet. Add fill liquid, bottle, label, box, etc.
+                                </div>
+                            ) : form.data.items.map((item, idx) => (
+                                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 32px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                                    <select value={item.raw_material_id} onChange={(e) => updateItem(idx, 'raw_material_id', e.target.value)}>
+                                        <option value="">— Select material —</option>
+                                        {materials.map((m) => <option key={m.id} value={m.id}>{m.name} ({formatQty(m.stock_qty)} {m.unit})</option>)}
                                     </select>
+                                    <input type="number" placeholder="Qty/pc" value={item.qty_per_unit} onChange={(e) => updateItem(idx, 'qty_per_unit', e.target.value)} step="0.001" min="0" />
+                                    <select value={item.unit} onChange={(e) => updateItem(idx, 'unit', e.target.value)}>
+                                        <option value="">— unit —</option>
+                                        {['kg', 'gm', 'g', 'mg', 'L', 'ml', 'pcs', 'nos'].map((u) => <option key={u} value={u}>{u}</option>)}
+                                    </select>
+                                    <button type="button" className="btn danger-xs" onClick={() => removeItem(idx)} style={{ padding: '0 8px', height: 32 }}>✕</button>
                                 </div>
                             ))}
-
-                            <div className="form-group">
-                                <label>📦 Outer Box Carton Size <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--tx-muted)' }}>— bottles per carton</span></label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    value={configForm.carton_size}
-                                    onChange={(e) => setConfigForm((f) => ({ ...f, carton_size: e.target.value }))}
-                                    style={{ width: 120 }}
-                                />
-                            </div>
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn" onClick={() => setConfigModal(false)}>Cancel</button>
-                            <button className="btn primary" onClick={saveConfig} disabled={saving || !configForm.our_brand.trim()}>
-                                {saving ? 'Saving…' : '💾 Save Recipe'}
-                            </button>
                         </div>
                     </div>
+                    <div className="modal-footer">
+                        <button className="btn" onClick={() => setEditModal(false)}>Cancel</button>
+                        <button className="btn primary" onClick={saveRecipe} disabled={form.processing || !form.data.name.trim()}>
+                            {editingRecipe ? 'Update Product' : 'Create Product'}
+                        </button>
+                    </div>
                 </div>
-            )}
+            </div>
+
+            {/* ── Run filling modal ────────────────────────────────────────── */}
+            <div className={`modal-overlay${runModal ? ' open' : ''}`} onClick={() => setRunModal(false)}>
+                <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440 }}>
+                    <div className="modal-header">
+                        <h2>Run Filling — {runTarget?.name}{runTarget?.packing_size ? ` ${runTarget.packing_size}` : ''}</h2>
+                        <button className="modal-close" onClick={() => setRunModal(false)}>✕</button>
+                    </div>
+                    <div className="modal-body">
+                        <div className="form-grid">
+                            <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                                <label>Quantity to fill (pcs) *</label>
+                                <input type="number" value={runForm.data.quantity} onChange={(e) => runForm.setData('quantity', e.target.value)} min="0.001" step="1" />
+                            </div>
+                        </div>
+
+                        {/* Live material breakdown */}
+                        {runTarget && runTarget.items.length > 0 && Number(runForm.data.quantity) > 0 && (() => {
+                            const qty = Number(runForm.data.quantity);
+                            return (
+                                <div style={{ margin: '12px 0', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                                    <div style={{ padding: '7px 12px', background: 'var(--bg-paper)', fontSize: 12, fontWeight: 600, color: 'var(--tx-muted)', borderBottom: '1px solid var(--border)' }}>
+                                        Materials required for this run
+                                    </div>
+                                    {runTarget.items.map((item, i) => {
+                                        const mat      = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
+                                        const matUnit  = mat?.unit ?? '';
+                                        const itemUnit = item.unit || matUnit;
+                                        const needed   = Number(item.qty_per_unit) * qty;
+                                        const neededInMatUnit = mat ? convertQty(needed, itemUnit, matUnit) : needed;
+                                        const inStock  = mat ? Number(mat.stock_qty) : 0;
+                                        const ok       = inStock >= neededInMatUnit;
+                                        return (
+                                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 12px', borderBottom: i < runTarget.items.length - 1 ? '1px solid var(--border)' : undefined, fontSize: 13, gap: 8 }}>
+                                                <span style={{ flex: 1, color: ok ? 'var(--tx-body)' : '#dc2626' }}>{mat?.name ?? `Material #${item.raw_material_id}`}</span>
+                                                <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                                    {formatQty(needed)} {normalizeUnitDisplay(itemUnit)}
+                                                    {!ok && <span style={{ marginLeft: 8, fontSize: 11, color: '#dc2626', background: '#fee2e2', padding: '1px 6px', borderRadius: 8 }}>⚠ short</span>}
+                                                    {ok && <span style={{ marginLeft: 8, fontSize: 11, color: '#059669', background: '#d1fae5', padding: '1px 6px', borderRadius: 8 }}>✓</span>}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })()}
+
+                        <div className="form-grid" style={{ marginTop: 4 }}>
+                            <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                                <label>Notes</label>
+                                <textarea value={runForm.data.notes} onChange={(e) => runForm.setData('notes', e.target.value)} rows={2} placeholder="Operator, lot notes, etc." />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="modal-footer">
+                        <button className="btn" onClick={() => setRunModal(false)}>Cancel</button>
+                        <button
+                            className="btn primary"
+                            onClick={submitRun}
+                            disabled={runForm.processing || (runTarget ? !canRun(runTarget, Number(runForm.data.quantity) || 1) : true)}
+                        >
+                            ▶ Run {runForm.data.quantity} pcs
+                        </button>
+                    </div>
+                </div>
+            </div>
         </>
     );
 }

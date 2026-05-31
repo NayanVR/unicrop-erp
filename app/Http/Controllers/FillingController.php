@@ -2,11 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\FillingRecipe;
 use App\Models\FillingRun;
 use App\Models\FinishedGood;
 use App\Models\InventoryTransaction;
-use App\Models\Order;
-use App\Models\ProductFillingConfig;
 use App\Models\RawMaterial;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,181 +17,177 @@ class FillingController extends Controller
 {
     public function index(): Response
     {
-        $orders = Order::query()
-            ->whereIn('status', ['confirmed', 'dispatched'])
-            ->with(['items'])
-            ->orderByRaw("CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END")
-            ->orderByDesc('id')
+        $recipes = FillingRecipe::query()
+            ->with(['items.rawMaterial:id,name,unit,stock_qty,cost_per_unit'])
+            ->orderBy('name')
             ->get();
 
-        // Only orders that have at least one item in filling stage
-        $orders = $orders->filter(fn ($order) =>
-            $order->items->contains(fn ($item) => $item->status === 'filling')
-        )->values();
-
-        // Configs with all related materials
-        $configs = ProductFillingConfig::with([
-            'fillMaterial:id,name,unit,stock_qty',
-            'bottle:id,name,unit,stock_qty',
-            'label:id,name,unit,stock_qty',
-            'outerBox:id,name,unit,stock_qty',
-            'printedBox:id,name,unit,stock_qty',
-        ])->get();
-
-        // All materials for config dropdowns
-        $materials = RawMaterial::where('is_active', true)
+        $materials = RawMaterial::query()
+            ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'unit', 'stock_qty', 'category']);
+            ->get(['id', 'name', 'unit', 'stock_qty', 'cost_per_unit', 'category']);
 
         $fillingRuns = FillingRun::with('user:id,name')
             ->latest()
             ->limit(300)
-            ->get(['id', 'our_brand', 'packing_size', 'quantity', 'user_id', 'items', 'created_at']);
+            ->get(['id', 'filling_recipe_id', 'our_brand', 'packing_size', 'quantity', 'user_id', 'items', 'created_at']);
 
         return Inertia::render('erp/filling/index', [
             'pageTitle'   => 'Filling',
-            'orders'      => $orders,
-            'configs'     => $configs,
+            'recipes'     => $recipes,
             'materials'   => $materials,
             'fillingRuns' => $fillingRuns,
         ]);
     }
 
-    public function saveConfig(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse
     {
-        $data = $request->validate([
-            'our_brand'        => 'required|string|max:100',
-            'packing_size'     => 'nullable|string|max:50',
-            'fill_material_id' => 'nullable|exists:raw_materials,id',
-            'bottle_id'        => 'nullable|exists:raw_materials,id',
-            'label_id'         => 'nullable|exists:raw_materials,id',
-            'outer_box_id'     => 'nullable|exists:raw_materials,id',
-            'printed_box_id'   => 'nullable|exists:raw_materials,id',
-            'carton_size'      => 'required|integer|min:1|max:9999',
-        ]);
+        $data = $this->validateRecipe($request);
 
-        ProductFillingConfig::updateOrCreate(
-            ['our_brand' => $data['our_brand'], 'packing_size' => $data['packing_size']],
-            $data
-        );
+        DB::transaction(function () use ($data) {
+            $recipe = FillingRecipe::create([
+                'name'          => $data['name'],
+                'packing_size'  => $data['packing_size'] ?? null,
+                'fill_quantity' => $data['fill_quantity'] ?? 1,
+                'notes'         => $data['notes'] ?? null,
+            ]);
 
-        return redirect()->back()->with('success', 'Config saved.');
+            foreach ($data['items'] ?? [] as $item) {
+                $recipe->items()->create([
+                    'raw_material_id' => $item['raw_material_id'],
+                    'qty_per_unit'    => $item['qty_per_unit'],
+                    'unit'            => $item['unit'] ?? null,
+                ]);
+            }
+        });
+
+        return redirect()->back()->with('success', 'Filling recipe created.');
     }
 
-    public function destroyConfig(ProductFillingConfig $config): RedirectResponse
+    public function update(Request $request, FillingRecipe $recipe): RedirectResponse
     {
-        $config->delete();
-        return redirect()->back()->with('success', 'Config deleted.');
+        $data = $this->validateRecipe($request, true);
+
+        DB::transaction(function () use ($data, $recipe) {
+            $recipe->update([
+                'name'          => $data['name'],
+                'packing_size'  => $data['packing_size'] ?? null,
+                'fill_quantity' => $data['fill_quantity'] ?? 1,
+                'notes'         => $data['notes'] ?? null,
+                'is_active'     => $data['is_active'] ?? true,
+            ]);
+
+            $recipe->items()->delete();
+            foreach ($data['items'] ?? [] as $item) {
+                $recipe->items()->create([
+                    'raw_material_id' => $item['raw_material_id'],
+                    'qty_per_unit'    => $item['qty_per_unit'],
+                    'unit'            => $item['unit'] ?? null,
+                ]);
+            }
+        });
+
+        return redirect()->back()->with('success', 'Filling recipe updated.');
     }
 
-    public function runFilling(Request $request): RedirectResponse
+    public function destroy(Request $request, FillingRecipe $recipe): RedirectResponse
+    {
+        $user  = $request->user();
+        $perms = $user?->permissions ?? [];
+        if ($user?->role !== 'admin' && ! in_array('filling', $perms)) {
+            abort(403);
+        }
+
+        $recipe->delete();
+
+        return redirect()->back()->with('success', 'Filling recipe deleted.');
+    }
+
+    public function runFilling(Request $request, FillingRecipe $recipe): RedirectResponse
     {
         $data = $request->validate([
-            'our_brand'    => 'required|string|max:100',
-            'packing_size' => 'nullable|string|max:50',
-            'quantity'     => 'required|numeric|min:1',
+            'quantity' => 'required|numeric|min:0.001',
+            'notes'    => 'nullable|string|max:500',
         ]);
 
         $qty = (float) $data['quantity'];
 
-        // Find config — exact pack-size match first, then brand-level fallback
-        $config = ProductFillingConfig::with(['fillMaterial', 'bottle', 'label', 'outerBox', 'printedBox'])
-            ->where('our_brand', $data['our_brand'])
-            ->where(function ($q) use ($data) {
-                $q->where('packing_size', $data['packing_size'])->orWhereNull('packing_size');
-            })
-            ->orderByRaw('packing_size IS NULL') // non-null (exact) first
-            ->first();
+        return DB::transaction(function () use ($recipe, $qty, $data, $request) {
+            $items = $recipe->items()->with('rawMaterial')->get();
 
-        if (! $config) {
-            return redirect()->back()->with('error', 'No filling config found for this product. Set it up first.');
-        }
-
-        $liters    = $this->packingToLiters($data['packing_size']);
-        $cartonQty = max(1, (int) $config->carton_size);
-
-        // Build the deduction list: [RawMaterial, qty needed]
-        $deductions = [];
-        if ($config->fillMaterial && $liters !== null) {
-            $deductions[] = [$config->fillMaterial, $this->fillNeed($qty * $liters, $config->fillMaterial->unit), 'Fill'];
-        }
-        if ($config->bottle)     { $deductions[] = [$config->bottle, $qty, 'Bottle']; }
-        if ($config->label)      { $deductions[] = [$config->label, $qty, 'Label']; }
-        if ($config->outerBox)   { $deductions[] = [$config->outerBox, ceil($qty / $cartonQty), 'Outer Box']; }
-        if ($config->printedBox) { $deductions[] = [$config->printedBox, $qty, 'Printed Box']; }
-
-        if (empty($deductions)) {
-            return redirect()->back()->with('error', 'No materials configured for this product.');
-        }
-
-        // Stock check
-        $shortfalls = [];
-        foreach ($deductions as [$mat, $need]) {
-            if ((float) $mat->stock_qty < $need) {
-                $shortfalls[] = "{$mat->name}: need " . rtrim(rtrim(number_format($need, 3), '0'), '.') . " {$mat->unit}, have {$mat->stock_qty}";
+            if ($items->isEmpty()) {
+                return redirect()->back()->with('error', 'This recipe has no materials. Add ingredients first.');
             }
-        }
-        if ($shortfalls) {
-            return redirect()->back()->with('error', 'Insufficient stock: ' . implode('; ', $shortfalls));
-        }
 
-        $label = trim($data['our_brand'] . ' ' . ($data['packing_size'] ?? ''));
+            // Stock check
+            $shortfalls = [];
+            foreach ($items as $item) {
+                if (! $item->rawMaterial) continue;
+                $itemUnit = $item->unit ?: $item->rawMaterial->unit;
+                $required = $this->convertQty((float) $item->qty_per_unit * $qty, $itemUnit, $item->rawMaterial->unit);
+                if ((float) $item->rawMaterial->stock_qty < $required) {
+                    $shortfalls[] = "{$item->rawMaterial->name}: need {$required} {$item->rawMaterial->unit}, have {$item->rawMaterial->stock_qty}";
+                }
+            }
+            if ($shortfalls) {
+                return redirect()->back()->with('error', 'Insufficient stock: ' . implode('; ', $shortfalls));
+            }
 
-        DB::transaction(function () use ($deductions, $request, $label, $qty, $data) {
             $runItems = [];
+            foreach ($items as $item) {
+                if (! $item->rawMaterial) continue;
+                $itemUnit    = $item->unit ?: $item->rawMaterial->unit;
+                $matUnit     = $item->rawMaterial->unit;
+                $qtyUsed     = (float) $item->qty_per_unit * $qty;
+                $qtyDeducted = $this->convertQty($qtyUsed, $itemUnit, $matUnit);
 
-            foreach ($deductions as [$mat, $need, $role]) {
-                $prev = (float) $mat->stock_qty;
-                $new  = $prev - $need;
-
-                $mat->decrement('stock_qty', $need);
+                $prev = (float) $item->rawMaterial->stock_qty;
+                $item->rawMaterial->decrement('stock_qty', $qtyDeducted);
 
                 InventoryTransaction::create([
-                    'raw_material_id' => $mat->id,
+                    'raw_material_id' => $item->rawMaterial->id,
                     'user_id'         => $request->user()?->id,
                     'type'            => 'issue',
-                    'qty'             => $need,
+                    'qty'             => $qtyDeducted,
                     'previous_stock'  => $prev,
-                    'new_stock'       => $new,
-                    'reference'       => "Filling: {$label} × {$qty}",
+                    'new_stock'       => $prev - $qtyDeducted,
+                    'reference'       => "Filling: {$recipe->name} × {$qty}",
+                    'notes'           => $data['notes'] ?? null,
                 ]);
 
                 $runItems[] = [
-                    'role'            => $role,
-                    'raw_material_id' => $mat->id,
-                    'name'            => $mat->name,
-                    'qty'             => $need,
-                    'unit'            => $mat->unit,
+                    'raw_material_id' => $item->rawMaterial->id,
+                    'name'            => $item->rawMaterial->name,
+                    'qty'             => $qtyDeducted,
+                    'unit'            => $matUnit,
                 ];
             }
 
-            // Record the filling run for history
             FillingRun::create([
-                'our_brand'    => $data['our_brand'],
-                'packing_size' => $data['packing_size'],
-                'quantity'     => $qty,
-                'user_id'      => $request->user()?->id,
-                'items'        => $runItems,
+                'filling_recipe_id' => $recipe->id,
+                'our_brand'         => $recipe->name,
+                'packing_size'      => $recipe->packing_size,
+                'quantity'          => $qty,
+                'user_id'           => $request->user()?->id,
+                'items'             => $runItems,
             ]);
 
-            // Add the filled product into finished goods
             FinishedGood::create([
                 'created_by'   => $request->user()?->id,
-                'name'         => $data['our_brand'],
-                'packing_size' => $data['packing_size'],
+                'name'         => $recipe->name,
+                'packing_size' => $recipe->packing_size,
                 'quantity'     => $qty,
                 'unit'         => 'pcs',
                 'source'       => 'filling',
             ]);
-        });
 
-        return redirect()->back()->with('success', "Filling done for {$label} ({$qty} pcs). Materials deducted, added to finished goods.");
+            return redirect()->back()->with('success', "Filling done for {$recipe->name} ({$qty} pcs). Materials deducted, added to finished goods.");
+        });
     }
 
     public function destroyRun(FillingRun $run): RedirectResponse
     {
         DB::transaction(function () use ($run) {
-            // Reverse stock deductions
             foreach ($run->items ?? [] as $item) {
                 $mat = RawMaterial::find($item['raw_material_id'] ?? null);
                 if ($mat) {
@@ -211,7 +206,6 @@ class FillingController extends Controller
                 }
             }
 
-            // Remove the linked finished good entry (most recent match)
             $fg = FinishedGood::where('source', 'filling')
                 ->where('name', $run->our_brand)
                 ->where('packing_size', $run->packing_size)
@@ -226,25 +220,41 @@ class FillingController extends Controller
         return redirect()->back()->with('success', 'Filling run deleted and stock reversed.');
     }
 
-    // Volume per unit in liters for a packing size string (e.g. "500ml" => 0.5, "1L" => 1).
-    private function packingToLiters(?string $size): ?float
+    /**
+     * @return array<string, mixed>
+     */
+    private function validateRecipe(Request $request, bool $withActive = false): array
     {
-        if (! $size) return null;
-        $s = strtolower(trim($size));
-        $num = (float) $s;
-        if ($num <= 0) return null;
-        if (str_contains($s, 'ml')) return $num / 1000;
-        if (str_contains($s, 'l')) return $num;
-        return null;
+        $rules = [
+            'name'                    => 'required|string|max:255',
+            'packing_size'            => 'nullable|string|max:50',
+            'fill_quantity'           => 'nullable|numeric|min:0.001',
+            'notes'                   => 'nullable|string|max:1000',
+            'items'                   => 'array',
+            'items.*.raw_material_id' => 'required|exists:raw_materials,id',
+            'items.*.qty_per_unit'    => 'required|numeric|min:0.001',
+            'items.*.unit'            => 'nullable|string|max:20',
+        ];
+        if ($withActive) {
+            $rules['is_active'] = 'boolean';
+        }
+
+        return $request->validate($rules);
     }
 
-    // Convert a liters value into the fill material's stocking unit.
-    private function fillNeed(float $liters, string $unit): float
+    // Convert qty between compatible units (weight: kg/g/mg; volume: L/mL).
+    private function convertQty(float $qty, string $fromUnit, string $toUnit): float
     {
-        $u = strtolower(trim($unit));
-        if (in_array($u, ['ml', 'milliliter', 'millilitre'])) return $liters * 1000;
-        if (in_array($u, ['g', 'gm', 'gram', 'grams']))       return $liters * 1000; // density ~1
-        // l, ltr, liter, kg, etc. → 1:1
-        return $liters;
+        $from = strtolower(trim($fromUnit));
+        $to   = strtolower(trim($toUnit));
+        if ($from === $to || $from === '' || $to === '') return $qty;
+
+        $weight = ['kg' => 1, 'kgs' => 1, 'g' => 1e-3, 'gm' => 1e-3, 'gram' => 1e-3, 'grams' => 1e-3, 'mg' => 1e-6, 'milligram' => 1e-6, 'milligrams' => 1e-6];
+        $volume = ['l' => 1, 'ltr' => 1, 'liter' => 1, 'litre' => 1, 'liters' => 1, 'litres' => 1, 'ml' => 1e-3, 'milliliter' => 1e-3, 'millilitre' => 1e-3, 'milliliters' => 1e-3, 'millilitres' => 1e-3];
+
+        if (isset($weight[$from], $weight[$to])) return $qty * ($weight[$from] / $weight[$to]);
+        if (isset($volume[$from], $volume[$to])) return $qty * ($volume[$from] / $volume[$to]);
+
+        return $qty;
     }
 }
