@@ -55,6 +55,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::get('factory', [FactoryController::class, 'index'])->name('factory.index');
         Route::get('filling', [FillingController::class, 'index'])->name('filling.index');
+        Route::post('filling/configs', [FillingController::class, 'saveConfig'])->name('filling.configs.save');
+        Route::delete('filling/configs/{config}', [FillingController::class, 'destroyConfig'])->name('filling.configs.destroy');
         Route::post('factory/items/{item}/advance', [FactoryController::class, 'advanceStage'])->name('factory.items.advance');
         Route::post('factory/items/{item}/revert', [FactoryController::class, 'revertStage'])->name('factory.items.revert');
         Route::post('factory/items/{item}/set-stage', [FactoryController::class, 'setStage'])->name('factory.items.set-stage');
