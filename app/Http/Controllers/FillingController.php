@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\FillingRun;
+use App\Models\FinishedGood;
 use App\Models\InventoryTransaction;
 use App\Models\Order;
 use App\Models\ProductFillingConfig;
@@ -42,11 +44,17 @@ class FillingController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'unit', 'stock_qty', 'category']);
 
+        $fillingRuns = FillingRun::with('user:id,name')
+            ->latest()
+            ->limit(300)
+            ->get(['id', 'our_brand', 'packing_size', 'quantity', 'user_id', 'items', 'created_at']);
+
         return Inertia::render('erp/filling/index', [
-            'pageTitle' => 'Filling',
-            'orders'    => $orders,
-            'configs'   => $configs,
-            'materials' => $materials,
+            'pageTitle'   => 'Filling',
+            'orders'      => $orders,
+            'configs'     => $configs,
+            'materials'   => $materials,
+            'fillingRuns' => $fillingRuns,
         ]);
     }
 
@@ -130,8 +138,10 @@ class FillingController extends Controller
 
         $label = trim($data['our_brand'] . ' ' . ($data['packing_size'] ?? ''));
 
-        DB::transaction(function () use ($deductions, $request, $label, $qty) {
-            foreach ($deductions as [$mat, $need]) {
+        DB::transaction(function () use ($deductions, $request, $label, $qty, $data) {
+            $runItems = [];
+
+            foreach ($deductions as [$mat, $need, $role]) {
                 $prev = (float) $mat->stock_qty;
                 $new  = $prev - $need;
 
@@ -146,10 +156,74 @@ class FillingController extends Controller
                     'new_stock'       => $new,
                     'reference'       => "Filling: {$label} × {$qty}",
                 ]);
+
+                $runItems[] = [
+                    'role'            => $role,
+                    'raw_material_id' => $mat->id,
+                    'name'            => $mat->name,
+                    'qty'             => $need,
+                    'unit'            => $mat->unit,
+                ];
             }
+
+            // Record the filling run for history
+            FillingRun::create([
+                'our_brand'    => $data['our_brand'],
+                'packing_size' => $data['packing_size'],
+                'quantity'     => $qty,
+                'user_id'      => $request->user()?->id,
+                'items'        => $runItems,
+            ]);
+
+            // Add the filled product into finished goods
+            FinishedGood::create([
+                'created_by'   => $request->user()?->id,
+                'name'         => $data['our_brand'],
+                'packing_size' => $data['packing_size'],
+                'quantity'     => $qty,
+                'unit'         => 'pcs',
+                'source'       => 'filling',
+            ]);
         });
 
-        return redirect()->back()->with('success', "Filling done for {$label} ({$qty} pcs). Materials deducted from stock.");
+        return redirect()->back()->with('success', "Filling done for {$label} ({$qty} pcs). Materials deducted, added to finished goods.");
+    }
+
+    public function destroyRun(FillingRun $run): RedirectResponse
+    {
+        DB::transaction(function () use ($run) {
+            // Reverse stock deductions
+            foreach ($run->items ?? [] as $item) {
+                $mat = RawMaterial::find($item['raw_material_id'] ?? null);
+                if ($mat) {
+                    $prev = (float) $mat->stock_qty;
+                    $mat->increment('stock_qty', $item['qty']);
+
+                    InventoryTransaction::create([
+                        'raw_material_id' => $mat->id,
+                        'user_id'         => request()->user()?->id,
+                        'type'            => 'return',
+                        'qty'             => $item['qty'],
+                        'previous_stock'  => $prev,
+                        'new_stock'       => $prev + $item['qty'],
+                        'reference'       => "Reversed filling: {$run->our_brand} {$run->packing_size}",
+                    ]);
+                }
+            }
+
+            // Remove the linked finished good entry (most recent match)
+            $fg = FinishedGood::where('source', 'filling')
+                ->where('name', $run->our_brand)
+                ->where('packing_size', $run->packing_size)
+                ->where('quantity', $run->quantity)
+                ->latest('id')
+                ->first();
+            $fg?->delete();
+
+            $run->delete();
+        });
+
+        return redirect()->back()->with('success', 'Filling run deleted and stock reversed.');
     }
 
     // Volume per unit in liters for a packing size string (e.g. "500ml" => 0.5, "1L" => 1).

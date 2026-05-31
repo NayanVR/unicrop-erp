@@ -45,10 +45,22 @@ type Config = {
     printed_box?: Material | null;
 };
 
+type FillingRunItem = { role: string; raw_material_id: number; name: string; qty: number; unit: string };
+type FillingRun = {
+    id: number;
+    our_brand: string;
+    packing_size: string | null;
+    quantity: number;
+    user?: { id: number; name: string } | null;
+    items: FillingRunItem[];
+    created_at: string;
+};
+
 type Props = {
     orders: Order[];
     configs: Config[];
     materials: Material[];
+    fillingRuns: FillingRun[];
 };
 
 // Parse packing size string to liters  (e.g. "500ml" → 0.5, "1L" → 1, "5ltr" → 5)
@@ -83,10 +95,12 @@ const PRIORITY_BORDER: Record<string, string> = {
     urgent: '#dc2626', high: '#d97706', normal: '#2563eb',
 };
 
-export default function FillingIndex({ orders, configs, materials }: Props) {
+export default function FillingIndex({ orders, configs, materials, fillingRuns }: Props) {
     const { auth } = usePage<{ auth: Auth }>().props;
     const isAdmin = auth.user?.role === 'admin';
 
+    const [pageView, setPageView] = useState<'filling' | 'history'>('filling');
+    const [histSearch, setHistSearch] = useState('');
     const [configModal, setConfigModal] = useState<{ brand: string; size: string | null } | null>(null);
     const [configForm, setConfigForm] = useState({
         fill_material_id: '', bottle_id: '', label_id: '',
@@ -177,16 +191,24 @@ export default function FillingIndex({ orders, configs, materials }: Props) {
             <div id="view-filling" className="view active">
 
                 {/* Header */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
                     <div>
                         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>🧪 Filling</h1>
                     </div>
-                    <span style={{ background: 'var(--bg-paper)', border: '1px solid var(--border)', borderRadius: 20, padding: '4px 14px', fontSize: 13, fontWeight: 600 }}>
-                        {brandMap.size} product{brandMap.size !== 1 ? 's' : ''}
-                    </span>
+                    {pageView === 'filling' && (
+                        <span style={{ background: 'var(--bg-paper)', border: '1px solid var(--border)', borderRadius: 20, padding: '4px 14px', fontSize: 13, fontWeight: 600 }}>
+                            {brandMap.size} product{brandMap.size !== 1 ? 's' : ''}
+                        </span>
+                    )}
                 </div>
 
-                {brandMap.size === 0 ? (
+                {/* Tab switcher */}
+                <div className="filter-bar" style={{ marginBottom: 20 }}>
+                    <button className={`pill${pageView === 'filling' ? ' active' : ''}`} onClick={() => setPageView('filling')} style={{ fontWeight: pageView === 'filling' ? 600 : 400 }}>🧪 In Filling ({brandMap.size})</button>
+                    <button className={`pill${pageView === 'history' ? ' active' : ''}`} onClick={() => setPageView('history')} style={{ fontWeight: pageView === 'history' ? 600 : 400 }}>📋 Run History ({fillingRuns.length})</button>
+                </div>
+
+                {pageView === 'filling' && (brandMap.size === 0 ? (
                     <div className="empty-state">
                         <div className="icon">🧪</div>
                         <p>No orders are currently in the filling stage.</p>
@@ -346,6 +368,74 @@ export default function FillingIndex({ orders, configs, materials }: Props) {
                                 </div>
                             );
                         })}
+                    </div>
+                ))}
+
+                {/* Run History view */}
+                {pageView === 'history' && (
+                    <div>
+                        <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
+                            <input
+                                type="search"
+                                value={histSearch}
+                                onChange={(e) => setHistSearch(e.target.value)}
+                                placeholder="🔍 Search by product or size..."
+                                style={{ width: 280 }}
+                            />
+                            <span style={{ fontSize: 13, color: 'var(--tx-muted)' }}>{fillingRuns.length} run{fillingRuns.length !== 1 ? 's' : ''}</span>
+                        </div>
+                        {fillingRuns.length === 0 ? (
+                            <div className="empty-state">
+                                <div className="icon">📋</div>
+                                <p>No filling runs yet. Run a filling to start recording history.</p>
+                            </div>
+                        ) : (
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                                    <thead>
+                                        <tr style={{ background: 'var(--bg-paper)', borderBottom: '2px solid var(--border)' }}>
+                                            <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>Date &amp; Time</th>
+                                            <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>Product</th>
+                                            <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>Size</th>
+                                            <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>Qty (pcs)</th>
+                                            <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>Materials Used</th>
+                                            <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tx-muted)' }}>By</th>
+                                            {isAdmin && <th style={{ padding: '8px 12px' }}></th>}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {fillingRuns
+                                            .filter((r) => {
+                                                if (!histSearch.trim()) return true;
+                                                const q = histSearch.toLowerCase();
+                                                return r.our_brand.toLowerCase().includes(q) || (r.packing_size ?? '').toLowerCase().includes(q);
+                                            })
+                                            .map((r) => (
+                                                <tr key={r.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                    <td style={{ padding: '8px 12px', whiteSpace: 'nowrap', color: 'var(--tx-muted)', fontSize: 12 }}>
+                                                        {new Date(r.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                    </td>
+                                                    <td style={{ padding: '8px 12px', fontWeight: 600 }}>{r.our_brand}</td>
+                                                    <td style={{ padding: '8px 12px' }}>{r.packing_size ?? '—'}</td>
+                                                    <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>{fmtQty(Number(r.quantity))}</td>
+                                                    <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--tx-sub)', maxWidth: 320 }}>
+                                                        {(r.items ?? []).map((it) => `${it.name} (${fmtQty(it.qty)} ${it.unit})`).join(', ') || '—'}
+                                                    </td>
+                                                    <td style={{ padding: '8px 12px', color: 'var(--tx-muted)', fontSize: 12 }}>{r.user?.name ?? '—'}</td>
+                                                    {isAdmin && (
+                                                        <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
+                                                            <button className="btn sm danger" onClick={() => {
+                                                                if (!confirm(`Delete this filling run?\n\n${r.our_brand} ${r.packing_size ?? ''} × ${r.quantity} pcs\n\nThis will restore the deducted materials to stock.`)) return;
+                                                                router.delete(`/filling/runs/${r.id}`, { preserveScroll: true });
+                                                            }}>Delete</button>
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
