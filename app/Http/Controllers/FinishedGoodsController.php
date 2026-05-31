@@ -25,6 +25,7 @@ class FinishedGoodsController extends Controller
             'total_batches' => $goods->count(),
             'total_quantity' => $goods->sum('quantity'),
             'production_batches' => $goods->where('source', 'production')->count(),
+            'filling_batches' => $goods->where('source', 'filling')->count(),
             'manual_entries' => $goods->where('source', 'manual')->count(),
         ];
 
