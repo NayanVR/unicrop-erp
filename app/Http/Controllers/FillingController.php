@@ -6,6 +6,7 @@ use App\Models\FillingRecipe;
 use App\Models\FillingRun;
 use App\Models\FinishedGood;
 use App\Models\InventoryTransaction;
+use App\Models\Product;
 use App\Models\RawMaterial;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,9 +19,11 @@ class FillingController extends Controller
     public function index(): Response
     {
         $recipes = FillingRecipe::query()
-            ->with(['items.rawMaterial:id,name,unit,stock_qty,cost_per_unit'])
+            ->with(['product:id,name', 'items.rawMaterial:id,name,unit,stock_qty,cost_per_unit'])
             ->orderBy('name')
             ->get();
+
+        $products = Product::where('is_active', true)->orderBy('name')->get(['id', 'name']);
 
         $materials = RawMaterial::query()
             ->where('is_active', true)
@@ -35,6 +38,7 @@ class FillingController extends Controller
         return Inertia::render('erp/filling/index', [
             'pageTitle'   => 'Filling',
             'recipes'     => $recipes,
+            'products'    => $products,
             'materials'   => $materials,
             'fillingRuns' => $fillingRuns,
         ]);
@@ -45,8 +49,10 @@ class FillingController extends Controller
         $data = $this->validateRecipe($request);
 
         DB::transaction(function () use ($data) {
+            $product = $data['product_id'] ? Product::find($data['product_id']) : null;
             $recipe = FillingRecipe::create([
-                'name'          => $data['name'],
+                'product_id'    => $product?->id,
+                'name'          => $product?->name ?? $data['name'],
                 'packing_size'  => $data['packing_size'] ?? null,
                 'fill_quantity' => $data['fill_quantity'] ?? 1,
                 'notes'         => $data['notes'] ?? null,
@@ -69,8 +75,10 @@ class FillingController extends Controller
         $data = $this->validateRecipe($request, true);
 
         DB::transaction(function () use ($data, $recipe) {
+            $product = $data['product_id'] ? Product::find($data['product_id']) : null;
             $recipe->update([
-                'name'          => $data['name'],
+                'product_id'    => $product?->id,
+                'name'          => $product?->name ?? $data['name'],
                 'packing_size'  => $data['packing_size'] ?? null,
                 'fill_quantity' => $data['fill_quantity'] ?? 1,
                 'notes'         => $data['notes'] ?? null,
@@ -173,6 +181,7 @@ class FillingController extends Controller
             ]);
 
             FinishedGood::create([
+                'product_id'   => $recipe->product_id,
                 'created_by'   => $request->user()?->id,
                 'name'         => $recipe->name,
                 'packing_size' => $recipe->packing_size,
@@ -226,7 +235,8 @@ class FillingController extends Controller
     private function validateRecipe(Request $request, bool $withActive = false): array
     {
         $rules = [
-            'name'                    => 'required|string|max:255',
+            'product_id'              => 'required|exists:products,id',
+            'name'                    => 'nullable|string|max:255',
             'packing_size'            => 'nullable|string|max:50',
             'fill_quantity'           => 'nullable|numeric|min:0.001',
             'notes'                   => 'nullable|string|max:1000',
