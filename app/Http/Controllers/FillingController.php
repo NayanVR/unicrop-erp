@@ -140,13 +140,16 @@ class FillingController extends Controller
                 return redirect()->back()->with('error', 'Insufficient stock: ' . implode('; ', $shortfalls));
             }
 
-            $runItems = [];
+            $runItems  = [];
+            $totalCost = 0.0;
             foreach ($items as $item) {
                 if (! $item->rawMaterial) continue;
                 $itemUnit    = $item->unit ?: $item->rawMaterial->unit;
                 $matUnit     = $item->rawMaterial->unit;
                 $qtyUsed     = (float) $item->qty_per_unit * $qty;
                 $qtyDeducted = $this->convertQty($qtyUsed, $itemUnit, $matUnit);
+                $lineCost    = $qtyDeducted * (float) $item->rawMaterial->cost_per_unit;
+                $totalCost  += $lineCost;
 
                 $prev = (float) $item->rawMaterial->stock_qty;
                 $item->rawMaterial->decrement('stock_qty', $qtyDeducted);
@@ -170,6 +173,8 @@ class FillingController extends Controller
                 ];
             }
 
+            $costPerPc = $qty > 0 ? round($totalCost / $qty, 4) : 0;
+
             FillingRun::create([
                 'filling_recipe_id' => $recipe->id,
                 'our_brand'         => $recipe->name,
@@ -180,21 +185,26 @@ class FillingController extends Controller
             ]);
 
             FinishedGood::create([
-                'created_by'   => $request->user()?->id,
-                'name'         => $recipe->name,
-                'packing_size' => $recipe->packing_size,
-                'quantity'     => $qty,
-                'unit'         => 'pcs',
-                'source'       => 'filling',
+                'created_by'    => $request->user()?->id,
+                'name'          => $recipe->name,
+                'packing_size'  => $recipe->packing_size,
+                'quantity'      => $qty,
+                'unit'          => 'pcs',
+                'source'        => 'filling',
+                'cost_per_unit' => $costPerPc > 0 ? $costPerPc : null,
+                'total_cost'    => $totalCost > 0 ? round($totalCost, 4) : null,
             ]);
 
-            // Increment output material stock in inventory
+            // Increment output material stock and update its cost_per_unit
             if ($recipe->output_raw_material_id) {
                 $output = RawMaterial::find($recipe->output_raw_material_id);
                 if ($output) {
                     $prevStock = (float) $output->stock_qty;
                     $newStock  = $prevStock + $qty;
                     $output->stock_qty = $newStock;
+                    if ($costPerPc > 0) {
+                        $output->cost_per_unit = $costPerPc;
+                    }
                     $output->save();
 
                     InventoryTransaction::create([
@@ -204,6 +214,7 @@ class FillingController extends Controller
                         'qty'             => $qty,
                         'previous_stock'  => $prevStock,
                         'new_stock'       => $newStock,
+                        'cost_per_unit'   => $costPerPc > 0 ? $costPerPc : null,
                         'reference'       => "Filling: {$recipe->name}" . ($recipe->packing_size ? " {$recipe->packing_size}" : '') . " × {$qty}",
                         'notes'           => $data['notes'] ?? null,
                     ]);

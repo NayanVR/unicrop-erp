@@ -1,3 +1,4 @@
+import type { Auth } from '@/types/auth';
 import ErpLayout from '@/layouts/erp-layout';
 import {
     destroy as finishedGoodsDestroy,
@@ -22,6 +23,8 @@ type FinishedGood = {
     unit: string;
     notes: string | null;
     source: 'production' | 'manual' | 'filling';
+    cost_per_unit: string | number | null;
+    total_cost: string | number | null;
     created_at: string;
     product: Product | null;
     bom: Bom | null;
@@ -41,6 +44,7 @@ type PageProps = {
     boms: Bom[];
     stats: Stats;
     flash?: { success?: string; error?: string };
+    auth: Auth;
 };
 
 const defaultForm = {
@@ -67,7 +71,9 @@ function packingToLiters(size: string | null | undefined): number {
 }
 
 export default function FinishedGoodsIndex() {
-    const { goods, products, boms, stats, flash } = usePage<PageProps>().props;
+    const { goods, products, boms, stats, flash, auth } = usePage<PageProps>().props;
+    const canSeeCost = auth.user?.role === 'admin' || auth.user?.cost_access === true;
+    const colCount   = canSeeCost ? 8 : 7;
     const [showModal, setShowModal] = useState(false);
     const [editing, setEditing] = useState<FinishedGood | null>(null);
     const [search, setSearch] = useState('');
@@ -225,13 +231,14 @@ export default function FinishedGoodsIndex() {
                             <th>Batch Ref</th>
                             <th>Quantity</th>
                             <th>Source</th>
+                            {canSeeCost && <th style={{ textAlign: 'right' }}>Cost / pc</th>}
                             <th>Date</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {productGroups.length === 0 && (
-                            <tr><td colSpan={7} className="empty-row">No entries found.</td></tr>
+                            <tr><td colSpan={colCount} className="empty-row">No entries found.</td></tr>
                         )}
                         {productGroups.map((pg) => {
                             const open = expandedProducts.has(pg.key);
@@ -253,7 +260,7 @@ export default function FinishedGoodsIndex() {
                                         <td style={{ color: 'var(--tx-muted)', fontWeight: 400, fontSize: 12 }}>
                                             {pg.totalEntries} batch{pg.totalEntries !== 1 ? 'es' : ''}
                                         </td>
-                                        <td colSpan={3}></td>
+                                        <td colSpan={canSeeCost ? 4 : 3}></td>
                                     </tr>
 
                                     {/* Size rows + entries */}
@@ -275,7 +282,7 @@ export default function FinishedGoodsIndex() {
                                                     </td>
                                                     <td>—</td>
                                                     <td style={{ fontWeight: 700 }}>{Number(sg.qty).toFixed(3)} {sg.unit}</td>
-                                                    <td colSpan={3}></td>
+                                                    <td colSpan={canSeeCost ? 4 : 3}></td>
                                                 </tr>
 
                                                 {/* Individual batch entries */}
@@ -290,6 +297,19 @@ export default function FinishedGoodsIndex() {
                                                                 {g.source}
                                                             </span>
                                                         </td>
+                                                        {canSeeCost && (
+                                                            <td style={{ textAlign: 'right', fontSize: 12 }}>
+                                                                {g.cost_per_unit
+                                                                    ? <span style={{ fontWeight: 600 }}>₹{Number(g.cost_per_unit).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                    : <span style={{ color: 'var(--tx-faint)' }}>—</span>
+                                                                }
+                                                                {g.total_cost && (
+                                                                    <div style={{ fontSize: 11, color: 'var(--tx-muted)', fontWeight: 400 }}>
+                                                                        Total: ₹{Number(g.total_cost).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                        )}
                                                         <td className="text-muted">{new Date(g.created_at).toLocaleDateString('en-IN')}</td>
                                                         <td className="action-cell">
                                                             <button className="btn-icon" onClick={() => openEdit(g)} title="Edit">✏️</button>

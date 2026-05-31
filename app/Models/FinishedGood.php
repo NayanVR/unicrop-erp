@@ -18,7 +18,17 @@ class FinishedGood extends Model
         'unit',
         'notes',
         'source',
+        'cost_per_unit',
+        'total_cost',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'cost_per_unit' => 'decimal:4',
+            'total_cost'    => 'decimal:4',
+        ];
+    }
 
     public function product(): BelongsTo
     {
