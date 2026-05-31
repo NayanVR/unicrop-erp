@@ -145,6 +145,32 @@ export default function FillingIndex({ orders, configs, materials }: Props) {
         });
     };
 
+    const [running, setRunning] = useState<string | null>(null);
+
+    const runFilling = (
+        brand: string,
+        size: string,
+        qty: number,
+        rows: { icon: string; label: string; mat: Material | null | undefined; need: number; unit: string }[],
+    ) => {
+        const lines = rows
+            .filter((r) => r.mat)
+            .map((r) => `  ${r.icon} ${r.mat!.name}: ${fmtQty(r.need)} ${r.unit}`)
+            .join('\n');
+        if (!lines) {
+            alert('No materials configured for this product. Click ⚙ to set up first.');
+            return;
+        }
+        const msg = `Run Filling — ${brand} ${size} × ${qty} pcs\n\nThis will deduct from inventory:\n${lines}\n\nProceed?`;
+        if (!window.confirm(msg)) return;
+        const key = `${brand}|${size}`;
+        setRunning(key);
+        router.post('/filling/run', { our_brand: brand, packing_size: size, quantity: qty }, {
+            preserveScroll: true,
+            onFinish: () => setRunning(null),
+        });
+    };
+
     return (
         <>
             <Head title="Filling" />
@@ -251,6 +277,9 @@ export default function FillingIndex({ orders, configs, materials }: Props) {
                                                 { icon: '🗃', label: 'Printed Box', mat: cfg?.printed_box, need: qty, unit: cfg?.printed_box?.unit ?? 'pcs' },
                                             ];
 
+                                            const runKey   = `${brand}|${size}`;
+                                            const hasConfig = rows.some((r) => r.mat);
+
                                             return (
                                                 <div key={size} style={{ marginBottom: 10 }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
@@ -264,6 +293,15 @@ export default function FillingIndex({ orders, configs, materials }: Props) {
                                                                 ⚙
                                                             </button>
                                                         )}
+                                                        <button
+                                                            className="btn sm primary"
+                                                            style={{ fontSize: 10, padding: '1px 8px', marginLeft: 'auto' }}
+                                                            disabled={!hasConfig || running === runKey}
+                                                            title={hasConfig ? '' : 'Configure materials first'}
+                                                            onClick={() => runFilling(brand, size, qty, rows)}
+                                                        >
+                                                            {running === runKey ? '…' : '▶ Run Filling'}
+                                                        </button>
                                                     </div>
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                                                         {rows.map((row) => (
