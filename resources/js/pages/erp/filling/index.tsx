@@ -8,6 +8,7 @@ type RawMaterial = {
     name: string;
     unit: string;
     stock_qty: string | number;
+    min_stock?: string | number | null;
     cost_per_unit: string | number;
     category?: string | null;
 };
@@ -136,6 +137,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
     const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
     const [runTarget, setRunTarget] = useState<Recipe | null>(null);
     const [dupWarning, setDupWarning] = useState<{ exact: boolean; names: string[] } | null>(null);
+    const [highlightedId, setHighlightedId] = useState<number | null>(null);
 
     const form = useForm<RecipeFormData>({
         output_raw_material_id: '', packing_size: '', fill_quantity: '1', notes: '', is_active: true, items: [],
@@ -270,6 +272,24 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
         });
     };
 
+    const scrollToCard = (recipeId: number) => {
+        setPageView('recipes');
+        setHighlightedId(recipeId);
+        setTimeout(() => {
+            document.getElementById(`filling-card-${recipeId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 50);
+        setTimeout(() => setHighlightedId(null), 2500);
+    };
+
+    // Recipes whose output material is low / out of stock
+    const lowStockRecipes = recipes.filter((r) => {
+        const m = r.output_material;
+        if (!m) return false;
+        const stock = Number(m.stock_qty);
+        const min   = Number(m.min_stock ?? 0);
+        return stock <= min || stock <= 0;
+    });
+
     const filtered = recipes.filter((r) => {
         if (!search.trim()) return true;
         const q = search.toLowerCase();
@@ -291,6 +311,39 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                     </div>
                     {pageView === 'recipes' && canManage && <button className="btn primary" onClick={openNew}>+ Add New Filling Product</button>}
                 </div>
+
+                {/* Production Required Alerts */}
+                {lowStockRecipes.length > 0 && (
+                    <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: '#9a3412', marginBottom: 8 }}>
+                            🧪 Filling Production Required ({lowStockRecipes.length})
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            {lowStockRecipes.map((r) => {
+                                const m     = r.output_material!;
+                                const isOut = Number(m.stock_qty) <= 0;
+                                return (
+                                    <button
+                                        key={r.id}
+                                        onClick={() => scrollToCard(r.id)}
+                                        style={{
+                                            border: `1px solid ${isOut ? '#fca5a5' : '#fcd34d'}`,
+                                            background: isOut ? '#fef2f2' : '#fffbeb',
+                                            borderRadius: 8, padding: '5px 12px', fontSize: 12,
+                                            fontWeight: 600, cursor: 'pointer', color: isOut ? '#dc2626' : '#92400e',
+                                            textAlign: 'left',
+                                        }}
+                                    >
+                                        {isOut ? '🔴' : '🟡'} {r.name}{r.packing_size ? ` ${r.packing_size}` : ''}
+                                        <span style={{ fontWeight: 400, marginLeft: 4 }}>
+                                            — {Number(m.stock_qty).toFixed(0)} pcs
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {/* Tab switcher */}
                 <div className="filter-bar" style={{ marginBottom: 20 }}>
@@ -318,21 +371,24 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                 ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16 }}>
                         {filtered.map((recipe) => {
-                            const qtyPreview = Math.round(Number(recipe.fill_quantity) || 1);
-                            const runnable = canRun(recipe, qtyPreview);
+                            const qtyPreview  = Math.round(Number(recipe.fill_quantity) || 1);
+                            const runnable    = canRun(recipe, qtyPreview);
+                            const highlighted = highlightedId === recipe.id;
                             return (
                                 <div
+                                    id={`filling-card-${recipe.id}`}
                                     key={recipe.id}
                                     style={{
-                                        background: '#fff',
-                                        border: '1px solid var(--border)',
-                                        borderLeft: '4px solid #2563eb',
+                                        background: highlighted ? '#fff7ed' : '#fff',
+                                        border: `1px solid ${highlighted ? '#fb923c' : 'var(--border)'}`,
+                                        borderLeft: `4px solid ${highlighted ? '#ea580c' : '#2563eb'}`,
                                         borderRadius: 10,
                                         padding: '16px 18px',
                                         display: 'flex',
                                         flexDirection: 'column',
                                         gap: 10,
-                                        boxShadow: '0 1px 4px rgba(0,0,0,.06)',
+                                        boxShadow: highlighted ? '0 0 0 3px #fed7aa' : '0 1px 4px rgba(0,0,0,.06)',
+                                        transition: 'all 0.4s ease',
                                     }}
                                 >
                                     {/* Top row: name + packing size */}

@@ -18,7 +18,7 @@ class FillingController extends Controller
     public function index(): Response
     {
         $recipes = FillingRecipe::query()
-            ->with(['outputMaterial:id,name,unit,stock_qty,category', 'items.rawMaterial:id,name,unit,stock_qty,cost_per_unit'])
+            ->with(['outputMaterial:id,name,unit,stock_qty,min_stock,category', 'items.rawMaterial:id,name,unit,stock_qty,cost_per_unit'])
             ->orderBy('name')
             ->get();
 

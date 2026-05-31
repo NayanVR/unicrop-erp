@@ -32,7 +32,7 @@ type Bom = {
     batch_size: string | number;
     batch_unit: string;
     output_raw_material_id?: number | null;
-    output_material?: { id: number; name: string; unit: string; category?: string | null } | null;
+    output_material?: { id: number; name: string; unit: string; stock_qty?: string | number | null; min_stock?: string | number | null; category?: string | null } | null;
     notes?: string | null;
     is_active: boolean;
     product?: { id: number; name: string } | null;
@@ -180,7 +180,8 @@ export default function BomIndex({ boms, products, materials, categories, produc
     const [runModal, setRunModal]     = useState(false);
     const [editingBom, setEditingBom] = useState<Bom | null>(null);
     const [runTarget, setRunTarget]   = useState<Bom | null>(null);
-    const [runSummary, setRunSummary] = useState<NormalizedRun | null>(null);
+    const [runSummary, setRunSummary]     = useState<NormalizedRun | null>(null);
+    const [highlightedId, setHighlightedId] = useState<number | null>(null);
 
     const form = useForm<BomFormData>({
         name: '', product_id: '', packing_size: '', batch_size: '1',
@@ -410,6 +411,23 @@ export default function BomIndex({ boms, products, materials, categories, produc
         win.document.close();
     };
 
+    const scrollToCard = (bomId: number) => {
+        setPageView('boms');
+        setHighlightedId(bomId);
+        setTimeout(() => {
+            document.getElementById(`bom-card-${bomId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 50);
+        setTimeout(() => setHighlightedId(null), 2500);
+    };
+
+    const lowStockBoms = boms.filter((b) => {
+        const m = b.output_material;
+        if (!m) return false;
+        const stock = Number(m.stock_qty ?? 0);
+        const min   = Number(m.min_stock ?? 0);
+        return stock <= min || stock <= 0;
+    });
+
     const filtered = boms.filter((b) => {
         if (typeFilter !== 'all' && bomType(b.batch_unit) !== typeFilter) return false;
         if (search.trim()) {
@@ -434,6 +452,39 @@ export default function BomIndex({ boms, products, materials, categories, produc
                     </div>
                     {pageView === 'boms' && <button className="btn primary" onClick={openNew}>+ Add New BOM</button>}
                 </div>
+
+                {/* Production Required Alerts */}
+                {lowStockBoms.length > 0 && (
+                    <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: '#9a3412', marginBottom: 8 }}>
+                            ⚗️ BOM Production Required ({lowStockBoms.length})
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            {lowStockBoms.map((b) => {
+                                const m     = b.output_material!;
+                                const isOut = Number(m.stock_qty ?? 0) <= 0;
+                                return (
+                                    <button
+                                        key={b.id}
+                                        onClick={() => scrollToCard(b.id)}
+                                        style={{
+                                            border: `1px solid ${isOut ? '#fca5a5' : '#fcd34d'}`,
+                                            background: isOut ? '#fef2f2' : '#fffbeb',
+                                            borderRadius: 8, padding: '5px 12px', fontSize: 12,
+                                            fontWeight: 600, cursor: 'pointer', color: isOut ? '#dc2626' : '#92400e',
+                                            textAlign: 'left',
+                                        }}
+                                    >
+                                        {isOut ? '🔴' : '🟡'} {b.name}{b.packing_size ? ` ${b.packing_size}` : ''}
+                                        <span style={{ fontWeight: 400, marginLeft: 4 }}>
+                                            — {Number(m.stock_qty ?? 0).toFixed(2)} {m.unit}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {/* Tab switcher */}
                 <div className="filter-bar" style={{ marginBottom: 20 }}>
@@ -475,22 +526,25 @@ export default function BomIndex({ boms, products, materials, categories, produc
                 ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16 }}>
                         {filtered.map((bom) => {
-                            const type = bomType(bom.batch_unit);
-                            const cfg  = TYPE_CONFIG[type];
-                            const runnable = canRun(bom);
+                            const type        = bomType(bom.batch_unit);
+                            const cfg         = TYPE_CONFIG[type];
+                            const runnable    = canRun(bom);
+                            const highlighted = highlightedId === bom.id;
                             return (
                                 <div
+                                    id={`bom-card-${bom.id}`}
                                     key={bom.id}
                                     style={{
-                                        background: '#fff',
-                                        border: '1px solid var(--border)',
-                                        borderLeft: `4px solid ${cfg.border}`,
+                                        background: highlighted ? '#fff7ed' : '#fff',
+                                        border: `1px solid ${highlighted ? '#fb923c' : 'var(--border)'}`,
+                                        borderLeft: `4px solid ${highlighted ? '#ea580c' : cfg.border}`,
                                         borderRadius: 10,
                                         padding: '16px 18px',
                                         display: 'flex',
                                         flexDirection: 'column',
                                         gap: 10,
-                                        boxShadow: '0 1px 4px rgba(0,0,0,.06)',
+                                        boxShadow: highlighted ? '0 0 0 3px #fed7aa' : '0 1px 4px rgba(0,0,0,.06)',
+                                        transition: 'all 0.4s ease',
                                     }}
                                 >
                                     {/* Top row: name + yield */}
