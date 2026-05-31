@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BomItem;
+use App\Models\FillingRecipeItem;
 use App\Models\InventoryCategory;
 use App\Models\InventoryPurchaseBill;
 use App\Models\InventoryPurchaseBillItem;
@@ -66,8 +68,11 @@ class InventoryController extends Controller
 
         $inventoryCategories = InventoryCategory::orderBy('name')->get();
 
+        $bomMaterialIds     = BomItem::distinct()->pluck('raw_material_id')->toArray();
+        $fillingMaterialIds = FillingRecipeItem::distinct()->pluck('raw_material_id')->toArray();
+
         return Inertia::render('erp/inventory/index', array_merge(
-            compact('materials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats', 'vendors', 'inventoryCategories'),
+            compact('materials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats', 'vendors', 'inventoryCategories', 'bomMaterialIds', 'fillingMaterialIds'),
             ['pageTitle' => 'Inventory']
         ));
     }

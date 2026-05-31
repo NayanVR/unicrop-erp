@@ -130,6 +130,8 @@ type Props = {
     stats: Stats;
     vendors: Vendor[];
     inventoryCategories: InventoryCategory[];
+    bomMaterialIds: number[];
+    fillingMaterialIds: number[];
 };
 
 // ── Route constants ───────────────────────────────────────────────────────────
@@ -212,7 +214,7 @@ function buildSku(catCode: string, size: string, shape: string): string {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function InventoryIndex({ materials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories }: Props) {
+export default function InventoryIndex({ materials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomMaterialIds, fillingMaterialIds }: Props) {
     const { auth } = usePage<{ auth: Auth }>().props;
     const role = auth.user?.role ?? '';
     const canSeeCost      = role === 'admin' || auth.user?.cost_access === true;
@@ -873,47 +875,52 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                 )}
             </div>
 
-            {/* Low Stock Alerts */}
-            {alertMaterials.length > 0 && (
-                <div className="card" style={{ marginBottom: 16 }}>
-                    <div className="card-title" style={{ marginBottom: 8 }}>⚠ Low Stock Alerts</div>
-                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                        {alertMaterials.map((m) => {
-                            const s = stockStatus(m);
-                            return (
-                                <div
-                                    key={m.id}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 8,
-                                        padding: '6px 10px',
-                                        borderRadius: 8,
-                                        border: `1px solid ${s === 'out' ? '#fca5a5' : '#fcd34d'}`,
-                                        background: s === 'out' ? '#fef2f2' : '#fffbeb',
-                                        fontSize: 13,
-                                    }}
-                                >
-                                    <span
-                                        style={{ cursor: 'pointer', fontWeight: 600, color: s === 'out' ? '#dc2626' : '#d97706' }}
-                                        onClick={() => { setSearch(m.name); setTab('materials'); }}
-                                    >
-                                        {s === 'out' ? '🔴' : '🟡'} {m.name}: {fmt(m.stock_qty)} {m.unit}
-                                    </span>
-                                    <button
-                                        type="button"
-                                        className="btn sm primary"
-                                        style={{ fontSize: 11, padding: '2px 8px' }}
-                                        onClick={() => openOrderPlaced(m)}
-                                    >
-                                        + Order Placed
-                                    </button>
-                                </div>
-                            );
-                        })}
+            {/* Low Stock Alerts — split by BOM / Filling / Other */}
+            {alertMaterials.length > 0 && (() => {
+                const bomAlerts     = alertMaterials.filter((m) => bomMaterialIds.includes(m.id));
+                const fillingAlerts = alertMaterials.filter((m) => fillingMaterialIds.includes(m.id) && !bomMaterialIds.includes(m.id));
+                const otherAlerts   = alertMaterials.filter((m) => !bomMaterialIds.includes(m.id) && !fillingMaterialIds.includes(m.id));
+
+                const renderAlerts = (list: RawMaterial[]) => list.map((m) => {
+                    const s = stockStatus(m);
+                    return (
+                        <div
+                            key={m.id}
+                            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, border: `1px solid ${s === 'out' ? '#fca5a5' : '#fcd34d'}`, background: s === 'out' ? '#fef2f2' : '#fffbeb', fontSize: 13 }}
+                        >
+                            <span style={{ cursor: 'pointer', fontWeight: 600, color: s === 'out' ? '#dc2626' : '#d97706' }} onClick={() => { setSearch(m.name); setTab('materials'); }}>
+                                {s === 'out' ? '🔴' : '🟡'} {m.name}: {fmt(m.stock_qty)} {m.unit}
+                            </span>
+                            <button type="button" className="btn sm primary" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => openOrderPlaced(m)}>
+                                + Order Placed
+                            </button>
+                        </div>
+                    );
+                });
+
+                return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                        {bomAlerts.length > 0 && (
+                            <div className="card">
+                                <div className="card-title" style={{ marginBottom: 8 }}>⚗️ BOM — Low Stock ({bomAlerts.length})</div>
+                                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>{renderAlerts(bomAlerts)}</div>
+                            </div>
+                        )}
+                        {fillingAlerts.length > 0 && (
+                            <div className="card">
+                                <div className="card-title" style={{ marginBottom: 8 }}>🧪 Filling — Low Stock ({fillingAlerts.length})</div>
+                                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>{renderAlerts(fillingAlerts)}</div>
+                            </div>
+                        )}
+                        {otherAlerts.length > 0 && (
+                            <div className="card">
+                                <div className="card-title" style={{ marginBottom: 8 }}>⚠ Low Stock ({otherAlerts.length})</div>
+                                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>{renderAlerts(otherAlerts)}</div>
+                            </div>
+                        )}
                     </div>
-                </div>
-            )}
+                );
+            })()}
 
             {/* On The Way */}
             {pendingReorders.length > 0 && (
