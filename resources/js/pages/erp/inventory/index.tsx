@@ -878,7 +878,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             {/* Low Stock Alerts — split by BOM / Filling / Other */}
             {alertMaterials.length > 0 && (() => {
                 const bomAlerts     = alertMaterials.filter((m) => bomMaterialIds.includes(m.id));
-                const fillingAlerts = alertMaterials.filter((m) => fillingMaterialIds.includes(m.id) && !bomMaterialIds.includes(m.id));
+                const fillingAlerts = alertMaterials.filter((m) => fillingMaterialIds.includes(m.id));
                 const otherAlerts   = alertMaterials.filter((m) => !bomMaterialIds.includes(m.id) && !fillingMaterialIds.includes(m.id));
 
                 const renderAlerts = (list: RawMaterial[]) => list.map((m) => {
