@@ -12,15 +12,15 @@ class UnitTransferController extends Controller
 {
     public function index(): Response
     {
-        $transfers = UnitTransfer::with('creator:id,name')
+        $transfers = UnitTransfer::with(['creator:id,name', 'receiver:id,name'])
             ->latest()
             ->get();
 
         $stats = [
-            'total' => $transfers->count(),
-            'loading' => $transfers->where('status', 'loading')->count(),
-            'in_transit' => $transfers->where('status', 'in-transit')->count(),
-            'unloaded' => $transfers->where('status', 'unloaded')->count(),
+            'total'       => $transfers->count(),
+            'in_transit'  => $transfers->where('status', 'in-transit')->count(),
+            'received'    => $transfers->where('status', 'unloaded')->count(),
+            'cancelled'   => $transfers->where('status', 'cancelled')->count(),
         ];
 
         return Inertia::render('erp/unit-transfer/index', compact('transfers', 'stats'));
@@ -37,21 +37,20 @@ class UnitTransferController extends Controller
             'quantity'     => 'required|numeric|min:0.001',
             'unit'         => 'required|string|max:20',
             'notes'        => 'nullable|string',
-            'received_by'  => 'nullable|string|max:100',
         ]);
 
         $data['created_by'] = $request->user()?->id;
-        $data['status'] = 'loading';
+        $data['status']     = 'in-transit';   // immediately "On the Way"
 
         UnitTransfer::create($data);
 
-        return redirect()->back()->with('success', 'Transfer created.');
+        return redirect()->back()->with('success', 'Transfer created — On the Way.');
     }
 
     public function updateStatus(Request $request, UnitTransfer $unitTransfer): RedirectResponse
     {
         $data = $request->validate([
-            'status' => 'required|in:loading,in-transit,unloaded,cancelled',
+            'status' => 'required|in:in-transit,unloaded,cancelled',
         ]);
 
         if ($unitTransfer->status === 'unloaded' || $unitTransfer->status === 'cancelled') {
@@ -60,12 +59,15 @@ class UnitTransferController extends Controller
 
         $extra = [];
         if ($data['status'] === 'unloaded') {
-            $extra['transferred_at'] = now();
+            $extra['received_by_user_id'] = $request->user()?->id;
+            $extra['received_at']         = now();
+            $extra['transferred_at']      = now();
         }
 
         $unitTransfer->update(array_merge($data, $extra));
 
-        return redirect()->back()->with('success', "Status updated to {$data['status']}.");
+        $label = $data['status'] === 'unloaded' ? 'Received' : ucfirst($data['status']);
+        return redirect()->back()->with('success', "Transfer marked as {$label}.");
     }
 
     public function destroy(UnitTransfer $unitTransfer): RedirectResponse

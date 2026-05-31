@@ -280,14 +280,13 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
 
     // Unit transfer modal (opened from a specific order item)
     const [transferModal, setTransferModal] = useState<{ order: Order; item: OrderItem } | null>(null);
-    const [transferForm, setTransferForm] = useState({ from_unit: '', to_unit: '', received_by: '', unit: 'pcs', notes: '', quantity: '' });
+    const [transferForm, setTransferForm] = useState({ from_unit: '', to_unit: '', unit: 'pcs', notes: '', quantity: '' });
     const [transferSaving, setTransferSaving] = useState(false);
 
     const openTransfer = (order: Order, item: OrderItem) => {
         setTransferForm({
             from_unit: '',
             to_unit: '',
-            received_by: '',
             unit: 'pcs',
             notes: '',
             quantity: String(item.quantity),
@@ -309,7 +308,6 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
             quantity:     transferForm.quantity,
             unit:         transferForm.unit,
             notes:        transferForm.notes,
-            received_by:  transferForm.received_by,
         }, {
             preserveScroll: true,
             onFinish: () => setTransferSaving(false),
@@ -1358,15 +1356,6 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                         <select value={transferForm.unit} onChange={(e) => setTransferForm((f) => ({ ...f, unit: e.target.value }))}>
                                             {['pcs', 'kg', 'g', 'L', 'ml', 'bags', 'drums'].map((u) => <option key={u}>{u}</option>)}
                                         </select>
-                                    </div>
-                                    <div className="form-group" style={{ gridColumn: '1/-1' }}>
-                                        <label>Received By (name)</label>
-                                        <input
-                                            type="text"
-                                            placeholder="Name of person receiving"
-                                            value={transferForm.received_by}
-                                            onChange={(e) => setTransferForm((f) => ({ ...f, received_by: e.target.value }))}
-                                        />
                                     </div>
                                     <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                         <label>Notes</label>

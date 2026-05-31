@@ -17,17 +17,24 @@ class UnitTransfer extends Model
         'quantity',
         'unit',
         'notes',
-        'received_by',
+        'received_by_user_id',
+        'received_at',
         'status',
         'transferred_at',
     ];
 
     protected $casts = [
         'transferred_at' => 'datetime',
+        'received_at'    => 'datetime',
     ];
 
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function receiver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'received_by_user_id');
     }
 }
