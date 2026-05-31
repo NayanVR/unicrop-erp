@@ -169,6 +169,7 @@ function fmtSmart(qty: number, unit: string): string {
 export default function BomIndex({ boms, products, materials, categories, productionRuns }: Props) {
     const { auth } = usePage<{ auth: Auth }>().props;
     const canSeeCost = auth.user?.role === 'admin' || auth.user?.cost_access === true;
+    const isAdmin    = auth.user?.role === 'admin';
 
     const [pageView, setPageView]     = useState<'boms' | 'history'>('boms');
     const [search, setSearch]         = useState('');
@@ -586,7 +587,7 @@ export default function BomIndex({ boms, products, materials, categories, produc
                                             {runnable ? '▶ Production Run' : '⚠️ Low Stock'}
                                         </button>
                                         <button className="btn sm" onClick={() => printBom(bom)} style={{ fontSize: 12 }}>🖨 Print</button>
-                                        <button className="btn danger-xs" onClick={() => deleteBom(bom)} style={{ marginLeft: 'auto', fontSize: 12 }}>Delete</button>
+                                        {isAdmin && <button className="btn danger-xs" onClick={() => deleteBom(bom)} style={{ marginLeft: 'auto', fontSize: 12 }}>Delete</button>}
                                     </div>
                                 </div>
                             );
@@ -661,10 +662,10 @@ export default function BomIndex({ boms, products, materials, categories, produc
                                                 <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
                                                     <button className="btn sm" onClick={() => setRunSummary(normalizeRun(r))} style={{ marginRight: 4 }}>Details</button>
                                                     <button className="btn sm" onClick={() => printRunSummary(normalizeRun(r))} style={{ marginRight: 4 }}>🖨</button>
-                                                    <button className="btn sm danger" onClick={() => {
+                                                    {isAdmin && <button className="btn sm danger" onClick={() => {
                                                         if (!confirm(`Delete run ${r.batch_number ?? r.id}?\n\nThis will reverse the stock deduction for all materials used in this run.`)) return;
                                                         router.delete(`/bom/runs/${r.id}`, { preserveScroll: true });
-                                                    }}>Delete</button>
+                                                    }}>Delete</button>}
                                                 </td>
                                             </tr>
                                         ))}
