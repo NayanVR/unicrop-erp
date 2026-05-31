@@ -191,8 +191,8 @@ class FillingController extends Controller
                 'quantity'      => $qty,
                 'unit'          => 'pcs',
                 'source'        => 'filling',
-                'cost_per_unit' => $costPerPc > 0 ? $costPerPc : null,
-                'total_cost'    => $totalCost > 0 ? round($totalCost, 4) : null,
+                'cost_per_unit' => $costPerPc,
+                'total_cost'    => round($totalCost, 4),
             ]);
 
             // Increment output material stock and update its cost_per_unit
@@ -202,9 +202,7 @@ class FillingController extends Controller
                     $prevStock = (float) $output->stock_qty;
                     $newStock  = $prevStock + $qty;
                     $output->stock_qty = $newStock;
-                    if ($costPerPc > 0) {
-                        $output->cost_per_unit = $costPerPc;
-                    }
+                    $output->cost_per_unit = $costPerPc;
                     $output->save();
 
                     InventoryTransaction::create([

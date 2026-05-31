@@ -366,6 +366,25 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                                         {!recipe.is_active && <span className="badge gray" style={{ fontSize: 11 }}>Inactive</span>}
                                     </div>
 
+                                    {/* Inventory output link (like BOM) */}
+                                    {recipe.output_material ? (
+                                        <div style={{ fontSize: 12, fontWeight: 600, color: '#15803d', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 4, padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                            📦 Inventory → {recipe.output_material.name}
+                                            {canSeeCost && Number(recipe.output_material.cost_per_unit) > 0 && (
+                                                <span style={{ fontWeight: 400, color: '#166534' }}>
+                                                    · ₹{Number(recipe.output_material.cost_per_unit).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/pc
+                                                </span>
+                                            )}
+                                            <span style={{ fontWeight: 400, color: '#166534' }}>
+                                                · Stock: {Number(recipe.output_material.stock_qty).toFixed(0)} pcs
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <div style={{ fontSize: 12, color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 4, padding: '3px 8px', display: 'inline-block' }}>
+                                            ⚠ Not linked to inventory — edit to link a Finished Good material
+                                        </div>
+                                    )}
+
                                     {recipe.notes && <div style={{ fontSize: 13, color: 'var(--tx-sub)' }}>{recipe.notes}</div>}
 
                                     {/* Materials (per pc) */}
