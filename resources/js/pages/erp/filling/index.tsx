@@ -154,7 +154,6 @@ export default function FillingIndex({ orders, configs, materials }: Props) {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
                     <div>
                         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>🧪 Filling</h1>
-                        <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--tx-sub)' }}>Products currently in filling stage</p>
                     </div>
                     <span style={{ background: 'var(--bg-paper)', border: '1px solid var(--border)', borderRadius: 20, padding: '4px 14px', fontSize: 13, fontWeight: 600 }}>
                         {brandMap.size} product{brandMap.size !== 1 ? 's' : ''}
