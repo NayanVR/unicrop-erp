@@ -135,14 +135,45 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
     const [runModal, setRunModal]   = useState(false);
     const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
     const [runTarget, setRunTarget] = useState<Recipe | null>(null);
+    const [dupWarning, setDupWarning] = useState<{ exact: boolean; names: string[] } | null>(null);
 
     const form = useForm<RecipeFormData>({
         output_raw_material_id: '', packing_size: '', fill_quantity: '1', notes: '', is_active: true, items: [],
     });
     const runForm = useForm<RunFormData>({ quantity: '1', notes: '' });
 
+    const checkDuplicate = (outputMatId: string) => {
+        if (!outputMatId) { setDupWarning(null); return; }
+        const matName = finishedGoodMaterials.find((m) => String(m.id) === outputMatId)?.name ?? '';
+        const others  = recipes.filter((r) => String(r.id) !== String(editingRecipe?.id ?? ''));
+
+        // Exact same output material
+        const exactMatch = others.find((r) => String(r.output_raw_material_id) === outputMatId);
+        if (exactMatch) {
+            setDupWarning({ exact: true, names: [exactMatch.name + (exactMatch.packing_size ? ` (${exactMatch.packing_size})` : '')] });
+            return;
+        }
+
+        // Similar name fuzzy check
+        if (matName) {
+            const h = matName.toLowerCase();
+            const similar = others.filter((r) => {
+                const rn = r.name.toLowerCase();
+                if (rn === h || rn.includes(h) || h.includes(rn)) return true;
+                // word overlap: if any word > 3 chars matches
+                const hWords = h.split(/\s+/).filter((w) => w.length > 3);
+                return hWords.some((w) => rn.includes(w));
+            });
+            if (similar.length > 0) {
+                setDupWarning({ exact: false, names: similar.map((r) => r.name + (r.packing_size ? ` (${r.packing_size})` : '')) });
+                return;
+            }
+        }
+        setDupWarning(null);
+    };
+
     const openNew = () => {
-        form.reset(); form.clearErrors(); setEditingRecipe(null); setEditModal(true);
+        form.reset(); form.clearErrors(); setEditingRecipe(null); setDupWarning(null); setEditModal(true);
     };
 
     const openEdit = (recipe: Recipe) => {
@@ -158,7 +189,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                 unit: i.unit ?? '',
             })),
         });
-        form.clearErrors(); setEditingRecipe(recipe); setEditModal(true);
+        form.clearErrors(); setEditingRecipe(recipe); setDupWarning(null); setEditModal(true);
     };
 
     const addItem = () => form.setData('items', [...form.data.items, { raw_material_id: '', qty_per_unit: '', unit: '' }]);
@@ -486,10 +517,30 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                                 <SearchableSelect
                                     options={finishedGoodMaterials.map((m) => ({ value: m.id, label: m.name }))}
                                     value={form.data.output_raw_material_id}
-                                    onChange={(v) => form.setData('output_raw_material_id', v)}
+                                    onChange={(v) => { form.setData('output_raw_material_id', v); checkDuplicate(v); }}
                                     placeholder="— Search finished good —"
                                 />
                                 {form.errors.output_raw_material_id && <div className="form-error">{form.errors.output_raw_material_id}</div>}
+                                {dupWarning && (
+                                    <div style={{
+                                        marginTop: 8, padding: '10px 14px', borderRadius: 8, fontSize: 13,
+                                        background: dupWarning.exact ? '#fef2f2' : '#fffbeb',
+                                        border: `1px solid ${dupWarning.exact ? '#fca5a5' : '#fcd34d'}`,
+                                        color: dupWarning.exact ? '#991b1b' : '#92400e',
+                                    }}>
+                                        <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                                            {dupWarning.exact ? '⚠ Already exists!' : '⚠ Similar recipe found'}
+                                        </div>
+                                        <div style={{ fontSize: 12 }}>
+                                            {dupWarning.exact
+                                                ? `A filling recipe for this product already exists:`
+                                                : `Existing recipes with a similar name:`}
+                                        </div>
+                                        <ul style={{ margin: '4px 0 0 16px', padding: 0, fontSize: 12 }}>
+                                            {dupWarning.names.map((n) => <li key={n}>{n}</li>)}
+                                        </ul>
+                                    </div>
+                                )}
                             </div>
                             <div className="form-group">
                                 <label>Packing Size</label>
