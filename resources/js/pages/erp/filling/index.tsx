@@ -169,7 +169,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
 
     const openRun = (recipe: Recipe) => {
         runForm.reset();
-        runForm.setData('quantity', String(recipe.fill_quantity || 1));
+        runForm.setData('quantity', String(Math.round(Number(recipe.fill_quantity) || 1)));
         setRunTarget(recipe);
         setRunModal(true);
     };
@@ -260,7 +260,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                 ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16 }}>
                         {filtered.map((recipe) => {
-                            const qtyPreview = Number(recipe.fill_quantity) || 1;
+                            const qtyPreview = Math.round(Number(recipe.fill_quantity) || 1);
                             const runnable = canRun(recipe, qtyPreview);
                             return (
                                 <div
@@ -289,7 +289,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
 
                                     {/* Default fill qty + inactive badge */}
                                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                                        <span style={{ fontSize: 12, color: 'var(--tx-sub)' }}>Default fill: <strong>{formatQty(recipe.fill_quantity)} pcs</strong></span>
+                                        <span style={{ fontSize: 12, color: 'var(--tx-sub)' }}>Default fill: <strong>{Math.round(Number(recipe.fill_quantity))} pcs</strong></span>
                                         {!recipe.is_active && <span className="badge gray" style={{ fontSize: 11 }}>Inactive</span>}
                                     </div>
 
