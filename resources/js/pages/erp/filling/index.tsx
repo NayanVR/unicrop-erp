@@ -1,3 +1,4 @@
+import SearchableSelect from '@/components/searchable-select';
 import type { Auth } from '@/types/auth';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
@@ -482,15 +483,12 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                         <div className="form-grid">
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                 <label>Product Name *</label>
-                                <select
+                                <SearchableSelect
+                                    options={finishedGoodMaterials.map((m) => ({ value: m.id, label: m.name }))}
                                     value={form.data.output_raw_material_id}
-                                    onChange={(e) => form.setData('output_raw_material_id', e.target.value)}
-                                >
-                                    <option value="">— Select finished good —</option>
-                                    {finishedGoodMaterials.map((m) => (
-                                        <option key={m.id} value={m.id}>{m.name}</option>
-                                    ))}
-                                </select>
+                                    onChange={(v) => form.setData('output_raw_material_id', v)}
+                                    placeholder="— Search finished good —"
+                                />
                                 {form.errors.output_raw_material_id && <div className="form-error">{form.errors.output_raw_material_id}</div>}
                             </div>
                             <div className="form-group">
@@ -517,11 +515,13 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                                     No materials added yet. Add fill liquid, bottle, label, box, etc.
                                 </div>
                             ) : form.data.items.map((item, idx) => (
-                                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 32px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                                    <select value={item.raw_material_id} onChange={(e) => updateItem(idx, 'raw_material_id', e.target.value)}>
-                                        <option value="">— Select material —</option>
-                                        {materials.map((m) => <option key={m.id} value={m.id}>{m.name} ({formatQty(m.stock_qty)} {m.unit})</option>)}
-                                    </select>
+                                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 32px', gap: 8, marginBottom: 8, alignItems: 'start' }}>
+                                    <SearchableSelect
+                                        options={materials.map((m) => ({ value: m.id, label: `${m.name} (${formatQty(m.stock_qty)} ${m.unit})` }))}
+                                        value={item.raw_material_id}
+                                        onChange={(v) => updateItem(idx, 'raw_material_id', v)}
+                                        placeholder="— Search material —"
+                                    />
                                     <input type="number" placeholder="Qty/pc" value={item.qty_per_unit} onChange={(e) => updateItem(idx, 'qty_per_unit', e.target.value)} step="0.001" min="0" />
                                     <select value={item.unit} onChange={(e) => updateItem(idx, 'unit', e.target.value)}>
                                         <option value="">— unit —</option>
