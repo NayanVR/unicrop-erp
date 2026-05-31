@@ -187,8 +187,8 @@ function stockStatus(m: RawMaterial): 'out' | 'low' | 'reorder' | 'good' {
 const fmt = (v: string | number, decimals = 3) =>
     Number(v).toLocaleString('en-IN', { maximumFractionDigits: decimals });
 
-const fmtAmt = (v: string | number) =>
-    '₹' + Number(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtAmt = (v: string | number | null | undefined) =>
+    (!v || Number(v) === 0) ? '—' : '₹' + Number(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const fmtDate = (s: string) =>
     new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
