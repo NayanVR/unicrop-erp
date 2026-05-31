@@ -45,6 +45,7 @@ const NAV_DEFS: Record<string, NavItem[]> = {
             href: ordersCreate(),
         },
         { id: 'factory', label: 'Production Orders', icon: '🏭', href: factoryIndex() },
+        { id: 'filling', label: 'Filling', icon: '🧪', href: '/filling' as NonNullable<InertiaLinkProps['href']> },
         { id: 'bom', label: 'Bill of Materials', icon: '⚗️', href: bomIndex() },
         { id: 'finished-goods', label: 'Finished Goods', icon: '✅', href: finishedGoodsIndex() },
         { id: 'inventory', label: 'Inventory', icon: '🗄️', href: inventoryIndex() },
@@ -126,7 +127,7 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
         const base = NAV_DEFS[role ?? 'admin'] ?? [];
         if (role === 'factory' && permissions.includes('filling')) {
             const insertAfter = base.findIndex((i) => i.id === 'factory');
-            const fillingItem: NavItem = { id: 'filling', label: 'Filling', icon: '🧪', href: `${factoryIndex()}?filter=filling` as NonNullable<InertiaLinkProps['href']> };
+            const fillingItem: NavItem = { id: 'filling', label: 'Filling', icon: '🧪', href: '/filling' as NonNullable<InertiaLinkProps['href']> };
             return insertAfter >= 0
                 ? [...base.slice(0, insertAfter + 1), fillingItem, ...base.slice(insertAfter + 1)]
                 : [...base, fillingItem];

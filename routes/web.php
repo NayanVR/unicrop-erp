@@ -5,6 +5,7 @@ use App\Http\Controllers\BomRecipeController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DesignController;
 use App\Http\Controllers\FactoryController;
+use App\Http\Controllers\FillingController;
 use App\Http\Controllers\FinishedGoodsController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\OrderController;
@@ -53,6 +54,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('orders/{order}/reject-urgent', [OrderController::class, 'rejectUrgent'])->name('orders.reject-urgent');
 
         Route::get('factory', [FactoryController::class, 'index'])->name('factory.index');
+        Route::get('filling', [FillingController::class, 'index'])->name('filling.index');
         Route::post('factory/items/{item}/advance', [FactoryController::class, 'advanceStage'])->name('factory.items.advance');
         Route::post('factory/items/{item}/revert', [FactoryController::class, 'revertStage'])->name('factory.items.revert');
         Route::post('factory/items/{item}/set-stage', [FactoryController::class, 'setStage'])->name('factory.items.set-stage');
