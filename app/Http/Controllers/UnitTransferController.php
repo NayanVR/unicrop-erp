@@ -29,13 +29,15 @@ class UnitTransferController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'from_unit' => 'required|string|max:100',
-            'to_unit' => 'required|string|max:100',
-            'item_type' => 'required|in:raw_material,finished_good,other',
-            'item_name' => 'required|string|max:255',
-            'quantity' => 'required|numeric|min:0.001',
-            'unit' => 'required|string|max:20',
-            'notes' => 'nullable|string',
+            'order_number' => 'nullable|string|max:50',
+            'from_unit'    => 'required|string|max:100',
+            'to_unit'      => 'required|string|max:100',
+            'item_type'    => 'required|in:raw_material,finished_good,other',
+            'item_name'    => 'required|string|max:255',
+            'quantity'     => 'required|numeric|min:0.001',
+            'unit'         => 'required|string|max:20',
+            'notes'        => 'nullable|string',
+            'received_by'  => 'nullable|string|max:100',
         ]);
 
         $data['created_by'] = $request->user()?->id;

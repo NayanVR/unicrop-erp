@@ -10,6 +10,7 @@ import { useState } from 'react';
 type Transfer = {
     id: number;
     created_by: number | null;
+    order_number: string | null;
     from_unit: string;
     to_unit: string;
     item_type: 'raw_material' | 'finished_good' | 'other';
@@ -17,6 +18,7 @@ type Transfer = {
     quantity: number;
     unit: string;
     notes: string | null;
+    received_by: string | null;
     status: 'loading' | 'in-transit' | 'unloaded' | 'cancelled';
     transferred_at: string | null;
     created_at: string;
@@ -145,9 +147,11 @@ export default function UnitTransferIndex() {
                     <thead>
                         <tr>
                             <th>Item</th>
-                            <th>Type</th>
+                            <th>Order</th>
                             <th>From → To</th>
                             <th>Quantity</th>
+                            <th>Sent By</th>
+                            <th>Received By</th>
                             <th>Status</th>
                             <th>Date</th>
                             <th>Actions</th>
@@ -155,16 +159,21 @@ export default function UnitTransferIndex() {
                     </thead>
                     <tbody>
                         {filtered.length === 0 && (
-                            <tr><td colSpan={7} className="empty-row">No transfers found.</td></tr>
+                            <tr><td colSpan={9} className="empty-row">No transfers found.</td></tr>
                         )}
                         {filtered.map((t) => (
                             <tr key={t.id}>
-                                <td className="font-medium">{t.item_name}</td>
-                                <td>
-                                    <span className="badge badge-gray">{t.item_type.replace('_', ' ')}</span>
+                                <td className="font-medium">
+                                    {t.item_name}
+                                    {t.notes && <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{t.notes}</div>}
+                                </td>
+                                <td className="text-muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                                    {t.order_number ?? '—'}
                                 </td>
                                 <td className="text-muted">{t.from_unit} → {t.to_unit}</td>
                                 <td>{Number(t.quantity).toFixed(3)} {t.unit}</td>
+                                <td style={{ fontSize: 13 }}>{t.creator?.name ?? '—'}</td>
+                                <td style={{ fontSize: 13 }}>{t.received_by ?? '—'}</td>
                                 <td>
                                     <span className={`badge ${STATUS_COLORS[t.status] ?? 'badge-gray'}`}>
                                         {t.status}

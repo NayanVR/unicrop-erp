@@ -1,7 +1,6 @@
 import { labels as itemLabels, setStage as itemSetStage } from '@/routes/factory/items';
 import { dispatch as orderDispatch, notes as orderNotes } from '@/routes/factory/orders';
 import { approveUrgent as ordersApproveUrgent, rejectUrgent as ordersRejectUrgent } from '@/routes/orders';
-import { index as unitTransferIndex } from '@/routes/unit-transfer';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import type { Auth } from '@/types/auth';
 import { useMemo, useState } from 'react';
@@ -278,6 +277,45 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
         setLabelFS((prev) => ({ ...prev, [key]: Math.max(6, prev[key] + delta) }));
     const [boxSizeDraft, setBoxSizeDraft] = useState<Record<number, string>>({});
     const [savingBoxSize, setSavingBoxSize] = useState<number | null>(null);
+
+    // Unit transfer modal (opened from a specific order item)
+    const [transferModal, setTransferModal] = useState<{ order: Order; item: OrderItem } | null>(null);
+    const [transferForm, setTransferForm] = useState({ from_unit: '', to_unit: '', received_by: '', unit: 'pcs', notes: '', quantity: '' });
+    const [transferSaving, setTransferSaving] = useState(false);
+
+    const openTransfer = (order: Order, item: OrderItem) => {
+        setTransferForm({
+            from_unit: '',
+            to_unit: '',
+            received_by: '',
+            unit: 'pcs',
+            notes: '',
+            quantity: String(item.quantity),
+        });
+        setTransferModal({ order, item });
+    };
+
+    const submitTransfer = () => {
+        if (!transferModal) return;
+        const { order, item } = transferModal;
+        const productName = [item.our_brand, item.packing_size].filter(Boolean).join(' ');
+        setTransferSaving(true);
+        router.post('/unit-transfer', {
+            order_number: order.order_number,
+            from_unit:    transferForm.from_unit,
+            to_unit:      transferForm.to_unit,
+            item_type:    'finished_good',
+            item_name:    productName,
+            quantity:     transferForm.quantity,
+            unit:         transferForm.unit,
+            notes:        transferForm.notes,
+            received_by:  transferForm.received_by,
+        }, {
+            preserveScroll: true,
+            onFinish: () => setTransferSaving(false),
+            onSuccess: () => setTransferModal(null),
+        });
+    };
 
     const photoMap = useMemo(() => buildPhotoMap(productPhotos), [productPhotos]);
 
@@ -1001,9 +1039,12 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
 
                                                                     {canAdvance && (
                                                                         <div>
-                                                                            <Link href={unitTransferIndex()} className="btn sm" onClick={(e) => e.stopPropagation()}>
+                                                                            <button
+                                                                                className="btn sm"
+                                                                                onClick={(e) => { e.stopPropagation(); openTransfer(order, item); }}
+                                                                            >
                                                                                 🔄 Transfer Unit
-                                                                            </Link>
+                                                                            </button>
                                                                         </div>
                                                                     )}
                                                                 </div>
@@ -1259,6 +1300,98 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                     </div>
                 </div>
             )}
+
+            {/* Unit Transfer Modal */}
+            {transferModal && (() => {
+                const { order, item } = transferModal;
+                const productName = [item.our_brand, item.packing_size].filter(Boolean).join(' ') || '—';
+                return (
+                    <div className="modal-overlay open" onClick={() => setTransferModal(null)}>
+                        <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+                            <div className="modal-header">
+                                <h2>🔄 Transfer Unit</h2>
+                                <button className="modal-close" onClick={() => setTransferModal(null)}>✕</button>
+                            </div>
+                            <div className="modal-body">
+                                {/* Auto-filled product info */}
+                                <div style={{ background: 'var(--bg-paper)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '10px 14px', marginBottom: 14, fontSize: 13 }}>
+                                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                                        <span><span style={{ color: 'var(--tx-muted)' }}>Order: </span><strong>{order.order_number}</strong></span>
+                                        <span><span style={{ color: 'var(--tx-muted)' }}>Party: </span><strong>{order.company_name}</strong></span>
+                                    </div>
+                                    <div style={{ marginTop: 4 }}>
+                                        <span style={{ color: 'var(--tx-muted)' }}>Product: </span><strong>{productName}</strong>
+                                    </div>
+                                </div>
+
+                                <div className="form-grid">
+                                    <div className="form-group">
+                                        <label>From Unit *</label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. Main Factory"
+                                            value={transferForm.from_unit}
+                                            onChange={(e) => setTransferForm((f) => ({ ...f, from_unit: e.target.value }))}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>To Unit *</label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. Warehouse B"
+                                            value={transferForm.to_unit}
+                                            onChange={(e) => setTransferForm((f) => ({ ...f, to_unit: e.target.value }))}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Qty *</label>
+                                        <input
+                                            type="number"
+                                            min="0.001"
+                                            step="any"
+                                            value={transferForm.quantity}
+                                            onChange={(e) => setTransferForm((f) => ({ ...f, quantity: e.target.value }))}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Unit *</label>
+                                        <select value={transferForm.unit} onChange={(e) => setTransferForm((f) => ({ ...f, unit: e.target.value }))}>
+                                            {['pcs', 'kg', 'g', 'L', 'ml', 'bags', 'drums'].map((u) => <option key={u}>{u}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                                        <label>Received By (name)</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Name of person receiving"
+                                            value={transferForm.received_by}
+                                            onChange={(e) => setTransferForm((f) => ({ ...f, received_by: e.target.value }))}
+                                        />
+                                    </div>
+                                    <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                                        <label>Notes</label>
+                                        <textarea
+                                            rows={2}
+                                            value={transferForm.notes}
+                                            onChange={(e) => setTransferForm((f) => ({ ...f, notes: e.target.value }))}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button className="btn" onClick={() => setTransferModal(null)}>Cancel</button>
+                                <button
+                                    className="btn primary"
+                                    disabled={transferSaving || !transferForm.from_unit || !transferForm.to_unit || !transferForm.quantity}
+                                    onClick={submitTransfer}
+                                >
+                                    {transferSaving ? 'Saving…' : '🔄 Create Transfer'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
         </>
     );
 }

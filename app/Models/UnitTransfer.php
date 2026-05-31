@@ -9,6 +9,7 @@ class UnitTransfer extends Model
 {
     protected $fillable = [
         'created_by',
+        'order_number',
         'from_unit',
         'to_unit',
         'item_type',
@@ -16,6 +17,7 @@ class UnitTransfer extends Model
         'quantity',
         'unit',
         'notes',
+        'received_by',
         'status',
         'transferred_at',
     ];
