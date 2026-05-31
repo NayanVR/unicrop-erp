@@ -12,7 +12,7 @@ class FillingController extends Controller
     {
         $orders = Order::query()
             ->whereIn('status', ['confirmed', 'dispatched'])
-            ->with(['items', 'party:id,company_name'])
+            ->with(['items'])
             ->orderByRaw("CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END")
             ->orderByDesc('id')
             ->get();
