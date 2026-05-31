@@ -78,11 +78,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('bom', [BomController::class, 'store'])->name('bom.store');
         Route::patch('bom/{bom}', [BomController::class, 'update'])->name('bom.update');
         Route::post('bom/{bom}/run', [BomController::class, 'runProduction'])->name('bom.run');
-    });
-
-    Route::middleware(['role:admin'])->group(function () {
         Route::delete('bom/{bom}', [BomController::class, 'destroy'])->name('bom.destroy');
         Route::delete('bom/runs/{run}', [BomController::class, 'destroyRun'])->name('bom.runs.destroy');
+    });
 
     // Inventory — view only: sales can see materials with limited columns
     Route::middleware(['role:admin,factory,accountant,sales'])->group(function () {

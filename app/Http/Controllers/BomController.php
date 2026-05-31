@@ -139,8 +139,14 @@ class BomController extends Controller
         });
     }
 
-    public function destroy(Bom $bom): RedirectResponse
+    public function destroy(Request $request, Bom $bom): RedirectResponse
     {
+        $user  = $request->user();
+        $perms = $user?->permissions ?? [];
+        if ($user?->role !== 'admin' && ! in_array('bom_delete', $perms)) {
+            abort(403);
+        }
+
         $bom->delete();
 
         return redirect()->back()->with('success', 'BOM deleted.');
@@ -279,8 +285,14 @@ class BomController extends Controller
         });
     }
 
-    public function destroyRun(ProductionRun $run): RedirectResponse
+    public function destroyRun(Request $request, ProductionRun $run): RedirectResponse
     {
+        $user  = $request->user();
+        $perms = $user?->permissions ?? [];
+        if ($user?->role !== 'admin' && ! in_array('bom_delete', $perms)) {
+            abort(403);
+        }
+
         DB::transaction(function () use ($run) {
             // Reverse stock deductions
             foreach ($run->items as $item) {

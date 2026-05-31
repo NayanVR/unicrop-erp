@@ -33,6 +33,10 @@ const stagePermissions = [
     { id: 'confirm', label: 'Confirm Orders' },
 ];
 
+const bomPermissions = [
+    { id: 'bom_delete', label: 'Delete BOM & Run History' },
+];
+
 const moduleAccess = [
     { id: 'factory', label: 'Production Orders' },
     { id: 'bom', label: 'Bill of Materials' },
@@ -573,6 +577,23 @@ export default function UsersIndex({ users, roles, companies }: Props) {
                                     </label>
                                 ))}
                             </div>
+
+                            {/* BOM Permissions */}
+                            <div style={{ marginTop: '12px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)', marginBottom: 6 }}>BOM Permissions</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px 12px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 'var(--radius-sm)' }}>
+                                {bomPermissions.map((perm) => (
+                                    <label key={perm.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+                                        <input
+                                            type="checkbox"
+                                            style={{ width: 'auto' }}
+                                            checked={form.data.permissions.includes(perm.id)}
+                                            onChange={() => toggleArrayValue('permissions', perm.id)}
+                                        />
+                                        {perm.label}
+                                    </label>
+                                ))}
+                            </div>
+
                             <div
                                 style={{
                                     marginTop: '12px',
