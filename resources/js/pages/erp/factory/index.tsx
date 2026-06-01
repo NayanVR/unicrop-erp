@@ -282,7 +282,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
 
     const [photoLightbox, setPhotoLightbox] = useState<string | null>(null);
     const [labelEditor, setLabelEditor] = useState<{ order: Order; labels: EditableLabel[] } | null>(null);
-    const [labelFS, setLabelFS] = useState({ transport: 44, totalBoxes: 54, brand: 24, boxNum: 24, party: 13 });
+    const [labelFS, setLabelFS] = useState({ transport: 28, totalBoxes: 36, brand: 16, boxNum: 18, party: 10 });
     const adjFS = (key: keyof typeof labelFS, delta: number) =>
         setLabelFS((prev) => ({ ...prev, [key]: Math.max(6, prev[key] + delta) }));
     const [boxSizeDraft, setBoxSizeDraft] = useState<Record<number, string>>({});
@@ -1192,10 +1192,11 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                         background: '#fff',
                                         display: 'flex',
                                         flexDirection: 'column',
-                                        padding: '3mm 4mm',
+                                        padding: '2mm 3mm',
                                         fontFamily: 'Arial, sans-serif',
                                         boxSizing: 'border-box',
                                         flexShrink: 0,
+                                        overflow: 'hidden',
                                         boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
                                         position: 'relative',
                                     }}
@@ -1241,12 +1242,12 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                         }}
                                     />
                                     {/* Box number | Total boxes */}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '2mm 0 1mm' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '1mm 0 0.5mm' }}>
                                         <span style={{ fontSize: `${labelFS.boxNum}pt`, fontWeight: 900, color: '#111' }}>{lbl.boxNum}</span>
                                         <span style={{ fontSize: `${labelFS.totalBoxes}pt`, fontWeight: 900, color: '#111' }}>{lbl.totalBoxes} box</span>
                                     </div>
                                     {/* In-box pcs | product box */}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2mm' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1mm' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '2mm' }}>
                                             <span style={{ fontSize: '8pt', color: '#555' }}>In-box:</span>
                                             <input
