@@ -213,6 +213,15 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
     const [selectedItemIds, setSelectedItemIds] = useState<number[]>([]);
     const [photoLightbox, setPhotoLightbox] = useState<string | null>(null);
 
+    // Tally integration state
+    const [tallyUrl, setTallyUrl] = useState(() => localStorage.getItem('tallyUrl') ?? 'http://localhost:9000');
+    const [tallyLedger, setTallyLedger] = useState(() => localStorage.getItem('tallyLedger') ?? 'Sales');
+    const [tallyConfigOpen, setTallyConfigOpen] = useState(false);
+    const [tallyConfigUrl, setTallyConfigUrl] = useState('');
+    const [tallyConfigLedger, setTallyConfigLedger] = useState('');
+    const [tallyStatus, setTallyStatus] = useState<'idle' | 'pushing' | 'success' | 'error'>('idle');
+    const [tallyMessage, setTallyMessage] = useState('');
+
     // Per-item design workflow modals (design role)
     const [printModal, setPrintModal] = useState<{ id: number; orderQty: number; current: number | null } | null>(null);
     const [printValue, setPrintValue] = useState('');
@@ -332,6 +341,119 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
 
     const designItemFor = (order: Order, itemId: number): DesignItem | undefined =>
         order.design_items?.find((d) => d.order_item_id === itemId);
+
+    const xmlEsc = (s: string) =>
+        s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    const buildTallyXML = (order: Order): string => {
+        const dateStr = order.order_date ? order.order_date.replace(/-/g, '') : new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const grandTotal = Number(order.total_amount ?? 0);
+        const gstTotal = Number(order.gst_total ?? 0);
+        const freightAmt = Number(order.freight_amount ?? 0);
+        const courierAmt = Number(order.courier_amount ?? 0);
+
+        const inventoryEntries = order.items.map((item) => {
+            const stockName = xmlEsc([item.our_brand, item.packing_size].filter(Boolean).join(' '));
+            const qty = Number(item.quantity);
+            const amt = Number(item.amount);
+            return `
+          <ALLINVENTORYENTRIES.LIST>
+            <STOCKITEMNAME>${stockName}</STOCKITEMNAME>
+            <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+            <RATE>${Number(item.rate).toFixed(2)}/Nos</RATE>
+            <AMOUNT>${amt.toFixed(2)}</AMOUNT>
+            <ACTUALQTY>${qty} Nos</ACTUALQTY>
+            <BILLEDQTY>${qty} Nos</BILLEDQTY>
+            <ACCOUNTINGALLOCATIONS.LIST>
+              <LEDGERNAME>${xmlEsc(tallyLedger)}</LEDGERNAME>
+              <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+              <AMOUNT>${amt.toFixed(2)}</AMOUNT>
+            </ACCOUNTINGALLOCATIONS.LIST>
+          </ALLINVENTORYENTRIES.LIST>`;
+        }).join('');
+
+        const freightEntry = freightAmt > 0 ? `
+          <ALLLEDGERENTRIES.LIST>
+            <LEDGERNAME>Freight Charges</LEDGERNAME>
+            <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+            <AMOUNT>${freightAmt.toFixed(2)}</AMOUNT>
+          </ALLLEDGERENTRIES.LIST>` : '';
+
+        const courierEntry = courierAmt > 0 ? `
+          <ALLLEDGERENTRIES.LIST>
+            <LEDGERNAME>Courier Charges</LEDGERNAME>
+            <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+            <AMOUNT>${courierAmt.toFixed(2)}</AMOUNT>
+          </ALLLEDGERENTRIES.LIST>` : '';
+
+        return `<?xml version="1.0" encoding="UTF-8"?>
+<ENVELOPE>
+  <HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER>
+  <BODY>
+    <IMPORTDATA>
+      <REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC>
+      <REQUESTDATA>
+        <TALLYMESSAGE xmlns:UDF="TallyUDF">
+          <VOUCHER VCHTYPE="Sales" ACTION="Create" OBJVIEW="Invoice Voucher View">
+            <DATE>${dateStr}</DATE>
+            <VOUCHERTYPENAME>Sales</VOUCHERTYPENAME>
+            <VOUCHERNUMBER>${xmlEsc(order.order_number)}</VOUCHERNUMBER>
+            <PARTYLEDGERNAME>${xmlEsc(order.company_name)}</PARTYLEDGERNAME>
+            <ALLLEDGERENTRIES.LIST>
+              <LEDGERNAME>${xmlEsc(order.company_name)}</LEDGERNAME>
+              <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+              <AMOUNT>-${grandTotal.toFixed(2)}</AMOUNT>
+            </ALLLEDGERENTRIES.LIST>${inventoryEntries}
+            <ALLLEDGERENTRIES.LIST>
+              <LEDGERNAME>IGST</LEDGERNAME>
+              <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+              <AMOUNT>${gstTotal.toFixed(2)}</AMOUNT>
+            </ALLLEDGERENTRIES.LIST>${freightEntry}${courierEntry}
+          </VOUCHER>
+        </TALLYMESSAGE>
+      </REQUESTDATA>
+    </IMPORTDATA>
+  </BODY>
+</ENVELOPE>`;
+    };
+
+    const downloadTallyXML = (order: Order) => {
+        const xml = buildTallyXML(order);
+        const blob = new Blob([xml], { type: 'text/xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `tally-${order.order_number}.xml`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const pushToTally = async (order: Order) => {
+        const xml = buildTallyXML(order);
+        setTallyStatus('pushing');
+        setTallyMessage('');
+        try {
+            const res = await fetch(tallyUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/xml' },
+                body: xml,
+            });
+            const text = await res.text();
+            if (!res.ok || text.includes('LINEERROR') || text.toLowerCase().includes('error')) {
+                setTallyStatus('error');
+                setTallyMessage('Tally returned an error. Try downloading the XML instead.');
+            } else {
+                setTallyStatus('success');
+                setTallyMessage('Voucher imported into Tally!');
+                setTimeout(() => setTallyStatus('idle'), 5000);
+            }
+        } catch {
+            downloadTallyXML(order);
+            setTallyStatus('error');
+            setTallyMessage('Could not reach Tally directly — XML file downloaded instead.');
+            setTimeout(() => setTallyStatus('idle'), 6000);
+        }
+    };
 
     return (
         <>
@@ -587,6 +709,62 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                     }
                                 >
                                     {trackSaving ? 'Saving…' : '✓ Update Labels'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Tally config modal ──────────────────────────────────── */}
+            {tallyConfigOpen && (
+                <div className="modal-overlay open" onClick={() => setTallyConfigOpen(false)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
+                        <div className="modal-header">
+                            <h2>⚙ Tally Settings</h2>
+                            <button className="modal-close" onClick={() => setTallyConfigOpen(false)}>✕</button>
+                        </div>
+                        <div className="modal-form">
+                            <div className="form-group" style={{ marginBottom: '16px' }}>
+                                <label>Tally HTTP Server URL</label>
+                                <input
+                                    type="text"
+                                    value={tallyConfigUrl}
+                                    onChange={(e) => setTallyConfigUrl(e.target.value)}
+                                    placeholder="http://localhost:9000"
+                                />
+                                <div style={{ fontSize: '11px', color: 'var(--tx-muted)', marginTop: '4px' }}>
+                                    In Tally Prime: F1 → Account Info → Configure → TSS → Enable HTTP Port
+                                </div>
+                            </div>
+                            <div className="form-group" style={{ marginBottom: '20px' }}>
+                                <label>Sales Ledger Name (in Tally)</label>
+                                <input
+                                    type="text"
+                                    value={tallyConfigLedger}
+                                    onChange={(e) => setTallyConfigLedger(e.target.value)}
+                                    placeholder="Sales"
+                                />
+                                <div style={{ fontSize: '11px', color: 'var(--tx-muted)', marginTop: '4px' }}>
+                                    Must match exactly the ledger name in your Tally company
+                                </div>
+                            </div>
+                            <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
+                                <button type="button" className="btn-secondary" onClick={() => setTallyConfigOpen(false)}>Cancel</button>
+                                <button
+                                    type="button"
+                                    className="btn-primary"
+                                    onClick={() => {
+                                        const u = tallyConfigUrl.trim() || 'http://localhost:9000';
+                                        const l = tallyConfigLedger.trim() || 'Sales';
+                                        setTallyUrl(u);
+                                        setTallyLedger(l);
+                                        localStorage.setItem('tallyUrl', u);
+                                        localStorage.setItem('tallyLedger', l);
+                                        setTallyConfigOpen(false);
+                                    }}
+                                >
+                                    ✓ Save
                                 </button>
                             </div>
                         </div>
@@ -1058,6 +1236,46 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                             <label>Grand Total</label>
                                                             <div style={{ fontWeight: 700, fontSize: '15px', color: '#1e40af' }}>₹{formatAmount(order.total_amount)}</div>
                                                         </div>
+                                                    </div>
+
+                                                    {/* Tally push actions */}
+                                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '12px', flexWrap: 'wrap', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
+                                                        <button
+                                                            type="button"
+                                                            className="btn sm primary"
+                                                            onClick={() => pushToTally(order)}
+                                                            disabled={tallyStatus === 'pushing'}
+                                                            style={{ background: '#1e40af', borderColor: '#1e40af', color: '#fff' }}
+                                                        >
+                                                            {tallyStatus === 'pushing' ? '⏳ Pushing…' : '📤 Push to Tally'}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="btn sm"
+                                                            onClick={() => downloadTallyXML(order)}
+                                                            title="Download Tally XML file"
+                                                        >
+                                                            ⬇ XML
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="btn sm"
+                                                            onClick={() => {
+                                                                setTallyConfigUrl(tallyUrl);
+                                                                setTallyConfigLedger(tallyLedger);
+                                                                setTallyConfigOpen(true);
+                                                            }}
+                                                            title={`Tally: ${tallyUrl} · Ledger: ${tallyLedger}`}
+                                                            style={{ padding: '4px 10px', fontSize: '13px' }}
+                                                        >
+                                                            ⚙
+                                                        </button>
+                                                        {tallyStatus === 'success' && (
+                                                            <span style={{ color: '#059669', fontSize: '12px', fontWeight: 600 }}>✓ {tallyMessage}</span>
+                                                        )}
+                                                        {tallyStatus === 'error' && (
+                                                            <span style={{ color: '#dc2626', fontSize: '12px' }}>{tallyMessage}</span>
+                                                        )}
                                                     </div>
                                                 </div>
                                             )}
