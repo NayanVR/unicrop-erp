@@ -993,6 +993,39 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                         </div>
                                                     )}
 
+                                                    {/* Products */}
+                                                    <div style={{ marginBottom: '12px' }}>
+                                                        <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)', marginBottom: '6px' }}>Products</div>
+                                                        <div className="prod-wrap">
+                                                            <table className="prod-table" style={{ fontSize: '12px' }}>
+                                                                <thead>
+                                                                    <tr>
+                                                                        <th>Our Brand</th>
+                                                                        <th>Party Brand</th>
+                                                                        <th>Packing</th>
+                                                                        <th>Qty</th>
+                                                                        <th>Rate</th>
+                                                                        <th>GST %</th>
+                                                                        <th>Amount</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {order.items.map((item) => (
+                                                                        <tr key={item.id}>
+                                                                            <td><div className="prod-name" style={{ fontSize: '12px' }}>{item.our_brand ?? '—'}</div></td>
+                                                                            <td><div style={{ fontSize: '12px', color: 'var(--tx-muted)' }}>{item.party_brand ?? '—'}</div></td>
+                                                                            <td>{item.packing_size ?? '—'}</td>
+                                                                            <td>{item.quantity}</td>
+                                                                            <td>₹{formatAmount(item.rate)}</td>
+                                                                            <td>{item.gst_percent}%</td>
+                                                                            <td>₹{formatAmount(item.amount)}</td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+
                                                     {/* Charges */}
                                                     <div className="form-grid three">
                                                         <div className="form-group">
