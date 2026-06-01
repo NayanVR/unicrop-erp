@@ -181,8 +181,9 @@ const priorityClassName = (priority?: string | null) =>
     `badge priority-${priority ?? 'normal'}`;
 
 export default function OrdersIndex({ orders, currentUserId, userRole, productPhotos = [] }: Props) {
-    const isDesign   = userRole === 'design';
-    const isAdmin    = userRole === 'admin';
+    const isDesign      = userRole === 'design';
+    const isAdmin       = userRole === 'admin';
+    const isAccountant  = userRole === 'accountant';
     const canConfirm = userRole === 'admin' || userRole === 'office';
 
     const canEditOrder = (order: { status?: string | null; created_by?: number | null }) =>
@@ -825,8 +826,8 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                 </table>
                                             </div>
 
-                                            {/* Production pipeline — visible for confirmed/dispatched orders */}
-                                            {(order.status === 'confirmed' || order.status === 'dispatched') && order.items.length > 0 && (
+                                            {/* Production pipeline — visible for confirmed/dispatched orders, not for accountants */}
+                                            {!isAccountant && (order.status === 'confirmed' || order.status === 'dispatched') && order.items.length > 0 && (
                                                 <div style={{ marginBottom: '14px' }}>
                                                     <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)', marginBottom: '8px' }}>
                                                         Production Progress
@@ -906,15 +907,17 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                         <div>{formatAmount(order.total_amount)}</div>
                                                     </div>
                                                 </div>
-                                                <div style={{ marginTop: '14px' }}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                                        <span>Production Progress</span>
-                                                        <span>{progress}%</span>
+                                                {!isAccountant && (
+                                                    <div style={{ marginTop: '14px' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                                            <span>Production Progress</span>
+                                                            <span>{progress}%</span>
+                                                        </div>
+                                                        <div className="progress-bar">
+                                                            <div className="progress-fill" style={{ width: `${progress}%`, background: 'var(--accent)' }} />
+                                                        </div>
                                                     </div>
-                                                    <div className="progress-bar">
-                                                        <div className="progress-fill" style={{ width: `${progress}%`, background: 'var(--accent)' }} />
-                                                    </div>
-                                                </div>
+                                                )}
                                             </div>
                                         </>
                                     )}
