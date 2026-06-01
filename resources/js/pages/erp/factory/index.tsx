@@ -97,6 +97,8 @@ type Order = {
     created_by_name?: string | null;
     design_status?: DesignStatus | null;
     tax_docs_pending?: boolean;
+    labels_last_printed_by?: string | null;
+    labels_last_printed_at?: string | null;
     items: OrderItem[];
 };
 
@@ -551,6 +553,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
             <body><div class="toolbar"><button onclick="fitLabels();window.print()">🖨 Save as PDF / Print</button><span>${labelEditor.labels.length} label(s) — ${labelEditor.order.order_number}</span></div>
             ${labelHtml}</body></html>`);
         win.document.close();
+        router.post(`/factory/orders/${labelEditor.order.id}/label-print`, {}, { preserveScroll: true });
     };
 
     const allLogEntries = orders.flatMap((o) => o.items);
@@ -741,14 +744,21 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                 {dispatchingOrder === order.id ? '…' : `📦 Dispatch${readyCount > 0 ? ` (${readyCount})` : ''}`}
                                             </button>
                                         )}
-                                        <button
-                                            type="button"
-                                            className="btn sm"
-                                            style={{ marginLeft: 'auto', borderColor: '#d97706', color: '#d97706' }}
-                                            onClick={(e) => openLabelEditor(order, e)}
-                                        >
-                                            🏷 Box Labels
-                                        </button>
+                                        <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px' }}>
+                                            <button
+                                                type="button"
+                                                className="btn sm"
+                                                style={{ borderColor: '#d97706', color: '#d97706' }}
+                                                onClick={(e) => openLabelEditor(order, e)}
+                                            >
+                                                🏷 Box Labels
+                                            </button>
+                                            {order.labels_last_printed_by && order.labels_last_printed_at && (
+                                                <span style={{ fontSize: '10px', color: 'var(--tx-muted)', textAlign: 'right' }}>
+                                                    🖨 {order.labels_last_printed_by} · {formatTime(order.labels_last_printed_at)} {formatDay(order.labels_last_printed_at)}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
 
                                     {/* ── Design status banner ── */}

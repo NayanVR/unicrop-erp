@@ -71,6 +71,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('factory/items/{item}', [FactoryController::class, 'updateItem'])->name('factory.items.update');
         Route::post('factory/orders/{order}/notes', [FactoryController::class, 'saveNotes'])->name('factory.orders.notes');
         Route::post('factory/orders/{order}/dispatch', [FactoryController::class, 'dispatchOrder'])->name('factory.orders.dispatch');
+        Route::post('factory/orders/{order}/label-print', [FactoryController::class, 'recordLabelPrint'])->name('factory.orders.label-print');
 
         // Inventory — factory + admin only
         Route::post('inventory/materials', [InventoryController::class, 'storeMaterial'])->name('inventory.materials.store');

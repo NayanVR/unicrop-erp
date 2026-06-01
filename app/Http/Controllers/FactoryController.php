@@ -258,6 +258,19 @@ class FactoryController extends Controller
     }
 
     /**
+     * Record who last printed box labels for an order.
+     */
+    public function recordLabelPrint(Request $request, Order $order): RedirectResponse
+    {
+        $order->update([
+            'labels_last_printed_by' => $request->user()?->name,
+            'labels_last_printed_at' => now(),
+        ]);
+
+        return redirect()->back();
+    }
+
+    /**
      * Save free-text factory notes on an order.
      */
     public function saveNotes(Request $request, Order $order): RedirectResponse

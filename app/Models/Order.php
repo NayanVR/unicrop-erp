@@ -40,6 +40,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'total_amount',
     'notes',
     'factory_notes',
+    'labels_last_printed_by',
+    'labels_last_printed_at',
 ])]
 class Order extends Model
 {
@@ -55,6 +57,7 @@ class Order extends Model
             'order_date' => 'date',
             'confirmed_at' => 'datetime',
             'urgent_approved_at' => 'datetime',
+            'labels_last_printed_at' => 'datetime',
             'freight_amount' => 'decimal:2',
             'courier_amount' => 'decimal:2',
             'round_off' => 'decimal:2',
