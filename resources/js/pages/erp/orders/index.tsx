@@ -354,10 +354,10 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
 
     const uploadDoc = (orderId: number, type: 'tax_invoice' | 'eway_bill', file: File) => {
         setUploadingDoc({ orderId, type });
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('document_type', type);
-        router.post(`/orders/${orderId}/documents`, formData, {
+        router.post(`/orders/${orderId}/documents`, {
+            file,
+            document_type: type,
+        } as Record<string, unknown>, {
             preserveScroll: true,
             forceFormData: true,
             onFinish: () => setUploadingDoc(null),
