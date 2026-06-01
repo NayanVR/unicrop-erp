@@ -29,8 +29,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('product-photos/{photo}/image', [ProductPhotoController::class, 'show'])->name('product-photos.show');
     Route::get('parties/{party}/pan-card', [PartyController::class, 'showPanCard'])->name('parties.pan-card');
 
+    Route::middleware(['role:admin,factory'])->group(function () {
+        Route::get('users', [UserController::class, 'index'])->name('users.index');
+    });
     Route::middleware(['role:admin'])->group(function () {
-        Route::resource('users', UserController::class)->only(['index', 'store', 'update', 'destroy']);
+        Route::post('users', [UserController::class, 'store'])->name('users.store');
+        Route::patch('users/{user}', [UserController::class, 'update'])->name('users.update');
+        Route::delete('users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
     });
 
     // Orders list is visible to office AND design users (controller filters by role)

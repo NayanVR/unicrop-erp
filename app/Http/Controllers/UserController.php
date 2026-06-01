@@ -24,6 +24,7 @@ class UserController extends Controller
                 ->orderBy('name')
                 ->get(['id', 'name', 'slug']),
             'companies' => [],
+            'isAdmin' => auth()->user()?->hasRole(Role::ADMIN) ?? false,
         ]);
     }
 

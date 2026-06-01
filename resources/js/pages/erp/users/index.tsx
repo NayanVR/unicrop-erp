@@ -8,6 +8,7 @@ type Props = {
     users: User[];
     roles: Role[];
     companies: { id: number; name: string }[];
+    isAdmin: boolean;
 };
 
 type UserFormData = {
@@ -51,7 +52,7 @@ const moduleAccess = [
 const userStatusLabel = (isActive?: boolean) =>
     isActive ? 'Active' : 'Inactive';
 
-export default function UsersIndex({ users, roles, companies }: Props) {
+export default function UsersIndex({ users, roles, companies, isAdmin }: Props) {
     const [modalOpen, setModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [revealedPwd, setRevealedPwd] = useState<Set<number>>(new Set());
@@ -175,9 +176,11 @@ export default function UsersIndex({ users, roles, companies }: Props) {
                         <h1>User Management</h1>
                         <p>Create and manage portal users</p>
                     </div>
-                    <button className="btn primary" onClick={openNewUserModal}>
-                        ＋ Add New User
-                    </button>
+                    {isAdmin && (
+                        <button className="btn primary" onClick={openNewUserModal}>
+                            ＋ Add New User
+                        </button>
+                    )}
                 </div>
 
                 <div className="users-grid">
@@ -245,28 +248,30 @@ export default function UsersIndex({ users, roles, companies }: Props) {
                                         )}
                                     </div>
                                 </div>
-                                <div className="user-card-actions">
-                                    <button
-                                        className="btn sm"
-                                        onClick={() => openEditUserModal(user)}
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        className="btn sm"
-                                        onClick={() => toggleUserStatus(user)}
-                                    >
-                                        {user.is_active
-                                            ? 'Deactivate'
-                                            : 'Activate'}
-                                    </button>
-                                    <button
-                                        className="btn danger-xs"
-                                        onClick={() => deleteUser(user)}
-                                    >
-                                        Delete
-                                    </button>
-                                </div>
+                                {isAdmin && (
+                                    <div className="user-card-actions">
+                                        <button
+                                            className="btn sm"
+                                            onClick={() => openEditUserModal(user)}
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            className="btn sm"
+                                            onClick={() => toggleUserStatus(user)}
+                                        >
+                                            {user.is_active
+                                                ? 'Deactivate'
+                                                : 'Activate'}
+                                        </button>
+                                        <button
+                                            className="btn danger-xs"
+                                            onClick={() => deleteUser(user)}
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         ))
                     )}
