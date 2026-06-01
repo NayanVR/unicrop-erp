@@ -15,7 +15,6 @@ use App\Models\Transport;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -615,13 +614,16 @@ class OrderController extends Controller
         return redirect()->back();
     }
 
-    public function downloadDocument(Request $request, Order $order, OrderAttachment $attachment): HttpResponse
+    public function downloadDocument(Request $request, Order $order, OrderAttachment $attachment): \Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         abort_if($attachment->order_id !== $order->id, 404);
-        abort_if(! Storage::disk('local')->exists($attachment->path), 404, 'File not found.');
 
-        return Storage::disk('local')->response($attachment->path, $attachment->original_name, [
-            'Content-Disposition' => 'inline; filename="'.$attachment->original_name.'"',
+        $fullPath = Storage::disk('local')->path($attachment->path);
+        abort_if(! file_exists($fullPath), 404, 'File not found.');
+
+        return response()->file($fullPath, [
+            'Content-Type'        => $attachment->mime_type ?? 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.addslashes($attachment->original_name).'"',
         ]);
     }
 
