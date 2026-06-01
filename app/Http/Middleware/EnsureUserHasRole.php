@@ -23,6 +23,11 @@ class EnsureUserHasRole
 
         $user->loadMissing('roles');
 
+        // No roles assigned yet = treat as admin (first-setup / unassigned owner)
+        if ($user->roles->isEmpty()) {
+            return $next($request);
+        }
+
         if ($roles !== [] && ! $user->hasAnyRole($roles)) {
             abort(403);
         }
