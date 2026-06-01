@@ -991,6 +991,121 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                 <div className="form-card" style={{ marginBottom: '12px', borderLeft: '3px solid #2563eb' }}>
                                                     <div className="form-card-title" style={{ color: '#1e40af' }}>🧾 Billing Details</div>
 
+                                                    {/* Upload / manage documents — shown first */}
+                                                    <div style={{ marginBottom: '12px' }}>
+                                                        <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)', marginBottom: '8px' }}>
+                                                            Documents
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                                            {(['tax_invoice', 'eway_bill'] as const).map((dtype) => {
+                                                                const existing = (order.docs ?? []).find((d) => d.document_type === dtype);
+                                                                const label = dtype === 'tax_invoice' ? 'Tax Invoice' : 'E-way Bill';
+                                                                const icon = dtype === 'tax_invoice' ? '🧾' : '📋';
+                                                                const isUploading = uploadingDoc?.orderId === order.id && uploadingDoc.type === dtype;
+                                                                return (
+                                                                    <div key={dtype} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: existing ? '#f0fdf4' : 'var(--bg-paper)', border: `1px solid ${existing ? '#86efac' : 'var(--border)'}`, borderRadius: '8px', padding: '8px 12px', minWidth: '180px' }}>
+                                                                        <span style={{ fontSize: '16px' }}>{icon}</span>
+                                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                                            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--tx-head)' }}>{label}</div>
+                                                                            {existing ? (
+                                                                                <div style={{ fontSize: '11px', color: '#16a34a' }}>Uploaded {existing.uploaded_at ?? ''}</div>
+                                                                            ) : (
+                                                                                <div style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>Not uploaded</div>
+                                                                            )}
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                                                                            {existing && (
+                                                                                <>
+                                                                                    <a
+                                                                                        href={`/orders/${order.id}/documents/${existing.id}`}
+                                                                                        target="_blank"
+                                                                                        rel="noopener noreferrer"
+                                                                                        className="btn sm"
+                                                                                        style={{ textDecoration: 'none', padding: '3px 8px', fontSize: '11px' }}
+                                                                                        onClick={(e) => e.stopPropagation()}
+                                                                                    >
+                                                                                        👁 View
+                                                                                    </a>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        className="btn sm"
+                                                                                        style={{ padding: '3px 8px', fontSize: '11px', color: '#dc2626', borderColor: '#dc2626' }}
+                                                                                        disabled={isUploading}
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            if (!confirm(`Delete ${label}?`)) return;
+                                                                                            router.delete(`/orders/${order.id}/documents/${existing.id}`, { preserveScroll: true });
+                                                                                        }}
+                                                                                    >
+                                                                                        🗑
+                                                                                    </button>
+                                                                                </>
+                                                                            )}
+                                                                            <label
+                                                                                className="btn sm primary"
+                                                                                style={{ cursor: isUploading ? 'not-allowed' : 'pointer', padding: '3px 8px', fontSize: '11px', opacity: isUploading ? 0.6 : 1 }}
+                                                                                onClick={(e) => e.stopPropagation()}
+                                                                            >
+                                                                                {isUploading ? '⏳' : existing ? '↻ Replace' : '⬆ Upload'}
+                                                                                <input
+                                                                                    type="file"
+                                                                                    accept="application/pdf"
+                                                                                    style={{ display: 'none' }}
+                                                                                    disabled={isUploading}
+                                                                                    onChange={(e) => {
+                                                                                        const file = e.target.files?.[0];
+                                                                                        if (file) uploadDoc(order.id, dtype, file);
+                                                                                        e.target.value = '';
+                                                                                    }}
+                                                                                />
+                                                                            </label>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Tally push actions */}
+                                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
+                                                        <button
+                                                            type="button"
+                                                            className="btn sm primary"
+                                                            onClick={() => pushToTally(order)}
+                                                            disabled={tallyStatus === 'pushing'}
+                                                            style={{ background: '#1e40af', borderColor: '#1e40af', color: '#fff' }}
+                                                        >
+                                                            {tallyStatus === 'pushing' ? '⏳ Pushing…' : '📤 Push to Tally'}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="btn sm"
+                                                            onClick={() => downloadTallyXML(order)}
+                                                            title="Download Tally XML file"
+                                                        >
+                                                            ⬇ XML
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="btn sm"
+                                                            onClick={() => {
+                                                                setTallyConfigUrl(tallyUrl);
+                                                                setTallyConfigLedger(tallyLedger);
+                                                                setTallyConfigOpen(true);
+                                                            }}
+                                                            title={`Tally: ${tallyUrl} · Ledger: ${tallyLedger}`}
+                                                            style={{ padding: '4px 10px', fontSize: '13px' }}
+                                                        >
+                                                            ⚙
+                                                        </button>
+                                                        {tallyStatus === 'success' && (
+                                                            <span style={{ color: '#059669', fontSize: '12px', fontWeight: 600 }}>✓ {tallyMessage}</span>
+                                                        )}
+                                                        {tallyStatus === 'error' && (
+                                                            <span style={{ color: '#dc2626', fontSize: '12px' }}>{tallyMessage}</span>
+                                                        )}
+                                                    </div>
+
                                                     {/* Party info */}
                                                     <div className="form-grid" style={{ marginBottom: '12px' }}>
                                                         <div className="form-group">
@@ -1118,120 +1233,6 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                         </div>
                                                     </div>
 
-                                                    {/* Upload / manage documents */}
-                                                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: '12px', marginTop: '12px' }}>
-                                                        <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)', marginBottom: '8px' }}>
-                                                            Documents
-                                                        </div>
-                                                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                                                            {(['tax_invoice', 'eway_bill'] as const).map((dtype) => {
-                                                                const existing = (order.docs ?? []).find((d) => d.document_type === dtype);
-                                                                const label = dtype === 'tax_invoice' ? 'Tax Invoice' : 'E-way Bill';
-                                                                const icon = dtype === 'tax_invoice' ? '🧾' : '📋';
-                                                                const isUploading = uploadingDoc?.orderId === order.id && uploadingDoc.type === dtype;
-                                                                return (
-                                                                    <div key={dtype} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: existing ? '#f0fdf4' : 'var(--bg-paper)', border: `1px solid ${existing ? '#86efac' : 'var(--border)'}`, borderRadius: '8px', padding: '8px 12px', minWidth: '180px' }}>
-                                                                        <span style={{ fontSize: '16px' }}>{icon}</span>
-                                                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                                                            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--tx-head)' }}>{label}</div>
-                                                                            {existing ? (
-                                                                                <div style={{ fontSize: '11px', color: '#16a34a' }}>Uploaded {existing.uploaded_at ?? ''}</div>
-                                                                            ) : (
-                                                                                <div style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>Not uploaded</div>
-                                                                            )}
-                                                                        </div>
-                                                                        <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                                                                            {existing && (
-                                                                                <>
-                                                                                    <a
-                                                                                        href={`/orders/${order.id}/documents/${existing.id}`}
-                                                                                        target="_blank"
-                                                                                        rel="noopener noreferrer"
-                                                                                        className="btn sm"
-                                                                                        style={{ textDecoration: 'none', padding: '3px 8px', fontSize: '11px' }}
-                                                                                        onClick={(e) => e.stopPropagation()}
-                                                                                    >
-                                                                                        👁 View
-                                                                                    </a>
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        className="btn sm"
-                                                                                        style={{ padding: '3px 8px', fontSize: '11px', color: '#dc2626', borderColor: '#dc2626' }}
-                                                                                        disabled={isUploading}
-                                                                                        onClick={(e) => {
-                                                                                            e.stopPropagation();
-                                                                                            if (!confirm(`Delete ${label}?`)) return;
-                                                                                            router.delete(`/orders/${order.id}/documents/${existing.id}`, { preserveScroll: true });
-                                                                                        }}
-                                                                                    >
-                                                                                        🗑
-                                                                                    </button>
-                                                                                </>
-                                                                            )}
-                                                                            <label
-                                                                                className="btn sm primary"
-                                                                                style={{ cursor: isUploading ? 'not-allowed' : 'pointer', padding: '3px 8px', fontSize: '11px', opacity: isUploading ? 0.6 : 1 }}
-                                                                                onClick={(e) => e.stopPropagation()}
-                                                                            >
-                                                                                {isUploading ? '⏳' : existing ? '↻ Replace' : '⬆ Upload'}
-                                                                                <input
-                                                                                    type="file"
-                                                                                    accept="application/pdf"
-                                                                                    style={{ display: 'none' }}
-                                                                                    disabled={isUploading}
-                                                                                    onChange={(e) => {
-                                                                                        const file = e.target.files?.[0];
-                                                                                        if (file) uploadDoc(order.id, dtype, file);
-                                                                                        e.target.value = '';
-                                                                                    }}
-                                                                                />
-                                                                            </label>
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Tally push actions */}
-                                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '12px', flexWrap: 'wrap', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
-                                                        <button
-                                                            type="button"
-                                                            className="btn sm primary"
-                                                            onClick={() => pushToTally(order)}
-                                                            disabled={tallyStatus === 'pushing'}
-                                                            style={{ background: '#1e40af', borderColor: '#1e40af', color: '#fff' }}
-                                                        >
-                                                            {tallyStatus === 'pushing' ? '⏳ Pushing…' : '📤 Push to Tally'}
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="btn sm"
-                                                            onClick={() => downloadTallyXML(order)}
-                                                            title="Download Tally XML file"
-                                                        >
-                                                            ⬇ XML
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="btn sm"
-                                                            onClick={() => {
-                                                                setTallyConfigUrl(tallyUrl);
-                                                                setTallyConfigLedger(tallyLedger);
-                                                                setTallyConfigOpen(true);
-                                                            }}
-                                                            title={`Tally: ${tallyUrl} · Ledger: ${tallyLedger}`}
-                                                            style={{ padding: '4px 10px', fontSize: '13px' }}
-                                                        >
-                                                            ⚙
-                                                        </button>
-                                                        {tallyStatus === 'success' && (
-                                                            <span style={{ color: '#059669', fontSize: '12px', fontWeight: 600 }}>✓ {tallyMessage}</span>
-                                                        )}
-                                                        {tallyStatus === 'error' && (
-                                                            <span style={{ color: '#dc2626', fontSize: '12px' }}>{tallyMessage}</span>
-                                                        )}
-                                                    </div>
                                                 </div>
                                             )}
 
