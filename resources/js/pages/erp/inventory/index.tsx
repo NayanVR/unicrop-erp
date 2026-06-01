@@ -857,13 +857,13 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
 
     return (
         <div id="view-inventory" className="view active">
-            <Head title={role === 'accountant' ? 'Products & HSN' : 'Inventory'} />
+            <Head title="Inventory" />
 
             {/* Page Header */}
             <div className="page-header">
                 <div className="page-header-left">
-                    <h1>{role === 'accountant' ? 'Products & HSN' : 'Inventory'}</h1>
-                    <p>{role === 'accountant' ? 'Product catalogue with HSN codes and tax rates' : 'Raw material stock levels & transaction history'}</p>
+                    <h1>Inventory</h1>
+                    <p>Raw material stock levels &amp; transaction history</p>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {canEnterBill && role !== 'accountant' && <button className="btn sm" onClick={() => setScanModal(true)}>📸 Scan Bill</button>}
@@ -876,10 +876,10 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             {/* Stats */}
             <div className="stats-grid">
                 <div className="stat-card">
-                    <div className="stat-icon" style={{ background: '#d1fae5' }}>{role === 'accountant' ? '🌿' : '📦'}</div>
+                    <div className="stat-icon" style={{ background: '#d1fae5' }}>📦</div>
                     <div>
                         <div className="stat-val">{stats.totalMaterials}</div>
-                        <div className="stat-label">{role === 'accountant' ? 'Total Products' : 'Total Materials'}</div>
+                        <div className="stat-label">Total Materials</div>
                     </div>
                 </div>
                 {role !== 'accountant' && <div className="stat-card">
@@ -1018,7 +1018,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                         onClick={() => setTab(t)}
                         style={{ fontWeight: tab === t ? 600 : 400 }}
                     >
-                        {t === 'materials' && (role === 'accountant' ? 'Products' : 'Materials')}
+                        {t === 'materials' && 'Materials'}
                         {t === 'log' && 'Transaction Log'}
                         {t === 'bills' && 'Purchase Bills'}
                         {t === 'reorders' && 'Reorders'}
