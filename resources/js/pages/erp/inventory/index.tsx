@@ -238,7 +238,7 @@ function buildSku(catCode: string, size: string, shape: string): string {
 export default function InventoryIndex({ materials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomOutputMap, fillingOutputMap, godowns }: Props) {
     const { auth } = usePage<{ auth: Auth }>().props;
     const role = auth.user?.role ?? auth.user?.roles?.[0]?.slug ?? '';
-    const canSeeCost      = role === 'admin' || auth.user?.cost_access === true;
+    const canSeeCost      = role === 'admin' || role === 'accountant' || auth.user?.cost_access === true;
     const canMarkReceived = role === 'admin' || role === 'factory';
     const canEnterBill    = role === 'admin' || role === 'factory' || role === 'accountant';
     const isSales         = !['admin', 'factory', 'accountant'].includes(role);
