@@ -19,19 +19,44 @@ class UserController extends Controller
             || in_array('manage_users', $user?->permissions ?? []);
     }
 
+    /** Returns the slug of the role this non-admin manager is restricted to, or null for admin (unrestricted). */
+    private function manageableRoleSlug(): ?string
+    {
+        $user = auth()->user();
+        if ($user?->hasRole(Role::ADMIN)) {
+            return null;
+        }
+        return $user?->roles->first()?->slug ?? null;
+    }
+
+    /** Abort 403 if a non-admin tries to touch a user outside their own role. */
+    private function assertSameRole(User $target): void
+    {
+        $slug = $this->manageableRoleSlug();
+        if ($slug === null) {
+            return; // admin — unrestricted
+        }
+        if (! $target->roles->pluck('slug')->contains($slug)) {
+            abort(403);
+        }
+    }
+
     public function index(): Response
     {
+        $manageableRoleSlug = $this->canManageUsers() ? $this->manageableRoleSlug() : null;
+
+        $usersQuery = User::query()->with('roles')->orderBy('name');
+        if ($manageableRoleSlug !== null) {
+            $usersQuery->whereHas('roles', fn ($q) => $q->where('slug', $manageableRoleSlug));
+        }
+
         return Inertia::render('erp/users/index', [
             'pageTitle' => 'User Management',
-            'users' => User::query()
-                ->with('roles')
-                ->orderBy('name')
-                ->get(['id', 'name', 'email', 'phone', 'notes', 'is_active', 'cost_access', 'modules', 'permissions', 'company_access', 'password_plain', 'created_at', 'updated_at']),
-            'roles' => Role::query()
-                ->orderBy('name')
-                ->get(['id', 'name', 'slug']),
+            'users' => $usersQuery->get(['id', 'name', 'email', 'phone', 'notes', 'is_active', 'cost_access', 'modules', 'permissions', 'company_access', 'password_plain', 'created_at', 'updated_at']),
+            'roles' => Role::query()->orderBy('name')->get(['id', 'name', 'slug']),
             'companies' => [],
             'canManageUsers' => $this->canManageUsers(),
+            'manageableRoleSlug' => $manageableRoleSlug,
         ]);
     }
 
@@ -40,17 +65,24 @@ class UserController extends Controller
         abort_unless($this->canManageUsers(), 403);
         $data = $request->validated();
 
+        $slug = $this->manageableRoleSlug();
+        if ($slug !== null) {
+            $allowedId = Role::where('slug', $slug)->value('id');
+            abort_unless($allowedId && in_array($allowedId, (array) $data['roles']), 403);
+            $data['roles'] = [$allowedId];
+        }
+
         $user = User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => $data['password'],
+            'name'           => $data['name'],
+            'email'          => $data['email'],
+            'password'       => $data['password'],
             'password_plain' => $data['password'],
-            'phone' => $data['phone'] ?? null,
-            'notes' => $data['notes'] ?? null,
-            'is_active' => $data['status'] === 'active',
-            'cost_access' => $data['cost_access'] ?? false,
-            'modules' => $data['modules'] ?? [],
-            'permissions' => $data['permissions'] ?? [],
+            'phone'          => $data['phone'] ?? null,
+            'notes'          => $data['notes'] ?? null,
+            'is_active'      => $data['status'] === 'active',
+            'cost_access'    => $data['cost_access'] ?? false,
+            'modules'        => $data['modules'] ?? [],
+            'permissions'    => $data['permissions'] ?? [],
             'company_access' => $data['company_access'] ?? [],
         ]);
 
@@ -62,17 +94,26 @@ class UserController extends Controller
     public function update(UpdateUserRequest $request, User $user): RedirectResponse
     {
         abort_unless($this->canManageUsers(), 403);
+        $user->loadMissing('roles');
+        $this->assertSameRole($user);
+
         $data = $request->validated();
 
+        $slug = $this->manageableRoleSlug();
+        if ($slug !== null) {
+            $allowedId = Role::where('slug', $slug)->value('id');
+            $data['roles'] = [$allowedId];
+        }
+
         $user->fill([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'phone' => $data['phone'] ?? null,
-            'notes' => $data['notes'] ?? null,
-            'is_active' => $data['status'] === 'active',
-            'cost_access' => $data['cost_access'] ?? false,
-            'modules' => $data['modules'] ?? [],
-            'permissions' => $data['permissions'] ?? [],
+            'name'           => $data['name'],
+            'email'          => $data['email'],
+            'phone'          => $data['phone'] ?? null,
+            'notes'          => $data['notes'] ?? null,
+            'is_active'      => $data['status'] === 'active',
+            'cost_access'    => $data['cost_access'] ?? false,
+            'modules'        => $data['modules'] ?? [],
+            'permissions'    => $data['permissions'] ?? [],
             'company_access' => $data['company_access'] ?? [],
         ]);
 
@@ -90,6 +131,9 @@ class UserController extends Controller
     public function destroy(User $user): RedirectResponse
     {
         abort_unless($this->canManageUsers(), 403);
+        $user->loadMissing('roles');
+        $this->assertSameRole($user);
+
         $user->roles()->detach();
         $user->delete();
 

@@ -9,6 +9,7 @@ type Props = {
     roles: Role[];
     companies: { id: number; name: string }[];
     canManageUsers: boolean;
+    manageableRoleSlug: string | null;
 };
 
 type UserFormData = {
@@ -53,7 +54,7 @@ const moduleAccess = [
 const userStatusLabel = (isActive?: boolean) =>
     isActive ? 'Active' : 'Inactive';
 
-export default function UsersIndex({ users, roles, companies, canManageUsers }: Props) {
+export default function UsersIndex({ users, roles, companies, canManageUsers, manageableRoleSlug }: Props) {
     const [modalOpen, setModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [revealedPwd, setRevealedPwd] = useState<Set<number>>(new Set());
@@ -81,6 +82,10 @@ export default function UsersIndex({ users, roles, companies, canManageUsers }: 
 
     const openNewUserModal = () => {
         resetForm();
+        if (manageableRoleSlug) {
+            const restrictedRole = roles.find((r) => r.slug === manageableRoleSlug);
+            if (restrictedRole) form.setData('roles', [restrictedRole.id]);
+        }
         setModalOpen(true);
     };
 
@@ -371,39 +376,36 @@ export default function UsersIndex({ users, roles, companies, canManageUsers }: 
                                         ...(form.errors.roles ? { padding: '8px', border: '1px solid var(--danger)', borderRadius: 'var(--radius-sm)' } : {}),
                                     }}
                                 >
-                                    {roles.map((role) => (
-                                        <label
-                                            key={role.id}
-                                            style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '8px',
-                                                fontSize: '13px',
-                                                cursor: 'pointer',
-                                                padding: '8px 10px',
-                                                background: 'var(--bg-paper)',
-                                                border: '1px solid var(--border)',
-                                                borderRadius:
-                                                    'var(--radius-sm)',
-                                            }}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                value={role.id}
-                                                checked={form.data.roles.includes(
-                                                    role.id,
-                                                )}
-                                                onChange={() =>
-                                                    toggleArrayValue(
-                                                        'roles',
-                                                        role.id,
-                                                    )
-                                                }
-                                                style={{ width: 'auto' }}
-                                            />
-                                            {role.name}
-                                        </label>
-                                    ))}
+                                    {roles.map((role) => {
+                                        const isLocked = manageableRoleSlug !== null && role.slug !== manageableRoleSlug;
+                                        return (
+                                            <label
+                                                key={role.id}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    fontSize: '13px',
+                                                    cursor: isLocked ? 'not-allowed' : 'pointer',
+                                                    padding: '8px 10px',
+                                                    background: 'var(--bg-paper)',
+                                                    border: '1px solid var(--border)',
+                                                    borderRadius: 'var(--radius-sm)',
+                                                    opacity: isLocked ? 0.4 : 1,
+                                                }}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    value={role.id}
+                                                    checked={form.data.roles.includes(role.id)}
+                                                    disabled={isLocked}
+                                                    onChange={() => !isLocked && toggleArrayValue('roles', role.id)}
+                                                    style={{ width: 'auto' }}
+                                                />
+                                                {role.name}
+                                            </label>
+                                        );
+                                    })}
                                 </div>
                                 {form.errors.roles && <span className="field-error">{form.errors.roles}</span>}
                             </div>
