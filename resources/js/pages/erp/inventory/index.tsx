@@ -905,7 +905,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             </div>
 
             {/* Low Stock Alerts — BOM outputs / Filling outputs / Purchase needed */}
-            {alertMaterials.length > 0 && (() => {
+            {!isSales && alertMaterials.length > 0 && (() => {
                 const bomOutputIds     = Object.keys(bomOutputMap).map(Number);
                 const fillingOutputIds = Object.keys(fillingOutputMap).map(Number);
 
@@ -970,7 +970,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             })()}
 
             {/* On The Way */}
-            {pendingReorders.length > 0 && (
+            {!isSales && pendingReorders.length > 0 && (
                 <div className="card" style={{ marginBottom: 16 }}>
                     <div className="card-title" style={{ marginBottom: 8 }}>🚚 On The Way</div>
                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -1083,8 +1083,8 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                         <tr key={m.id}>
                                             <td>
                                                 <div className="prod-name">{m.name}</div>
-                                                {m.sku && <div className="prod-detail">{m.sku}</div>}
-                                                {(m.dim_l || m.dim_w || m.dim_h) && (
+                                                {!isSales && m.sku && <div className="prod-detail">{m.sku}</div>}
+                                                {!isSales && (m.dim_l || m.dim_w || m.dim_h) && (
                                                     <div className="prod-detail" style={{ color: '#6b7280' }}>
                                                         📐 {[m.dim_l, m.dim_w, m.dim_h].map((d) => d != null && Number(d) > 0 ? Number(d) : '?').join(' × ')} mm
                                                     </div>

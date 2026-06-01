@@ -24,31 +24,47 @@ use Inertia\Response;
 
 class InventoryController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $user = $request->user();
+        $user->loadMissing('roles');
+        $isSales = $user->roles->first()?->slug === 'sales';
+
         $materials = RawMaterial::query()
             ->withCount('transactions')
             ->orderBy('name')
             ->get();
 
-        $recentTransactions = InventoryTransaction::query()
+        if ($isSales) {
+            $materials->each(function ($m) {
+                $m->cost_per_unit = null;
+                $m->supplier      = null;
+                $m->notes         = null;
+                $m->hsn           = null;
+                $m->gst           = null;
+                $m->min_stock     = 0;
+                $m->reorder_level = 0;
+            });
+        }
+
+        $recentTransactions = $isSales ? collect() : InventoryTransaction::query()
             ->with(['rawMaterial:id,name,unit', 'user:id,name'])
             ->orderByDesc('id')
             ->limit(50)
             ->get();
 
-        $purchaseBills = InventoryPurchaseBill::query()
+        $purchaseBills = $isSales ? collect() : InventoryPurchaseBill::query()
             ->with(['items', 'user:id,name'])
             ->orderByDesc('id')
             ->limit(50)
             ->get();
 
-        $reorders = InventoryReorder::query()
+        $reorders = $isSales ? collect() : InventoryReorder::query()
             ->with(['rawMaterial:id,name', 'receivedByUser:id,name'])
             ->orderByDesc('id')
             ->get();
 
-        $vendors = Party::query()
+        $vendors = $isSales ? collect() : Party::query()
             ->where('is_active', true)
             ->whereIn('type', ['supplier', 'both'])
             ->orderBy('name')
@@ -64,27 +80,26 @@ class InventoryController extends Controller
             'outOfStock' => $activeMaterials->filter(
                 fn ($m) => (float) $m->stock_qty <= 0
             )->count(),
-            'totalStockValue' => $activeMaterials->sum(
+            'totalStockValue' => $isSales ? 0 : $activeMaterials->sum(
                 fn ($m) => (float) $m->stock_qty * (float) $m->cost_per_unit
             ),
         ];
 
         $inventoryCategories = InventoryCategory::orderBy('name')->get();
 
-        // Output materials: produced internally, need production run not purchase order
-        $bomOutputMap = Bom::whereNotNull('output_raw_material_id')
+        $bomOutputMap    = $isSales ? [] : Bom::whereNotNull('output_raw_material_id')
             ->where('is_active', true)
             ->get(['output_raw_material_id', 'name'])
             ->groupBy('output_raw_material_id')
             ->map(fn ($g) => $g->pluck('name')->toArray());
 
-        $fillingOutputMap = FillingRecipe::whereNotNull('output_raw_material_id')
+        $fillingOutputMap = $isSales ? [] : FillingRecipe::whereNotNull('output_raw_material_id')
             ->where('is_active', true)
             ->get(['output_raw_material_id', 'name', 'packing_size'])
             ->groupBy('output_raw_material_id')
             ->map(fn ($g) => $g->map(fn ($r) => $r->name . ($r->packing_size ? " ({$r->packing_size})" : ''))->toArray());
 
-        $godowns = Godown::query()
+        $godowns = $isSales ? collect() : Godown::query()
             ->where('is_active', true)
             ->orderBy('name')
             ->with(['stocks.rawMaterial:id,name,unit,category'])
