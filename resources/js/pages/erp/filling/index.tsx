@@ -26,6 +26,7 @@ type Recipe = {
     output_raw_material_id: number | null;
     output_material?: RawMaterial | null;
     name: string;
+    group_name?: string | null;
     packing_size?: string | null;
     fill_quantity: string | number;
     notes?: string | null;
@@ -53,6 +54,7 @@ type Props = {
 
 type RecipeFormData = {
     output_raw_material_id: string;
+    group_name: string;
     packing_size: string;
     fill_quantity: string;
     notes: string;
@@ -138,9 +140,19 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
     const [runTarget, setRunTarget] = useState<Recipe | null>(null);
     const [dupWarning, setDupWarning] = useState<{ exact: boolean; names: string[] } | null>(null);
     const [highlightedId, setHighlightedId] = useState<number | null>(null);
+    const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+    const toggleGroup = (key: string) => {
+        setCollapsedGroups((prev) => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+    };
 
     const form = useForm<RecipeFormData>({
-        output_raw_material_id: '', packing_size: '', fill_quantity: '1', notes: '', is_active: true, items: [],
+        output_raw_material_id: '', group_name: '', packing_size: '', fill_quantity: '1', notes: '', is_active: true, items: [],
     });
     const runForm = useForm<RunFormData>({ quantity: '1', notes: '' });
 
@@ -181,6 +193,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
     const openEdit = (recipe: Recipe) => {
         form.setData({
             output_raw_material_id: recipe.output_raw_material_id ? String(recipe.output_raw_material_id) : '',
+            group_name: recipe.group_name ?? '',
             packing_size: recipe.packing_size ?? '',
             fill_quantity: String(recipe.fill_quantity),
             notes: recipe.notes ?? '',
@@ -274,10 +287,18 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
 
     const scrollToCard = (recipeId: number) => {
         setPageView('recipes');
+        const recipe = recipes.find((r) => r.id === recipeId);
+        const groupKey = recipe?.group_name || '';
+        // Ensure the group containing this card is expanded
+        setCollapsedGroups((prev) => {
+            const next = new Set(prev);
+            next.delete(groupKey);
+            return next;
+        });
         setHighlightedId(recipeId);
         setTimeout(() => {
             document.getElementById(`filling-card-${recipeId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 50);
+        }, 60);
         setTimeout(() => setHighlightedId(null), 2500);
     };
 
@@ -368,29 +389,87 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                         <div className="icon">🧪</div>
                         <p>{recipes.length === 0 ? 'No filling products yet. Create one to define a filling recipe.' : 'No products match your search.'}</p>
                     </div>
-                ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16 }}>
-                        {filtered.map((recipe) => {
-                            const qtyPreview  = Math.round(Number(recipe.fill_quantity) || 1);
-                            const runnable    = canRun(recipe, qtyPreview);
-                            const highlighted = highlightedId === recipe.id;
-                            return (
-                                <div
-                                    id={`filling-card-${recipe.id}`}
-                                    key={recipe.id}
-                                    style={{
-                                        background: highlighted ? '#fff7ed' : '#fff',
-                                        border: `1px solid ${highlighted ? '#fb923c' : 'var(--border)'}`,
-                                        borderLeft: `4px solid ${highlighted ? '#ea580c' : '#2563eb'}`,
-                                        borderRadius: 10,
-                                        padding: '16px 18px',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: 10,
-                                        boxShadow: highlighted ? '0 0 0 3px #fed7aa' : '0 1px 4px rgba(0,0,0,.06)',
-                                        transition: 'all 0.4s ease',
-                                    }}
-                                >
+                ) : (() => {
+                    // Build grouped structure
+                    const groupMap: Record<string, Recipe[]> = {};
+                    for (const r of filtered) {
+                        const key = r.group_name || '';
+                        if (!groupMap[key]) groupMap[key] = [];
+                        groupMap[key].push(r);
+                    }
+                    // Named groups first (alphabetical), then ungrouped ('')
+                    const sortedKeys = Object.keys(groupMap).sort((a, b) => {
+                        if (a === '' && b !== '') return 1;
+                        if (b === '' && a !== '') return -1;
+                        return a.localeCompare(b);
+                    });
+
+                    return sortedKeys.map((groupKey) => {
+                        const groupRecipes  = groupMap[groupKey];
+                        const isCollapsed   = collapsedGroups.has(groupKey);
+                        const hasLowStock   = groupRecipes.some((r) => {
+                            const m = r.output_material;
+                            return m && (Number(m.stock_qty) <= Number(m.min_stock ?? 0) || Number(m.stock_qty) <= 0);
+                        });
+
+                        return (
+                            <div key={groupKey || '__ungrouped__'} style={{ marginBottom: 28 }}>
+                                {/* Group header — only show if there are named groups or multiple groups */}
+                                {(groupKey || sortedKeys.length > 1) && (
+                                    <div
+                                        onClick={() => toggleGroup(groupKey)}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+                                            padding: '10px 16px', borderRadius: 10, marginBottom: isCollapsed ? 0 : 14,
+                                            background: groupKey ? '#f5f3ff' : 'var(--bg-paper)',
+                                            border: `1.5px solid ${groupKey ? '#c4b5fd' : 'var(--border)'}`,
+                                            userSelect: 'none',
+                                            transition: 'background 0.15s',
+                                        }}
+                                    >
+                                        <span style={{
+                                            fontSize: 13, display: 'inline-block',
+                                            transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+                                            transition: 'transform 0.2s',
+                                            color: 'var(--tx-muted)',
+                                        }}>▼</span>
+                                        <span style={{ fontWeight: 700, fontSize: 15, flex: 1, color: groupKey ? '#6d28d9' : 'var(--tx-head)' }}>
+                                            {groupKey || '📂 No Group'}
+                                        </span>
+                                        {hasLowStock && (
+                                            <span style={{ fontSize: 11, background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
+                                                ⚠ Low Stock
+                                            </span>
+                                        )}
+                                        <span style={{ fontSize: 12, background: groupKey ? '#ede9fe' : 'var(--bg-secondary)', color: groupKey ? '#6d28d9' : 'var(--tx-muted)', border: '1px solid ' + (groupKey ? '#c4b5fd' : 'var(--border)'), padding: '2px 10px', borderRadius: 10, fontWeight: 700 }}>
+                                            {groupRecipes.length}
+                                        </span>
+                                    </div>
+                                )}
+
+                                {!isCollapsed && (
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16 }}>
+                                        {groupRecipes.map((recipe) => {
+                                            const qtyPreview  = Math.round(Number(recipe.fill_quantity) || 1);
+                                            const runnable    = canRun(recipe, qtyPreview);
+                                            const highlighted = highlightedId === recipe.id;
+                                            return (
+                                                <div
+                                                    id={`filling-card-${recipe.id}`}
+                                                    key={recipe.id}
+                                                    style={{
+                                                        background: highlighted ? '#fff7ed' : '#fff',
+                                                        border: `1px solid ${highlighted ? '#fb923c' : 'var(--border)'}`,
+                                                        borderLeft: `4px solid ${highlighted ? '#ea580c' : '#2563eb'}`,
+                                                        borderRadius: 10,
+                                                        padding: '16px 18px',
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        gap: 10,
+                                                        boxShadow: highlighted ? '0 0 0 3px #fed7aa' : '0 1px 4px rgba(0,0,0,.06)',
+                                                        transition: 'all 0.4s ease',
+                                                    }}
+                                                >
                                     {/* Top row: name + packing size */}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                                         <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.3 }}>{recipe.name}</div>
@@ -507,6 +586,10 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                         })}
                     </div>
                 )}
+                            </div>
+                        );
+                    });
+                })()}
                 </>}
 
                 {/* ── Run History view ─────────────────────────────────────── */}
@@ -616,6 +699,22 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                                         </ul>
                                     </div>
                                 )}
+                            </div>
+                            <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                                <label>Group</label>
+                                <input
+                                    type="text"
+                                    list="filling-groups-list"
+                                    value={form.data.group_name}
+                                    onChange={(e) => form.setData('group_name', e.target.value)}
+                                    placeholder="e.g. Amino Acid, NPK, Fungicide…"
+                                />
+                                <datalist id="filling-groups-list">
+                                    {[...new Set(recipes.map((r) => r.group_name).filter(Boolean))].map((g) => (
+                                        <option key={g!} value={g!} />
+                                    ))}
+                                </datalist>
+                                <small style={{ color: 'var(--tx-muted)', fontSize: 11 }}>Group similar products together (optional). Type a name or pick an existing group.</small>
                             </div>
                             <div className="form-group">
                                 <label>Packing Size</label>

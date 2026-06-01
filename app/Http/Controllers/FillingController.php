@@ -20,6 +20,8 @@ class FillingController extends Controller
     {
         $recipes = FillingRecipe::query()
             ->with(['outputMaterial:id,name,unit,stock_qty,min_stock,category', 'items.rawMaterial:id,name,unit,stock_qty,cost_per_unit'])
+            ->orderByRaw("CASE WHEN group_name IS NULL OR group_name = '' THEN 1 ELSE 0 END")
+            ->orderBy('group_name')
             ->orderBy('name')
             ->get();
 
@@ -53,6 +55,7 @@ class FillingController extends Controller
             $recipe = FillingRecipe::create([
                 'output_raw_material_id' => $outputMat?->id,
                 'name'                   => $outputMat?->name ?? '',
+                'group_name'             => $data['group_name'] ?? null,
                 'packing_size'           => $data['packing_size'] ?? null,
                 'fill_quantity'          => $data['fill_quantity'] ?? 1,
                 'notes'                  => $data['notes'] ?? null,
@@ -81,6 +84,7 @@ class FillingController extends Controller
             $recipe->update([
                 'output_raw_material_id' => $outputMat?->id,
                 'name'                   => $outputMat?->name ?? '',
+                'group_name'             => $data['group_name'] ?? null,
                 'packing_size'           => $data['packing_size'] ?? null,
                 'fill_quantity'          => $data['fill_quantity'] ?? 1,
                 'notes'                  => $data['notes'] ?? null,
@@ -295,6 +299,7 @@ class FillingController extends Controller
     {
         $rules = [
             'output_raw_material_id'  => 'required|exists:raw_materials,id',
+            'group_name'              => 'nullable|string|max:100',
             'packing_size'            => 'nullable|string|max:50',
             'fill_quantity'           => 'nullable|numeric|min:0.001',
             'notes'                   => 'nullable|string|max:1000',
