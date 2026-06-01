@@ -72,12 +72,20 @@ type Order = {
     order_number: string;
     company_name: string;
     customer_name: string;
+    gst_no?: string | null;
+    pan_no?: string | null;
+    phone?: string | null;
+    delivery_address?: string | null;
+    transport_name?: string | null;
+    transport_type?: string | null;
+    destination?: string | null;
+    freight_amount?: string | number | null;
+    courier_amount?: string | number | null;
+    round_off?: string | number | null;
     sales_user_id?: number | null;
     sales_user?: { id: number; name: string } | null;
     created_by?: number | null;
     order_date?: string | null;
-    destination?: string | null;
-    transport_name?: string | null;
     priority?: string | null;
     status?: string | null;
     urgent_approved?: boolean | null;
@@ -919,6 +927,107 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                     </div>
                                                 )}
                                             </div>
+
+                                            {/* ── Billing details — accountant only ── */}
+                                            {isAccountant && (
+                                                <div className="form-card" style={{ marginTop: '12px', marginBottom: 0, borderLeft: '3px solid #2563eb' }}>
+                                                    <div className="form-card-title" style={{ color: '#1e40af' }}>🧾 Billing Details</div>
+
+                                                    {/* Party info */}
+                                                    <div className="form-grid" style={{ marginBottom: '12px' }}>
+                                                        <div className="form-group">
+                                                            <label>Company</label>
+                                                            <div>{order.company_name}</div>
+                                                        </div>
+                                                        <div className="form-group">
+                                                            <label>Customer</label>
+                                                            <div>{order.customer_name}</div>
+                                                        </div>
+                                                        {order.gst_no && (
+                                                            <div className="form-group">
+                                                                <label>GSTIN</label>
+                                                                <div style={{ fontFamily: 'monospace', fontWeight: 700 }}>{order.gst_no}</div>
+                                                            </div>
+                                                        )}
+                                                        {order.pan_no && (
+                                                            <div className="form-group">
+                                                                <label>PAN</label>
+                                                                <div style={{ fontFamily: 'monospace' }}>{order.pan_no}</div>
+                                                            </div>
+                                                        )}
+                                                        {order.phone && (
+                                                            <div className="form-group">
+                                                                <label>Phone</label>
+                                                                <div>{order.phone}</div>
+                                                            </div>
+                                                        )}
+                                                        {order.destination && (
+                                                            <div className="form-group">
+                                                                <label>Destination</label>
+                                                                <div>{order.destination}</div>
+                                                            </div>
+                                                        )}
+                                                        {order.delivery_address && (
+                                                            <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                                                                <label>Delivery Address</label>
+                                                                <div style={{ whiteSpace: 'pre-line' }}>{order.delivery_address}</div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Transport */}
+                                                    {(order.transport_name || order.transport_type) && (
+                                                        <div className="form-grid" style={{ marginBottom: '12px' }}>
+                                                            {order.transport_name && (
+                                                                <div className="form-group">
+                                                                    <label>Transport</label>
+                                                                    <div>{order.transport_name}</div>
+                                                                </div>
+                                                            )}
+                                                            {order.transport_type && (
+                                                                <div className="form-group">
+                                                                    <label>Transport Type</label>
+                                                                    <div>{order.transport_type}</div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Charges */}
+                                                    <div className="form-grid three">
+                                                        <div className="form-group">
+                                                            <label>Subtotal</label>
+                                                            <div style={{ fontWeight: 600 }}>₹{formatAmount(order.subtotal)}</div>
+                                                        </div>
+                                                        <div className="form-group">
+                                                            <label>GST</label>
+                                                            <div>₹{formatAmount(order.gst_total)}</div>
+                                                        </div>
+                                                        {Number(order.freight_amount ?? 0) > 0 && (
+                                                            <div className="form-group">
+                                                                <label>Freight</label>
+                                                                <div>₹{formatAmount(order.freight_amount)}</div>
+                                                            </div>
+                                                        )}
+                                                        {Number(order.courier_amount ?? 0) > 0 && (
+                                                            <div className="form-group">
+                                                                <label>Courier</label>
+                                                                <div>₹{formatAmount(order.courier_amount)}</div>
+                                                            </div>
+                                                        )}
+                                                        {Number(order.round_off ?? 0) !== 0 && (
+                                                            <div className="form-group">
+                                                                <label>Round Off</label>
+                                                                <div>₹{formatAmount(order.round_off)}</div>
+                                                            </div>
+                                                        )}
+                                                        <div className="form-group">
+                                                            <label>Grand Total</label>
+                                                            <div style={{ fontWeight: 700, fontSize: '15px', color: '#1e40af' }}>₹{formatAmount(order.total_amount)}</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </>
                                     )}
 
