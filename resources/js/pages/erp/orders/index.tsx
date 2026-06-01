@@ -1078,7 +1078,8 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                                                     {order.eway_bill_not_required ? '↩ Undo' : 'No Need'}
                                                                                 </button>
                                                                             )}
-                                                                            {!ewayNoNeed && (
+                                                                            {/* Show upload unless manually marked No Need */}
+                                                                            {!order.eway_bill_not_required && (
                                                                                 <label
                                                                                     className="btn sm primary"
                                                                                     style={{ cursor: isUploading ? 'not-allowed' : 'pointer', padding: '3px 8px', fontSize: '11px', opacity: isUploading ? 0.6 : 1 }}
