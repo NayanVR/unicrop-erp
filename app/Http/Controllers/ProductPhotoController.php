@@ -207,8 +207,8 @@ class ProductPhotoController extends Controller
      */
     private function compressImage(string $sourcePath): string
     {
-        $targetBytes = 5 * 1024; // 5 KB
-        $maxDim = 300;
+        $targetBytes = 50 * 1024; // 50 KB — sharp on screen, loads in <0.5s on 3G
+        $maxDim = 800;
         $useWebp = function_exists('imagewebp') && function_exists('imagecreatefromwebp');
 
         $info = getimagesize($sourcePath);
