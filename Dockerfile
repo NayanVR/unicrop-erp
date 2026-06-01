@@ -45,6 +45,7 @@ FROM php:8.4-fpm-alpine AS app
 RUN apk add --no-cache \
         nginx \
         supervisor \
+        ghostscript \
         libpng-dev \
         libjpeg-turbo-dev \
         freetype-dev \

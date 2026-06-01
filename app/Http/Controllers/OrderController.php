@@ -594,7 +594,37 @@ class OrderController extends Controller
         ]);
 
         $file = $request->file('file');
-        $path = $file->store('order-documents/'.$order->id, 'local');
+
+        // Store original first, then attempt Ghostscript compression
+        $path      = $file->store('order-documents/'.$order->id, 'local');
+        $fullPath  = Storage::disk('local')->path($path);
+        $finalSize = $file->getSize();
+
+        $gsPath = trim((string) shell_exec('which gs'));
+        if ($gsPath) {
+            $compressed = $fullPath.'.compressed.pdf';
+            $cmd = sprintf(
+                '%s -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/ebook'
+                .' -dNOPAUSE -dBATCH -dQUIET -dEmbedAllFonts=true -dSubsetFonts=true'
+                .' -sOutputFile=%s %s 2>/dev/null',
+                escapeshellarg($gsPath),
+                escapeshellarg($compressed),
+                escapeshellarg($fullPath)
+            );
+            exec($cmd, $out, $exitCode);
+
+            if ($exitCode === 0 && file_exists($compressed) && filesize($compressed) > 0) {
+                // Only replace if the compressed version is actually smaller
+                if (filesize($compressed) < filesize($fullPath)) {
+                    rename($compressed, $fullPath);
+                    $finalSize = filesize($fullPath);
+                } else {
+                    @unlink($compressed);
+                }
+            } elseif (file_exists($compressed)) {
+                @unlink($compressed);
+            }
+        }
 
         // Replace any existing document of the same type for this order
         $existing = $order->attachments()->where('document_type', $request->document_type)->first();
@@ -606,8 +636,8 @@ class OrderController extends Controller
         $order->attachments()->create([
             'original_name' => $file->getClientOriginalName(),
             'path'          => $path,
-            'mime_type'     => $file->getMimeType() ?? 'application/pdf',
-            'size'          => $file->getSize(),
+            'mime_type'     => 'application/pdf',
+            'size'          => $finalSize,
             'document_type' => $request->document_type,
         ]);
 
