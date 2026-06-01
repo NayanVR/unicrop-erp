@@ -1677,7 +1677,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                     />
                                     {matForm.errors.reorder_level && <div className="form-error">{matForm.errors.reorder_level}</div>}
                                 </div>
-                                <div className="form-group">
+                                {role !== 'accountant' && <div className="form-group">
                                     <label>Cost/Unit (₹)</label>
                                     <input
                                         type="number"
@@ -1687,8 +1687,8 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                         onChange={(e) => matForm.setData('cost_per_unit', e.target.value)}
                                     />
                                     {matForm.errors.cost_per_unit && <div className="form-error">{matForm.errors.cost_per_unit}</div>}
-                                </div>
-                                <div className="form-group">
+                                </div>}
+                                {role !== 'accountant' && <div className="form-group">
                                     <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                         <span>Selling Rate (₹)</span>
                                         <span style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden', fontSize: 11, height: 20 }}>
@@ -1729,7 +1729,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                         </div>
                                     )}
                                     {matForm.errors.selling_rate && <div className="form-error">{matForm.errors.selling_rate}</div>}
-                                </div>
+                                </div>}
                                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                                     <label>Box Dimensions (mm) — L × W × H</label>
                                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
