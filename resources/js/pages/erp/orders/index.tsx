@@ -106,6 +106,7 @@ type Order = {
     design_items?: DesignItem[];
     items: OrderItem[];
     docs?: OrderDoc[];
+    eway_bill_not_required?: boolean;
 };
 
 type DesignItem = {
@@ -862,15 +863,16 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                         <div>{order.sales_user?.name ?? 'Unassigned'}</div>
                                     </div>
                                     {isAccountant && (() => {
-                                        const hasTax  = (order.docs ?? []).some((d) => d.document_type === 'tax_invoice');
-                                        const hasEway = (order.docs ?? []).some((d) => d.document_type === 'eway_bill');
-                                        if (hasTax && hasEway) {
+                                        const hasTax   = (order.docs ?? []).some((d) => d.document_type === 'tax_invoice');
+                                        const hasEway  = (order.docs ?? []).some((d) => d.document_type === 'eway_bill');
+                                        const ewayOk   = hasEway || !!order.eway_bill_not_required;
+                                        if (hasTax && ewayOk) {
                                             return <span style={{ fontSize: '11px', fontWeight: 700, color: '#16a34a', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '6px', padding: '3px 8px', whiteSpace: 'nowrap' }}>✓ Done</span>;
                                         }
                                         return (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-end' }}>
                                                 {!hasTax  && <span style={{ fontSize: '10px', fontWeight: 600, color: '#b45309', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: '4px', padding: '2px 6px', whiteSpace: 'nowrap' }}>🧾 Invoice Pending</span>}
-                                                {!hasEway && <span style={{ fontSize: '10px', fontWeight: 600, color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '2px 6px', whiteSpace: 'nowrap' }}>📋 E-way Pending</span>}
+                                                {!ewayOk  && <span style={{ fontSize: '10px', fontWeight: 600, color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '2px 6px', whiteSpace: 'nowrap' }}>📋 E-way Pending</span>}
                                             </div>
                                         );
                                     })()}
@@ -1011,17 +1013,22 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                         </div>
                                                         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                                                             {(['tax_invoice', 'eway_bill'] as const).map((dtype) => {
-                                                                const existing = (order.docs ?? []).find((d) => d.document_type === dtype);
-                                                                const label = dtype === 'tax_invoice' ? 'Tax Invoice' : 'E-way Bill';
-                                                                const icon = dtype === 'tax_invoice' ? '🧾' : '📋';
+                                                                const existing    = (order.docs ?? []).find((d) => d.document_type === dtype);
+                                                                const label       = dtype === 'tax_invoice' ? 'Tax Invoice' : 'E-way Bill';
+                                                                const icon        = dtype === 'tax_invoice' ? '🧾' : '📋';
                                                                 const isUploading = uploadingDoc?.orderId === order.id && uploadingDoc.type === dtype;
+                                                                const ewayNoNeed  = dtype === 'eway_bill' && !!order.eway_bill_not_required;
+                                                                const bgColor     = existing ? '#f0fdf4' : ewayNoNeed ? '#f5f3ff' : 'var(--bg-paper)';
+                                                                const borderColor = existing ? '#86efac' : ewayNoNeed ? '#c4b5fd' : 'var(--border)';
                                                                 return (
-                                                                    <div key={dtype} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: existing ? '#f0fdf4' : 'var(--bg-paper)', border: `1px solid ${existing ? '#86efac' : 'var(--border)'}`, borderRadius: '8px', padding: '8px 12px', minWidth: '180px' }}>
+                                                                    <div key={dtype} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: bgColor, border: `1px solid ${borderColor}`, borderRadius: '8px', padding: '8px 12px', minWidth: '180px' }}>
                                                                         <span style={{ fontSize: '16px' }}>{icon}</span>
                                                                         <div style={{ flex: 1, minWidth: 0 }}>
                                                                             <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--tx-head)' }}>{label}</div>
                                                                             {existing ? (
                                                                                 <div style={{ fontSize: '11px', color: '#16a34a' }}>Uploaded {existing.uploaded_at ?? ''}</div>
+                                                                            ) : ewayNoNeed ? (
+                                                                                <div style={{ fontSize: '11px', color: '#7c3aed' }}>Not Required</div>
                                                                             ) : (
                                                                                 <div style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>Not uploaded</div>
                                                                             )}
@@ -1054,24 +1061,40 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                                                     </button>
                                                                                 </>
                                                                             )}
-                                                                            <label
-                                                                                className="btn sm primary"
-                                                                                style={{ cursor: isUploading ? 'not-allowed' : 'pointer', padding: '3px 8px', fontSize: '11px', opacity: isUploading ? 0.6 : 1 }}
-                                                                                onClick={(e) => e.stopPropagation()}
-                                                                            >
-                                                                                {isUploading ? '⏳' : existing ? '↻ Replace' : '⬆ Upload'}
-                                                                                <input
-                                                                                    type="file"
-                                                                                    accept="application/pdf"
-                                                                                    style={{ display: 'none' }}
-                                                                                    disabled={isUploading}
-                                                                                    onChange={(e) => {
-                                                                                        const file = e.target.files?.[0];
-                                                                                        if (file) uploadDoc(order.id, dtype, file);
-                                                                                        e.target.value = '';
+                                                                            {/* E-way "No Need" toggle — only when no file uploaded */}
+                                                                            {dtype === 'eway_bill' && !existing && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="btn sm"
+                                                                                    style={{ padding: '3px 8px', fontSize: '11px', color: ewayNoNeed ? '#7c3aed' : 'var(--tx-muted)', borderColor: ewayNoNeed ? '#c4b5fd' : 'var(--border)', background: ewayNoNeed ? '#f5f3ff' : undefined }}
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        router.post(`/orders/${order.id}/eway-not-required`, { value: !ewayNoNeed }, { preserveScroll: true });
                                                                                     }}
-                                                                                />
-                                                                            </label>
+                                                                                >
+                                                                                    {ewayNoNeed ? '↩ Undo' : 'No Need'}
+                                                                                </button>
+                                                                            )}
+                                                                            {!ewayNoNeed && (
+                                                                                <label
+                                                                                    className="btn sm primary"
+                                                                                    style={{ cursor: isUploading ? 'not-allowed' : 'pointer', padding: '3px 8px', fontSize: '11px', opacity: isUploading ? 0.6 : 1 }}
+                                                                                    onClick={(e) => e.stopPropagation()}
+                                                                                >
+                                                                                    {isUploading ? '⏳' : existing ? '↻ Replace' : '⬆ Upload'}
+                                                                                    <input
+                                                                                        type="file"
+                                                                                        accept="application/pdf"
+                                                                                        style={{ display: 'none' }}
+                                                                                        disabled={isUploading}
+                                                                                        onChange={(e) => {
+                                                                                            const file = e.target.files?.[0];
+                                                                                            if (file) uploadDoc(order.id, dtype, file);
+                                                                                            e.target.value = '';
+                                                                                        }}
+                                                                                    />
+                                                                                </label>
+                                                                            )}
                                                                         </div>
                                                                     </div>
                                                                 );

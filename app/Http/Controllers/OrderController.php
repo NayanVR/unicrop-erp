@@ -657,6 +657,13 @@ class OrderController extends Controller
         ]);
     }
 
+    public function setEwayNotRequired(Request $request, Order $order): RedirectResponse
+    {
+        $request->validate(['value' => ['required', 'boolean']]);
+        $order->update(['eway_bill_not_required' => $request->boolean('value')]);
+        return redirect()->back();
+    }
+
     public function deleteDocument(Request $request, Order $order, OrderAttachment $attachment): RedirectResponse
     {
         abort_if($attachment->order_id !== $order->id, 404);

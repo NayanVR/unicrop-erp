@@ -44,10 +44,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Order documents — download accessible by any authenticated user with order access
     Route::get('orders/{order}/documents/{attachment}', [OrderController::class, 'downloadDocument'])->name('orders.documents.show');
 
-    // Order documents — upload / delete restricted to accountant and admin
+    // Order documents — upload / delete / eway flag restricted to accountant and admin
     Route::middleware(['role:admin,accountant'])->group(function () {
         Route::post('orders/{order}/documents', [OrderController::class, 'uploadDocument'])->name('orders.documents.store');
         Route::delete('orders/{order}/documents/{attachment}', [OrderController::class, 'deleteDocument'])->name('orders.documents.destroy');
+        Route::post('orders/{order}/eway-not-required', [OrderController::class, 'setEwayNotRequired'])->name('orders.eway-not-required');
     });
 
     Route::middleware(['role:admin,office'])->group(function () {

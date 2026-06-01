@@ -42,6 +42,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'factory_notes',
     'labels_last_printed_by',
     'labels_last_printed_at',
+    'eway_bill_not_required',
 ])]
 class Order extends Model
 {
