@@ -36,8 +36,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
     });
 
-    // Orders list is visible to office AND design users (controller filters by role)
-    Route::middleware(['role:admin,office,design'])->group(function () {
+    // Orders list is visible to office, design, and accountant users (controller filters by role)
+    Route::middleware(['role:admin,office,design,accountant'])->group(function () {
         Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
     });
 

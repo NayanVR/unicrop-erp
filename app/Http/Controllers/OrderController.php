@@ -45,6 +45,11 @@ class OrderController extends Controller
         if ($role === Role::DESIGN) {
             $ordersQuery->whereIn('status', ['confirmed', 'design']);
         }
+
+        // Accountants see only confirmed and dispatched orders
+        if ($role === Role::ACCOUNTANT) {
+            $ordersQuery->whereIn('status', ['confirmed', 'dispatched']);
+        }
         // Admin and office see all orders
 
         $orders = $ordersQuery->get();
