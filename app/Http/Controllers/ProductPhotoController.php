@@ -118,17 +118,14 @@ class ProductPhotoController extends Controller
         }
 
         $productLabel = !empty($data['party_brand']) ? $data['party_brand'] : $data['our_brand'];
-        $ext = $request->file('photo')->getClientOriginalExtension() ?: 'jpg';
-        $filename = Str::slug($productLabel) . '_' . Str::random(8) . '.' . strtolower($ext);
+        $filename = Str::slug($productLabel) . '_' . Str::random(8) . '.webp';
         $path = 'product-photos/' . $folderName . '/' . $filename;
 
         Log::error('[gallery-debug] attempting S3 put', ['disk' => $disk, 'path' => $path]);
 
         try {
-            Storage::disk($disk)->put(
-                $path,
-                file_get_contents($request->file('photo')->getRealPath()),
-            );
+            $compressed = $this->compressImage($request->file('photo')->getRealPath());
+            Storage::disk($disk)->put($path, $compressed);
             Log::error('[gallery-debug] S3 put succeeded');
         } catch (\Throwable $e) {
             Log::error('Photo upload failed', [
@@ -179,15 +176,12 @@ class ProductPhotoController extends Controller
             }
 
             $productLabel = !empty($data['party_brand']) ? $data['party_brand'] : $data['our_brand'];
-            $ext = $request->file('photo')->getClientOriginalExtension() ?: 'jpg';
-            $filename = Str::slug($productLabel) . '_' . Str::random(8) . '.' . strtolower($ext);
+            $filename = Str::slug($productLabel) . '_' . Str::random(8) . '.webp';
             $path = 'product-photos/' . $folderName . '/' . $filename;
 
             try {
-                Storage::disk($disk)->put(
-                    $path,
-                    file_get_contents($request->file('photo')->getRealPath()),
-                );
+                $compressed = $this->compressImage($request->file('photo')->getRealPath());
+                Storage::disk($disk)->put($path, $compressed);
             } catch (\Throwable $e) {
                 Log::error('Photo update upload failed', ['path' => $path, 'error' => $e->getMessage()]);
                 return redirect()->back()->with('error', 'Upload failed: ' . $e->getMessage());
@@ -203,6 +197,71 @@ class ProductPhotoController extends Controller
         $photo->save();
 
         return redirect()->back()->with('success', 'Photo updated successfully.');
+    }
+
+    /**
+     * Compress an image to ≤5 KB WebP with best possible clarity.
+     * Starts at quality 85, resizes to fit 300×300, then lowers quality until target size is met.
+     */
+    private function compressImage(string $sourcePath): string
+    {
+        $targetBytes = 5 * 1024; // 5 KB
+        $maxDim = 300;
+
+        $info = getimagesize($sourcePath);
+        $mime = $info['mime'] ?? '';
+
+        $src = match ($mime) {
+            'image/jpeg' => imagecreatefromjpeg($sourcePath),
+            'image/png'  => imagecreatefrompng($sourcePath),
+            'image/webp' => imagecreatefromwebp($sourcePath),
+            default      => imagecreatefromjpeg($sourcePath),
+        };
+
+        $ow = imagesx($src);
+        $oh = imagesy($src);
+
+        // Scale down so longest side ≤ maxDim
+        $ratio = min($maxDim / $ow, $maxDim / $oh, 1.0);
+        $nw = max(1, (int) round($ow * $ratio));
+        $nh = max(1, (int) round($oh * $ratio));
+
+        $dst = imagecreatetruecolor($nw, $nh);
+        // Preserve transparency
+        imagealphablending($dst, false);
+        imagesavealpha($dst, true);
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $ow, $oh);
+        imagedestroy($src);
+
+        // Binary-search quality between 10 and 85
+        $lo = 10;
+        $hi = 85;
+        $best = '';
+
+        while ($lo <= $hi) {
+            $mid = (int)(($lo + $hi) / 2);
+            ob_start();
+            imagewebp($dst, null, $mid);
+            $data = ob_get_clean();
+
+            if (strlen($data) <= $targetBytes) {
+                $best = $data;
+                $lo = $mid + 1; // try higher quality
+            } else {
+                $hi = $mid - 1; // need lower quality
+            }
+        }
+
+        // Fallback: if even quality 10 exceeded target, use the lowest-quality output
+        if ($best === '') {
+            ob_start();
+            imagewebp($dst, null, 10);
+            $best = ob_get_clean();
+        }
+
+        imagedestroy($dst);
+
+        return $best;
     }
 
     public function storeFolder(Request $request): RedirectResponse
