@@ -66,6 +66,13 @@ const actorForStage = (item: OrderItem, stage: string): string | null => {
     return null;
 };
 
+type OrderDoc = {
+    id: number;
+    document_type: 'tax_invoice' | 'eway_bill';
+    original_name: string;
+    uploaded_at?: string | null;
+};
+
 type Order = {
     id: number;
     party_id?: number | null;
@@ -98,6 +105,7 @@ type Order = {
     design_handlers?: string[];
     design_items?: DesignItem[];
     items: OrderItem[];
+    docs?: OrderDoc[];
 };
 
 type DesignItem = {
@@ -192,6 +200,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
     const isDesign      = userRole === 'design';
     const isAdmin       = userRole === 'admin';
     const isAccountant  = userRole === 'accountant';
+    const isSales       = userRole === 'sales';
     const canConfirm = userRole === 'admin' || userRole === 'office';
 
     const canEditOrder = (order: { status?: string | null; created_by?: number | null }) =>
@@ -212,6 +221,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
     const [skipPartyApproval, setSkipPartyApproval] = useState(false);
     const [selectedItemIds, setSelectedItemIds] = useState<number[]>([]);
     const [photoLightbox, setPhotoLightbox] = useState<string | null>(null);
+    const [uploadingDoc, setUploadingDoc] = useState<{ orderId: number; type: 'tax_invoice' | 'eway_bill' } | null>(null);
 
     // Tally integration state
     const [tallyUrl, setTallyUrl] = useState(() => localStorage.getItem('tallyUrl') ?? 'http://localhost:9000');
@@ -341,6 +351,18 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
 
     const designItemFor = (order: Order, itemId: number): DesignItem | undefined =>
         order.design_items?.find((d) => d.order_item_id === itemId);
+
+    const uploadDoc = (orderId: number, type: 'tax_invoice' | 'eway_bill', file: File) => {
+        setUploadingDoc({ orderId, type });
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('document_type', type);
+        router.post(`/orders/${orderId}/documents`, formData, {
+            preserveScroll: true,
+            forceFormData: true,
+            onFinish: () => setUploadingDoc(null),
+        });
+    };
 
     const xmlEsc = (s: string) =>
         s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -940,6 +962,27 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                         </div>
                                     )}
 
+                                    {/* ── Documents row — visible to sales and other non-design roles ── */}
+                                    {!isDesign && (order.docs ?? []).length > 0 && (
+                                        <div className="activity-row" style={{ gap: '8px', flexWrap: 'wrap' }}>
+                                            {(order.docs ?? []).map((doc) => (
+                                                <a
+                                                    key={doc.id}
+                                                    href={`/orders/${order.id}/documents/${doc.id}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="activity-chip"
+                                                    style={{ textDecoration: 'none', color: '#1e40af', fontWeight: 600, border: '1px solid #bfdbfe', background: '#eff6ff' }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    {doc.document_type === 'tax_invoice' ? '🧾' : '📋'}{' '}
+                                                    {doc.document_type === 'tax_invoice' ? 'Tax Invoice' : 'E-way Bill'}
+                                                    {doc.uploaded_at ? ` · ${doc.uploaded_at}` : ''}
+                                                </a>
+                                            ))}
+                                        </div>
+                                    )}
+
                                     {/* ── Non-design: financial items table + summary ── */}
                                     {!isDesign && (
                                         <>
@@ -1235,6 +1278,81 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                         <div className="form-group">
                                                             <label>Grand Total</label>
                                                             <div style={{ fontWeight: 700, fontSize: '15px', color: '#1e40af' }}>₹{formatAmount(order.total_amount)}</div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Upload / manage documents */}
+                                                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: '12px', marginTop: '12px' }}>
+                                                        <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)', marginBottom: '8px' }}>
+                                                            Documents
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                                            {(['tax_invoice', 'eway_bill'] as const).map((dtype) => {
+                                                                const existing = (order.docs ?? []).find((d) => d.document_type === dtype);
+                                                                const label = dtype === 'tax_invoice' ? 'Tax Invoice' : 'E-way Bill';
+                                                                const icon = dtype === 'tax_invoice' ? '🧾' : '📋';
+                                                                const isUploading = uploadingDoc?.orderId === order.id && uploadingDoc.type === dtype;
+                                                                return (
+                                                                    <div key={dtype} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: existing ? '#f0fdf4' : 'var(--bg-paper)', border: `1px solid ${existing ? '#86efac' : 'var(--border)'}`, borderRadius: '8px', padding: '8px 12px', minWidth: '180px' }}>
+                                                                        <span style={{ fontSize: '16px' }}>{icon}</span>
+                                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                                            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--tx-head)' }}>{label}</div>
+                                                                            {existing ? (
+                                                                                <div style={{ fontSize: '11px', color: '#16a34a' }}>Uploaded {existing.uploaded_at ?? ''}</div>
+                                                                            ) : (
+                                                                                <div style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>Not uploaded</div>
+                                                                            )}
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                                                                            {existing && (
+                                                                                <>
+                                                                                    <a
+                                                                                        href={`/orders/${order.id}/documents/${existing.id}`}
+                                                                                        target="_blank"
+                                                                                        rel="noopener noreferrer"
+                                                                                        className="btn sm"
+                                                                                        style={{ textDecoration: 'none', padding: '3px 8px', fontSize: '11px' }}
+                                                                                        onClick={(e) => e.stopPropagation()}
+                                                                                    >
+                                                                                        👁 View
+                                                                                    </a>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        className="btn sm"
+                                                                                        style={{ padding: '3px 8px', fontSize: '11px', color: '#dc2626', borderColor: '#dc2626' }}
+                                                                                        disabled={isUploading}
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            if (!confirm(`Delete ${label}?`)) return;
+                                                                                            router.delete(`/orders/${order.id}/documents/${existing.id}`, { preserveScroll: true });
+                                                                                        }}
+                                                                                    >
+                                                                                        🗑
+                                                                                    </button>
+                                                                                </>
+                                                                            )}
+                                                                            <label
+                                                                                className="btn sm primary"
+                                                                                style={{ cursor: isUploading ? 'not-allowed' : 'pointer', padding: '3px 8px', fontSize: '11px', opacity: isUploading ? 0.6 : 1 }}
+                                                                                onClick={(e) => e.stopPropagation()}
+                                                                            >
+                                                                                {isUploading ? '⏳' : existing ? '↻ Replace' : '⬆ Upload'}
+                                                                                <input
+                                                                                    type="file"
+                                                                                    accept="application/pdf"
+                                                                                    style={{ display: 'none' }}
+                                                                                    disabled={isUploading}
+                                                                                    onChange={(e) => {
+                                                                                        const file = e.target.files?.[0];
+                                                                                        if (file) uploadDoc(order.id, dtype, file);
+                                                                                        e.target.value = '';
+                                                                                    }}
+                                                                                />
+                                                                            </label>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
                                                     </div>
 

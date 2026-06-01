@@ -97,6 +97,7 @@ type Order = {
     created_by_name?: string | null;
     design_status?: DesignStatus | null;
     tax_docs_pending?: boolean;
+    docs?: Array<{ id: number; document_type: string; original_name: string }>;
     labels_last_printed_by?: string | null;
     labels_last_printed_at?: string | null;
     items: OrderItem[];
@@ -785,20 +786,30 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                         </div>
                                     )}
 
-                                    {/* ── Tax documents banner ── */}
-                                    {order.tax_docs_pending && (
-                                        <div
-                                            style={{
-                                                background: 'var(--bg-yellow, #fefce8)',
-                                                border: '1px solid var(--border-yellow, #fde68a)',
-                                                borderRadius: '6px',
-                                                padding: '8px 12px',
-                                                marginBottom: '10px',
-                                                fontSize: '13px',
-                                                color: '#92400e',
-                                            }}
-                                        >
-                                            📄 Tax documents pending — accountant will upload invoice &amp; e-way bill
+                                    {/* ── Tax documents ── */}
+                                    {((order.docs ?? []).length > 0 || order.tax_docs_pending) && (
+                                        <div style={{ marginBottom: '10px' }}>
+                                            {order.tax_docs_pending && (
+                                                <div style={{ background: 'var(--bg-yellow, #fefce8)', border: '1px solid var(--border-yellow, #fde68a)', borderRadius: '6px', padding: '7px 12px', fontSize: '12px', color: '#92400e', marginBottom: '6px' }}>
+                                                    📄 Tax Invoice pending — accountant will upload
+                                                </div>
+                                            )}
+                                            {(order.docs ?? []).length > 0 && (
+                                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                                    {(order.docs ?? []).map((doc) => (
+                                                        <a
+                                                            key={doc.id}
+                                                            href={`/orders/${order.id}/documents/${doc.id}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '5px 10px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: '#1e40af' }}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                            {doc.document_type === 'tax_invoice' ? '🧾 Tax Invoice' : '📋 E-way Bill'}
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 

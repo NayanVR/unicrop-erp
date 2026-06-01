@@ -36,9 +36,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
     });
 
-    // Orders list is visible to office, design, and accountant users (controller filters by role)
-    Route::middleware(['role:admin,office,design,accountant'])->group(function () {
+    // Orders list — controller filters by role; sales see confirmed/dispatched only
+    Route::middleware(['role:admin,office,design,accountant,sales'])->group(function () {
         Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
+    });
+
+    // Order documents — download accessible by any authenticated user with order access
+    Route::get('orders/{order}/documents/{attachment}', [OrderController::class, 'downloadDocument'])->name('orders.documents.show');
+
+    // Order documents — upload / delete restricted to accountant and admin
+    Route::middleware(['role:admin,accountant'])->group(function () {
+        Route::post('orders/{order}/documents', [OrderController::class, 'uploadDocument'])->name('orders.documents.store');
+        Route::delete('orders/{order}/documents/{attachment}', [OrderController::class, 'deleteDocument'])->name('orders.documents.destroy');
     });
 
     Route::middleware(['role:admin,office'])->group(function () {

@@ -64,9 +64,16 @@ class FactoryController extends Controller
                 'at'    => $latestDesign->updated_at?->toISOString(),
             ] : null;
 
-            // Tax documents banner — pending until an invoice attachment exists.
-            $docTypes = $order->attachments->pluck('document_type')->filter()->map(fn ($t) => strtolower($t));
-            $order->tax_docs_pending = ! $docTypes->contains('invoice');
+            // Tax documents — pass actual records for download links
+            $taxDocs = $order->attachments
+                ->whereIn('document_type', ['tax_invoice', 'eway_bill'])
+                ->map(fn ($a) => [
+                    'id'            => $a->id,
+                    'document_type' => $a->document_type,
+                    'original_name' => $a->original_name,
+                ])->values()->all();
+            $order->docs = $taxDocs;
+            $order->tax_docs_pending = collect($taxDocs)->where('document_type', 'tax_invoice')->isEmpty();
 
             $order->unsetRelation('salesUser');
             $order->unsetRelation('createdBy');

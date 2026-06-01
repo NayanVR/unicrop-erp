@@ -7,6 +7,7 @@ use App\Http\Requests\StoreOrderRequest;
 use App\Http\Requests\UpdateOrderRequest;
 use App\Models\DesignOrder;
 use App\Models\Order;
+use App\Models\OrderAttachment;
 use App\Models\Party;
 use App\Models\ProductPhoto;
 use App\Models\Role;
@@ -14,6 +15,7 @@ use App\Models\Transport;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -37,6 +39,7 @@ class OrderController extends Controller
                 'confirmedBy:id,name',
                 'designOrders:id,order_id,order_item_id,assigned_to,status,order_qty,pcs_to_print,labels_received,skip_party_approval,stage_log',
                 'designOrders.assignee:id,name',
+                'attachments:id,order_id,document_type,original_name,created_at',
             ])
             ->orderByDesc('order_date')
             ->orderByDesc('id');
@@ -56,6 +59,11 @@ class OrderController extends Controller
                          ->whereHas('items', fn ($i) => $i->where('status', 'ready'));
                   });
             });
+        }
+
+        // Sales users see confirmed and dispatched orders only
+        if ($role === Role::SALES) {
+            $ordersQuery->whereIn('status', ['confirmed', 'dispatched']);
         }
         // Admin and office see all orders
 
@@ -86,9 +94,20 @@ class OrderController extends Controller
                 'stage_log'           => $d->stage_log,
             ])->all();
 
+            // Tax / eway bill documents for this order
+            $order->docs = $order->attachments
+                ->whereIn('document_type', ['tax_invoice', 'eway_bill'])
+                ->map(fn ($a) => [
+                    'id'            => $a->id,
+                    'document_type' => $a->document_type,
+                    'original_name' => $a->original_name,
+                    'uploaded_at'   => $a->created_at?->format('d M Y'),
+                ])->values()->all();
+
             $order->unsetRelation('confirmedBy');
             $order->unsetRelation('createdBy');
             $order->unsetRelation('designOrders');
+            $order->unsetRelation('attachments');
         });
 
         return Inertia::render('erp/orders/index', [
@@ -566,6 +585,54 @@ class OrderController extends Controller
         if ($attachments) {
             $order->attachments()->createMany($attachments);
         }
+    }
+
+    public function uploadDocument(Request $request, Order $order): RedirectResponse
+    {
+        $request->validate([
+            'file'          => ['required', 'file', 'mimes:pdf', 'max:10240'],
+            'document_type' => ['required', 'in:tax_invoice,eway_bill'],
+        ]);
+
+        $file = $request->file('file');
+        $path = $file->store('order-documents/'.$order->id, 'local');
+
+        // Replace any existing document of the same type for this order
+        $existing = $order->attachments()->where('document_type', $request->document_type)->first();
+        if ($existing) {
+            Storage::disk('local')->delete($existing->path);
+            $existing->delete();
+        }
+
+        $order->attachments()->create([
+            'original_name' => $file->getClientOriginalName(),
+            'path'          => $path,
+            'mime_type'     => $file->getMimeType() ?? 'application/pdf',
+            'size'          => $file->getSize(),
+            'document_type' => $request->document_type,
+        ]);
+
+        return redirect()->back();
+    }
+
+    public function downloadDocument(Request $request, Order $order, OrderAttachment $attachment): HttpResponse
+    {
+        abort_if($attachment->order_id !== $order->id, 404);
+        abort_if(! Storage::disk('local')->exists($attachment->path), 404, 'File not found.');
+
+        return Storage::disk('local')->response($attachment->path, $attachment->original_name, [
+            'Content-Disposition' => 'inline; filename="'.$attachment->original_name.'"',
+        ]);
+    }
+
+    public function deleteDocument(Request $request, Order $order, OrderAttachment $attachment): RedirectResponse
+    {
+        abort_if($attachment->order_id !== $order->id, 404);
+
+        Storage::disk('local')->delete($attachment->path);
+        $attachment->delete();
+
+        return redirect()->back();
     }
 
     private function generateOrderNumber(): string
