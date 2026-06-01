@@ -240,8 +240,9 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const role = auth.user?.role ?? auth.user?.roles?.[0]?.slug ?? '';
     const canSeeCost      = role === 'admin' || auth.user?.cost_access === true;
     const canSeeTotalValue = role === 'accountant' || canSeeCost;
-    const canMarkReceived = role === 'admin' || role === 'factory';
-    const canManageStock  = role === 'admin' || role === 'factory';
+    const canMarkReceived  = role === 'admin' || role === 'factory';
+    const canManageStock   = role === 'admin' || role === 'factory';
+    const canEditMaterial  = role === 'admin' || role === 'factory' || role === 'accountant';
     const canEnterBill    = role === 'admin' || role === 'factory' || role === 'accountant';
     const isSales         = !['admin', 'factory', 'accountant'].includes(role);
 
@@ -1077,7 +1078,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                         {canSeeCost && <th>Cost/Unit</th>}
                                         {canSeeCost && <th>Value</th>}
                                         <th>Selling Rate</th>
-                                        {canManageStock && <th>Actions</th>}
+                                        {canEditMaterial && <th>Actions</th>}
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1099,12 +1100,12 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                             {canSeeCost && <td>{fmtAmt(m.cost_per_unit)}</td>}
                                             {canSeeCost && <td>{fmtAmt(Number(m.stock_qty) * Number(m.cost_per_unit))}</td>}
                                             <td>{fmtAmt(m.selling_rate)}</td>
-                                            {canManageStock && (
+                                            {canEditMaterial && (
                                                 <td>
                                                     <div style={{ display: 'flex', gap: 4 }}>
-                                                        <button className="btn sm primary" onClick={() => openTxn(m)}>+ Stock</button>
+                                                        {canManageStock && <button className="btn sm primary" onClick={() => openTxn(m)}>+ Stock</button>}
                                                         <button className="btn sm" onClick={() => openEditMat(m)}>Edit</button>
-                                                        <button className="btn danger sm" onClick={() => deleteMaterial(m.id)}>🗑</button>
+                                                        {canManageStock && <button className="btn danger sm" onClick={() => deleteMaterial(m.id)}>🗑</button>}
                                                     </div>
                                                 </td>
                                             )}

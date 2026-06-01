@@ -84,7 +84,7 @@ const NAV_DEFS: Record<string, NavItem[]> = {
         { id: 'acct-dashboard', label: 'Dashboard', icon: '📊', href: dashboard() },
         { id: 'all-orders', label: 'Orders', icon: '📋', href: ordersIndex() },
         { id: 'inventory', label: 'Inventory', icon: '🗄️', href: inventoryIndex() },
-        { id: 'settings', label: 'Products & HSN', icon: '🌿', href: settingsIndex() },
+        { id: 'inventory', label: 'Products & HSN', icon: '🌿', href: inventoryIndex() },
     ],
     sales: [
         { id: 'dashboard', label: 'Dashboard', icon: '🌾', href: dashboard() },
