@@ -118,7 +118,8 @@ class ProductPhotoController extends Controller
         }
 
         $productLabel = !empty($data['party_brand']) ? $data['party_brand'] : $data['our_brand'];
-        $filename = Str::slug($productLabel) . '_' . Str::random(8) . '.webp';
+        $imgExt = function_exists('imagewebp') ? 'webp' : 'jpg';
+        $filename = Str::slug($productLabel) . '_' . Str::random(8) . '.' . $imgExt;
         $path = 'product-photos/' . $folderName . '/' . $filename;
 
         Log::error('[gallery-debug] attempting S3 put', ['disk' => $disk, 'path' => $path]);
@@ -176,7 +177,8 @@ class ProductPhotoController extends Controller
             }
 
             $productLabel = !empty($data['party_brand']) ? $data['party_brand'] : $data['our_brand'];
-            $filename = Str::slug($productLabel) . '_' . Str::random(8) . '.webp';
+            $imgExt = function_exists('imagewebp') ? 'webp' : 'jpg';
+            $filename = Str::slug($productLabel) . '_' . Str::random(8) . '.' . $imgExt;
             $path = 'product-photos/' . $folderName . '/' . $filename;
 
             try {
@@ -207,6 +209,7 @@ class ProductPhotoController extends Controller
     {
         $targetBytes = 5 * 1024; // 5 KB
         $maxDim = 300;
+        $useWebp = function_exists('imagewebp') && function_exists('imagecreatefromwebp');
 
         $info = getimagesize($sourcePath);
         $mime = $info['mime'] ?? '';
@@ -214,24 +217,27 @@ class ProductPhotoController extends Controller
         $src = match ($mime) {
             'image/jpeg' => imagecreatefromjpeg($sourcePath),
             'image/png'  => imagecreatefrompng($sourcePath),
-            'image/webp' => imagecreatefromwebp($sourcePath),
+            'image/webp' => $useWebp ? imagecreatefromwebp($sourcePath) : imagecreatefromjpeg($sourcePath),
             default      => imagecreatefromjpeg($sourcePath),
         };
 
         $ow = imagesx($src);
         $oh = imagesy($src);
 
-        // Scale down so longest side ≤ maxDim
         $ratio = min($maxDim / $ow, $maxDim / $oh, 1.0);
         $nw = max(1, (int) round($ow * $ratio));
         $nh = max(1, (int) round($oh * $ratio));
 
         $dst = imagecreatetruecolor($nw, $nh);
-        // Preserve transparency
-        imagealphablending($dst, false);
-        imagesavealpha($dst, true);
+        // White background (handles PNG transparency → JPEG)
+        $white = imagecolorallocate($dst, 255, 255, 255);
+        imagefill($dst, 0, 0, $white);
         imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $ow, $oh);
         imagedestroy($src);
+
+        $encode = $useWebp
+            ? fn($quality) => imagewebp($dst, null, $quality)
+            : fn($quality) => imagejpeg($dst, null, $quality);
 
         // Binary-search quality between 10 and 85
         $lo = 10;
@@ -241,21 +247,21 @@ class ProductPhotoController extends Controller
         while ($lo <= $hi) {
             $mid = (int)(($lo + $hi) / 2);
             ob_start();
-            imagewebp($dst, null, $mid);
+            $encode($mid);
             $data = ob_get_clean();
 
             if (strlen($data) <= $targetBytes) {
                 $best = $data;
-                $lo = $mid + 1; // try higher quality
+                $lo = $mid + 1;
             } else {
-                $hi = $mid - 1; // need lower quality
+                $hi = $mid - 1;
             }
         }
 
-        // Fallback: if even quality 10 exceeded target, use the lowest-quality output
+        // Fallback: if even quality 10 exceeded target, use it anyway
         if ($best === '') {
             ob_start();
-            imagewebp($dst, null, 10);
+            $encode(10);
             $best = ob_get_clean();
         }
 
