@@ -1131,19 +1131,19 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 <div
                     className="modal-overlay open"
                     onClick={() => setLabelEditor(null)}
-                    style={{ zIndex: 9000, alignItems: 'flex-start', overflowY: 'auto', padding: '24px 16px' }}
+                    style={{ zIndex: 9000 }}
                 >
                     <div
                         className="modal"
                         onClick={(e) => e.stopPropagation()}
-                        style={{ maxWidth: '900px', width: '100%', margin: 'auto' }}
+                        style={{ maxWidth: '680px', width: '100%', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 40px)' }}
                     >
-                        <div className="modal-header" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <h2 style={{ flex: 1 }}>🏷 Box Labels — {labelEditor.order.order_number}</h2>
+                        <div className="modal-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                            <h2 style={{ flex: 1, fontSize: '15px' }}>🏷 Box Labels — {labelEditor.order.order_number}</h2>
                             <button
                                 type="button"
                                 className="btn-primary"
-                                style={{ padding: '8px 18px', fontSize: '14px' }}
+                                style={{ padding: '7px 14px', fontSize: '13px' }}
                                 onClick={downloadLabelsPDF}
                             >
                                 ⬇ Download PDF
@@ -1151,29 +1151,33 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                             <button className="modal-close" onClick={() => setLabelEditor(null)}>✕</button>
                         </div>
                         {/* Font size controls */}
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', padding: '0 20px 12px', alignItems: 'center' }}>
-                            <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600, marginRight: 2 }}>Font size:</span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '8px 16px', alignItems: 'center', flexShrink: 0, borderBottom: '1px solid var(--border)' }}>
+                            <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, marginRight: 2 }}>Font:</span>
                             {([
                                 { key: 'transport', label: 'Transport' },
                                 { key: 'party',     label: 'Party' },
-                                { key: 'totalBoxes',label: 'Total boxes' },
-                                { key: 'boxNum',    label: 'Box no.' },
+                                { key: 'totalBoxes',label: 'Boxes' },
+                                { key: 'boxNum',    label: 'Box#' },
                                 { key: 'brand',     label: 'Product' },
                             ] as { key: keyof typeof labelFS; label: string }[]).map(({ key, label }) => (
-                                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#f1f5f9', borderRadius: '6px', padding: '3px 6px' }}>
-                                    <span style={{ fontSize: '11px', color: '#475569', minWidth: 60 }}>{label}</span>
-                                    <button type="button" onClick={() => adjFS(key, -2)} style={{ width: 22, height: 22, border: '1px solid #cbd5e1', borderRadius: 4, background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 14, lineHeight: 1 }}>−</button>
-                                    <span style={{ fontSize: '12px', fontWeight: 700, minWidth: 28, textAlign: 'center' }}>{labelFS[key]}pt</span>
-                                    <button type="button" onClick={() => adjFS(key, 2)} style={{ width: 22, height: 22, border: '1px solid #cbd5e1', borderRadius: 4, background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 14, lineHeight: 1 }}>+</button>
+                                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '2px', background: '#f1f5f9', borderRadius: '5px', padding: '2px 5px' }}>
+                                    <span style={{ fontSize: '10px', color: '#475569', minWidth: 48 }}>{label}</span>
+                                    <button type="button" onClick={() => adjFS(key, -2)} style={{ width: 20, height: 20, border: '1px solid #cbd5e1', borderRadius: 3, background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 13, lineHeight: 1 }}>−</button>
+                                    <span style={{ fontSize: '11px', fontWeight: 700, minWidth: 26, textAlign: 'center' }}>{labelFS[key]}pt</span>
+                                    <button type="button" onClick={() => adjFS(key, 2)} style={{ width: 20, height: 20, border: '1px solid #cbd5e1', borderRadius: 3, background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 13, lineHeight: 1 }}>+</button>
                                 </div>
                             ))}
                         </div>
+                        {/* Scrollable labels grid */}
                         <div
                             style={{
+                                flex: 1,
+                                overflowY: 'auto',
+                                minHeight: 0,
                                 display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                                gap: '16px',
-                                padding: '0 20px 20px',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                                gap: '12px',
+                                padding: '14px 16px',
                             }}
                         >
                             {labelEditor.labels.map((lbl, idx) => (
