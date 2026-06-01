@@ -1,3 +1,4 @@
+import LowStockProductionCard, { type LowStockProduction } from '@/components/low-stock-production-card';
 import { index as bomIndex } from '@/routes/bom';
 import { index as factoryIndex } from '@/routes/factory';
 import { index as inventoryIndex } from '@/routes/inventory';
@@ -49,6 +50,7 @@ type Props = {
     pendingTransfers: number;
     finishedThisWeek: number;
     recentDispatched: RecentDispatched[];
+    lowStockProduction: LowStockProduction | null;
 };
 
 const STAGES = [
@@ -69,7 +71,7 @@ const priorityBadge = (p: string) => {
 };
 
 export default function FactoryDashboard({
-    stageCounts, activeOrders, urgentPending, lowStock, pendingTransfers, finishedThisWeek, recentDispatched,
+    stageCounts, activeOrders, urgentPending, lowStock, pendingTransfers, finishedThisWeek, recentDispatched, lowStockProduction,
 }: Props) {
     const totalActive = STAGES.filter((s) => s.key !== 'dispatched').reduce((sum, s) => sum + (stageCounts[s.key] ?? 0), 0);
     const inProduction = (stageCounts['processing'] ?? 0) + (stageCounts['filling'] ?? 0) + (stageCounts['labeling'] ?? 0);
@@ -103,6 +105,8 @@ export default function FactoryDashboard({
                         </Link>
                     </div>
                 )}
+
+                <LowStockProductionCard data={lowStockProduction} />
 
                 {/* ── Top stat cards ── */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '14px', marginBottom: '24px' }}>

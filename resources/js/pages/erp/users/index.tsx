@@ -35,6 +35,7 @@ const stagePermissions = [
 
 const bomPermissions = [
     { id: 'bom_delete', label: 'Delete BOM & Run History' },
+    { id: 'low_stock_alerts', label: 'Low Stock Alerts on Dashboard' },
 ];
 
 const moduleAccess = [

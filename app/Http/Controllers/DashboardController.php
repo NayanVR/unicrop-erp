@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Bom;
 use App\Models\DesignOrder;
+use App\Models\FillingRecipe;
 use App\Models\FinishedGood;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -27,10 +29,76 @@ class DashboardController extends Controller
         }
 
         if ($role === Role::FACTORY) {
-            return $this->factoryDashboard();
+            return $this->factoryDashboard($currentUser);
         }
 
         return $this->salesDashboard($currentUser);
+    }
+
+    /**
+     * Low-stock BOM & Filling output products (produced in-house).
+     * Returns null when the user is not allowed to see it.
+     */
+    private function lowStockProduction(User $user): ?array
+    {
+        $allowed = $user->hasRole(Role::ADMIN)
+            || in_array('low_stock_alerts', $user->permissions ?? []);
+
+        if (! $allowed) {
+            return null;
+        }
+
+        $bomMap = Bom::query()
+            ->whereNotNull('output_raw_material_id')
+            ->where('is_active', true)
+            ->get(['output_raw_material_id', 'name'])
+            ->groupBy('output_raw_material_id')
+            ->map(fn ($g) => $g->pluck('name')->values()->toArray());
+
+        $fillingMap = FillingRecipe::query()
+            ->whereNotNull('output_raw_material_id')
+            ->where('is_active', true)
+            ->get(['output_raw_material_id', 'name', 'packing_size'])
+            ->groupBy('output_raw_material_id')
+            ->map(fn ($g) => $g->map(fn ($r) => $r->name . ($r->packing_size ? " ({$r->packing_size})" : ''))->values()->toArray());
+
+        $outputIds = $bomMap->keys()->merge($fillingMap->keys())->unique()->all();
+
+        if (empty($outputIds)) {
+            return ['bom' => [], 'filling' => []];
+        }
+
+        $materials = RawMaterial::query()
+            ->whereIn('id', $outputIds)
+            ->where('is_active', true)
+            ->get(['id', 'name', 'unit', 'stock_qty', 'min_stock'])
+            ->filter(fn ($m) => (float) $m->stock_qty <= (float) $m->min_stock || (float) $m->stock_qty <= 0)
+            ->keyBy('id');
+
+        $row = fn ($m, array $recipes) => [
+            'id'        => $m->id,
+            'name'      => $m->name,
+            'unit'      => $m->unit,
+            'stock_qty' => (float) $m->stock_qty,
+            'min_stock' => (float) $m->min_stock,
+            'recipes'   => $recipes,
+        ];
+
+        $bom = [];
+        foreach ($bomMap as $matId => $recipes) {
+            if ($materials->has($matId)) {
+                $bom[] = $row($materials->get($matId), $recipes);
+            }
+        }
+
+        $filling = [];
+        foreach ($fillingMap as $matId => $recipes) {
+            if ($materials->has($matId)) {
+                $filling[] = $row($materials->get($matId), $recipes);
+            }
+        }
+
+        return ['bom' => $bom, 'filling' => $filling];
     }
 
     private function designDashboard(User $user): Response
@@ -90,7 +158,7 @@ class DashboardController extends Controller
         ]);
     }
 
-    private function factoryDashboard(): Response
+    private function factoryDashboard(User $user): Response
     {
         // Production item stage breakdown (confirmed orders only)
         $stageCounts = OrderItem::query()
@@ -174,14 +242,15 @@ class DashboardController extends Controller
             ]);
 
         return Inertia::render('erp/factory-dashboard', [
-            'pageTitle'        => 'Dashboard',
-            'stageCounts'      => $stageCounts,
-            'activeOrders'     => $activeOrders,
-            'urgentPending'    => $urgentPending,
-            'lowStock'         => $lowStock,
-            'pendingTransfers' => $pendingTransfers,
-            'finishedThisWeek' => $finishedThisWeek,
-            'recentDispatched' => $recentDispatched,
+            'pageTitle'           => 'Dashboard',
+            'stageCounts'         => $stageCounts,
+            'activeOrders'        => $activeOrders,
+            'urgentPending'       => $urgentPending,
+            'lowStock'            => $lowStock,
+            'pendingTransfers'    => $pendingTransfers,
+            'finishedThisWeek'    => $finishedThisWeek,
+            'recentDispatched'    => $recentDispatched,
+            'lowStockProduction'  => $this->lowStockProduction($user),
         ]);
     }
 
@@ -235,9 +304,10 @@ class DashboardController extends Controller
         }
 
         return Inertia::render('erp/dashboard', [
-            'pageTitle'     => 'Dashboard',
-            'salesData'     => $salesData,
-            'currentUserId' => $user->id,
+            'pageTitle'          => 'Dashboard',
+            'salesData'          => $salesData,
+            'currentUserId'      => $user->id,
+            'lowStockProduction' => $this->lowStockProduction($user),
         ]);
     }
 }

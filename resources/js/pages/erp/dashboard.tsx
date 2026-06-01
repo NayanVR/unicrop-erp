@@ -1,3 +1,4 @@
+import LowStockProductionCard, { type LowStockProduction } from '@/components/low-stock-production-card';
 import { create as ordersCreate } from '@/routes/orders';
 import { Head, Link } from '@inertiajs/react';
 import { useState } from 'react';
@@ -20,6 +21,7 @@ type Period = 'today' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 't
 type Props = {
     salesData: Record<Period, PeriodData>;
     currentUserId: number | null;
+    lowStockProduction: LowStockProduction | null;
 };
 
 const PERIODS: { key: Period; label: string }[] = [
@@ -37,7 +39,7 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 const fmt = (v: number) =>
     '₹' + v.toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
-export default function Dashboard({ salesData, currentUserId }: Props) {
+export default function Dashboard({ salesData, currentUserId, lowStockProduction }: Props) {
     const [period, setPeriod] = useState<Period>('today');
     const data = salesData[period];
     const maxValue = Math.max(...data.leaderboard.map((e) => e.value), 1);
@@ -55,6 +57,8 @@ export default function Dashboard({ salesData, currentUserId }: Props) {
                         ＋ New Order
                     </Link>
                 </div>
+
+                <LowStockProductionCard data={lowStockProduction} />
 
                 <div className="card">
                     {/* Header + period pills */}
