@@ -865,7 +865,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                     {isAccountant && (() => {
                                         const hasTax   = (order.docs ?? []).some((d) => d.document_type === 'tax_invoice');
                                         const hasEway  = (order.docs ?? []).some((d) => d.document_type === 'eway_bill');
-                                        const ewayOk   = hasEway || !!order.eway_bill_not_required;
+                                        const ewayOk   = hasEway || !!order.eway_bill_not_required || Number(order.total_amount ?? 0) < 50000;
                                         if (hasTax && ewayOk) {
                                             return <span style={{ fontSize: '11px', fontWeight: 700, color: '#16a34a', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '6px', padding: '3px 8px', whiteSpace: 'nowrap' }}>✓ Done</span>;
                                         }
@@ -1017,7 +1017,8 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                                 const label       = dtype === 'tax_invoice' ? 'Tax Invoice' : 'E-way Bill';
                                                                 const icon        = dtype === 'tax_invoice' ? '🧾' : '📋';
                                                                 const isUploading = uploadingDoc?.orderId === order.id && uploadingDoc.type === dtype;
-                                                                const ewayNoNeed  = dtype === 'eway_bill' && !!order.eway_bill_not_required;
+                                                                const autoExempt  = dtype === 'eway_bill' && Number(order.total_amount ?? 0) < 50000;
+                                                                const ewayNoNeed  = dtype === 'eway_bill' && (!!order.eway_bill_not_required || autoExempt);
                                                                 const bgColor     = existing ? '#f0fdf4' : ewayNoNeed ? '#f5f3ff' : 'var(--bg-paper)';
                                                                 const borderColor = existing ? '#86efac' : ewayNoNeed ? '#c4b5fd' : 'var(--border)';
                                                                 return (
@@ -1027,6 +1028,8 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                                             <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--tx-head)' }}>{label}</div>
                                                                             {existing ? (
                                                                                 <div style={{ fontSize: '11px', color: '#16a34a' }}>Uploaded {existing.uploaded_at ?? ''}</div>
+                                                                            ) : autoExempt ? (
+                                                                                <div style={{ fontSize: '11px', color: '#7c3aed' }}>Not Required (below ₹50,000)</div>
                                                                             ) : ewayNoNeed ? (
                                                                                 <div style={{ fontSize: '11px', color: '#7c3aed' }}>Not Required</div>
                                                                             ) : (
@@ -1061,18 +1064,18 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                                                     </button>
                                                                                 </>
                                                                             )}
-                                                                            {/* E-way "No Need" toggle — only when no file uploaded */}
-                                                                            {dtype === 'eway_bill' && !existing && (
+                                                                            {/* Manual "No Need" toggle — only when no file and not auto-exempt */}
+                                                                            {dtype === 'eway_bill' && !existing && !autoExempt && (
                                                                                 <button
                                                                                     type="button"
                                                                                     className="btn sm"
-                                                                                    style={{ padding: '3px 8px', fontSize: '11px', color: ewayNoNeed ? '#7c3aed' : 'var(--tx-muted)', borderColor: ewayNoNeed ? '#c4b5fd' : 'var(--border)', background: ewayNoNeed ? '#f5f3ff' : undefined }}
+                                                                                    style={{ padding: '3px 8px', fontSize: '11px', color: order.eway_bill_not_required ? '#7c3aed' : 'var(--tx-muted)', borderColor: order.eway_bill_not_required ? '#c4b5fd' : 'var(--border)', background: order.eway_bill_not_required ? '#f5f3ff' : undefined }}
                                                                                     onClick={(e) => {
                                                                                         e.stopPropagation();
-                                                                                        router.post(`/orders/${order.id}/eway-not-required`, { value: !ewayNoNeed }, { preserveScroll: true });
+                                                                                        router.post(`/orders/${order.id}/eway-not-required`, { value: !order.eway_bill_not_required }, { preserveScroll: true });
                                                                                     }}
                                                                                 >
-                                                                                    {ewayNoNeed ? '↩ Undo' : 'No Need'}
+                                                                                    {order.eway_bill_not_required ? '↩ Undo' : 'No Need'}
                                                                                 </button>
                                                                             )}
                                                                             {!ewayNoNeed && (
