@@ -866,8 +866,8 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     <p>Raw material stock levels &amp; transaction history</p>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {canEnterBill && <button className="btn sm" onClick={() => setScanModal(true)}>📸 Scan Bill</button>}
-                    {canEnterBill && <button className="btn sm" onClick={() => setBillModal(true)}>📄 Purchase Bill</button>}
+                    {canEnterBill && role !== 'accountant' && <button className="btn sm" onClick={() => setScanModal(true)}>📸 Scan Bill</button>}
+                    {canEnterBill && role !== 'accountant' && <button className="btn sm" onClick={() => setBillModal(true)}>📄 Purchase Bill</button>}
                     {canMarkReceived && <button className="btn sm" onClick={openPackModal}>📦 Packaging</button>}
                     {canMarkReceived && <button className="btn sm primary" onClick={openNewMat}>+ Add Material</button>}
                 </div>
@@ -882,20 +882,20 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                         <div className="stat-label">Total Materials</div>
                     </div>
                 </div>
-                <div className="stat-card">
+                {role !== 'accountant' && <div className="stat-card">
                     <div className="stat-icon" style={{ background: '#fef3c7' }}>⚠️</div>
                     <div>
                         <div className="stat-val">{stats.lowStock}</div>
                         <div className="stat-label">Low Stock</div>
                     </div>
-                </div>
-                <div className="stat-card">
+                </div>}
+                {role !== 'accountant' && <div className="stat-card">
                     <div className="stat-icon" style={{ background: '#fee2e2' }}>🚫</div>
                     <div>
                         <div className="stat-val">{stats.outOfStock}</div>
                         <div className="stat-label">Out of Stock</div>
                     </div>
-                </div>
+                </div>}
                 {canSeeTotalValue && (
                     <div className="stat-card">
                         <div className="stat-icon" style={{ background: '#e0f2fe' }}>💰</div>
@@ -908,7 +908,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             </div>
 
             {/* Low Stock Alerts — BOM outputs / Filling outputs / Purchase needed */}
-            {!isSales && alertMaterials.length > 0 && (() => {
+            {!isSales && role !== 'accountant' && alertMaterials.length > 0 && (() => {
                 const bomOutputIds     = Object.keys(bomOutputMap).map(Number);
                 const fillingOutputIds = Object.keys(fillingOutputMap).map(Number);
 
@@ -973,7 +973,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             })()}
 
             {/* On The Way */}
-            {!isSales && pendingReorders.length > 0 && (
+            {!isSales && role !== 'accountant' && pendingReorders.length > 0 && (
                 <div className="card" style={{ marginBottom: 16 }}>
                     <div className="card-title" style={{ marginBottom: 8 }}>🚚 On The Way</div>
                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -1008,7 +1008,10 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
 
             {/* Tabs */}
             <div className="filter-bar" style={{ marginBottom: 0, borderBottom: '1px solid #e5e7eb' }}>
-                {(['materials', 'log', 'bills', 'reorders', 'categories', 'godowns'] as const).filter((t) => !isSales || t === 'materials').map((t) => (
+                {(['materials', 'log', 'bills', 'reorders', 'categories', 'godowns'] as const).filter((t) => {
+                    if (role === 'accountant') return t === 'materials' || t === 'categories';
+                    return !isSales || t === 'materials';
+                }).map((t) => (
                     <button
                         key={t}
                         className={`pill${tab === t ? ' active' : ''}`}
