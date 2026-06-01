@@ -986,172 +986,9 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                     {/* ── Non-design: financial items table + summary ── */}
                                     {!isDesign && (
                                         <>
-                                            <div className="prod-wrap">
-                                                <table className="prod-table">
-                                                    <thead>
-                                                        <tr>
-                                                            <th style={{ width: '52px' }}></th>
-                                                            <th>Product</th>
-                                                            <th>Packing</th>
-                                                            <th>Qty</th>
-                                                            <th>Rate</th>
-                                                            <th>GST %</th>
-                                                            <th>Amount</th>
-                                                            <th>Status</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {order.items.length === 0 ? (
-                                                            <tr>
-                                                                <td colSpan={8} style={{ textAlign: 'center', padding: '16px' }}>
-                                                                    No items yet.
-                                                                </td>
-                                                            </tr>
-                                                        ) : (
-                                                            order.items.map((item) => {
-                                                                const photo = getItemPhoto(item, order.party_id, photoMap);
-                                                                return (
-                                                                    <tr key={item.id}>
-                                                                        <td style={{ textAlign: 'center', padding: '4px 6px' }}>
-                                                                            {photo ? (
-                                                                                <img
-                                                                                    src={photo} alt=""
-                                                                                    onClick={(e) => { e.stopPropagation(); setPhotoLightbox(photo); }}
-                                                                                    style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '6px', border: '1px solid var(--border)', background: '#fff', padding: '2px', display: 'block', cursor: 'zoom-in' }}
-                                                                                />
-                                                                            ) : (
-                                                                                <div style={{ width: '40px', height: '40px', borderRadius: '6px', border: '1px dashed var(--border)', background: 'var(--bg-paper)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', color: 'var(--tx-muted)' }}>
-                                                                                    📷
-                                                                                </div>
-                                                                            )}
-                                                                        </td>
-                                                                        <td>
-                                                                            <div className="prod-name">{item.our_brand ?? '—'}</div>
-                                                                            <div className="prod-detail">{item.party_brand ?? '—'}</div>
-                                                                        </td>
-                                                                        <td>{item.packing_size ?? '—'}</td>
-                                                                        <td>{item.quantity}</td>
-                                                                        <td>{formatAmount(item.rate)}</td>
-                                                                        <td>{item.gst_percent}</td>
-                                                                        <td>{formatAmount(item.amount)}</td>
-                                                                        <td>
-                                                                            <span className={`badge s-${normalizeStage(item.status)}`}>
-                                                                                {(!item.status || item.status === 'pending'
-                                                                                    ? 'Awaiting Acceptance'
-                                                                                    : (PROD_STAGE_LABELS[item.status] ?? item.status)
-                                                                                ).toUpperCase()}
-                                                                            </span>
-                                                                            {lastStageActor(item) && (
-                                                                                <div className="prod-detail" style={{ marginTop: '2px' }}>
-                                                                                    by {lastStageActor(item)}
-                                                                                </div>
-                                                                            )}
-                                                                        </td>
-                                                                    </tr>
-                                                                );
-                                                            })
-                                                        )}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-
-                                            {/* Production pipeline — visible for confirmed/dispatched orders, not for accountants */}
-                                            {!isAccountant && (order.status === 'confirmed' || order.status === 'dispatched') && order.items.length > 0 && (
-                                                <div style={{ marginBottom: '14px' }}>
-                                                    <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)', marginBottom: '8px' }}>
-                                                        Production Progress
-                                                    </div>
-                                                    <div style={{ overflowX: 'auto' }}>
-                                                        <table className="prod-table" style={{ fontSize: '12px' }}>
-                                                            <thead>
-                                                                <tr>
-                                                                    <th>Product</th>
-                                                                    {PROD_STAGES.map((s) => (
-                                                                        <th key={s} style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                                                                            {PROD_STAGE_LABELS[s]}
-                                                                        </th>
-                                                                    ))}
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {order.items.map((item) => {
-                                                                    const stageIdx = PROD_STAGES.indexOf(normalizeStage(item.status));
-                                                                    const worker = lastStageActor(item);
-                                                                    return (
-                                                                        <tr key={item.id}>
-                                                                            <td>
-                                                                                <div className="prod-name" style={{ fontSize: '12px' }}>{item.our_brand ?? '—'}</div>
-                                                                                {item.party_brand && <div className="prod-detail">{item.party_brand}</div>}
-                                                                                {worker && (
-                                                                                    <div style={{ fontSize: '11px', color: 'var(--tx-muted)', marginTop: '2px' }}>
-                                                                                        👷 {worker}
-                                                                                    </div>
-                                                                                )}
-                                                                            </td>
-                                                                            {PROD_STAGES.map((s, i) => {
-                                                                                const isPast = i < stageIdx;
-                                                                                const isCurrent = i === stageIdx;
-                                                                                const actor = actorForStage(item, s);
-                                                                                return (
-                                                                                    <td key={s} style={{ textAlign: 'center', verticalAlign: 'top', paddingTop: '6px' }}>
-                                                                                        {isPast ? (
-                                                                                            <span title={actor ? `by ${actor}` : undefined} style={{ color: '#059669', fontSize: '14px', cursor: actor ? 'help' : 'default' }}>✓</span>
-                                                                                        ) : isCurrent ? (
-                                                                                            <div>
-                                                                                                <span className={`badge s-${s}`} style={{ fontSize: '10px' }}>●</span>
-                                                                                                {actor && (
-                                                                                                    <div style={{ fontSize: '10px', color: 'var(--tx-muted)', marginTop: '3px', whiteSpace: 'nowrap' }}>
-                                                                                                        {actor}
-                                                                                                    </div>
-                                                                                                )}
-                                                                                            </div>
-                                                                                        ) : (
-                                                                                            <span style={{ color: 'var(--tx-faint)', fontSize: '12px' }}>○</span>
-                                                                                        )}
-                                                                                    </td>
-                                                                                );
-                                                                            })}
-                                                                        </tr>
-                                                                    );
-                                                                })}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            <div className="form-card" style={{ marginBottom: 0 }}>
-                                                <div className="form-card-title">Order Summary</div>
-                                                <div className="form-grid three">
-                                                    <div className="form-group">
-                                                        <label>Subtotal</label>
-                                                        <div>{formatAmount(order.subtotal)}</div>
-                                                    </div>
-                                                    <div className="form-group">
-                                                        <label>GST</label>
-                                                        <div>{formatAmount(order.gst_total)}</div>
-                                                    </div>
-                                                    <div className="form-group">
-                                                        <label>Total</label>
-                                                        <div>{formatAmount(order.total_amount)}</div>
-                                                    </div>
-                                                </div>
-                                                {!isAccountant && (
-                                                    <div style={{ marginTop: '14px' }}>
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                                            <span>Production Progress</span>
-                                                            <span>{progress}%</span>
-                                                        </div>
-                                                        <div className="progress-bar">
-                                                            <div className="progress-fill" style={{ width: `${progress}%`, background: 'var(--accent)' }} />
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* ── Billing details — accountant only ── */}
+                                            {/* ── Billing details — accountant only, shown FIRST ── */}
                                             {isAccountant && (
-                                                <div className="form-card" style={{ marginTop: '12px', marginBottom: 0, borderLeft: '3px solid #2563eb' }}>
+                                                <div className="form-card" style={{ marginBottom: '12px', borderLeft: '3px solid #2563eb' }}>
                                                     <div className="form-card-title" style={{ color: '#1e40af' }}>🧾 Billing Details</div>
 
                                                     {/* Party info */}
@@ -1397,6 +1234,170 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                     </div>
                                                 </div>
                                             )}
+
+                                            <div className="prod-wrap">
+                                                <table className="prod-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th style={{ width: '52px' }}></th>
+                                                            <th>Product</th>
+                                                            <th>Packing</th>
+                                                            <th>Qty</th>
+                                                            <th>Rate</th>
+                                                            <th>GST %</th>
+                                                            <th>Amount</th>
+                                                            <th>Status</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {order.items.length === 0 ? (
+                                                            <tr>
+                                                                <td colSpan={8} style={{ textAlign: 'center', padding: '16px' }}>
+                                                                    No items yet.
+                                                                </td>
+                                                            </tr>
+                                                        ) : (
+                                                            order.items.map((item) => {
+                                                                const photo = getItemPhoto(item, order.party_id, photoMap);
+                                                                return (
+                                                                    <tr key={item.id}>
+                                                                        <td style={{ textAlign: 'center', padding: '4px 6px' }}>
+                                                                            {photo ? (
+                                                                                <img
+                                                                                    src={photo} alt=""
+                                                                                    onClick={(e) => { e.stopPropagation(); setPhotoLightbox(photo); }}
+                                                                                    style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '6px', border: '1px solid var(--border)', background: '#fff', padding: '2px', display: 'block', cursor: 'zoom-in' }}
+                                                                                />
+                                                                            ) : (
+                                                                                <div style={{ width: '40px', height: '40px', borderRadius: '6px', border: '1px dashed var(--border)', background: 'var(--bg-paper)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', color: 'var(--tx-muted)' }}>
+                                                                                    📷
+                                                                                </div>
+                                                                            )}
+                                                                        </td>
+                                                                        <td>
+                                                                            <div className="prod-name">{item.our_brand ?? '—'}</div>
+                                                                            <div className="prod-detail">{item.party_brand ?? '—'}</div>
+                                                                        </td>
+                                                                        <td>{item.packing_size ?? '—'}</td>
+                                                                        <td>{item.quantity}</td>
+                                                                        <td>{formatAmount(item.rate)}</td>
+                                                                        <td>{item.gst_percent}</td>
+                                                                        <td>{formatAmount(item.amount)}</td>
+                                                                        <td>
+                                                                            <span className={`badge s-${normalizeStage(item.status)}`}>
+                                                                                {(!item.status || item.status === 'pending'
+                                                                                    ? 'Awaiting Acceptance'
+                                                                                    : (PROD_STAGE_LABELS[item.status] ?? item.status)
+                                                                                ).toUpperCase()}
+                                                                            </span>
+                                                                            {lastStageActor(item) && (
+                                                                                <div className="prod-detail" style={{ marginTop: '2px' }}>
+                                                                                    by {lastStageActor(item)}
+                                                                                </div>
+                                                                            )}
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                            {/* Production pipeline — visible for confirmed/dispatched orders, not for accountants */}
+                                            {!isAccountant && (order.status === 'confirmed' || order.status === 'dispatched') && order.items.length > 0 && (
+                                                <div style={{ marginBottom: '14px' }}>
+                                                    <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)', marginBottom: '8px' }}>
+                                                        Production Progress
+                                                    </div>
+                                                    <div style={{ overflowX: 'auto' }}>
+                                                        <table className="prod-table" style={{ fontSize: '12px' }}>
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Product</th>
+                                                                    {PROD_STAGES.map((s) => (
+                                                                        <th key={s} style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                                                            {PROD_STAGE_LABELS[s]}
+                                                                        </th>
+                                                                    ))}
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {order.items.map((item) => {
+                                                                    const stageIdx = PROD_STAGES.indexOf(normalizeStage(item.status));
+                                                                    const worker = lastStageActor(item);
+                                                                    return (
+                                                                        <tr key={item.id}>
+                                                                            <td>
+                                                                                <div className="prod-name" style={{ fontSize: '12px' }}>{item.our_brand ?? '—'}</div>
+                                                                                {item.party_brand && <div className="prod-detail">{item.party_brand}</div>}
+                                                                                {worker && (
+                                                                                    <div style={{ fontSize: '11px', color: 'var(--tx-muted)', marginTop: '2px' }}>
+                                                                                        👷 {worker}
+                                                                                    </div>
+                                                                                )}
+                                                                            </td>
+                                                                            {PROD_STAGES.map((s, i) => {
+                                                                                const isPast = i < stageIdx;
+                                                                                const isCurrent = i === stageIdx;
+                                                                                const actor = actorForStage(item, s);
+                                                                                return (
+                                                                                    <td key={s} style={{ textAlign: 'center', verticalAlign: 'top', paddingTop: '6px' }}>
+                                                                                        {isPast ? (
+                                                                                            <span title={actor ? `by ${actor}` : undefined} style={{ color: '#059669', fontSize: '14px', cursor: actor ? 'help' : 'default' }}>✓</span>
+                                                                                        ) : isCurrent ? (
+                                                                                            <div>
+                                                                                                <span className={`badge s-${s}`} style={{ fontSize: '10px' }}>●</span>
+                                                                                                {actor && (
+                                                                                                    <div style={{ fontSize: '10px', color: 'var(--tx-muted)', marginTop: '3px', whiteSpace: 'nowrap' }}>
+                                                                                                        {actor}
+                                                                                                    </div>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        ) : (
+                                                                                            <span style={{ color: 'var(--tx-faint)', fontSize: '12px' }}>○</span>
+                                                                                        )}
+                                                                                    </td>
+                                                                                );
+                                                                            })}
+                                                                        </tr>
+                                                                    );
+                                                                })}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="form-card" style={{ marginBottom: 0 }}>
+                                                <div className="form-card-title">Order Summary</div>
+                                                <div className="form-grid three">
+                                                    <div className="form-group">
+                                                        <label>Subtotal</label>
+                                                        <div>{formatAmount(order.subtotal)}</div>
+                                                    </div>
+                                                    <div className="form-group">
+                                                        <label>GST</label>
+                                                        <div>{formatAmount(order.gst_total)}</div>
+                                                    </div>
+                                                    <div className="form-group">
+                                                        <label>Total</label>
+                                                        <div>{formatAmount(order.total_amount)}</div>
+                                                    </div>
+                                                </div>
+                                                {!isAccountant && (
+                                                    <div style={{ marginTop: '14px' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                                            <span>Production Progress</span>
+                                                            <span>{progress}%</span>
+                                                        </div>
+                                                        <div className="progress-bar">
+                                                            <div className="progress-fill" style={{ width: `${progress}%`, background: 'var(--accent)' }} />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
                                         </>
                                     )}
 
