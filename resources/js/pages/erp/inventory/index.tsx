@@ -1541,7 +1541,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                         <h3>{editingMat ? 'Edit Material' : 'Add Material'}</h3>
                         <button className="modal-close" onClick={() => setMatModal(false)}>×</button>
                     </div>
-                    <form onSubmit={submitMat}>
+                    <form onSubmit={submitMat} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                         <div className="modal-body">
                             <div className="form-grid">
                                 <div className="form-group">
@@ -1770,7 +1770,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                         <h3>Stock Transaction</h3>
                         <button className="modal-close" onClick={() => setTxnModal(false)}>×</button>
                     </div>
-                    <form onSubmit={submitTxn}>
+                    <form onSubmit={submitTxn} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                         <div className="modal-body">
                             {txnTarget && (
                                 <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
@@ -2274,7 +2274,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                         <h3>🚚 Order Placed</h3>
                         <button className="modal-close" onClick={() => setReorderModal(false)}>×</button>
                     </div>
-                    <form onSubmit={submitReorder}>
+                    <form onSubmit={submitReorder} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                         <div className="modal-body">
                             <div className="form-grid">
                                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
