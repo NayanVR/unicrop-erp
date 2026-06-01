@@ -123,14 +123,18 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
     const permissions = (auth.user?.permissions ?? []) as string[];
     const navItems = useMemo(() => {
         const base = NAV_DEFS[role ?? 'admin'] ?? [];
+        let items = base;
         if (role === 'factory' && permissions.includes('filling')) {
-            const insertAfter = base.findIndex((i) => i.id === 'factory');
+            const insertAfter = items.findIndex((i) => i.id === 'factory');
             const fillingItem: NavItem = { id: 'filling', label: 'Filling', icon: '🧪', href: '/filling' as NonNullable<InertiaLinkProps['href']> };
-            return insertAfter >= 0
-                ? [...base.slice(0, insertAfter + 1), fillingItem, ...base.slice(insertAfter + 1)]
-                : [...base, fillingItem];
+            items = insertAfter >= 0
+                ? [...items.slice(0, insertAfter + 1), fillingItem, ...items.slice(insertAfter + 1)]
+                : [...items, fillingItem];
         }
-        return base;
+        if (role !== 'admin' && !permissions.includes('manage_users')) {
+            items = items.filter((i) => i.id !== 'users');
+        }
+        return items;
     }, [role, permissions]);
 
     useDraggableModals();
