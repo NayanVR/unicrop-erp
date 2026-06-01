@@ -1136,7 +1136,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                     <div
                         className="modal"
                         onClick={(e) => e.stopPropagation()}
-                        style={{ maxWidth: '680px', width: '100%', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 40px)' }}
+                        style={{ maxWidth: '420px', width: '100%', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 40px)' }}
                     >
                         <div className="modal-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                             <h2 style={{ flex: 1, fontSize: '15px' }}>🏷 Box Labels — {labelEditor.order.order_number}</h2>
@@ -1168,45 +1168,49 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                 </div>
                             ))}
                         </div>
-                        {/* Scrollable labels grid */}
+                        {/* Scrollable labels — each card is exactly 100mm × 75mm */}
                         <div
                             style={{
                                 flex: 1,
                                 overflowY: 'auto',
                                 minHeight: 0,
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                                gap: '12px',
-                                padding: '14px 16px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '16px',
+                                padding: '16px',
+                                background: '#e5e7eb',
                             }}
                         >
                             {labelEditor.labels.map((lbl, idx) => (
                                 <div
                                     key={lbl.key}
                                     style={{
-                                        border: '1.5px solid #999',
-                                        borderRadius: '6px',
-                                        padding: '10px 12px',
+                                        width: '100mm',
+                                        height: '75mm',
+                                        border: '0.5px solid #000',
                                         background: '#fff',
                                         display: 'flex',
                                         flexDirection: 'column',
-                                        gap: '3px',
+                                        padding: '3mm 4mm',
                                         fontFamily: 'Arial, sans-serif',
+                                        boxSizing: 'border-box',
+                                        flexShrink: 0,
+                                        overflow: 'hidden',
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+                                        position: 'relative',
                                     }}
                                 >
-                                    {/* Label badge */}
-                                    <div style={{ fontSize: '10px', color: '#888', marginBottom: '2px', fontWeight: 600, letterSpacing: '0.04em' }}>
-                                        LABEL {lbl.boxNum} OF {lbl.totalBoxes}
-                                    </div>
                                     {/* Transport */}
                                     <input
                                         value={lbl.transport}
                                         onChange={(e) => updateLabelField(idx, 'transport', e.target.value)}
                                         placeholder="Transport name"
                                         style={{
-                                            border: 'none', borderBottom: '1px dashed #ccc', outline: 'none',
-                                            fontSize: `${Math.round(labelFS.transport * 1.33)}px`, fontWeight: 900, lineHeight: 1.1, padding: '2px 0',
-                                            width: '100%', background: 'transparent',
+                                            border: 'none', borderBottom: '1px dashed #bbb', outline: 'none',
+                                            fontSize: `${labelFS.transport}pt`, fontWeight: 900, lineHeight: 1.1,
+                                            padding: '0', width: '100%', background: 'transparent',
+                                            fontFamily: 'Arial, sans-serif',
                                         }}
                                     />
                                     {/* Destination */}
@@ -1215,9 +1219,10 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                         onChange={(e) => updateLabelField(idx, 'destination', e.target.value)}
                                         placeholder="Destination"
                                         style={{
-                                            border: 'none', borderBottom: '1px dashed #ccc', outline: 'none',
-                                            fontSize: '11px', color: '#444', padding: '2px 0',
-                                            width: '100%', background: 'transparent',
+                                            border: 'none', borderBottom: '1px dashed #bbb', outline: 'none',
+                                            fontSize: '8pt', color: '#444', marginTop: '1mm',
+                                            padding: '0', width: '100%', background: 'transparent',
+                                            fontFamily: 'Arial, sans-serif',
                                         }}
                                     />
                                     {/* Party */}
@@ -1226,65 +1231,67 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                         onChange={(e) => updateLabelField(idx, 'party', e.target.value)}
                                         placeholder="Party name"
                                         style={{
-                                            border: 'none', borderBottom: '1px dashed #ccc', outline: 'none',
-                                            fontSize: `${Math.round(labelFS.party * 1.33)}px`, fontWeight: 700, padding: '2px 0',
-                                            width: '100%', background: 'transparent',
+                                            border: 'none', borderBottom: '1px dashed #bbb', outline: 'none',
+                                            fontSize: `${labelFS.party}pt`, fontWeight: 700, marginTop: '1mm',
+                                            padding: '0', width: '100%', background: 'transparent',
+                                            fontFamily: 'Arial, sans-serif',
                                         }}
                                     />
-                                    {/* Auto row: box number | total boxes */}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '4px 0 2px' }}>
-                                        <span style={{ fontSize: `${Math.round(labelFS.boxNum * 1.33)}px`, fontWeight: 900, color: '#111' }}>{lbl.boxNum}</span>
-                                        <span style={{ fontSize: `${Math.round(labelFS.totalBoxes * 1.33)}px`, fontWeight: 900, color: '#111' }}>{lbl.totalBoxes} box</span>
+                                    {/* Box number | Total boxes */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '2mm 0 1mm' }}>
+                                        <span style={{ fontSize: `${labelFS.boxNum}pt`, fontWeight: 900, color: '#111' }}>{lbl.boxNum}</span>
+                                        <span style={{ fontSize: `${labelFS.totalBoxes}pt`, fontWeight: 900, color: '#111' }}>{lbl.totalBoxes} box</span>
                                     </div>
-                                    {/* In-box pcs (editable) | product box N/M (auto) */}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                            <span style={{ fontSize: '11px', color: '#555' }}>In-box:</span>
+                                    {/* In-box pcs | product box */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2mm' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2mm' }}>
+                                            <span style={{ fontSize: '8pt', color: '#555' }}>In-box:</span>
                                             <input
                                                 type="number"
                                                 min={1}
                                                 value={lbl.inBoxPcs}
                                                 onChange={(e) => updateLabelField(idx, 'inBoxPcs', e.target.value)}
-                                                placeholder="pcs"
                                                 style={{
-                                                    border: 'none', borderBottom: '1px dashed #ccc', outline: 'none',
-                                                    fontSize: '13px', fontWeight: 700, color: '#111',
-                                                    width: '60px', background: 'transparent', padding: '0 2px',
+                                                    border: 'none', borderBottom: '1px dashed #bbb', outline: 'none',
+                                                    fontSize: '9pt', fontWeight: 700, color: '#111',
+                                                    width: '14mm', background: 'transparent', padding: '0',
+                                                    fontFamily: 'Arial, sans-serif',
                                                 }}
                                             />
-                                            <span style={{ fontSize: '11px', color: '#555' }}>pcs</span>
+                                            <span style={{ fontSize: '8pt', color: '#555' }}>pcs</span>
                                         </div>
-                                        <span style={{ fontSize: '10px', color: '#777', fontStyle: 'italic' }}>
+                                        <span style={{ fontSize: '7pt', color: '#777', fontStyle: 'italic' }}>
                                             product box {lbl.itemBoxNum}/{lbl.itemTotalBoxes}
                                         </span>
                                     </div>
-                                    {/* Product block */}
-                                    <div style={{ borderTop: '1px solid #ddd', paddingTop: '6px', marginTop: '2px' }}>
-                                        {/* Brand */}
-                                        <textarea
-                                            value={lbl.brand}
-                                            onChange={(e) => updateLabelField(idx, 'brand', e.target.value)}
-                                            placeholder="Brand · packing"
-                                            rows={2}
-                                            style={{
-                                                border: 'none', borderBottom: '1px dashed #ccc', outline: 'none',
-                                                fontSize: `${Math.round(labelFS.brand * 1.33)}px`, fontWeight: 900, padding: '2px 0',
-                                                width: '100%', background: 'transparent',
-                                                resize: 'none', overflow: 'hidden',
-                                                wordBreak: 'break-word', whiteSpace: 'pre-wrap',
-                                                fontFamily: 'inherit', lineHeight: 1.15,
-                                            }}
-                                        />
-                                    </div>
-                                    {/* Order ref */}
+                                    {/* Divider */}
+                                    <div style={{ borderTop: '0.5px solid #555', marginBottom: '1.5mm' }} />
+                                    {/* Brand / product */}
+                                    <textarea
+                                        value={lbl.brand}
+                                        onChange={(e) => updateLabelField(idx, 'brand', e.target.value)}
+                                        placeholder="Brand · packing"
+                                        rows={2}
+                                        style={{
+                                            border: 'none', outline: 'none',
+                                            fontSize: `${labelFS.brand}pt`, fontWeight: 900, lineHeight: 1.15,
+                                            padding: '0', width: '100%', background: 'transparent',
+                                            resize: 'none', overflow: 'hidden',
+                                            wordBreak: 'break-word', whiteSpace: 'pre-wrap',
+                                            fontFamily: 'Arial, sans-serif', flex: 1,
+                                        }}
+                                    />
+                                    {/* Order ref — bottom right */}
                                     <input
                                         value={lbl.orderRef}
                                         onChange={(e) => updateLabelField(idx, 'orderRef', e.target.value)}
                                         placeholder="Order ref"
                                         style={{
                                             border: 'none', outline: 'none',
-                                            fontSize: '10px', color: '#999', padding: '2px 0',
-                                            width: '100%', background: 'transparent', textAlign: 'right',
+                                            fontSize: '7pt', color: '#999',
+                                            padding: '0', width: '100%', background: 'transparent',
+                                            textAlign: 'right', fontFamily: 'Arial, sans-serif',
+                                            marginTop: 'auto',
                                         }}
                                     />
                                 </div>
