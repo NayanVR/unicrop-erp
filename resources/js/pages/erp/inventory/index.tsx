@@ -857,13 +857,13 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
 
     return (
         <div id="view-inventory" className="view active">
-            <Head title="Inventory" />
+            <Head title={role === 'accountant' ? 'Products & HSN' : 'Inventory'} />
 
             {/* Page Header */}
             <div className="page-header">
                 <div className="page-header-left">
-                    <h1>Inventory</h1>
-                    <p>Raw material stock levels &amp; transaction history</p>
+                    <h1>{role === 'accountant' ? 'Products & HSN' : 'Inventory'}</h1>
+                    <p>{role === 'accountant' ? 'Product catalogue with HSN codes and tax rates' : 'Raw material stock levels & transaction history'}</p>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {canEnterBill && role !== 'accountant' && <button className="btn sm" onClick={() => setScanModal(true)}>📸 Scan Bill</button>}
@@ -876,10 +876,10 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             {/* Stats */}
             <div className="stats-grid">
                 <div className="stat-card">
-                    <div className="stat-icon" style={{ background: '#d1fae5' }}>📦</div>
+                    <div className="stat-icon" style={{ background: '#d1fae5' }}>{role === 'accountant' ? '🌿' : '📦'}</div>
                     <div>
                         <div className="stat-val">{stats.totalMaterials}</div>
-                        <div className="stat-label">Total Materials</div>
+                        <div className="stat-label">{role === 'accountant' ? 'Total Products' : 'Total Materials'}</div>
                     </div>
                 </div>
                 {role !== 'accountant' && <div className="stat-card">
@@ -1018,7 +1018,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                         onClick={() => setTab(t)}
                         style={{ fontWeight: tab === t ? 600 : 400 }}
                     >
-                        {t === 'materials' && 'Materials'}
+                        {t === 'materials' && (role === 'accountant' ? 'Products' : 'Materials')}
                         {t === 'log' && 'Transaction Log'}
                         {t === 'bills' && 'Purchase Bills'}
                         {t === 'reorders' && 'Reorders'}
@@ -1068,6 +1068,45 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
 
                     {filteredMaterials.length === 0 ? (
                         <div className="empty-state">No materials found.</div>
+                    ) : role === 'accountant' ? (
+                        <div className="prod-wrap">
+                            <table className="prod-table">
+                                <thead>
+                                    <tr>
+                                        <th>Product</th>
+                                        <th>SKU</th>
+                                        <th>Category</th>
+                                        <th>HSN Code</th>
+                                        <th>GST %</th>
+                                        <th>Selling Rate</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredMaterials.map((m) => (
+                                        <tr key={m.id}>
+                                            <td><div className="prod-name">{m.name}</div></td>
+                                            <td>{m.sku ? <span style={{ fontFamily: 'monospace', fontSize: 13 }}>{m.sku}</span> : <span style={{ color: '#9ca3af' }}>—</span>}</td>
+                                            <td>{m.category ?? <span style={{ color: '#9ca3af' }}>—</span>}</td>
+                                            <td>
+                                                {m.hsn
+                                                    ? <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{m.hsn}</span>
+                                                    : <span style={{ color: '#ef4444', fontSize: 12 }}>Not set</span>}
+                                            </td>
+                                            <td>
+                                                {m.gst != null && m.gst !== ''
+                                                    ? <span style={{ background: '#f0fdf4', color: '#16a34a', borderRadius: 4, padding: '2px 8px', fontWeight: 600, fontSize: 13 }}>{m.gst}%</span>
+                                                    : <span style={{ color: '#9ca3af' }}>—</span>}
+                                            </td>
+                                            <td>{fmtAmt(m.selling_rate)}</td>
+                                            <td>
+                                                <button className="btn sm" onClick={() => openEditMat(m)}>Edit</button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     ) : (
                         <div className="prod-wrap">
                             <table className="prod-table">
