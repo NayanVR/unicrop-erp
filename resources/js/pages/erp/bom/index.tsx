@@ -6,7 +6,7 @@ import {
 } from '@/routes/bom';
 import type { Auth } from '@/types/auth';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type RawMaterial = {
     id: number;
@@ -182,6 +182,34 @@ export default function BomIndex({ boms, products, materials, categories, produc
     const [runTarget, setRunTarget]   = useState<Bom | null>(null);
     const [runSummary, setRunSummary]     = useState<NormalizedRun | null>(null);
     const [highlightedId, setHighlightedId] = useState<number | null>(null);
+
+    // Quick-add material from output product field
+    const [quickAddOpen, setQuickAddOpen]         = useState(false);
+    const [pendingSelectName, setPendingSelectName] = useState<string | null>(null);
+    const quickForm = useForm({ name: '', unit: 'kg', category: '' });
+
+    // After materials prop refreshes, auto-select the just-created material
+    useEffect(() => {
+        if (!pendingSelectName) return;
+        const mat = materials.find((m) => m.name.toLowerCase() === pendingSelectName.toLowerCase());
+        if (mat) {
+            form.setData('output_raw_material_id', String(mat.id));
+            form.setData('output_category', mat.category ?? '');
+            setPendingSelectName(null);
+            setQuickAddOpen(false);
+            quickForm.reset();
+        }
+    }, [materials, pendingSelectName]);
+
+    const submitQuickAdd = () => {
+        if (!quickForm.data.name.trim() || !quickForm.data.unit) return;
+        setPendingSelectName(quickForm.data.name.trim());
+        quickForm.post('/inventory/materials', {
+            preserveState: true,
+            preserveScroll: true,
+            onError: () => setPendingSelectName(null),
+        });
+    };
 
     const form = useForm<BomFormData>({
         name: '', product_id: '', packing_size: '', batch_size: '1',
@@ -764,7 +792,7 @@ export default function BomIndex({ boms, products, materials, categories, produc
                                         (stock will be added here when BOM is run)
                                     </span>
                                 </label>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: 8 }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px 32px', gap: 8 }}>
                                     <select
                                         value={form.data.output_raw_material_id}
                                         onChange={(e) => {
@@ -794,6 +822,18 @@ export default function BomIndex({ boms, products, materials, categories, produc
                                         <option value="">— Category —</option>
                                         {categories.map((c) => <option key={c} value={c}>{c}</option>)}
                                     </select>
+                                    <button
+                                        type="button"
+                                        title="Add new material to inventory"
+                                        onClick={() => { quickForm.reset(); setQuickAddOpen(true); }}
+                                        style={{
+                                            height: 36, width: 32, border: '1px dashed #2563eb',
+                                            borderRadius: 6, background: '#eff6ff', color: '#2563eb',
+                                            fontSize: 20, fontWeight: 700, cursor: 'pointer',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            flexShrink: 0,
+                                        }}
+                                    >+</button>
                                 </div>
                             </div>
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
@@ -835,6 +875,64 @@ export default function BomIndex({ boms, products, materials, categories, produc
                     </div>
                 </div>
             </div>
+
+            {/* ── Quick Add Material modal ─────────────────────────────────── */}
+            {quickAddOpen && (
+                <div className="modal-overlay open" style={{ zIndex: 1100 }} onClick={() => setQuickAddOpen(false)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400 }}>
+                        <div className="modal-header">
+                            <h2>➕ Add New Material</h2>
+                            <button className="modal-close" onClick={() => setQuickAddOpen(false)}>✕</button>
+                        </div>
+                        <div className="modal-body">
+                            <p style={{ fontSize: 13, color: 'var(--tx-muted)', marginTop: 0, marginBottom: 16 }}>
+                                New material will be added to Inventory and auto-selected as the Output Product.
+                            </p>
+                            <div className="form-grid">
+                                <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                                    <label>Name *</label>
+                                    <input
+                                        autoFocus
+                                        type="text"
+                                        value={quickForm.data.name}
+                                        onChange={(e) => quickForm.setData('name', e.target.value)}
+                                        placeholder="e.g. Amino Liquid"
+                                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitQuickAdd(); } }}
+                                    />
+                                    {quickForm.errors.name && <div className="form-error">{quickForm.errors.name}</div>}
+                                </div>
+                                <div className="form-group">
+                                    <label>Unit *</label>
+                                    <select value={quickForm.data.unit} onChange={(e) => quickForm.setData('unit', e.target.value)}>
+                                        {['kg', 'g', 'gm', 'mg', 'L', 'ml', 'pcs', 'nos', 'litre', 'ltr'].map((u) => (
+                                            <option key={u} value={u}>{u}</option>
+                                        ))}
+                                    </select>
+                                    {quickForm.errors.unit && <div className="form-error">{quickForm.errors.unit}</div>}
+                                </div>
+                                <div className="form-group">
+                                    <label>Category</label>
+                                    <select value={quickForm.data.category} onChange={(e) => quickForm.setData('category', e.target.value)}>
+                                        <option value="">— None —</option>
+                                        {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn" type="button" onClick={() => setQuickAddOpen(false)}>Cancel</button>
+                            <button
+                                className="btn primary"
+                                type="button"
+                                onClick={submitQuickAdd}
+                                disabled={quickForm.processing || !quickForm.data.name.trim()}
+                            >
+                                {quickForm.processing ? 'Adding…' : '+ Add & Select'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ── Run production modal ─────────────────────────────────────── */}
             <div className={`modal-overlay${runModal ? ' open' : ''}`} onClick={() => setRunModal(false)}>
