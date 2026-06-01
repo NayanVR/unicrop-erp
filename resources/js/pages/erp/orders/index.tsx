@@ -1370,7 +1370,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                 </div>
                                             )}
 
-                                            <div className="form-card" style={{ marginBottom: 0 }}>
+                                            {!isAccountant && <div className="form-card" style={{ marginBottom: 0 }}>
                                                 <div className="form-card-title">Order Summary</div>
                                                 <div className="form-grid three">
                                                     <div className="form-group">
@@ -1397,7 +1397,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                         </div>
                                                     </div>
                                                 )}
-                                            </div>
+                                            </div>}
 
                                         </>
                                     )}
