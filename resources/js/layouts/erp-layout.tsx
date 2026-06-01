@@ -83,7 +83,6 @@ const NAV_DEFS: Record<string, NavItem[]> = {
     accountant: [
         { id: 'acct-dashboard', label: 'Dashboard', icon: '📊', href: dashboard() },
         { id: 'all-orders', label: 'Orders', icon: '📋', href: ordersIndex() },
-        { id: 'inventory', label: 'Inventory', icon: '🗄️', href: inventoryIndex() },
         { id: 'inventory', label: 'Products & HSN', icon: '🌿', href: inventoryIndex() },
     ],
     sales: [
