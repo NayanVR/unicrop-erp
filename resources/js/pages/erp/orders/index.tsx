@@ -861,6 +861,19 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                         <div>{formatDate(order.order_date)}</div>
                                         <div>{order.sales_user?.name ?? 'Unassigned'}</div>
                                     </div>
+                                    {isAccountant && (() => {
+                                        const hasTax  = (order.docs ?? []).some((d) => d.document_type === 'tax_invoice');
+                                        const hasEway = (order.docs ?? []).some((d) => d.document_type === 'eway_bill');
+                                        if (hasTax && hasEway) {
+                                            return <span style={{ fontSize: '11px', fontWeight: 700, color: '#16a34a', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '6px', padding: '3px 8px', whiteSpace: 'nowrap' }}>✓ Done</span>;
+                                        }
+                                        return (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-end' }}>
+                                                {!hasTax  && <span style={{ fontSize: '10px', fontWeight: 600, color: '#b45309', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: '4px', padding: '2px 6px', whiteSpace: 'nowrap' }}>🧾 Invoice Pending</span>}
+                                                {!hasEway && <span style={{ fontSize: '10px', fontWeight: 600, color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '2px 6px', whiteSpace: 'nowrap' }}>📋 E-way Pending</span>}
+                                            </div>
+                                        );
+                                    })()}
                                     <div className="chevron">▶</div>
                                 </div>
 
