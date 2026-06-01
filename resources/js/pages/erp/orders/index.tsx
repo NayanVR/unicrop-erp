@@ -837,8 +837,34 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                         <div className="icon">📋</div>
                         <p>{isDesign ? 'No design orders yet.' : 'No orders yet.'}</p>
                     </div>
-                ) : (
-                    visibleOrders.map((order) => {
+                ) : (() => {
+                    const billingDone = (order: Order) => {
+                        const hasTax  = (order.docs ?? []).some((d) => d.document_type === 'tax_invoice');
+                        const hasEway = (order.docs ?? []).some((d) => d.document_type === 'eway_bill');
+                        const ewayOk  = hasEway || !!order.eway_bill_not_required || Number(order.total_amount ?? 0) < 50000;
+                        return hasTax && ewayOk;
+                    };
+
+                    const pendingOrders = isAccountant ? visibleOrders.filter((o) => !billingDone(o)) : [];
+                    const doneOrders    = isAccountant ? visibleOrders.filter((o) =>  billingDone(o)) : [];
+                    const orderGroups   = isAccountant
+                        ? [
+                            { label: `Pending (${pendingOrders.length})`, orders: pendingOrders, accent: '#b45309', bg: '#fef3c7', border: '#fcd34d' },
+                            { label: `Done (${doneOrders.length})`,    orders: doneOrders,    accent: '#16a34a', bg: '#f0fdf4', border: '#86efac' },
+                          ]
+                        : [{ label: null, orders: visibleOrders, accent: '', bg: '', border: '' }];
+
+                    return orderGroups.map(({ label, orders, accent, bg, border }) => (
+                        <div key={label ?? 'all'}>
+                            {label && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '18px 0 10px', padding: '8px 14px', background: bg, border: `1px solid ${border}`, borderRadius: '8px' }}>
+                                    <span style={{ fontWeight: 700, fontSize: '13px', color: accent }}>{label}</span>
+                                </div>
+                            )}
+                            {orders.length === 0 && label && (
+                                <div style={{ color: 'var(--tx-muted)', fontSize: '13px', padding: '10px 4px' }}>No orders.</div>
+                            )}
+                            {orders.map((order) => {
                         const isOpen = openOrders.includes(order.id);
                         const totalItems = order.items.length;
                         const dispatchedItems = order.items.filter((i) => i.status === 'dispatched').length;
@@ -1540,8 +1566,10 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                 </div>
                             </div>
                         );
-                    })
-                )}
+                    })}
+                        </div>
+                    ));
+                })()}
             </div>
 
             {/* Photo lightbox */}
