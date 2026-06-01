@@ -121,10 +121,22 @@ const initials = (name?: string | null): string => {
         .toUpperCase();
 };
 
+type NotificationItem = {
+    id: string;
+    data: {
+        order_id: number;
+        order_number: string;
+        company_name: string;
+        total_amount: string;
+    };
+    created_at: string;
+};
+
 export default function ErpLayout({ children }: { children: React.ReactNode }) {
     const { auth, pageTitle } = usePage<PageProps>().props;
     const [isMobileOpen, setIsMobileOpen] = useState(false);
     const [timeLabel, setTimeLabel] = useState('');
+    const [notifications, setNotifications] = useState<NotificationItem[]>([]);
     const { resolvedAppearance, updateAppearance } = useAppearance();
 
     const role        = auth.user?.role ?? auth.user?.roles?.[0]?.slug ?? null;
@@ -164,6 +176,43 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
     }, [role, permissions, modules]);
 
     useDraggableModals();
+
+    const canReceiveNotifications = role === 'accountant' || role === 'sales' || role === 'admin';
+
+    const fetchNotifications = () => {
+        if (!canReceiveNotifications) return;
+        fetch('/erp/notifications', { headers: { Accept: 'application/json' } })
+            .then((r) => r.ok ? r.json() : [])
+            .then((data: NotificationItem[]) => setNotifications(data))
+            .catch(() => {});
+    };
+
+    const dismissNotification = (id: string) => {
+        fetch(`/erp/notifications/${id}/read`, {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '', Accept: 'application/json' },
+        }).then(() => setNotifications((prev) => prev.filter((n) => n.id !== id)));
+    };
+
+    const dismissAll = () => {
+        fetch('/erp/notifications/read-all', {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '', Accept: 'application/json' },
+        }).then(() => setNotifications([]));
+    };
+
+    useEffect(() => {
+        if (!canReceiveNotifications) return;
+        fetchNotifications();
+        const interval = window.setInterval(fetchNotifications, 30000);
+        const onFocus = () => fetchNotifications();
+        window.addEventListener('focus', onFocus);
+        return () => {
+            window.clearInterval(interval);
+            window.removeEventListener('focus', onFocus);
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [role]);
 
     useEffect(() => {
         const updateTime = () => {
@@ -283,6 +332,55 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
 
                 <div className="content-area">{children}</div>
             </div>
+
+            {notifications.length > 0 && (
+                <div style={{
+                    position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999,
+                    maxWidth: '360px', width: '100%',
+                    background: 'var(--card-bg, #fff)', border: '1.5px solid #fcd34d',
+                    borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+                    overflow: 'hidden',
+                }}>
+                    <div style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '10px 14px', background: '#fef3c7', borderBottom: '1px solid #fcd34d',
+                    }}>
+                        <span style={{ fontWeight: 700, fontSize: '13px', color: '#92400e' }}>
+                            🔔 Order Ready ({notifications.length})
+                        </span>
+                        <button
+                            onClick={dismissAll}
+                            style={{ fontSize: '11px', color: '#92400e', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+                        >
+                            Dismiss All
+                        </button>
+                    </div>
+                    <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                        {notifications.map((n) => (
+                            <div key={n.id} style={{
+                                display: 'flex', alignItems: 'flex-start', gap: '10px',
+                                padding: '10px 14px', borderBottom: '1px solid var(--border-color, #e5e7eb)',
+                            }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary, #111)' }}>
+                                        Order #{n.data.order_number} ready
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: 'var(--text-muted, #6b7280)', marginTop: '2px' }}>
+                                        {n.data.company_name} &mdash; ₹{Number(n.data.total_amount).toLocaleString('en-IN')}
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => dismissNotification(n.id)}
+                                    style={{ flexShrink: 0, fontSize: '16px', lineHeight: 1, background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', paddingTop: '2px' }}
+                                    title="Dismiss"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

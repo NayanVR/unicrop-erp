@@ -6,6 +6,9 @@ use App\Events\ErpActivity;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\ProductPhoto;
+use App\Models\Role;
+use App\Models\User;
+use App\Notifications\OrderAllItemsReady;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -143,6 +146,32 @@ class FactoryController extends Controller
             $allDispatched = $order->items()->where('status', '!=', 'dispatched')->doesntExist();
             if ($allDispatched) {
                 $order->update(['status' => 'dispatched']);
+            }
+        }
+
+        // When an item reaches 'ready', check if all items are ready and amount > 50k
+        if ($nextStage === 'ready') {
+            $order = $item->order;
+            $allReady = $order->items()
+                ->whereNotIn('status', ['ready', 'dispatched'])
+                ->doesntExist();
+
+            if ($allReady && (float) $order->total_amount > 50000) {
+                $notifyUsers = User::where('is_active', true)
+                    ->whereHas('roles', fn ($q) => $q->whereIn('slug', [Role::ACCOUNTANT, Role::SALES]))
+                    ->get();
+
+                foreach ($notifyUsers as $notifyUser) {
+                    // Avoid duplicate — skip if unread notification for this order already exists
+                    $alreadyNotified = $notifyUser->unreadNotifications()
+                        ->where('type', OrderAllItemsReady::class)
+                        ->where('data->order_id', $order->id)
+                        ->exists();
+
+                    if (! $alreadyNotified) {
+                        $notifyUser->notify(new OrderAllItemsReady($order));
+                    }
+                }
             }
         }
 

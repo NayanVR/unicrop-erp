@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\BomController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\BomRecipeController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GodownController;
@@ -136,6 +137,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('rate-calculator', fn() => inertia('erp/rate-calculator/index', ['pageTitle' => 'Rate Calculator']))->name('rate-calculator.index');
+
+    // In-app notifications (JSON API, no Inertia)
+    Route::get('erp/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('erp/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+    Route::post('erp/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
 
     Route::middleware(['role:admin,factory'])->group(function () {
         Route::get('finished-goods', [FinishedGoodsController::class, 'index'])->name('finished-goods.index');
