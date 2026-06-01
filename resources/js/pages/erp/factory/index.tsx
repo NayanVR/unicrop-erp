@@ -1136,7 +1136,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                     <div
                         className="modal"
                         onClick={(e) => e.stopPropagation()}
-                        style={{ maxWidth: '420px', width: '100%', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 40px)' }}
+                        style={{ maxWidth: '480px', width: '100%', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 40px)' }}
                     >
                         <div className="modal-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                             <h2 style={{ flex: 1, fontSize: '15px' }}>🏷 Box Labels — {labelEditor.order.order_number}</h2>
@@ -1196,21 +1196,22 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                         fontFamily: 'Arial, sans-serif',
                                         boxSizing: 'border-box',
                                         flexShrink: 0,
-                                        overflow: 'hidden',
                                         boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
                                         position: 'relative',
                                     }}
                                 >
                                     {/* Transport */}
-                                    <input
+                                    <textarea
                                         value={lbl.transport}
                                         onChange={(e) => updateLabelField(idx, 'transport', e.target.value)}
                                         placeholder="Transport name"
+                                        rows={1}
                                         style={{
                                             border: 'none', borderBottom: '1px dashed #bbb', outline: 'none',
                                             fontSize: `${labelFS.transport}pt`, fontWeight: 900, lineHeight: 1.1,
                                             padding: '0', width: '100%', background: 'transparent',
-                                            fontFamily: 'Arial, sans-serif',
+                                            fontFamily: 'Arial, sans-serif', resize: 'none',
+                                            overflow: 'hidden',
                                         }}
                                     />
                                     {/* Destination */}
@@ -1226,15 +1227,17 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                         }}
                                     />
                                     {/* Party */}
-                                    <input
+                                    <textarea
                                         value={lbl.party}
                                         onChange={(e) => updateLabelField(idx, 'party', e.target.value)}
                                         placeholder="Party name"
+                                        rows={2}
                                         style={{
                                             border: 'none', borderBottom: '1px dashed #bbb', outline: 'none',
                                             fontSize: `${labelFS.party}pt`, fontWeight: 700, marginTop: '1mm',
                                             padding: '0', width: '100%', background: 'transparent',
-                                            fontFamily: 'Arial, sans-serif',
+                                            fontFamily: 'Arial, sans-serif', resize: 'none',
+                                            overflow: 'hidden', lineHeight: 1.2,
                                         }}
                                     />
                                     {/* Box number | Total boxes */}
