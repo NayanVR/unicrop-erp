@@ -1272,7 +1272,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                 </div>
                                             )}
 
-                                            <div className="prod-wrap">
+                                            {!isAccountant && <div className="prod-wrap">
                                                 <table className="prod-table">
                                                     <thead>
                                                         <tr>
@@ -1339,7 +1339,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                         )}
                                                     </tbody>
                                                 </table>
-                                            </div>
+                                            </div>}
 
                                             {/* Production pipeline — visible for confirmed/dispatched orders, not for accountants */}
                                             {!isAccountant && (order.status === 'confirmed' || order.status === 'dispatched') && order.items.length > 0 && (
