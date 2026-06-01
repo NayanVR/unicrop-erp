@@ -28,7 +28,8 @@ class InventoryController extends Controller
     {
         $user = $request->user();
         $user->loadMissing('roles');
-        $isSales = $user->roles->first()?->slug === 'sales';
+        $fullAccessRoles = ['admin', 'factory', 'accountant'];
+        $isSales = ! in_array($user->roles->first()?->slug, $fullAccessRoles);
 
         $materials = RawMaterial::query()
             ->withCount('transactions')
