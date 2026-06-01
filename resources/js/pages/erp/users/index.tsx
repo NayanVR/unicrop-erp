@@ -8,7 +8,7 @@ type Props = {
     users: User[];
     roles: Role[];
     companies: { id: number; name: string }[];
-    isAdmin: boolean;
+    canManageUsers: boolean;
 };
 
 type UserFormData = {
@@ -37,6 +37,7 @@ const stagePermissions = [
 const bomPermissions = [
     { id: 'bom_delete', label: 'Delete BOM & Run History' },
     { id: 'low_stock_alerts', label: 'Low Stock Alerts on Dashboard' },
+    { id: 'manage_users', label: 'User Management (Add / Edit / Delete)' },
 ];
 
 const moduleAccess = [
@@ -52,7 +53,7 @@ const moduleAccess = [
 const userStatusLabel = (isActive?: boolean) =>
     isActive ? 'Active' : 'Inactive';
 
-export default function UsersIndex({ users, roles, companies, isAdmin }: Props) {
+export default function UsersIndex({ users, roles, companies, canManageUsers }: Props) {
     const [modalOpen, setModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [revealedPwd, setRevealedPwd] = useState<Set<number>>(new Set());
@@ -176,7 +177,7 @@ export default function UsersIndex({ users, roles, companies, isAdmin }: Props) 
                         <h1>User Management</h1>
                         <p>Create and manage portal users</p>
                     </div>
-                    {isAdmin && (
+                    {canManageUsers && (
                         <button className="btn primary" onClick={openNewUserModal}>
                             ＋ Add New User
                         </button>
@@ -248,7 +249,7 @@ export default function UsersIndex({ users, roles, companies, isAdmin }: Props) 
                                         )}
                                     </div>
                                 </div>
-                                {isAdmin && (
+                                {canManageUsers && (
                                     <div className="user-card-actions">
                                         <button
                                             className="btn sm"

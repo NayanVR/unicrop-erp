@@ -12,6 +12,13 @@ use Inertia\Response;
 
 class UserController extends Controller
 {
+    private function canManageUsers(): bool
+    {
+        $user = auth()->user();
+        return $user?->hasRole(Role::ADMIN)
+            || in_array('manage_users', $user?->permissions ?? []);
+    }
+
     public function index(): Response
     {
         return Inertia::render('erp/users/index', [
@@ -24,12 +31,13 @@ class UserController extends Controller
                 ->orderBy('name')
                 ->get(['id', 'name', 'slug']),
             'companies' => [],
-            'isAdmin' => auth()->user()?->hasRole(Role::ADMIN) ?? false,
+            'canManageUsers' => $this->canManageUsers(),
         ]);
     }
 
     public function store(StoreUserRequest $request): RedirectResponse
     {
+        abort_unless($this->canManageUsers(), 403);
         $data = $request->validated();
 
         $user = User::create([
@@ -53,6 +61,7 @@ class UserController extends Controller
 
     public function update(UpdateUserRequest $request, User $user): RedirectResponse
     {
+        abort_unless($this->canManageUsers(), 403);
         $data = $request->validated();
 
         $user->fill([
@@ -80,6 +89,7 @@ class UserController extends Controller
 
     public function destroy(User $user): RedirectResponse
     {
+        abort_unless($this->canManageUsers(), 403);
         $user->roles()->detach();
         $user->delete();
 
