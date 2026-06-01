@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Bom;
 use App\Models\FillingRecipe;
+use App\Models\Godown;
+use App\Models\GodownStock;
 use App\Models\InventoryCategory;
 use App\Models\InventoryPurchaseBill;
 use App\Models\InventoryPurchaseBillItem;
@@ -82,8 +84,14 @@ class InventoryController extends Controller
             ->groupBy('output_raw_material_id')
             ->map(fn ($g) => $g->map(fn ($r) => $r->name . ($r->packing_size ? " ({$r->packing_size})" : ''))->toArray());
 
+        $godowns = Godown::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->with(['stocks.rawMaterial:id,name,unit,category'])
+            ->get();
+
         return Inertia::render('erp/inventory/index', array_merge(
-            compact('materials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats', 'vendors', 'inventoryCategories', 'bomOutputMap', 'fillingOutputMap'),
+            compact('materials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats', 'vendors', 'inventoryCategories', 'bomOutputMap', 'fillingOutputMap', 'godowns'),
             ['pageTitle' => 'Inventory']
         ));
     }
@@ -151,6 +159,7 @@ class InventoryController extends Controller
         $data = $request->validate([
             'type'          => 'required|in:purchase,issue,adjustment,return',
             'qty'           => 'required|numeric',
+            'godown_id'     => 'nullable|exists:godowns,id',
             'cost_per_unit' => 'nullable|numeric|min:0',
             'reference'     => 'nullable|string|max:255',
             'notes'         => 'nullable|string|max:500',
@@ -170,6 +179,7 @@ class InventoryController extends Controller
             InventoryTransaction::create([
                 'raw_material_id' => $material->id,
                 'user_id'         => $request->user()?->id,
+                'godown_id'       => $data['godown_id'] ?? null,
                 'type'            => $data['type'],
                 'qty'             => $data['qty'],
                 'previous_stock'  => $previous,
@@ -188,8 +198,32 @@ class InventoryController extends Controller
             $material->refresh();
             (new LowStockAlertService())->checkAndAlert($material);
 
+            // Update godown stock if a godown is specified
+            if (! empty($data['godown_id'])) {
+                $this->updateGodownStock((int) $data['godown_id'], $material->id, $data['type'], abs((float) $qty));
+            }
+
             return redirect()->back()->with('success', 'Stock updated.');
         });
+    }
+
+    private function updateGodownStock(int $godownId, int $materialId, string $type, float $qty): void
+    {
+        $stock = GodownStock::firstOrCreate(
+            ['godown_id' => $godownId, 'raw_material_id' => $materialId],
+            ['stock_qty' => 0]
+        );
+
+        $current = (float) $stock->stock_qty;
+
+        $stock->stock_qty = match ($type) {
+            'purchase', 'return' => $current + $qty,
+            'issue'              => max(0, $current - $qty),
+            'adjustment'         => $qty,
+            default              => $current,
+        };
+
+        $stock->save();
     }
 
     public function storePurchaseBill(Request $request): RedirectResponse
@@ -204,6 +238,7 @@ class InventoryController extends Controller
             'round_off'             => 'nullable|numeric',
             'bill_file'             => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'add_to_stock'          => 'boolean',
+            'godown_id'             => 'nullable|exists:godowns,id',
             'items'                    => 'required|array|min:1',
             'items.*.raw_material_id'  => 'nullable|exists:raw_materials,id',
             'items.*.material_name'    => 'required|string|max:255',
@@ -310,12 +345,17 @@ class InventoryController extends Controller
                     InventoryTransaction::create([
                         'raw_material_id' => $material->id,
                         'user_id'         => $request->user()?->id,
+                        'godown_id'       => $data['godown_id'] ?? null,
                         'type'            => 'purchase',
                         'qty'             => $item['qty'],
                         'previous_stock'  => $previous,
                         'new_stock'       => $new,
                         'reference'       => $billNumber,
                     ]);
+
+                    if (! empty($data['godown_id'])) {
+                        $this->updateGodownStock((int) $data['godown_id'], $material->id, 'purchase', (float) $item['qty']);
+                    }
                 }
             }
         });

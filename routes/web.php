@@ -3,6 +3,7 @@
 use App\Http\Controllers\BomController;
 use App\Http\Controllers\BomRecipeController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\GodownController;
 use App\Http\Controllers\DesignController;
 use App\Http\Controllers\FactoryController;
 use App\Http\Controllers\FillingController;
@@ -78,6 +79,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('inventory/reorders/{reorder}', [InventoryController::class, 'destroyReorder'])->name('inventory.reorders.destroy');
         Route::post('inventory/categories', [InventoryController::class, 'storeCategory'])->name('inventory.categories.store');
         Route::patch('inventory/categories/{category}', [InventoryController::class, 'updateCategory'])->name('inventory.categories.update');
+        Route::post('inventory/godowns', [GodownController::class, 'store'])->name('inventory.godowns.store');
+        Route::patch('inventory/godowns/{godown}', [GodownController::class, 'update'])->name('inventory.godowns.update');
+        Route::delete('inventory/godowns/{godown}', [GodownController::class, 'destroy'])->name('inventory.godowns.destroy');
         Route::delete('inventory/categories/{category}', [InventoryController::class, 'destroyCategory'])->name('inventory.categories.destroy');
 
         Route::get('bom', [BomController::class, 'index'])->name('bom.index');

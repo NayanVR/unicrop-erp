@@ -122,6 +122,23 @@ type InventoryCategory = {
     color: string | null;
 };
 
+type GodownStock = {
+    id: number;
+    godown_id: number;
+    raw_material_id: number;
+    stock_qty: string | number;
+    raw_material?: { id: number; name: string; unit: string; category: string | null } | null;
+};
+
+type Godown = {
+    id: number;
+    name: string;
+    location: string | null;
+    notes: string | null;
+    is_active: boolean;
+    stocks: GodownStock[];
+};
+
 type Props = {
     materials: RawMaterial[];
     recentTransactions: Transaction[];
@@ -132,6 +149,7 @@ type Props = {
     inventoryCategories: InventoryCategory[];
     bomOutputMap: Record<string, string[]>;
     fillingOutputMap: Record<string, string[]>;
+    godowns: Godown[];
 };
 
 // ── Route constants ───────────────────────────────────────────────────────────
@@ -144,6 +162,9 @@ const ROUTES = {
     receiveReorder: (id: number) => `/inventory/reorders/${id}/receive`,
     destroyReorder: (id: number) => `/inventory/reorders/${id}`,
     storeCategory: '/inventory/categories',
+    storeGodown: '/inventory/godowns',
+    updateGodown: (id: number) => `/inventory/godowns/${id}`,
+    destroyGodown: (id: number) => `/inventory/godowns/${id}`,
     updateCategory: (id: number) => `/inventory/categories/${id}`,
     destroyCategory: (id: number) => `/inventory/categories/${id}`,
 };
@@ -214,7 +235,7 @@ function buildSku(catCode: string, size: string, shape: string): string {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function InventoryIndex({ materials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomOutputMap, fillingOutputMap }: Props) {
+export default function InventoryIndex({ materials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomOutputMap, fillingOutputMap, godowns }: Props) {
     const { auth } = usePage<{ auth: Auth }>().props;
     const role = auth.user?.role ?? '';
     const canSeeCost      = role === 'admin' || auth.user?.cost_access === true;
@@ -223,7 +244,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const isSales         = role === 'sales';
 
     // Tab
-    const [tab, setTab] = useState<'materials' | 'log' | 'bills' | 'reorders' | 'categories'>('materials');
+    const [tab, setTab] = useState<'materials' | 'log' | 'bills' | 'reorders' | 'categories' | 'godowns'>('materials');
 
     // Category management
     const [catMgmtModal, setCatMgmtModal] = useState(false);
@@ -243,6 +264,11 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const [reorderModal, setReorderModal] = useState(false);
     const [packModal, setPackModal] = useState(false);
     const [scanModal, setScanModal] = useState(false);
+    const [godownModal, setGodownModal] = useState(false);
+    const [editingGodown, setEditingGodown] = useState<Godown | null>(null);
+    const [godownForm, setGodownForm] = useState({ name: '', location: '', notes: '' });
+    const [godownCatFilter, setGodownCatFilter] = useState<string>('all');
+    const [selectedGodown, setSelectedGodown] = useState<Godown | null>(null);
 
     // Modal targets
     const [editingMat, setEditingMat] = useState<RawMaterial | null>(null);
@@ -285,6 +311,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         freight_charges: '0',
         round_off: '0',
         add_to_stock: true,
+        godown_id: '',
     });
     const [billFile, setBillFile] = useState<File | null>(null);
     const [billRows, setBillRows] = useState<
@@ -371,6 +398,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const txnForm = useForm({
         type: 'purchase',
         qty: '',
+        godown_id: '',
         cost_per_unit: '',
         reference: '',
         notes: '',
@@ -647,7 +675,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     };
 
     const resetBillForm = () => {
-        setBillForm({ party_id: '', vendor_name: '', bill_number: '', bill_date: '', freight_charges: '0', round_off: '0', add_to_stock: true });
+        setBillForm({ party_id: '', vendor_name: '', bill_number: '', bill_date: '', freight_charges: '0', round_off: '0', add_to_stock: true, godown_id: '' });
         setBillFile(null);
         setBillRows([]);
         setBillMatDropdown(null);
@@ -683,6 +711,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         fd.append('freight_charges', billForm.freight_charges || '0');
         fd.append('round_off', billForm.round_off || '0');
         fd.append('add_to_stock', billForm.add_to_stock ? '1' : '0');
+        if (billForm.godown_id) fd.append('godown_id', billForm.godown_id);
         fd.append('total_amount', String(billTotal));
         if (billFile) fd.append('bill_file', billFile);
         billRows.forEach((row, i) => {
@@ -976,7 +1005,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
 
             {/* Tabs */}
             <div className="filter-bar" style={{ marginBottom: 0, borderBottom: '1px solid #e5e7eb' }}>
-                {(['materials', 'log', 'bills', 'reorders', 'categories'] as const).filter((t) => !isSales || t === 'materials').map((t) => (
+                {(['materials', 'log', 'bills', 'reorders', 'categories', 'godowns'] as const).filter((t) => !isSales || t === 'materials').map((t) => (
                     <button
                         key={t}
                         className={`pill${tab === t ? ' active' : ''}`}
@@ -988,6 +1017,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                         {t === 'bills' && 'Purchase Bills'}
                         {t === 'reorders' && 'Reorders'}
                         {t === 'categories' && 'Categories'}
+                        {t === 'godowns' && '🏭 Godowns'}
                     </button>
                 ))}
             </div>
@@ -1359,9 +1389,150 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                 </div>
             )}
 
+            {/* ── Godowns Tab ───────────────────────────────────────────────── */}
+            {tab === 'godowns' && (
+                <div style={{ padding: '20px 0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>🏭 Godowns / Warehouses</h3>
+                        {!isSales && (
+                            <button className="btn primary sm" onClick={() => { setEditingGodown(null); setGodownForm({ name: '', location: '', notes: '' }); setGodownModal(true); }}>
+                                + Add Godown
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Godown cards */}
+                    {godowns.length === 0 ? (
+                        <div style={{ color: '#9ca3af', textAlign: 'center', padding: '40px 0', fontSize: 14 }}>
+                            No godowns added yet. Add your first warehouse/godown.
+                        </div>
+                    ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
+                            {godowns.map((g) => {
+                                const gCats = Array.from(new Set(g.stocks.map((s) => s.raw_material?.category ?? 'Uncategorized')));
+                                const filteredStocks = godownCatFilter === 'all' || selectedGodown?.id !== g.id
+                                    ? g.stocks : g.stocks.filter((s) => (s.raw_material?.category ?? 'Uncategorized') === godownCatFilter);
+
+                                return (
+                                    <div key={g.id} className="card" style={{ padding: 16 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                                            <div>
+                                                <div style={{ fontWeight: 700, fontSize: 15 }}>{g.name}</div>
+                                                {g.location && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>📍 {g.location}</div>}
+                                            </div>
+                                            {!isSales && (
+                                                <button className="btn sm" style={{ flexShrink: 0 }} onClick={() => {
+                                                    setEditingGodown(g);
+                                                    setGodownForm({ name: g.name, location: g.location ?? '', notes: g.notes ?? '' });
+                                                    setGodownModal(true);
+                                                }}>Edit</button>
+                                            )}
+                                        </div>
+
+                                        {/* Category filter pills for this godown */}
+                                        {g.stocks.length > 0 && (
+                                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+                                                <button
+                                                    className={`pill${(selectedGodown?.id !== g.id || godownCatFilter === 'all') ? ' active' : ''}`}
+                                                    style={{ fontSize: 11, padding: '2px 8px' }}
+                                                    onClick={() => { setSelectedGodown(g); setGodownCatFilter('all'); }}
+                                                >All</button>
+                                                {gCats.map((c) => (
+                                                    <button
+                                                        key={c}
+                                                        className={`pill${selectedGodown?.id === g.id && godownCatFilter === c ? ' active' : ''}`}
+                                                        style={{ fontSize: 11, padding: '2px 8px' }}
+                                                        onClick={() => { setSelectedGodown(g); setGodownCatFilter(c); }}
+                                                    >{c}</button>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Stock list */}
+                                        {g.stocks.length === 0 ? (
+                                            <div style={{ fontSize: 12, color: '#9ca3af', textAlign: 'center', padding: '12px 0' }}>No stock recorded in this godown.</div>
+                                        ) : (
+                                            <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                                                <thead>
+                                                    <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                                                        <th style={{ padding: '4px 8px', textAlign: 'left', fontWeight: 600 }}>Material</th>
+                                                        <th style={{ padding: '4px 8px', textAlign: 'left', fontWeight: 600, color: '#6b7280' }}>Category</th>
+                                                        <th style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600 }}>Stock</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {(selectedGodown?.id === g.id && godownCatFilter !== 'all' ? filteredStocks : g.stocks)
+                                                        .filter((s) => Number(s.stock_qty) > 0)
+                                                        .sort((a, b) => (a.raw_material?.name ?? '').localeCompare(b.raw_material?.name ?? ''))
+                                                        .map((s) => (
+                                                            <tr key={s.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                                                                <td style={{ padding: '5px 8px', fontWeight: 500 }}>{s.raw_material?.name ?? `#${s.raw_material_id}`}</td>
+                                                                <td style={{ padding: '5px 8px', color: '#6b7280' }}>{s.raw_material?.category ?? '—'}</td>
+                                                                <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>
+                                                                    {Number(s.stock_qty).toLocaleString('en-IN', { maximumFractionDigits: 3 })} {s.raw_material?.unit}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                </tbody>
+                                            </table>
+                                        )}
+
+                                        {/* Total items count */}
+                                        <div style={{ marginTop: 8, fontSize: 11, color: '#9ca3af', textAlign: 'right' }}>
+                                            {g.stocks.filter((s) => Number(s.stock_qty) > 0).length} item(s) in stock
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* ════════════════════════════════════════════════════════════════
                 MODALS
             ════════════════════════════════════════════════════════════════ */}
+
+            {/* ── Godown Modal ──────────────────────────────────────────────── */}
+            <div className={`modal-overlay${godownModal ? ' open' : ''}`} onClick={() => setGodownModal(false)}>
+                <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440, width: '95%' }}>
+                    <div className="modal-header">
+                        <h3>{editingGodown ? 'Edit Godown' : 'Add Godown'}</h3>
+                        <button className="modal-close" onClick={() => setGodownModal(false)}>×</button>
+                    </div>
+                    <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <div className="form-group">
+                            <label>Godown Name *</label>
+                            <input type="text" value={godownForm.name} onChange={(e) => setGodownForm((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Main Warehouse, Cold Storage" />
+                        </div>
+                        <div className="form-group">
+                            <label>Location</label>
+                            <input type="text" value={godownForm.location} onChange={(e) => setGodownForm((p) => ({ ...p, location: e.target.value }))} placeholder="e.g. Plot 12, GIDC Rajkot" />
+                        </div>
+                        <div className="form-group">
+                            <label>Notes</label>
+                            <input type="text" value={godownForm.notes} onChange={(e) => setGodownForm((p) => ({ ...p, notes: e.target.value }))} placeholder="Optional" />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
+                            <button className="btn" onClick={() => setGodownModal(false)}>Cancel</button>
+                            <button className="btn primary" onClick={() => {
+                                if (!godownForm.name.trim()) return;
+                                if (editingGodown) {
+                                    router.patch(ROUTES.updateGodown(editingGodown.id), godownForm, {
+                                        preserveScroll: true, onSuccess: () => setGodownModal(false),
+                                    });
+                                } else {
+                                    router.post(ROUTES.storeGodown, godownForm, {
+                                        preserveScroll: true, onSuccess: () => setGodownModal(false),
+                                    });
+                                }
+                            }}>
+                                {editingGodown ? 'Update' : 'Add Godown'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             {/* ── Material Modal ────────────────────────────────────────────── */}
             <div className={`modal-overlay${matModal ? ' open' : ''}`} onClick={() => setMatModal(false)}>
@@ -1624,6 +1795,15 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                     </select>
                                     {txnForm.errors.type && <div className="form-error">{txnForm.errors.type}</div>}
                                 </div>
+                                {godowns.length > 0 && (
+                                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                        <label>Godown / Warehouse</label>
+                                        <select value={txnForm.data.godown_id} onChange={(e) => txnForm.setData('godown_id', e.target.value)}>
+                                            <option value="">— No specific godown —</option>
+                                            {godowns.map((g) => <option key={g.id} value={g.id}>{g.name}{g.location ? ` (${g.location})` : ''}</option>)}
+                                        </select>
+                                    </div>
+                                )}
                                 <div className="form-group">
                                     <label>Qty *</label>
                                     <input
@@ -1991,18 +2171,33 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                         )}
 
                         {/* Add to stock */}
-                        <div style={{ marginTop: 16, padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <input
-                                type="checkbox"
-                                id="addToStock"
-                                checked={billForm.add_to_stock}
-                                onChange={(e) => setBillForm((p) => ({ ...p, add_to_stock: e.target.checked }))}
-                                style={{ width: 16, height: 16, cursor: 'pointer' }}
-                            />
-                            <label htmlFor="addToStock" style={{ margin: 0, cursor: 'pointer', fontWeight: 600, color: '#059669' }}>
-                                📦 Add Qty to Inventory Stock
-                            </label>
-                            <span style={{ fontSize: 12, color: '#6b7280' }}>— automatically update stock for all items in this bill</span>
+                        <div style={{ marginTop: 16, padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <input
+                                    type="checkbox"
+                                    id="addToStock"
+                                    checked={billForm.add_to_stock}
+                                    onChange={(e) => setBillForm((p) => ({ ...p, add_to_stock: e.target.checked }))}
+                                    style={{ width: 16, height: 16, cursor: 'pointer' }}
+                                />
+                                <label htmlFor="addToStock" style={{ margin: 0, cursor: 'pointer', fontWeight: 600, color: '#059669' }}>
+                                    📦 Add Qty to Inventory Stock
+                                </label>
+                                <span style={{ fontSize: 12, color: '#6b7280' }}>— automatically update stock for all items in this bill</span>
+                            </div>
+                            {billForm.add_to_stock && godowns.length > 0 && (
+                                <div style={{ marginTop: 10 }}>
+                                    <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Godown / Warehouse</label>
+                                    <select
+                                        value={billForm.godown_id}
+                                        onChange={(e) => setBillForm((p) => ({ ...p, godown_id: e.target.value }))}
+                                        style={{ fontSize: 13, width: '100%', maxWidth: 300 }}
+                                    >
+                                        <option value="">— No specific godown —</option>
+                                        {godowns.map((g) => <option key={g.id} value={g.id}>{g.name}{g.location ? ` (${g.location})` : ''}</option>)}
+                                    </select>
+                                </div>
+                            )}
                         </div>
                     </div>
                     <div className="modal-footer">

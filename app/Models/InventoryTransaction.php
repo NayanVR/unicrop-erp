@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['raw_material_id', 'user_id', 'type', 'qty', 'previous_stock', 'new_stock', 'cost_per_unit', 'reference', 'notes'])]
+#[Fillable(['raw_material_id', 'user_id', 'godown_id', 'type', 'qty', 'previous_stock', 'new_stock', 'cost_per_unit', 'reference', 'notes'])]
 class InventoryTransaction extends Model
 {
     /**
@@ -36,5 +36,13 @@ class InventoryTransaction extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return BelongsTo<Godown, InventoryTransaction>
+     */
+    public function godown(): BelongsTo
+    {
+        return $this->belongsTo(Godown::class);
     }
 }
