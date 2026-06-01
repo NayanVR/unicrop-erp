@@ -494,7 +494,6 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                         <div class="brand-name">${esc(lbl.brand || '—')}</div>
                     </div>
                     <div class="order-ref">${esc(lbl.orderRef)}</div>
-                    <div class="printed-by">Printed by: ${esc(printedBy)} · ${printedOn}</div>
                 </div>
             </div>`,
             )
