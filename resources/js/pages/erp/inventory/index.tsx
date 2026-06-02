@@ -1134,7 +1134,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                             </>
                         );
                     })()
-                    ) : (
+                    : (
                         <div className="prod-wrap">
                             <table className="prod-table">
                                 <thead>
