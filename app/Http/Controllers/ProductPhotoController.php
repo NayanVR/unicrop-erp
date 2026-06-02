@@ -109,12 +109,13 @@ class ProductPhotoController extends Controller
         ]);
 
         $data = $request->validate([
-            'party_id' => 'nullable|exists:parties,id',
-            'our_brand' => 'required|string|max:255',
-            'party_brand' => 'nullable|string|max:255',
-            'packing_size' => 'nullable|string|max:100',
-            'mrp'          => 'nullable|string|max:50',
-            'photo' => 'required|image|mimes:jpg,jpeg,png,webp|max:8192',
+            'party_id'              => 'nullable|exists:parties,id',
+            'our_brand'             => 'required|string|max:255',
+            'party_brand'           => 'nullable|string|max:255',
+            'sizes'                 => 'required|array|min:1',
+            'sizes.*.packing_size'  => 'nullable|string|max:100',
+            'sizes.*.mrp'           => 'nullable|string|max:50',
+            'photo'                 => 'required|image|mimes:jpg,jpeg,png,webp|max:8192',
         ]);
 
         Log::error('[gallery-debug] validation passed');
@@ -150,17 +151,20 @@ class ProductPhotoController extends Controller
             return redirect()->back()->with('error', 'Upload failed: ' . $e->getMessage());
         }
 
-        ProductPhoto::create([
-            'party_id'    => $data['party_id'] ?? null,
-            'our_brand'   => $data['our_brand'],
-            'party_brand' => $data['party_brand'] ?? null,
-            'packing_size'=> $data['packing_size'] ?? null,
-            'mrp'         => $data['mrp'] ?? null,
-            'photo_path'  => $path,
-            'uploaded_by' => $request->user()?->id,
-        ]);
+        foreach ($data['sizes'] as $sizeRow) {
+            ProductPhoto::create([
+                'party_id'    => $data['party_id'] ?? null,
+                'our_brand'   => $data['our_brand'],
+                'party_brand' => $data['party_brand'] ?? null,
+                'packing_size'=> $sizeRow['packing_size'] ?: null,
+                'mrp'         => $sizeRow['mrp'] ?: null,
+                'photo_path'  => $path,
+                'uploaded_by' => $request->user()?->id,
+            ]);
+        }
 
-        return redirect()->back()->with('success', 'Photo uploaded successfully.');
+        $count = count($data['sizes']);
+        return redirect()->back()->with('success', $count > 1 ? "{$count} photos uploaded." : 'Photo uploaded successfully.');
     }
 
     public function update(Request $request, ProductPhoto $photo): RedirectResponse

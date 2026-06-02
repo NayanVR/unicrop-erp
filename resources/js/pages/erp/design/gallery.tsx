@@ -102,7 +102,7 @@ type PageProps = {
     flash?: { success?: string; error?: string };
 };
 
-type UploadForm   = { party_id: string; our_brand: string; party_brand: string; packing_size: string; mrp: string; photo: File | null };
+type UploadForm   = { party_id: string; our_brand: string; party_brand: string; photo: File | null };
 type FolderForm   = { party_id: string };
 
 // null = folder list, 'our-brand' = Our Brand, number = party_id
@@ -121,8 +121,9 @@ export default function DesignGallery() {
     const [photoSearch,   setPhotoSearch]   = useState('');
 
     const uploadForm = useForm<UploadForm>({
-        party_id: '', our_brand: '', party_brand: '', packing_size: '', mrp: '', photo: null,
+        party_id: '', our_brand: '', party_brand: '', photo: null,
     });
+    const [sizeRows, setSizeRows] = useState<{ packing_size: string; mrp: string }[]>([{ packing_size: '', mrp: '' }]);
     const folderForm = useForm<FolderForm>({ party_id: '' });
     const fileRef    = useRef<HTMLInputElement | null>(null);
 
@@ -220,6 +221,7 @@ export default function DesignGallery() {
     const openUpload = (partyId?: number) => {
         uploadForm.reset();
         uploadForm.clearErrors();
+        setSizeRows([{ packing_size: '', mrp: '' }]);
         if (partyId) uploadForm.setData('party_id', String(partyId));
         setShowUpload(true);
     };
@@ -236,12 +238,22 @@ export default function DesignGallery() {
 
     const submitUpload = (e: React.FormEvent) => {
         e.preventDefault();
-        uploadForm.post(galleryStore().url, {
+        const fd = new FormData();
+        if (uploadForm.data.party_id) fd.append('party_id', uploadForm.data.party_id);
+        fd.append('our_brand', uploadForm.data.our_brand);
+        if (uploadForm.data.party_brand) fd.append('party_brand', uploadForm.data.party_brand);
+        if (uploadForm.data.photo) fd.append('photo', uploadForm.data.photo);
+        sizeRows.forEach((row, i) => {
+            fd.append(`sizes[${i}][packing_size]`, row.packing_size);
+            fd.append(`sizes[${i}][mrp]`, row.mrp);
+        });
+        router.post(galleryStore().url, fd as any, {
             forceFormData: true,
             preserveScroll: true,
             onSuccess: () => {
                 setShowUpload(false);
                 uploadForm.reset();
+                setSizeRows([{ packing_size: '', mrp: '' }]);
                 if (fileRef.current) fileRef.current.value = '';
             },
         });
@@ -525,7 +537,11 @@ export default function DesignGallery() {
                         allCategories={allCategories}
                         brandSuggestions={brandSuggestions}
                         sizeSuggestions={sizeSuggestions}
-                        onClose={() => { setShowUpload(false); uploadForm.reset(); }}
+                        sizeRows={sizeRows}
+                        onSizeRowChange={(i, f, v) => setSizeRows((r) => r.map((row, idx) => idx === i ? { ...row, [f]: v } : row))}
+                        onAddSizeRow={() => setSizeRows((r) => [...r, { packing_size: '', mrp: '' }])}
+                        onRemoveSizeRow={(i) => setSizeRows((r) => r.filter((_, idx) => idx !== i))}
+                        onClose={() => { setShowUpload(false); uploadForm.reset(); setSizeRows([{ packing_size: '', mrp: '' }]); }}
                         onSubmit={submitUpload}
                     />
                 )}
@@ -689,7 +705,11 @@ export default function DesignGallery() {
                     allCategories={allCategories}
                     brandSuggestions={brandSuggestions}
                     sizeSuggestions={sizeSuggestions}
-                    onClose={() => { setShowUpload(false); uploadForm.reset(); }}
+                    sizeRows={sizeRows}
+                    onSizeRowChange={(i, f, v) => setSizeRows((r) => r.map((row, idx) => idx === i ? { ...row, [f]: v } : row))}
+                    onAddSizeRow={() => setSizeRows((r) => [...r, { packing_size: '', mrp: '' }])}
+                    onRemoveSizeRow={(i) => setSizeRows((r) => r.filter((_, idx) => idx !== i))}
+                    onClose={() => { setShowUpload(false); uploadForm.reset(); setSizeRows([{ packing_size: '', mrp: '' }]); }}
                     onSubmit={submitUpload}
                 />
             )}
@@ -910,7 +930,8 @@ function PhotoCard({ photo, deleting, onView, onEdit, onDelete }: {
     );
 }
 
-function UploadModal({ form, fileRef, folders, ourBrands, allCategories, brandSuggestions, sizeSuggestions, onClose, onSubmit }: {
+function UploadModal({ form, fileRef, folders, ourBrands, allCategories, brandSuggestions, sizeSuggestions,
+    sizeRows, onSizeRowChange, onAddSizeRow, onRemoveSizeRow, onClose, onSubmit }: {
     form: ReturnType<typeof useForm<UploadForm>>;
     fileRef: React.RefObject<HTMLInputElement | null>;
     folders: Folder[];
@@ -918,6 +939,10 @@ function UploadModal({ form, fileRef, folders, ourBrands, allCategories, brandSu
     allCategories: string[];
     brandSuggestions: string[];
     sizeSuggestions: string[];
+    sizeRows: { packing_size: string; mrp: string }[];
+    onSizeRowChange: (index: number, field: 'packing_size' | 'mrp', value: string) => void;
+    onAddSizeRow: () => void;
+    onRemoveSizeRow: (index: number) => void;
     onClose: () => void;
     onSubmit: (e: React.FormEvent) => void;
 }) {
@@ -985,30 +1010,43 @@ function UploadModal({ form, fileRef, folders, ourBrands, allCategories, brandSu
                             </div>
                         )}
 
-                        {/* Packing size + MRP */}
-                        <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
-                            <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                                <label>Packing Size</label>
-                                <input
-                                    type="text"
-                                    list="gallery-packing-sizes"
-                                    value={form.data.packing_size}
-                                    onChange={(e) => form.setData('packing_size', e.target.value)}
-                                    placeholder="e.g. 500ml, 1ltr"
-                                />
-                                <datalist id="gallery-packing-sizes">
-                                    {sizeSuggestions.map((s) => <option key={s} value={s} />)}
-                                </datalist>
-                            </div>
-                            <div className="form-group" style={{ width: '130px', marginBottom: 0 }}>
-                                <label>MRP</label>
-                                <input
-                                    type="text"
-                                    value={form.data.mrp}
-                                    onChange={(e) => form.setData('mrp', e.target.value)}
-                                    placeholder="e.g. ₹120"
-                                />
-                            </div>
+                        {/* Packing Sizes + MRP (dynamic rows) */}
+                        <div className="form-group" style={{ marginBottom: '14px' }}>
+                            <label>Packing Size & MRP</label>
+                            <datalist id="upload-packing-sizes">
+                                {sizeSuggestions.map((s) => <option key={s} value={s} />)}
+                            </datalist>
+                            {sizeRows.map((row, i) => (
+                                <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '6px', alignItems: 'center' }}>
+                                    <input
+                                        type="text"
+                                        list="upload-packing-sizes"
+                                        value={row.packing_size}
+                                        onChange={(e) => onSizeRowChange(i, 'packing_size', e.target.value)}
+                                        placeholder="500ml, 1ltr…"
+                                        style={{ flex: 1 }}
+                                    />
+                                    <input
+                                        type="text"
+                                        value={row.mrp}
+                                        onChange={(e) => onSizeRowChange(i, 'mrp', e.target.value)}
+                                        placeholder="MRP ₹120"
+                                        style={{ width: '110px' }}
+                                    />
+                                    {sizeRows.length > 1 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => onRemoveSizeRow(i)}
+                                            style={{ flexShrink: 0, background: 'none', border: '1px solid var(--border)', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', color: 'var(--tx-muted)', fontSize: '14px', lineHeight: 1 }}
+                                        >×</button>
+                                    )}
+                                </div>
+                            ))}
+                            <button
+                                type="button"
+                                onClick={onAddSizeRow}
+                                style={{ marginTop: '4px', fontSize: '12px', color: 'var(--primary, #16a34a)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
+                            >＋ Add Size</button>
                         </div>
 
                         {/* Photo file */}
