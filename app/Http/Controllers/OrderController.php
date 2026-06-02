@@ -60,9 +60,15 @@ class OrderController extends Controller
             });
         }
 
-        // Office users see confirmed and dispatched orders
+        // Office/Sales users see confirmed and dispatched orders + their own submitted/draft
         if ($role === Role::OFFICE) {
-            $ordersQuery->whereIn('status', ['confirmed', 'dispatched']);
+            $ordersQuery->where(function ($q) use ($user) {
+                $q->whereIn('status', ['confirmed', 'dispatched'])
+                  ->orWhere(function ($q2) use ($user) {
+                      $q2->whereIn('status', ['submitted', 'draft'])
+                         ->where('created_by', $user->id);
+                  });
+            });
         }
 
         // Sales users see confirmed/dispatched orders + their own submitted/draft orders
