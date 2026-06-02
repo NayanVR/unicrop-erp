@@ -24,6 +24,8 @@ class Role extends Model
 
     public const ACCOUNTANT = 'accountant';
 
+    public const SALES = 'sales';
+
     /**
      * @return array<int, array{slug: string, name: string}>
      */
