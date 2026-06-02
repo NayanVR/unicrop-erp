@@ -140,6 +140,8 @@ type Godown = {
     stocks: GodownStock[];
 };
 
+type FinishGoodGroup = { name: string; count: number };
+
 type Props = {
     materials: RawMaterial[];
     recentTransactions: Transaction[];
@@ -151,6 +153,7 @@ type Props = {
     bomOutputMap: Record<string, string[]>;
     fillingOutputMap: Record<string, string[]>;
     godowns: Godown[];
+    finishGoodGroups: FinishGoodGroup[];
 };
 
 // ── Route constants ───────────────────────────────────────────────────────────
@@ -236,7 +239,7 @@ function buildSku(catCode: string, size: string, shape: string): string {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function InventoryIndex({ materials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomOutputMap, fillingOutputMap, godowns }: Props) {
+export default function InventoryIndex({ materials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomOutputMap, fillingOutputMap, godowns, finishGoodGroups }: Props) {
     const { auth } = usePage<{ auth: Auth }>().props;
     const role = auth.user?.role ?? auth.user?.roles?.[0]?.slug ?? '';
     const canSeeCost      = role === 'admin' || auth.user?.cost_access === true;
@@ -260,6 +263,19 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | 'low' | 'out'>('all');
     const [catFilter, setCatFilter] = useState<string>('all');
+
+    // Group name combobox
+    const [groupNameOpen, setGroupNameOpen] = useState(false);
+    const groupNameRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (groupNameRef.current && !groupNameRef.current.contains(e.target as Node)) {
+                setGroupNameOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
 
     // Finish-good grouped view
     const [collapsedFinishGroups, setCollapsedFinishGroups] = useState<Set<string>>(new Set());
@@ -1785,18 +1801,74 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                 {(() => {
                                     const cat = matForm.data.category.toLowerCase();
                                     const isFinish = cat.includes('finish') && cat.includes('good') && !cat.includes('semi');
-                                    return isFinish ? (
-                                        <div className="form-group">
+                                    if (!isFinish) return null;
+
+                                    const currentVal = matForm.data.group_name.trim();
+                                    const exactMatch = finishGoodGroups.find(
+                                        (g) => g.name.toLowerCase() === currentVal.toLowerCase()
+                                    );
+                                    const similarMatches = !exactMatch && currentVal.length >= 2
+                                        ? finishGoodGroups.filter((g) =>
+                                            g.name.toLowerCase().includes(currentVal.toLowerCase()) ||
+                                            currentVal.toLowerCase().includes(g.name.toLowerCase())
+                                          )
+                                        : [];
+                                    const filteredGroups = finishGoodGroups.filter((g) =>
+                                        g.name.toLowerCase().includes(currentVal.toLowerCase())
+                                    );
+
+                                    return (
+                                        <div className="form-group" ref={groupNameRef} style={{ position: 'relative' }}>
                                             <label>Product Group <span style={{ fontSize: 11, color: 'var(--tx-muted)', fontWeight: 400 }}>(groups same-brand items)</span></label>
                                             <input
                                                 type="text"
                                                 value={matForm.data.group_name}
-                                                onChange={(e) => matForm.setData('group_name', e.target.value)}
+                                                onChange={(e) => { matForm.setData('group_name', e.target.value); setGroupNameOpen(true); }}
+                                                onFocus={() => setGroupNameOpen(true)}
                                                 placeholder="e.g. Chia Seed Oil"
+                                                autoComplete="off"
                                             />
+                                            {groupNameOpen && finishGoodGroups.length > 0 && (
+                                                <div style={{
+                                                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                                                    background: '#fff', border: '1px solid #d1d5db', borderRadius: 8,
+                                                    boxShadow: '0 4px 12px rgba(0,0,0,.12)', marginTop: 2, maxHeight: 200, overflowY: 'auto',
+                                                }}>
+                                                    {(currentVal ? filteredGroups : finishGoodGroups).length === 0 ? (
+                                                        <div style={{ padding: '8px 12px', fontSize: 13, color: 'var(--tx-muted)' }}>No matching groups</div>
+                                                    ) : (currentVal ? filteredGroups : finishGoodGroups).map((g) => (
+                                                        <div
+                                                            key={g.name}
+                                                            onMouseDown={(e) => { e.preventDefault(); matForm.setData('group_name', g.name); setGroupNameOpen(false); }}
+                                                            style={{
+                                                                padding: '8px 12px', cursor: 'pointer', fontSize: 13,
+                                                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                                                background: g.name.toLowerCase() === currentVal.toLowerCase() ? '#f0fdf4' : 'transparent',
+                                                            }}
+                                                            onMouseEnter={(e) => (e.currentTarget.style.background = '#f9fafb')}
+                                                            onMouseLeave={(e) => (e.currentTarget.style.background = g.name.toLowerCase() === currentVal.toLowerCase() ? '#f0fdf4' : 'transparent')}
+                                                        >
+                                                            <span style={{ fontWeight: 500 }}>{g.name}</span>
+                                                            <span style={{ fontSize: 11, color: '#6b7280', background: '#f3f4f6', padding: '1px 7px', borderRadius: 10 }}>
+                                                                {g.count} item{g.count !== 1 ? 's' : ''}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {exactMatch && (
+                                                <div style={{ marginTop: 5, fontSize: 12, color: '#059669', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    ✓ Group exists — joining "{exactMatch.name}" ({exactMatch.count} product{exactMatch.count !== 1 ? 's' : ''})
+                                                </div>
+                                            )}
+                                            {!exactMatch && similarMatches.length > 0 && (
+                                                <div style={{ marginTop: 5, fontSize: 12, color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 6, padding: '4px 10px' }}>
+                                                    ⚠ Similar group exists: {similarMatches.map((g) => `"${g.name}"`).join(', ')}
+                                                </div>
+                                            )}
                                             {matForm.errors.group_name && <div className="form-error">{matForm.errors.group_name}</div>}
                                         </div>
-                                    ) : null;
+                                    );
                                 })()}
                                 <div className="form-group">
                                     <label>SKU</label>

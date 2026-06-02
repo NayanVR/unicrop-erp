@@ -106,8 +106,17 @@ class InventoryController extends Controller
             ->with(['stocks.rawMaterial:id,name,unit,category'])
             ->get();
 
+        $finishGoodGroups = RawMaterial::whereRaw("LOWER(category) LIKE ? AND LOWER(category) NOT LIKE ?", ['%finish%good%', '%semi%'])
+            ->whereNotNull('group_name')
+            ->where('group_name', '!=', '')
+            ->selectRaw('group_name, COUNT(*) as cnt')
+            ->groupBy('group_name')
+            ->orderBy('group_name')
+            ->get()
+            ->map(fn ($r) => ['name' => $r->group_name, 'count' => (int) $r->cnt]);
+
         return Inertia::render('erp/inventory/index', array_merge(
-            compact('materials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats', 'vendors', 'inventoryCategories', 'bomOutputMap', 'fillingOutputMap', 'godowns'),
+            compact('materials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats', 'vendors', 'inventoryCategories', 'bomOutputMap', 'fillingOutputMap', 'godowns', 'finishGoodGroups'),
             ['pageTitle' => 'Inventory']
         ));
     }
