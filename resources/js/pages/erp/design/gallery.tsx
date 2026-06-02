@@ -96,6 +96,7 @@ type PageProps = {
     folders: Folder[];
     parties: Party[];
     ourBrands: string[];
+    allCategories: string[];
     partyRates: PartyRate[];
     packingSizes: string[];
     flash?: { success?: string; error?: string };
@@ -108,7 +109,7 @@ type FolderForm   = { party_id: string };
 type ActiveFolder = null | 'our-brand' | number;
 
 export default function DesignGallery() {
-    const { photos, folders, parties, ourBrands, partyRates, packingSizes, flash } =
+    const { photos, folders, parties, ourBrands, allCategories, partyRates, packingSizes, flash } =
         usePage<PageProps>().props;
 
     const [activeFolder,  setActiveFolder]  = useState<ActiveFolder>(null);
@@ -521,6 +522,7 @@ export default function DesignGallery() {
                         fileRef={fileRef}
                         folders={folders}
                         ourBrands={ourBrands}
+                        allCategories={allCategories}
                         brandSuggestions={brandSuggestions}
                         sizeSuggestions={sizeSuggestions}
                         onClose={() => { setShowUpload(false); uploadForm.reset(); }}
@@ -684,6 +686,7 @@ export default function DesignGallery() {
                     fileRef={fileRef}
                     folders={folders}
                     ourBrands={ourBrands}
+                    allCategories={allCategories}
                     brandSuggestions={brandSuggestions}
                     sizeSuggestions={sizeSuggestions}
                     onClose={() => { setShowUpload(false); uploadForm.reset(); }}
@@ -907,11 +910,12 @@ function PhotoCard({ photo, deleting, onView, onEdit, onDelete }: {
     );
 }
 
-function UploadModal({ form, fileRef, folders, ourBrands, brandSuggestions, sizeSuggestions, onClose, onSubmit }: {
+function UploadModal({ form, fileRef, folders, ourBrands, allCategories, brandSuggestions, sizeSuggestions, onClose, onSubmit }: {
     form: ReturnType<typeof useForm<UploadForm>>;
     fileRef: React.RefObject<HTMLInputElement | null>;
     folders: Folder[];
     ourBrands: string[];
+    allCategories: string[];
     brandSuggestions: string[];
     sizeSuggestions: string[];
     onClose: () => void;
@@ -952,6 +956,11 @@ function UploadModal({ form, fileRef, folders, ourBrands, brandSuggestions, size
                             />
                             {form.errors.our_brand && (
                                 <span className="field-error">{form.errors.our_brand}</span>
+                            )}
+                            {ourBrands.length === 0 && (
+                                <div style={{ marginTop: '6px', fontSize: '11px', color: '#b45309', background: '#fef3c7', padding: '6px 10px', borderRadius: '6px' }}>
+                                    No products found. DB categories: {allCategories.length === 0 ? '(none)' : allCategories.join(', ')}
+                                </div>
                             )}
                         </div>
 

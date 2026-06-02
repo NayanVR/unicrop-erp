@@ -60,10 +60,16 @@ class ProductPhotoController extends Controller
             ->get(['id', 'name']);
 
         $ourBrands = RawMaterial::where('is_active', true)
-            ->whereRaw("LOWER(category) = ?", ['finish good product'])
+            ->whereRaw("LOWER(category) LIKE ? AND LOWER(category) NOT LIKE ?", ['%finish%good%', '%semi%'])
             ->select('name')
             ->orderBy('name')
             ->pluck('name');
+
+        // Debug: all distinct categories so we can verify the exact name
+        $allCategories = RawMaterial::whereNotNull('category')
+            ->distinct()
+            ->orderBy('category')
+            ->pluck('category');
 
         $partyRates = ProductRate::whereNotNull('party_brand')
             ->select('party_id', 'our_brand', 'party_brand', 'packing_size')
@@ -80,6 +86,7 @@ class ProductPhotoController extends Controller
             'folders' => $folders,
             'parties' => $parties,
             'ourBrands' => $ourBrands,
+            'allCategories' => $allCategories,
             'partyRates' => $partyRates,
             'packingSizes' => $packingSizes,
         ]);
