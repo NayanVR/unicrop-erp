@@ -1068,8 +1068,10 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
 
                     {filteredMaterials.length === 0 ? (
                         <div className="empty-state">No materials found.</div>
-                    ) : role === 'accountant' ? (
-                        <div className="prod-wrap">
+                    ) : role === 'accountant' ? (() => {
+                        const missingHsnGst = filteredMaterials.filter((m) => !m.hsn || m.gst == null || m.gst === '');
+                        const complete      = filteredMaterials.filter((m) =>  m.hsn && m.gst != null && m.gst !== '');
+                        const renderTable   = (rows: typeof filteredMaterials) => (
                             <table className="prod-table">
                                 <thead>
                                     <tr>
@@ -1083,7 +1085,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredMaterials.map((m) => (
+                                    {rows.map((m) => (
                                         <tr key={m.id}>
                                             <td><div className="prod-name">{m.name}</div></td>
                                             <td>{m.sku ? <span style={{ fontFamily: 'monospace', fontSize: 13 }}>{m.sku}</span> : <span style={{ color: '#9ca3af' }}>—</span>}</td>
@@ -1096,7 +1098,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                             <td>
                                                 {m.gst != null && m.gst !== ''
                                                     ? <span style={{ background: '#f0fdf4', color: '#16a34a', borderRadius: 4, padding: '2px 8px', fontWeight: 600, fontSize: 13 }}>{m.gst}%</span>
-                                                    : <span style={{ color: '#9ca3af' }}>—</span>}
+                                                    : <span style={{ color: '#ef4444', fontSize: 12 }}>Not set</span>}
                                             </td>
                                             <td>{fmtAmt(m.selling_rate)}</td>
                                             <td>
@@ -1106,7 +1108,32 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                     ))}
                                 </tbody>
                             </table>
-                        </div>
+                        );
+                        return (
+                            <>
+                                {missingHsnGst.length > 0 && (
+                                    <div style={{ marginBottom: 24 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '6px 12px', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 8 }}>
+                                            <span style={{ fontSize: 15 }}>⚠️</span>
+                                            <span style={{ fontWeight: 700, color: '#92400e', fontSize: 14 }}>HSN / GST Missing ({missingHsnGst.length})</span>
+                                        </div>
+                                        <div className="prod-wrap">{renderTable(missingHsnGst)}</div>
+                                    </div>
+                                )}
+                                {complete.length > 0 && (
+                                    <div>
+                                        {missingHsnGst.length > 0 && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '6px 12px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8 }}>
+                                                <span style={{ fontSize: 15 }}>✅</span>
+                                                <span style={{ fontWeight: 700, color: '#166534', fontSize: 14 }}>Complete ({complete.length})</span>
+                                            </div>
+                                        )}
+                                        <div className="prod-wrap">{renderTable(complete)}</div>
+                                    </div>
+                                )}
+                            </>
+                        );
+                    })()
                     ) : (
                         <div className="prod-wrap">
                             <table className="prod-table">
