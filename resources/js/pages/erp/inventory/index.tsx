@@ -1080,6 +1080,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                         <th>Category</th>
                                         <th>HSN Code</th>
                                         <th>GST %</th>
+                                        <th>Stock</th>
                                         <th>Selling Rate</th>
                                         <th>Actions</th>
                                     </tr>
@@ -1100,6 +1101,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                                     ? <span style={{ background: '#f0fdf4', color: '#16a34a', borderRadius: 4, padding: '2px 8px', fontWeight: 600, fontSize: 13 }}>{m.gst}%</span>
                                                     : <span style={{ color: '#ef4444', fontSize: 12 }}>Not set</span>}
                                             </td>
+                                            <td style={{ fontWeight: 600 }}>{fmt(m.stock_qty)} {m.unit}</td>
                                             <td>{fmtAmt(m.selling_rate)}</td>
                                             <td>
                                                 <button className="btn sm" onClick={() => openEditMat(m)}>Edit</button>
