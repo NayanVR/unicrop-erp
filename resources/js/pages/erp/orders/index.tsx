@@ -169,7 +169,9 @@ const normalizeStage = (status?: string | null) =>
 
 const formatDate = (value?: string | null) => {
     if (!value) return '—';
-    return new Date(`${value}T00:00:00`).toLocaleDateString('en-IN', {
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('en-IN', {
         day: '2-digit', month: 'short', year: 'numeric',
     });
 };
