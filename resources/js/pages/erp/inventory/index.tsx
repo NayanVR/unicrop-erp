@@ -16,6 +16,7 @@ type RawMaterial = {
     hsn: string | null;
     gst: string | number;
     category: string | null;
+    group_name: string | null;
     unit: string;
     stock_qty: string | number;
     min_stock: string | number;
@@ -260,6 +261,17 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const [statusFilter, setStatusFilter] = useState<'all' | 'low' | 'out'>('all');
     const [catFilter, setCatFilter] = useState<string>('all');
 
+    // Finish-good grouped view
+    const [collapsedFinishGroups, setCollapsedFinishGroups] = useState<Set<string>>(new Set());
+    const toggleFinishGroup = (key: string) => {
+        setCollapsedFinishGroups((prev) => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+    };
+
     // Modal states
     const [matModal, setMatModal] = useState(false);
     const [txnModal, setTxnModal] = useState(false);
@@ -385,6 +397,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         gst: '18',
         unit: 'kg',
         category: '',
+        group_name: '',
         min_stock: '0',
         reorder_level: '0',
         cost_per_unit: '0',
@@ -458,6 +471,11 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                 color: c.color ?? undefined,
             })),
     ];
+
+    const isFinishGoodCat = catFilter !== 'all' &&
+        catFilter.toLowerCase().includes('finish') &&
+        catFilter.toLowerCase().includes('good') &&
+        !catFilter.toLowerCase().includes('semi');
 
     const filteredMaterials = materials.filter((m) => {
         const s = stockStatus(m);
@@ -538,6 +556,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             gst: String(m.gst),
             unit: m.unit,
             category: m.category ?? '',
+            group_name: m.group_name ?? '',
             min_stock: String(m.min_stock),
             reorder_level: String(m.reorder_level),
             cost_per_unit: String(m.cost_per_unit),
@@ -1136,6 +1155,119 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                             </>
                         );
                     })()
+                    : isFinishGoodCat ? (() => {
+                        // Build grouped structure by group_name
+                        const groupMap: Record<string, RawMaterial[]> = {};
+                        for (const m of filteredMaterials) {
+                            const key = m.group_name || '';
+                            if (!groupMap[key]) groupMap[key] = [];
+                            groupMap[key].push(m);
+                        }
+                        const sortedKeys = Object.keys(groupMap).sort((a, b) => {
+                            if (a === '' && b !== '') return 1;
+                            if (b === '' && a !== '') return -1;
+                            return a.localeCompare(b);
+                        });
+
+                        return (
+                            <div>
+                                {sortedKeys.map((groupKey) => {
+                                    const groupMats = groupMap[groupKey];
+                                    const isCollapsed = collapsedFinishGroups.has(groupKey);
+                                    const hasLowStock = groupMats.some((m) => stockStatus(m) === 'low' || stockStatus(m) === 'out');
+
+                                    return (
+                                        <div key={groupKey || '__ungrouped__'} style={{ marginBottom: 24 }}>
+                                            {(groupKey || sortedKeys.length > 1) && (
+                                                <div
+                                                    onClick={() => toggleFinishGroup(groupKey)}
+                                                    style={{
+                                                        display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+                                                        padding: '10px 16px', borderRadius: 10, marginBottom: isCollapsed ? 0 : 14,
+                                                        background: groupKey ? '#f0fdf4' : 'var(--bg-paper)',
+                                                        border: `1.5px solid ${groupKey ? '#86efac' : 'var(--border)'}`,
+                                                        userSelect: 'none',
+                                                    }}
+                                                >
+                                                    <span style={{
+                                                        fontSize: 13, display: 'inline-block',
+                                                        transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+                                                        transition: 'transform 0.2s',
+                                                        color: 'var(--tx-muted)',
+                                                    }}>▼</span>
+                                                    <span style={{ fontWeight: 700, fontSize: 15, flex: 1, color: groupKey ? '#166534' : 'var(--tx-head)' }}>
+                                                        {groupKey || '📂 No Group'}
+                                                    </span>
+                                                    {hasLowStock && (
+                                                        <span style={{ fontSize: 11, background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
+                                                            ⚠ Low Stock
+                                                        </span>
+                                                    )}
+                                                    <span style={{ fontSize: 12, background: groupKey ? '#dcfce7' : 'var(--bg-secondary)', color: groupKey ? '#166534' : 'var(--tx-muted)', border: '1px solid ' + (groupKey ? '#86efac' : 'var(--border)'), padding: '2px 10px', borderRadius: 10, fontWeight: 700 }}>
+                                                        {groupMats.length}
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            {!isCollapsed && (
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+                                                    {groupMats.map((m) => {
+                                                        const s = stockStatus(m);
+                                                        const borderColor = s === 'out' ? '#fca5a5' : s === 'low' ? '#fcd34d' : '#e5e7eb';
+                                                        const accentColor = s === 'out' ? '#dc2626' : s === 'low' ? '#d97706' : '#2563eb';
+                                                        return (
+                                                            <div key={m.id} style={{
+                                                                background: '#fff',
+                                                                border: `1px solid ${borderColor}`,
+                                                                borderLeft: `4px solid ${accentColor}`,
+                                                                borderRadius: 10,
+                                                                padding: '14px 16px',
+                                                                display: 'flex',
+                                                                flexDirection: 'column',
+                                                                gap: 8,
+                                                                boxShadow: '0 1px 4px rgba(0,0,0,.06)',
+                                                            }}>
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                                                                    <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.3 }}>{m.name}</div>
+                                                                    <StatusBadge m={m} />
+                                                                </div>
+                                                                {m.sku && <div style={{ fontSize: 12, color: 'var(--tx-muted)', fontFamily: 'monospace' }}>{m.sku}</div>}
+                                                                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 13 }}>
+                                                                    <div>
+                                                                        <span style={{ color: 'var(--tx-muted)', fontSize: 11 }}>Stock</span>
+                                                                        <div style={{ fontWeight: 600, color: s === 'out' ? '#dc2626' : s === 'low' ? '#d97706' : '#111827' }}>
+                                                                            {fmt(m.stock_qty)} {m.unit}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div>
+                                                                        <span style={{ color: 'var(--tx-muted)', fontSize: 11 }}>Selling Rate</span>
+                                                                        <div style={{ fontWeight: 600 }}>{fmtAmt(m.selling_rate)}</div>
+                                                                    </div>
+                                                                    {canSeeCost && (
+                                                                        <div>
+                                                                            <span style={{ color: 'var(--tx-muted)', fontSize: 11 }}>Cost/Unit</span>
+                                                                            <div style={{ fontWeight: 600 }}>{fmtAmt(m.cost_per_unit)}</div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                {canEditMaterial && (
+                                                                    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                                                                        {canManageStock && <button className="btn sm primary" onClick={() => openTxn(m)}>+ Stock</button>}
+                                                                        <button className="btn sm" onClick={() => openEditMat(m)}>Edit</button>
+                                                                        {canManageStock && <button className="btn danger sm" onClick={() => deleteMaterial(m.id)}>🗑</button>}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })()
                     : (
                         <div className="prod-wrap">
                             <table className="prod-table">
@@ -1650,6 +1782,22 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                     </select>
                                     {matForm.errors.category && <div className="form-error">{matForm.errors.category}</div>}
                                 </div>
+                                {(() => {
+                                    const cat = matForm.data.category.toLowerCase();
+                                    const isFinish = cat.includes('finish') && cat.includes('good') && !cat.includes('semi');
+                                    return isFinish ? (
+                                        <div className="form-group">
+                                            <label>Product Group <span style={{ fontSize: 11, color: 'var(--tx-muted)', fontWeight: 400 }}>(groups same-brand items)</span></label>
+                                            <input
+                                                type="text"
+                                                value={matForm.data.group_name}
+                                                onChange={(e) => matForm.setData('group_name', e.target.value)}
+                                                placeholder="e.g. Chia Seed Oil"
+                                            />
+                                            {matForm.errors.group_name && <div className="form-error">{matForm.errors.group_name}</div>}
+                                        </div>
+                                    ) : null;
+                                })()}
                                 <div className="form-group">
                                     <label>SKU</label>
                                     <input
