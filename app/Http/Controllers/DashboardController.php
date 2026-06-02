@@ -349,7 +349,7 @@ class DashboardController extends Controller
     private function salesDashboard(User $user): Response
     {
         $salesUsers = User::where('is_active', true)
-            ->whereHas('roles', fn ($q) => $q->whereIn('slug', [Role::OFFICE]))
+            ->whereHas('roles', fn ($q) => $q->whereIn('slug', [Role::SALES]))
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -388,17 +388,68 @@ class DashboardController extends Controller
 
             $myRow = $results->get($user->id);
 
+            // Top parties for this user in this period
+            $topParties = Order::query()
+                ->where('sales_user_id', $user->id)
+                ->where('status', 'confirmed')
+                ->whereBetween('order_date', [$start, $end])
+                ->selectRaw('company_name, COUNT(*) as orders_count, SUM(total_amount) as total_value')
+                ->groupBy('company_name')
+                ->orderByDesc('total_value')
+                ->limit(5)
+                ->get()
+                ->map(fn ($r) => [
+                    'company_name' => $r->company_name,
+                    'orders'       => (int) $r->orders_count,
+                    'value'        => (float) $r->total_value,
+                ])->values();
+
             $salesData[$key] = [
                 'myOrders'    => $myRow ? (int) $myRow->orders_count : 0,
                 'myValue'     => $myRow ? (float) $myRow->total_value : 0.0,
                 'leaderboard' => $leaderboard,
+                'topParties'  => $topParties,
             ];
         }
+
+        // My recent confirmed/dispatched orders (not period-specific)
+        $recentOrders = Order::query()
+            ->where('sales_user_id', $user->id)
+            ->whereIn('status', ['confirmed', 'dispatched'])
+            ->orderByDesc('id')
+            ->limit(8)
+            ->get(['id', 'order_number', 'company_name', 'total_amount', 'status', 'order_date', 'priority'])
+            ->map(fn ($o) => [
+                'id'           => $o->id,
+                'order_number' => $o->order_number,
+                'company_name' => $o->company_name,
+                'total_amount' => (float) $o->total_amount,
+                'status'       => $o->status,
+                'order_date'   => $o->order_date?->toDateString(),
+                'priority'     => $o->priority ?? 'normal',
+            ]);
+
+        // My submitted/pending orders awaiting confirmation
+        $pendingOrders = Order::query()
+            ->where(fn ($q) => $q->where('sales_user_id', $user->id)->orWhere('created_by', $user->id))
+            ->where('status', 'submitted')
+            ->orderByDesc('id')
+            ->get(['id', 'order_number', 'company_name', 'total_amount', 'order_date', 'priority'])
+            ->map(fn ($o) => [
+                'id'           => $o->id,
+                'order_number' => $o->order_number,
+                'company_name' => $o->company_name,
+                'total_amount' => (float) $o->total_amount,
+                'order_date'   => $o->order_date?->toDateString(),
+                'priority'     => $o->priority ?? 'normal',
+            ]);
 
         return Inertia::render('erp/dashboard', [
             'pageTitle'          => 'Dashboard',
             'salesData'          => $salesData,
             'currentUserId'      => $user->id,
+            'recentOrders'       => $recentOrders,
+            'pendingOrders'      => $pendingOrders,
             'lowStockProduction' => $this->lowStockProduction($user),
         ]);
     }
