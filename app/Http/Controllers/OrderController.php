@@ -60,8 +60,8 @@ class OrderController extends Controller
             });
         }
 
-        // Sales users see confirmed and dispatched orders only
-        if ($role === Role::SALES) {
+        // Office/Sales users see confirmed and dispatched orders only
+        if ($role === Role::OFFICE) {
             $ordersQuery->whereIn('status', ['confirmed', 'dispatched']);
         }
         // Admin and office see all orders

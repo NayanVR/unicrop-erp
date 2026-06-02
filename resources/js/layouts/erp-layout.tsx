@@ -176,7 +176,7 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
 
     useDraggableModals();
 
-    const canReceiveNotifications = role === 'accountant' || role === 'sales' || role === 'admin';
+    const canReceiveNotifications = role === 'accountant' || role === 'office' || role === 'admin';
 
     const fetchNotifications = () => {
         if (!canReceiveNotifications) return;

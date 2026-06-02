@@ -158,7 +158,7 @@ class FactoryController extends Controller
 
             if ($allReady && (float) $order->total_amount > 50000) {
                 $notifyUsers = User::where('is_active', true)
-                    ->whereHas('roles', fn ($q) => $q->whereIn('slug', [Role::ACCOUNTANT, Role::SALES]))
+                    ->whereHas('roles', fn ($q) => $q->whereIn('slug', [Role::ACCOUNTANT, Role::OFFICE]))
                     ->get();
 
                 foreach ($notifyUsers as $notifyUser) {

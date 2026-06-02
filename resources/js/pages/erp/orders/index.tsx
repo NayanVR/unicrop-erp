@@ -203,7 +203,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
     const isDesign      = userRole === 'design';
     const isAdmin       = userRole === 'admin';
     const isAccountant  = userRole === 'accountant';
-    const isSales       = userRole === 'sales';
+    const isSales       = userRole === 'office';
     const canConfirm = userRole === 'admin' || userRole === 'office';
 
     const canEditOrder = (order: { status?: string | null; created_by?: number | null }) =>

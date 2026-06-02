@@ -349,7 +349,7 @@ class DashboardController extends Controller
     private function salesDashboard(User $user): Response
     {
         $salesUsers = User::where('is_active', true)
-            ->whereHas('roles', fn ($q) => $q->whereIn('slug', [Role::SALES]))
+            ->whereHas('roles', fn ($q) => $q->whereIn('slug', [Role::OFFICE]))
             ->orderBy('name')
             ->get(['id', 'name']);
 
