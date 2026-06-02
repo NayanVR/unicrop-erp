@@ -853,6 +853,11 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                                             <option key={r.packing_size} value={r.packing_size} />
                                                         ))}
                                                     </datalist>
+                                                    {rowPhoto?.mrp && (
+                                                        <div style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600, marginTop: '2px' }}>
+                                                            MRP: {rowPhoto.mrp}
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 <td>
                                                     <input
