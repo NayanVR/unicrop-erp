@@ -60,7 +60,7 @@ class ProductPhotoController extends Controller
             ->get(['id', 'name']);
 
         $ourBrands = RawMaterial::where('is_active', true)
-            ->whereRaw("LOWER(category) LIKE ?", ['%semi%finish%'])
+            ->whereRaw("LOWER(category) = ?", ['finish good'])
             ->select('name')
             ->orderBy('name')
             ->pluck('name');
