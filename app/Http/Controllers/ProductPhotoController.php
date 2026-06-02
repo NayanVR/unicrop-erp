@@ -38,6 +38,7 @@ class ProductPhotoController extends Controller
                 'our_brand'      => $p->our_brand,
                 'party_brand'    => $p->party_brand,
                 'packing_size'   => $p->packing_size,
+                'mrp'            => $p->mrp,
                 'photo_url'      => $p->photo_url,
                 'uploaded_by'    => $p->uploader?->name,
                 'updated_by'     => $p->updater?->name,
@@ -103,6 +104,7 @@ class ProductPhotoController extends Controller
             'our_brand' => 'required|string|max:255',
             'party_brand' => 'nullable|string|max:255',
             'packing_size' => 'nullable|string|max:100',
+            'mrp'          => 'nullable|string|max:50',
             'photo' => 'required|image|mimes:jpg,jpeg,png,webp|max:8192',
         ]);
 
@@ -140,11 +142,12 @@ class ProductPhotoController extends Controller
         }
 
         ProductPhoto::create([
-            'party_id' => $data['party_id'] ?? null,
-            'our_brand' => $data['our_brand'],
+            'party_id'    => $data['party_id'] ?? null,
+            'our_brand'   => $data['our_brand'],
             'party_brand' => $data['party_brand'] ?? null,
-            'packing_size' => $data['packing_size'] ?? null,
-            'photo_path' => $path,
+            'packing_size'=> $data['packing_size'] ?? null,
+            'mrp'         => $data['mrp'] ?? null,
+            'photo_path'  => $path,
             'uploaded_by' => $request->user()?->id,
         ]);
 
@@ -157,6 +160,7 @@ class ProductPhotoController extends Controller
             'our_brand'    => 'required|string|max:255',
             'party_brand'  => 'nullable|string|max:255',
             'packing_size' => 'nullable|string|max:100',
+            'mrp'          => 'nullable|string|max:50',
             'photo'        => 'nullable|image|mimes:jpg,jpeg,png,webp|max:8192',
         ]);
 
@@ -195,6 +199,7 @@ class ProductPhotoController extends Controller
         $photo->our_brand    = $data['our_brand'];
         $photo->party_brand  = $data['party_brand'] ?? null;
         $photo->packing_size = $data['packing_size'] ?? null;
+        $photo->mrp          = $data['mrp'] ?? null;
         $photo->updated_by   = auth()->id();
         $photo->save();
 

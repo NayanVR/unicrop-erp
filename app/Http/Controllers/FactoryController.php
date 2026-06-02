@@ -106,6 +106,7 @@ class FactoryController extends Controller
                     'our_brand'    => $p->our_brand,
                     'party_brand'  => $p->party_brand,
                     'packing_size' => $p->packing_size,
+                    'mrp'          => $p->mrp,
                     'photo_url'    => $p->photo_url,
                 ]),
         ]);

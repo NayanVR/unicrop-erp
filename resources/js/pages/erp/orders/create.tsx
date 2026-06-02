@@ -34,6 +34,7 @@ type ProductPhoto = {
     our_brand: string;
     party_brand: string | null;
     packing_size: string | null;
+    mrp: string | null;
     photo_url: string;
 };
 
@@ -276,46 +277,47 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         [partyRates],
     );
 
+    type PhotoInfo = { url: string; mrp: string | null };
+
     // Photo lookup maps
     const photoMap = useMemo(() => {
-        const ob     = new Map<string, string>(); // "brand|size" → url  (Our Brand folder)
-        const obAny  = new Map<string, string>(); // "brand" → first url (Our Brand folder, any size)
-        const pb     = new Map<string, string>(); // "partyId|partyBrand|size" → url
-        const pbAny  = new Map<string, string>(); // "partyId|partyBrand" → first url
+        const ob     = new Map<string, PhotoInfo>();
+        const obAny  = new Map<string, PhotoInfo>();
+        const pb     = new Map<string, PhotoInfo>();
+        const pbAny  = new Map<string, PhotoInfo>();
 
         for (const p of productPhotos) {
             const b = p.our_brand.toLowerCase();
             const s = (p.packing_size ?? '').toLowerCase();
+            const info: PhotoInfo = { url: p.photo_url, mrp: p.mrp ?? null };
 
             if (p.party_id === null) {
-                ob.set(`${b}|${s}`, p.photo_url);
-                if (!obAny.has(b)) obAny.set(b, p.photo_url);
+                ob.set(`${b}|${s}`, info);
+                if (!obAny.has(b)) obAny.set(b, info);
             } else if (p.party_brand) {
                 const pb_ = p.party_brand.toLowerCase();
-                pb.set(`${p.party_id}|${pb_}|${s}`, p.photo_url);
+                pb.set(`${p.party_id}|${pb_}|${s}`, info);
                 const anyKey = `${p.party_id}|${pb_}`;
-                if (!pbAny.has(anyKey)) pbAny.set(anyKey, p.photo_url);
+                if (!pbAny.has(anyKey)) pbAny.set(anyKey, info);
             }
         }
         return { ob, obAny, pb, pbAny };
     }, [productPhotos]);
 
-    const getRowPhoto = (row: ProductRow): string | null => {
+    const getRowPhoto = (row: ProductRow): PhotoInfo | null => {
         if (!row.our_brand) return null;
         const s = row.packing_size.toLowerCase();
 
-        // Party brand row → show party brand photo, fall back to Our Brand
         if (form.data.party_id && row.party_brand) {
             const pid = form.data.party_id;
             const pb_ = row.party_brand.toLowerCase();
-            const url =
+            const info =
                 photoMap.pb.get(`${pid}|${pb_}|${s}`) ??
                 photoMap.pb.get(`${pid}|${pb_}|`) ??
                 photoMap.pbAny.get(`${pid}|${pb_}`);
-            if (url) return url;
+            if (info) return info;
         }
 
-        // Our brand row (or no party brand photo found) → show Our Brand photo
         const b = row.our_brand.toLowerCase();
         return (
             photoMap.ob.get(`${b}|${s}`) ??
@@ -802,11 +804,16 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                             <tr key={`row-${index}`}>
                                                 <td style={{ textAlign: 'center', padding: '4px' }}>
                                                     {rowPhoto ? (
-                                                        <img
-                                                            src={rowPhoto}
-                                                            alt=""
-                                                            style={{ width: '44px', height: '44px', objectFit: 'contain', borderRadius: '6px', border: '1px solid var(--border)', background: '#fff', padding: '2px' }}
-                                                        />
+                                                        <div style={{ display: 'inline-block', textAlign: 'center' }}>
+                                                            <img
+                                                                src={rowPhoto.url}
+                                                                alt=""
+                                                                style={{ width: '44px', height: '44px', objectFit: 'contain', borderRadius: '6px', border: '1px solid var(--border)', background: '#fff', padding: '2px', display: 'block' }}
+                                                            />
+                                                            {rowPhoto.mrp && (
+                                                                <div style={{ fontSize: '10px', color: 'var(--tx-muted)', marginTop: '2px', fontWeight: 600 }}>{rowPhoto.mrp}</div>
+                                                            )}
+                                                        </div>
                                                     ) : (
                                                         <div style={{ width: '44px', height: '44px', borderRadius: '6px', border: '1px dashed var(--border)', background: 'var(--bg-paper)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', color: 'var(--tx-muted)' }}>
                                                             📷

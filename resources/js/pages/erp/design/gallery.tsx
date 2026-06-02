@@ -14,6 +14,7 @@ type Photo = {
     our_brand: string;
     party_brand: string | null;
     packing_size: string | null;
+    mrp: string | null;
     photo_url: string;
     uploaded_by: string | null;
     updated_by: string | null;
@@ -30,7 +31,7 @@ type PageProps = {
     flash?: { success?: string; error?: string };
 };
 
-type UploadForm   = { party_id: string; our_brand: string; party_brand: string; packing_size: string; photo: File | null };
+type UploadForm   = { party_id: string; our_brand: string; party_brand: string; packing_size: string; mrp: string; photo: File | null };
 type FolderForm   = { party_id: string };
 
 // null = folder list, 'our-brand' = Our Brand, number = party_id
@@ -49,13 +50,13 @@ export default function DesignGallery() {
     const [photoSearch,   setPhotoSearch]   = useState('');
 
     const uploadForm = useForm<UploadForm>({
-        party_id: '', our_brand: '', party_brand: '', packing_size: '', photo: null,
+        party_id: '', our_brand: '', party_brand: '', packing_size: '', mrp: '', photo: null,
     });
     const folderForm = useForm<FolderForm>({ party_id: '' });
     const fileRef    = useRef<HTMLInputElement | null>(null);
 
     const [editingPhoto,   setEditingPhoto]   = useState<Photo | null>(null);
-    const [editForm,       setEditForm]       = useState({ our_brand: '', party_brand: '', packing_size: '' });
+    const [editForm,       setEditForm]       = useState({ our_brand: '', party_brand: '', packing_size: '', mrp: '' });
     const [editFile,       setEditFile]       = useState<File | null>(null);
     const [editProcessing, setEditProcessing] = useState(false);
     const editFileRef = useRef<HTMLInputElement | null>(null);
@@ -205,6 +206,7 @@ export default function DesignGallery() {
             our_brand:    photo.our_brand,
             party_brand:  photo.party_brand ?? '',
             packing_size: photo.packing_size ?? '',
+            mrp:          photo.mrp ?? '',
         });
         setEditFile(null);
         setEditingPhoto(photo);
@@ -218,6 +220,7 @@ export default function DesignGallery() {
         fd.append('our_brand',    editForm.our_brand);
         fd.append('party_brand',  editForm.party_brand);
         fd.append('packing_size', editForm.packing_size);
+        fd.append('mrp',          editForm.mrp);
         if (editFile) fd.append('photo', editFile);
         setEditProcessing(true);
         router.post(`/design/gallery/${editingPhoto.id}`, fd, {
@@ -361,7 +364,10 @@ export default function DesignGallery() {
                                             </div>
                                         )}
                                         {photo.packing_size && (
-                                            <div style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>{photo.packing_size}</div>
+                                            <div style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>{photo.packing_size}{photo.mrp ? ` · MRP ${photo.mrp}` : ''}</div>
+                                        )}
+                                        {!photo.packing_size && photo.mrp && (
+                                            <div style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>MRP {photo.mrp}</div>
                                         )}
                                         <button
                                             type="button"
@@ -654,14 +660,25 @@ export default function DesignGallery() {
                                 </div>
                             )}
 
-                            <div className="form-group" style={{ marginBottom: '14px' }}>
-                                <label>Packing Size</label>
-                                <input
-                                    type="text"
-                                    value={editForm.packing_size}
-                                    onChange={(e) => setEditForm((p) => ({ ...p, packing_size: e.target.value }))}
-                                    placeholder="e.g. 500ml, 1ltr"
-                                />
+                            <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
+                                <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                                    <label>Packing Size</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.packing_size}
+                                        onChange={(e) => setEditForm((p) => ({ ...p, packing_size: e.target.value }))}
+                                        placeholder="e.g. 500ml, 1ltr"
+                                    />
+                                </div>
+                                <div className="form-group" style={{ width: '130px', marginBottom: 0 }}>
+                                    <label>MRP</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.mrp}
+                                        onChange={(e) => setEditForm((p) => ({ ...p, mrp: e.target.value }))}
+                                        placeholder="e.g. ₹120"
+                                    />
+                                </div>
                             </div>
 
                             <div className="form-group">
@@ -892,19 +909,30 @@ function UploadModal({ form, fileRef, folders, ourBrands, brandSuggestions, size
                             </div>
                         )}
 
-                        {/* Packing size */}
-                        <div className="form-group" style={{ marginBottom: '14px' }}>
-                            <label>Packing Size</label>
-                            <input
-                                type="text"
-                                list="gallery-packing-sizes"
-                                value={form.data.packing_size}
-                                onChange={(e) => form.setData('packing_size', e.target.value)}
-                                placeholder="e.g. 500ml, 1ltr"
-                            />
-                            <datalist id="gallery-packing-sizes">
-                                {sizeSuggestions.map((s) => <option key={s} value={s} />)}
-                            </datalist>
+                        {/* Packing size + MRP */}
+                        <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
+                            <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                                <label>Packing Size</label>
+                                <input
+                                    type="text"
+                                    list="gallery-packing-sizes"
+                                    value={form.data.packing_size}
+                                    onChange={(e) => form.setData('packing_size', e.target.value)}
+                                    placeholder="e.g. 500ml, 1ltr"
+                                />
+                                <datalist id="gallery-packing-sizes">
+                                    {sizeSuggestions.map((s) => <option key={s} value={s} />)}
+                                </datalist>
+                            </div>
+                            <div className="form-group" style={{ width: '130px', marginBottom: 0 }}>
+                                <label>MRP</label>
+                                <input
+                                    type="text"
+                                    value={form.data.mrp}
+                                    onChange={(e) => form.setData('mrp', e.target.value)}
+                                    placeholder="e.g. ₹120"
+                                />
+                            </div>
                         </div>
 
                         {/* Photo file */}

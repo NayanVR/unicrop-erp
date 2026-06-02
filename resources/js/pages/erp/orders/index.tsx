@@ -3,16 +3,19 @@ import { confirm as ordersConfirm, create as ordersCreate, destroy as ordersDest
 import { Head, Link, router } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
+type PhotoInfo = { url: string; mrp: string | null };
+
 function buildPhotoMap(photos: ProductPhoto[]) {
-    const ob = new Map<string, string>();
-    const pb = new Map<string, string>();
+    const ob = new Map<string, PhotoInfo>();
+    const pb = new Map<string, PhotoInfo>();
     for (const p of photos) {
         const size = (p.packing_size ?? '').toLowerCase();
+        const info: PhotoInfo = { url: p.photo_url, mrp: p.mrp ?? null };
         if (p.party_id === null) {
-            ob.set(`${p.our_brand.toLowerCase()}|${size}`, p.photo_url);
-            if (!p.packing_size) ob.set(`${p.our_brand.toLowerCase()}|`, p.photo_url);
+            ob.set(`${p.our_brand.toLowerCase()}|${size}`, info);
+            if (!p.packing_size) ob.set(`${p.our_brand.toLowerCase()}|`, info);
         } else if (p.party_brand) {
-            pb.set(`${p.party_id}|${p.party_brand.toLowerCase()}|${size}`, p.photo_url);
+            pb.set(`${p.party_id}|${p.party_brand.toLowerCase()}|${size}`, info);
         }
     }
     return { ob, pb };
@@ -21,14 +24,14 @@ function buildPhotoMap(photos: ProductPhoto[]) {
 function getItemPhoto(
     item: OrderItem,
     partyId: number | null | undefined,
-    map: { ob: Map<string, string>; pb: Map<string, string> },
-): string | null {
+    map: { ob: Map<string, PhotoInfo>; pb: Map<string, PhotoInfo> },
+): PhotoInfo | null {
     if (!item.our_brand) return null;
     const size = (item.packing_size ?? '').toLowerCase();
     if (partyId && item.party_brand) {
         const key = `${partyId}|${item.party_brand.toLowerCase()}|${size}`;
-        const url = map.pb.get(key) ?? map.pb.get(`${partyId}|${item.party_brand.toLowerCase()}|`);
-        if (url) return url;
+        const info = map.pb.get(key) ?? map.pb.get(`${partyId}|${item.party_brand.toLowerCase()}|`);
+        if (info) return info;
     }
     return map.ob.get(`${item.our_brand.toLowerCase()}|${size}`)
         ?? map.ob.get(`${item.our_brand.toLowerCase()}|`)
@@ -140,6 +143,7 @@ type ProductPhoto = {
     our_brand: string;
     party_brand: string | null;
     packing_size: string | null;
+    mrp: string | null;
     photo_url: string;
 };
 
@@ -1328,16 +1332,21 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                             </tr>
                                                         ) : (
                                                             order.items.map((item) => {
-                                                                const photo = getItemPhoto(item, order.party_id, photoMap);
+                                                                const photoInfo = getItemPhoto(item, order.party_id, photoMap);
                                                                 return (
                                                                     <tr key={item.id}>
                                                                         <td style={{ textAlign: 'center', padding: '4px 6px' }}>
-                                                                            {photo ? (
-                                                                                <img
-                                                                                    src={photo} alt=""
-                                                                                    onClick={(e) => { e.stopPropagation(); setPhotoLightbox(photo); }}
-                                                                                    style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '6px', border: '1px solid var(--border)', background: '#fff', padding: '2px', display: 'block', cursor: 'zoom-in' }}
-                                                                                />
+                                                                            {photoInfo ? (
+                                                                                <div style={{ display: 'inline-block', textAlign: 'center' }}>
+                                                                                    <img
+                                                                                        src={photoInfo.url} alt=""
+                                                                                        onClick={(e) => { e.stopPropagation(); setPhotoLightbox(photoInfo.url); }}
+                                                                                        style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '6px', border: '1px solid var(--border)', background: '#fff', padding: '2px', display: 'block', cursor: 'zoom-in' }}
+                                                                                    />
+                                                                                    {photoInfo.mrp && (
+                                                                                        <div style={{ fontSize: '10px', color: 'var(--tx-muted)', marginTop: '2px', fontWeight: 600 }}>{photoInfo.mrp}</div>
+                                                                                    )}
+                                                                                </div>
                                                                             ) : (
                                                                                 <div style={{ width: '40px', height: '40px', borderRadius: '6px', border: '1px dashed var(--border)', background: 'var(--bg-paper)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', color: 'var(--tx-muted)' }}>
                                                                                     📷
@@ -1487,16 +1496,16 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                     const stages = designStagesFor(d.skip_party_approval);
                                                     const curIdx = stages.findIndex((s) => s.key === d.status);
                                                     const isDone = d.status === 'received-factory';
-                                                    const photo = getItemPhoto(item, order.party_id, photoMap);
+                                                    const photoInfo2 = getItemPhoto(item, order.party_id, photoMap);
 
                                                     return (
                                                         <div key={d.id} className="design-item-block">
                                                             <div className="design-item-top">
-                                                                {photo ? (
+                                                                {photoInfo2 ? (
                                                                     <img
-                                                                        src={photo} alt=""
+                                                                        src={photoInfo2.url} alt=""
                                                                         className="design-item-photo"
-                                                                        onClick={(e) => { e.stopPropagation(); setPhotoLightbox(photo); }}
+                                                                        onClick={(e) => { e.stopPropagation(); setPhotoLightbox(photoInfo2.url); }}
                                                                         style={{ cursor: 'zoom-in' }}
                                                                     />
                                                                 ) : (

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'our_brand',
     'party_brand',
     'packing_size',
+    'mrp',
     'photo_path',
     'uploaded_by',
     'updated_by',
