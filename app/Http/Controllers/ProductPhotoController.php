@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Bom;
 use App\Models\Party;
 use App\Models\ProductPhoto;
 use App\Models\ProductPhotoFolder;
 use App\Models\ProductRate;
+use App\Models\RawMaterial;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Filesystem\FilesystemAdapter;
@@ -59,9 +59,9 @@ class ProductPhotoController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        $ourBrands = Bom::where('is_active', true)
+        $ourBrands = RawMaterial::where('is_active', true)
+            ->whereRaw("LOWER(category) LIKE ?", ['%semi%finish%'])
             ->select('name')
-            ->distinct()
             ->orderBy('name')
             ->pluck('name');
 
