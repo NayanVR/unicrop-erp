@@ -61,7 +61,7 @@ class OrderController extends Controller
         }
 
         // Office/Sales users see confirmed and dispatched orders only
-        if ($role === Role::OFFICE) {
+        if ($role === Role::OFFICE || $role === Role::SALES) {
             $ordersQuery->whereIn('status', ['confirmed', 'dispatched']);
         }
         // Admin and office see all orders
@@ -133,7 +133,7 @@ class OrderController extends Controller
 
         $salesUsers = User::query()
             ->where('is_active', true)
-            ->whereHas('roles', fn ($query) => $query->whereIn('slug', [Role::ADMIN, Role::OFFICE]))
+            ->whereHas('roles', fn ($query) => $query->whereIn('slug', [Role::ADMIN, Role::OFFICE, Role::SALES]))
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -338,7 +338,7 @@ class OrderController extends Controller
 
         $salesUsers = User::query()
             ->where('is_active', true)
-            ->whereHas('roles', fn ($query) => $query->whereIn('slug', [Role::ADMIN, Role::OFFICE]))
+            ->whereHas('roles', fn ($query) => $query->whereIn('slug', [Role::ADMIN, Role::OFFICE, Role::SALES]))
             ->orderBy('name')
             ->get(['id', 'name']);
 
