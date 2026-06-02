@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Bom;
 use App\Models\Party;
 use App\Models\ProductPhoto;
 use App\Models\ProductPhotoFolder;
@@ -58,10 +59,11 @@ class ProductPhotoController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        $ourBrands = ProductRate::select('our_brand')
+        $ourBrands = Bom::where('is_active', true)
+            ->select('name')
             ->distinct()
-            ->orderBy('our_brand')
-            ->pluck('our_brand');
+            ->orderBy('name')
+            ->pluck('name');
 
         $partyRates = ProductRate::whereNotNull('party_brand')
             ->select('party_id', 'our_brand', 'party_brand', 'packing_size')

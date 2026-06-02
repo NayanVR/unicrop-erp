@@ -3,6 +3,76 @@ import { store as foldersStore } from '@/routes/design/gallery/folders';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useRef, useState } from 'react';
 
+function SearchableSelect({
+    value, onChange, options, placeholder, hasError,
+}: {
+    value: string;
+    onChange: (val: string) => void;
+    options: string[];
+    placeholder?: string;
+    hasError?: boolean;
+}) {
+    const [query, setQuery] = useState('');
+    const [open, setOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const filtered = query
+        ? options.filter((o) => o.toLowerCase().includes(query.toLowerCase()))
+        : options;
+
+    const handleBlur = () => {
+        setTimeout(() => {
+            if (!containerRef.current?.contains(document.activeElement)) {
+                setOpen(false);
+                setQuery('');
+            }
+        }, 150);
+    };
+
+    return (
+        <div ref={containerRef} style={{ position: 'relative' }}>
+            <input
+                type="text"
+                className={hasError ? 'error' : ''}
+                value={open ? query : value}
+                placeholder={value ? value : placeholder}
+                onFocus={() => { setOpen(true); setQuery(''); }}
+                onBlur={handleBlur}
+                onChange={(e) => setQuery(e.target.value)}
+                autoComplete="off"
+            />
+            {open && (
+                <div style={{
+                    position: 'absolute', top: 'calc(100% + 2px)', left: 0, right: 0,
+                    background: 'var(--bg-card, #fff)', border: '1px solid var(--border, #e5e7eb)',
+                    borderRadius: '6px', maxHeight: '220px', overflowY: 'auto', zIndex: 1000,
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                }}>
+                    {filtered.length === 0 ? (
+                        <div style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--tx-muted)' }}>
+                            No results
+                        </div>
+                    ) : filtered.map((opt) => (
+                        <div
+                            key={opt}
+                            onMouseDown={() => { onChange(opt); setOpen(false); setQuery(''); }}
+                            style={{
+                                padding: '8px 12px', cursor: 'pointer', fontSize: '13px',
+                                background: opt === value ? 'var(--bg-active, #f0fdf4)' : '',
+                                fontWeight: opt === value ? 600 : 400,
+                            }}
+                            onMouseEnter={(e) => { if (opt !== value) (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover, #f9fafb)'; }}
+                            onMouseLeave={(e) => { if (opt !== value) (e.currentTarget as HTMLElement).style.background = ''; }}
+                        >
+                            {opt}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
 type Party  = { id: number; name: string };
 type Folder = { id: number; party_id: number; party_name: string };
 type PartyRate = { party_id: number | null; our_brand: string; party_brand: string; packing_size: string };
@@ -641,10 +711,11 @@ export default function DesignGallery() {
 
                             <div className="form-group" style={{ marginBottom: '14px' }}>
                                 <label>Our Brand / Product Name *</label>
-                                <input
-                                    type="text"
+                                <SearchableSelect
                                     value={editForm.our_brand}
-                                    onChange={(e) => setEditForm((p) => ({ ...p, our_brand: e.target.value }))}
+                                    onChange={(val) => setEditForm((p) => ({ ...p, our_brand: val }))}
+                                    options={ourBrands}
+                                    placeholder="Search product…"
                                 />
                             </div>
 
@@ -869,20 +940,16 @@ function UploadModal({ form, fileRef, folders, ourBrands, brandSuggestions, size
                             </select>
                         </div>
 
-                        {/* Our brand / product name */}
+                        {/* Our brand / product name — BOM names only */}
                         <div className="form-group" style={{ marginBottom: '14px' }}>
                             <label>Our Brand / Product Name *</label>
-                            <input
-                                type="text"
-                                list="gallery-our-brands"
-                                className={form.errors.our_brand ? 'error' : ''}
+                            <SearchableSelect
                                 value={form.data.our_brand}
-                                onChange={(e) => form.setData('our_brand', e.target.value)}
-                                placeholder="e.g. Unicrop Neem Oil"
+                                onChange={(val) => form.setData('our_brand', val)}
+                                options={ourBrands}
+                                placeholder="Search product…"
+                                hasError={!!form.errors.our_brand}
                             />
-                            <datalist id="gallery-our-brands">
-                                {ourBrands.map((b) => <option key={b} value={b} />)}
-                            </datalist>
                             {form.errors.our_brand && (
                                 <span className="field-error">{form.errors.our_brand}</span>
                             )}
