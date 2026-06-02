@@ -24,8 +24,6 @@ class Role extends Model
 
     public const ACCOUNTANT = 'accountant';
 
-    public const SALES = 'sales';
-
     /**
      * @return array<int, array{slug: string, name: string}>
      */
@@ -33,11 +31,10 @@ class Role extends Model
     {
         return [
             ['slug' => self::ADMIN, 'name' => 'Admin'],
-            ['slug' => self::OFFICE, 'name' => 'Office / Sales'],
+            ['slug' => self::OFFICE, 'name' => 'Sales'],
             ['slug' => self::FACTORY, 'name' => 'Factory'],
             ['slug' => self::DESIGN, 'name' => 'Design'],
             ['slug' => self::ACCOUNTANT, 'name' => 'Accounts'],
-            ['slug' => self::SALES, 'name' => 'Sales'],
         ];
     }
 

@@ -107,8 +107,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('bom/runs/{run}', [BomController::class, 'destroyRun'])->name('bom.runs.destroy');
     });
 
-    // Inventory — view only: office and sales see materials with limited columns
-    Route::middleware(['role:admin,factory,accountant,office,sales'])->group(function () {
+    // Inventory — view: admin, factory, accountant, office
+    Route::middleware(['role:admin,factory,accountant,office'])->group(function () {
         Route::get('inventory', [InventoryController::class, 'index'])->name('inventory.index');
     });
 
