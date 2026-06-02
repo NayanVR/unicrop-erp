@@ -203,8 +203,9 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
     const isDesign      = userRole === 'design';
     const isAdmin       = userRole === 'admin';
     const isAccountant  = userRole === 'accountant';
-    const isSales       = userRole === 'office';
-    const canConfirm = userRole === 'admin' || userRole === 'office';
+    const isSales       = userRole === 'sales';
+    const canConfirm = userRole === 'admin' || userRole === 'office' || userRole === 'sales';
+    const canCreateOrder = isAdmin || userRole === 'office' || isSales;
 
     const canEditOrder = (order: { status?: string | null; created_by?: number | null }) =>
         ['draft', 'submitted'].includes(order.status ?? '') &&
@@ -807,7 +808,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                 : 'Track order status, production progress, and dispatch.'}
                         </p>
                     </div>
-                    {canConfirm && (
+                    {canCreateOrder && (
                         <Link className="btn primary" href={ordersCreate()}>
                             ＋ New Order
                         </Link>
