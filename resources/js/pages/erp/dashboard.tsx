@@ -40,147 +40,147 @@ const fmt = (v: number) =>
     '₹' + v.toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
 export default function Dashboard({ salesData, currentUserId, lowStockProduction }: Props) {
-    const [period, setPeriod] = useState<Period>('today');
+    const [period, setPeriod] = useState<Period>('thisMonth');
     const data = salesData[period];
     const maxValue = Math.max(...data.leaderboard.map((e) => e.value), 1);
+    const myRank = data.leaderboard.findIndex((e) => e.userId === currentUserId) + 1;
 
     return (
         <>
             <Head title="Dashboard" />
-            <div id="view-dashboard" className="view active">
-                <div className="page-header">
-                    <div className="page-header-left">
-                        <h1>Dashboard</h1>
-                        <p>Sales performance &amp; confirmed order overview</p>
+
+            {/* Page header */}
+            <div className="page-header">
+                <div className="page-header-left">
+                    <h1>Dashboard</h1>
+                    <p>Your sales performance &amp; team leaderboard</p>
+                </div>
+                <Link className="btn primary" href={ordersCreate().url}>＋ New Order</Link>
+            </div>
+
+            <LowStockProductionCard data={lowStockProduction} />
+
+            {/* Period selector */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+                {PERIODS.map((p) => (
+                    <button
+                        key={p.key}
+                        type="button"
+                        className={`pill${period === p.key ? ' active' : ''}`}
+                        onClick={() => setPeriod(p.key)}
+                        style={{ fontWeight: period === p.key ? 700 : 400 }}
+                    >
+                        {p.label}
+                    </button>
+                ))}
+            </div>
+
+            {/* My performance stats */}
+            <div className="stats-grid" style={{ marginBottom: 24 }}>
+                <div className="stat-card" style={{ borderLeft: '4px solid var(--accent)' }}>
+                    <div className="stat-icon" style={{ background: 'var(--accent-lt, #eff6ff)' }}>🌱</div>
+                    <div>
+                        <div className="stat-val">{data.myOrders}</div>
+                        <div className="stat-label">My Orders</div>
                     </div>
-                    <Link className="btn primary" href={ordersCreate().url}>
-                        ＋ New Order
-                    </Link>
                 </div>
 
-                <LowStockProductionCard data={lowStockProduction} />
-
-                <div className="card">
-                    {/* Header + period pills */}
-                    <div style={{ marginBottom: '16px' }}>
-                        <div className="card-title" style={{ marginBottom: '12px' }}>
-                            💰 My Sales — Confirmed Order Value
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                            {PERIODS.map((p) => (
-                                <button
-                                    key={p.key}
-                                    type="button"
-                                    className={`pill${period === p.key ? ' active' : ''}`}
-                                    onClick={() => setPeriod(p.key)}
-                                >
-                                    {p.label}
-                                </button>
-                            ))}
-                        </div>
+                <div className="stat-card" style={{ borderLeft: '4px solid #d97706' }}>
+                    <div className="stat-icon" style={{ background: '#fffbeb' }}>💰</div>
+                    <div>
+                        <div className="stat-val" style={{ fontSize: 18 }}>{fmt(data.myValue)}</div>
+                        <div className="stat-label">My Value</div>
                     </div>
+                </div>
 
-                    {/* My stat cards */}
-                    <div style={{ display: 'flex', gap: '16px', marginBottom: '32px', flexWrap: 'wrap' }}>
-                        <div style={{
-                            border: '2px solid var(--accent)',
-                            borderRadius: '12px',
-                            padding: '20px 28px',
-                            flex: '1 1 160px',
-                            maxWidth: '220px',
-                            background: 'var(--accent-lt)',
-                        }}>
-                            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: '10px' }}>
-                                MY ORDERS
-                            </div>
-                            <div style={{ fontSize: '40px', fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}>
-                                {data.myOrders}
-                            </div>
-                            <div style={{ fontSize: '12px', color: 'var(--tx-sub)', marginTop: '6px' }}>
-                                confirmed orders
-                            </div>
+                <div className="stat-card" style={{ borderLeft: '4px solid #7c3aed' }}>
+                    <div className="stat-icon" style={{ background: '#f5f3ff' }}>🏆</div>
+                    <div>
+                        <div className="stat-val">
+                            {myRank > 0 ? (MEDALS[myRank - 1] ?? `#${myRank}`) : '—'}
                         </div>
-
-                        <div style={{
-                            border: '2px solid #d97706',
-                            borderRadius: '12px',
-                            padding: '20px 28px',
-                            flex: '1 1 160px',
-                            maxWidth: '260px',
-                            background: '#fffbeb',
-                        }}>
-                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#d97706', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: '10px' }}>
-                                MY VALUE
-                            </div>
-                            <div style={{ fontSize: '40px', fontWeight: 800, color: '#d97706', lineHeight: 1 }}>
-                                {fmt(data.myValue)}
-                            </div>
-                            <div style={{ fontSize: '12px', color: '#92400e', marginTop: '6px' }}>
-                                confirmed order value
-                            </div>
-                        </div>
+                        <div className="stat-label">My Rank</div>
                     </div>
+                </div>
+            </div>
 
-                    {/* Leaderboard */}
-                    <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--tx-head)', marginBottom: '14px' }}>
-                        🏆 Sales Leaderboard
+            {/* Leaderboard */}
+            <div className="card">
+                <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--tx-head)', marginBottom: 16 }}>
+                    🏆 Sales Leaderboard
+                </div>
+
+                {data.leaderboard.length === 0 ? (
+                    <div className="empty-state" style={{ padding: '28px 0' }}>
+                        <div className="icon">📊</div>
+                        <p>No confirmed orders for this period.</p>
                     </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                         {data.leaderboard.map((entry, idx) => {
                             const isMe = entry.userId === currentUserId;
                             const barPct = maxValue > 0 ? (entry.value / maxValue) * 100 : 0;
+                            const medal = MEDALS[idx];
 
                             return (
                                 <div
                                     key={entry.userId}
                                     style={{
-                                        padding: '12px 16px',
-                                        borderRadius: '10px',
+                                        padding: '14px 16px',
+                                        borderRadius: 10,
                                         border: isMe ? '2px solid var(--accent)' : '1px solid var(--border)',
-                                        background: isMe ? 'var(--accent-lt)' : 'var(--bg-paper)',
+                                        background: isMe ? 'var(--accent-lt, #eff6ff)' : 'var(--bg-paper)',
                                     }}
                                 >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                                        <span style={{ fontSize: '22px', minWidth: '32px', textAlign: 'center' }}>
-                                            {MEDALS[idx] ?? `#${idx + 1}`}
-                                        </span>
-                                        <span style={{
-                                            fontWeight: 700,
-                                            fontSize: '15px',
-                                            flex: 1,
-                                            color: isMe ? 'var(--accent)' : 'var(--tx-head)',
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                                        {/* Rank */}
+                                        <div style={{
+                                            width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            background: medal ? 'transparent' : (isMe ? 'var(--accent)' : '#e5e7eb'),
+                                            fontSize: medal ? 22 : 13,
+                                            fontWeight: 800,
+                                            color: medal ? undefined : (isMe ? '#fff' : '#6b7280'),
                                         }}>
-                                            {entry.name}{isMe ? ' (Me)' : ''}
-                                        </span>
-                                        <span style={{ fontWeight: 700, color: '#d97706', fontSize: '15px' }}>
-                                            {fmt(entry.value)}
-                                        </span>
-                                        <span style={{ fontSize: '12px', color: 'var(--tx-muted)', minWidth: '56px', textAlign: 'right' }}>
-                                            {entry.orders} order{entry.orders !== 1 ? 's' : ''}
-                                        </span>
+                                            {medal ?? `#${idx + 1}`}
+                                        </div>
+
+                                        {/* Name */}
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{
+                                                fontWeight: 700, fontSize: 15,
+                                                color: isMe ? 'var(--accent)' : 'var(--tx-head)',
+                                            }}>
+                                                {entry.name}{isMe ? ' (Me)' : ''}
+                                            </div>
+                                            <div style={{ fontSize: 12, color: 'var(--tx-muted)', marginTop: 1 }}>
+                                                {entry.orders} order{entry.orders !== 1 ? 's' : ''}
+                                            </div>
+                                        </div>
+
+                                        {/* Value */}
+                                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                            <div style={{ fontWeight: 800, fontSize: 16, color: '#d97706' }}>
+                                                {fmt(entry.value)}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div style={{ height: '8px', background: 'var(--border-lt)', borderRadius: '4px', overflow: 'hidden' }}>
+
+                                    {/* Progress bar */}
+                                    <div style={{ height: 7, background: 'var(--border-lt, #e5e7eb)', borderRadius: 4, overflow: 'hidden' }}>
                                         <div style={{
                                             height: '100%',
                                             width: `${barPct}%`,
-                                            background: isMe ? 'var(--accent)' : '#94a3b8',
-                                            borderRadius: '4px',
-                                            transition: 'width 0.35s ease',
+                                            borderRadius: 4,
+                                            background: isMe ? 'var(--accent)' : (idx === 0 ? '#f59e0b' : '#94a3b8'),
+                                            transition: 'width 0.4s ease',
                                         }} />
                                     </div>
                                 </div>
                             );
                         })}
-
-                        {data.leaderboard.length === 0 && (
-                            <div className="empty-state" style={{ padding: '28px 0' }}>
-                                <div className="icon">📊</div>
-                                <p>No confirmed orders for this period.</p>
-                            </div>
-                        )}
                     </div>
-                </div>
+                )}
             </div>
         </>
     );
