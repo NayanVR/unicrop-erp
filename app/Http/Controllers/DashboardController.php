@@ -32,6 +32,10 @@ class DashboardController extends Controller
             return $this->factoryDashboard($currentUser);
         }
 
+        if ($role === Role::ACCOUNTANT) {
+            return $this->accountantDashboard();
+        }
+
         return $this->salesDashboard($currentUser);
     }
 
@@ -251,6 +255,94 @@ class DashboardController extends Controller
             'finishedThisWeek'    => $finishedThisWeek,
             'recentDispatched'    => $recentDispatched,
             'lowStockProduction'  => $this->lowStockProduction($user),
+        ]);
+    }
+
+    private function accountantDashboard(): Response
+    {
+        $now = now();
+
+        // All active orders with attachments
+        $activeOrders = Order::query()
+            ->whereIn('status', ['confirmed', 'dispatched'])
+            ->with(['attachments:id,order_id,document_type', 'salesUser:id,name'])
+            ->orderByDesc('id')
+            ->get();
+
+        $mapped = $activeOrders->map(function (Order $o) {
+            $docs    = $o->attachments->whereIn('document_type', ['tax_invoice', 'eway_bill']);
+            $hasTax  = $docs->where('document_type', 'tax_invoice')->isNotEmpty();
+            $hasEway = $docs->where('document_type', 'eway_bill')->isNotEmpty();
+            $ewayOk  = $hasEway || $o->eway_bill_not_required || (float) $o->total_amount < 50000;
+
+            return [
+                'id'              => $o->id,
+                'order_number'    => $o->order_number,
+                'company_name'    => $o->company_name,
+                'total_amount'    => (float) $o->total_amount,
+                'order_date'      => $o->order_date?->toDateString(),
+                'status'          => $o->status,
+                'priority'        => $o->priority ?? 'normal',
+                'has_tax_invoice' => $hasTax,
+                'has_eway'        => $hasEway,
+                'eway_ok'         => $ewayOk,
+                'billing_done'    => $hasTax && $ewayOk,
+                'sales_user'      => $o->salesUser?->name,
+            ];
+        });
+
+        $pendingInvoice = $mapped->filter(fn ($o) => ! $o['has_tax_invoice'])->values();
+        $pendingEway    = $mapped->filter(fn ($o) => $o['has_tax_invoice'] && ! $o['eway_ok'])->values();
+        $billingDone    = $mapped->filter(fn ($o) => $o['billing_done'])->take(10)->values();
+
+        // This month stats
+        $thisMonthValue = Order::query()
+            ->whereIn('status', ['confirmed', 'dispatched'])
+            ->whereMonth('order_date', $now->month)
+            ->whereYear('order_date', $now->year)
+            ->sum('total_amount');
+
+        $thisMonthCount = Order::query()
+            ->whereIn('status', ['confirmed', 'dispatched'])
+            ->whereMonth('order_date', $now->month)
+            ->whereYear('order_date', $now->year)
+            ->count();
+
+        // Products missing HSN or GST
+        $missingHsnGst = RawMaterial::query()
+            ->where('is_active', true)
+            ->where(fn ($q) => $q
+                ->whereNull('hsn')->orWhere('hsn', '')
+                ->orWhereNull('gst')->orWhere('gst', ''))
+            ->orderBy('name')
+            ->get(['id', 'name', 'category', 'hsn', 'gst'])
+            ->map(fn ($m) => [
+                'id'       => $m->id,
+                'name'     => $m->name,
+                'category' => $m->category,
+                'hsn'      => $m->hsn,
+                'gst'      => $m->gst,
+            ]);
+
+        $totalStockValue = RawMaterial::query()
+            ->where('is_active', true)
+            ->get(['stock_qty', 'cost_per_unit'])
+            ->sum(fn ($m) => (float) $m->stock_qty * (float) $m->cost_per_unit);
+
+        return Inertia::render('erp/accountant-dashboard', [
+            'pageTitle'      => 'Dashboard',
+            'pendingInvoice' => $pendingInvoice,
+            'pendingEway'    => $pendingEway,
+            'billingDone'    => $billingDone,
+            'missingHsnGst'  => $missingHsnGst->take(8)->values(),
+            'stats'          => [
+                'pendingInvoiceCount' => $pendingInvoice->count(),
+                'pendingEwayCount'    => $pendingEway->count(),
+                'thisMonthValue'      => (float) $thisMonthValue,
+                'thisMonthCount'      => $thisMonthCount,
+                'missingHsnGstCount'  => $missingHsnGst->count(),
+                'totalStockValue'     => $totalStockValue,
+            ],
         ]);
     }
 
