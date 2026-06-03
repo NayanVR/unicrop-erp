@@ -325,7 +325,7 @@ export default function DesignGallery() {
             <div id="view-design-gallery" className="view active">
                 <div className="page-header">
                     <div className="page-header-left">
-                        <h1>Photo Gallery</h1>
+                        <h1>Product Gallery</h1>
                         <p>Organize brand photos in party folders</p>
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
