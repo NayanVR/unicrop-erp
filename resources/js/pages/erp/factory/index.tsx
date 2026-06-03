@@ -379,7 +379,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
     };
 
     const rejectUrgent = (orderId: number) => {
-        if (!confirm('Reject this urgent order? The office will need to address it.')) return;
+        if (!confirm('Reject this urgent order? The sales team will need to address it.')) return;
         setRejectingId(orderId);
         router.post(ordersRejectUrgent(orderId).url, {}, { preserveScroll: true, onFinish: () => setRejectingId(null) });
     };
@@ -597,7 +597,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                             </span>
                         </div>
                         <p style={{ fontSize: '13px', color: 'var(--tx-sub)', marginBottom: '14px' }}>
-                            These urgent orders are waiting for your approval before office can confirm them for production.
+                            These urgent orders are waiting for your approval before sales can confirm them for production.
                         </p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             {urgentPending.map((order) => (
@@ -662,7 +662,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                         <div className="icon">🏭</div>
                         <p>
                             {orders.length === 0
-                                ? 'No confirmed orders in production. Orders must be confirmed by office/admin first.'
+                                ? 'No confirmed orders in production. Orders must be confirmed by sales/admin first.'
                                 : 'No orders match this filter.'}
                         </p>
                     </div>

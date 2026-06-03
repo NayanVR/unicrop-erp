@@ -163,7 +163,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->whereHas('roles', fn($q) => $q->where('slug', 'accountant'))
             ->get(['id','name','is_active']);
 
-        $officeUsers = \App\Models\User::where('is_active', true)
+        $salesUsers = \App\Models\User::where('is_active', true)
             ->whereHas('roles', fn($q) => $q->where('slug', 'sales'))
             ->get(['id','name','is_active']);
 
@@ -177,7 +177,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'item_statuses'      => $itemStatuses,
             'ready_count'        => $allReadyItems,
             'accountants_found'  => $accountants->toArray(),
-            'office_users_found' => $officeUsers->toArray(),
+            'sales_users_found'  => $salesUsers->toArray(),
             'all_users'          => $allUsers->toArray(),
             'notifications_total'=> \DB::table('notifications')->count(),
         ]);

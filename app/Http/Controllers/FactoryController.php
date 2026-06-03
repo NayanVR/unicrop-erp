@@ -270,7 +270,7 @@ class FactoryController extends Controller
      *
      * Recipients:
      *  - All active accountants
-     *  - The specific office user who created/owns this order (created_by or sales_user_id)
+     *  - The specific sales user who created/owns this order (created_by or sales_user_id)
      */
     private function notifyOrderReady(Order $order): void
     {
@@ -298,7 +298,7 @@ class FactoryController extends Controller
                 ->whereHas('roles', fn ($q) => $q->where('slug', 'accountant'))
                 ->get();
 
-            // Only the specific office user(s) tied to this order
+            // Only the specific sales user(s) tied to this order
             $ownerIds = array_values(array_filter(array_unique([
                 $order->created_by,
                 $order->sales_user_id,

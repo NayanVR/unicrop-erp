@@ -923,7 +923,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                             {statusLabel(order.status)}
                                         </span>
 
-                                        {/* Confirm button — office/admin only, submitted orders only */}
+                                        {/* Confirm button — sales/admin only, submitted orders only */}
                                         {canConfirm && order.status === 'submitted' && (
                                             <div className="confirm-btn">
                                                 {order.priority === 'urgent' && order.urgent_approved !== true ? (
