@@ -74,6 +74,8 @@ type EditingOrder = {
     items: EditingOrderItem[];
 };
 
+type FinishGoodBrand = { name: string; group: string | null };
+
 type Props = {
     pageTitle: string;
     salesUsers: SalesUser[];
@@ -82,6 +84,7 @@ type Props = {
     parties: Party[];
     currentUser: { id: number; name: string };
     productPhotos: ProductPhoto[];
+    finishGoodBrands: FinishGoodBrand[];
     editingOrder?: EditingOrder | null;
 };
 
@@ -170,7 +173,7 @@ const toNumber = (value: string) => {
 
 const todayDate = () => new Date().toISOString().split('T')[0];
 
-export default function OrdersCreate({ salesUsers, transports, couriers, parties, currentUser, productPhotos, editingOrder }: Props) {
+export default function OrdersCreate({ salesUsers, transports, couriers, parties, currentUser, productPhotos, finishGoodBrands, editingOrder }: Props) {
     const isEditing = !!editingOrder;
 
     const [rows, setRows] = useState<ProductRow[]>(() => {
@@ -199,6 +202,8 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
     });
     const [partyDropdownOpen, setPartyDropdownOpen] = useState(false);
     const partyRef = useRef<HTMLDivElement>(null);
+    const [openBrandRow, setOpenBrandRow] = useState<number | null>(null);
+    const [brandSearch, setBrandSearch] = useState('');
 
     useEffect(() => {
         const handler = (e: MouseEvent) => {
@@ -276,6 +281,24 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         () => [...new Set(partyRates.map((r) => r.our_brand))].sort(),
         [partyRates],
     );
+
+    const groupedBrands = useMemo(() => {
+        const q = brandSearch.toLowerCase().trim();
+        const filtered = q
+            ? finishGoodBrands.filter(
+                (b) => b.name.toLowerCase().includes(q) || (b.group ?? '').toLowerCase().includes(q),
+              )
+            : finishGoodBrands;
+        const map = new Map<string, string[]>();
+        for (const b of filtered) {
+            const g = b.group ?? '';
+            if (!map.has(g)) map.set(g, []);
+            map.get(g)!.push(b.name);
+        }
+        const result: { group: string; brands: string[] }[] = [];
+        map.forEach((brands, group) => result.push({ group, brands }));
+        return result;
+    }, [finishGoodBrands, brandSearch]);
 
     type PhotoInfo = { url: string; mrp: string | null };
 
@@ -821,16 +844,61 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                                     )}
                                                 </td>
                                                 <td>
-                                                    <input
-                                                        type="text"
-                                                        list={`brands-${index}`}
-                                                        value={row.our_brand}
-                                                        onChange={(e) => updateRow(index, 'our_brand', e.target.value)}
-                                                        placeholder="Brand"
-                                                    />
-                                                    <datalist id={`brands-${index}`}>
-                                                        {brandOptions.map((b) => <option key={b} value={b} />)}
-                                                    </datalist>
+                                                    <div style={{ position: 'relative' }}>
+                                                        <input
+                                                            type="text"
+                                                            value={openBrandRow === index ? brandSearch : row.our_brand}
+                                                            placeholder="Search brand..."
+                                                            onFocus={() => {
+                                                                setOpenBrandRow(index);
+                                                                setBrandSearch('');
+                                                            }}
+                                                            onChange={(e) => setBrandSearch(e.target.value)}
+                                                            onBlur={() => setTimeout(() => setOpenBrandRow(null), 160)}
+                                                        />
+                                                        {openBrandRow === index && (
+                                                            <div style={{
+                                                                position: 'absolute',
+                                                                top: 'calc(100% + 2px)',
+                                                                left: 0,
+                                                                minWidth: '220px',
+                                                                background: 'var(--bg-paper)',
+                                                                border: '1px solid var(--border)',
+                                                                borderRadius: '8px',
+                                                                boxShadow: '0 6px 20px rgba(0,0,0,0.14)',
+                                                                zIndex: 200,
+                                                                maxHeight: '260px',
+                                                                overflowY: 'auto',
+                                                            }}>
+                                                                {groupedBrands.length === 0 ? (
+                                                                    <div style={{ padding: '10px 14px', fontSize: '13px', color: 'var(--tx-muted)' }}>No products found</div>
+                                                                ) : groupedBrands.map(({ group, brands }) => (
+                                                                    <div key={group}>
+                                                                        {group && (
+                                                                            <div style={{ padding: '5px 12px', fontSize: '11px', fontWeight: 700, color: '#16a34a', background: '#f0fdf4', borderBottom: '1px solid var(--border)', letterSpacing: '0.02em' }}>
+                                                                                {group}
+                                                                            </div>
+                                                                        )}
+                                                                        {brands.map((brand) => (
+                                                                            <div
+                                                                                key={brand}
+                                                                                onMouseDown={(e) => {
+                                                                                    e.preventDefault();
+                                                                                    updateRow(index, 'our_brand', brand);
+                                                                                    setOpenBrandRow(null);
+                                                                                }}
+                                                                                style={{ padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}
+                                                                                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover, #f5f5f5)'; }}
+                                                                                onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}
+                                                                            >
+                                                                                {brand}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </td>
                                                 <td>
                                                     <input
