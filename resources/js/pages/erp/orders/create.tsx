@@ -287,9 +287,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
     const groupedBrands = useMemo(() => {
         const q = brandSearch.toLowerCase().trim();
         const filtered = q
-            ? finishGoodBrands.filter(
-                (b) => b.name.toLowerCase().includes(q) || (b.group ?? '').toLowerCase().includes(q),
-              )
+            ? finishGoodBrands.filter((b) => b.name.toLowerCase().includes(q))
             : finishGoodBrands;
         const map = new Map<string, string[]>();
         for (const b of filtered) {
