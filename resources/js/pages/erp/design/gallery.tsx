@@ -337,7 +337,7 @@ export default function DesignGallery() {
                             📁 New Folder
                         </button>
                         <button type="button" className="btn primary" onClick={() => openUpload()}>
-                            ＋ Upload Photo
+                            ＋ Upload Product
                         </button>
                     </div>
                 </div>
@@ -950,7 +950,7 @@ function UploadModal({ form, fileRef, folders, ourBrands, allCategories, brandSu
         <div className="modal-overlay open" onClick={onClose}>
             <div className="modal" style={{ width: '460px' }} onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
-                    <h2 className="modal-title">Upload Photo</h2>
+                    <h2 className="modal-title">Upload Product</h2>
                     <button type="button" className="modal-close" onClick={onClose}>✕</button>
                 </div>
                 <form onSubmit={onSubmit}>
@@ -1067,7 +1067,7 @@ function UploadModal({ form, fileRef, folders, ourBrands, allCategories, brandSu
                     <div className="modal-footer">
                         <button type="button" className="btn secondary" onClick={onClose}>Cancel</button>
                         <button type="submit" className="btn primary" disabled={form.processing}>
-                            {form.processing ? 'Uploading…' : 'Upload Photo'}
+                            {form.processing ? 'Uploading…' : 'Upload Product'}
                         </button>
                     </div>
                 </form>
