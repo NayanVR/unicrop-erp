@@ -417,7 +417,7 @@ export default function DesignGallery() {
                 {crossFolderPhotos.length > 0 && (
                     <div style={{ marginTop: '28px' }}>
                         <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--tx-muted)', marginBottom: '12px' }}>
-                            📷 Photos matching "{folderSearch}" — {crossFolderPhotos.length} result{crossFolderPhotos.length !== 1 ? 's' : ''}
+                            📷 Products matching "{folderSearch}" — {crossFolderPhotos.length} result{crossFolderPhotos.length !== 1 ? 's' : ''}
                         </div>
                         <div style={{
                             display: 'grid',
@@ -591,7 +591,7 @@ export default function DesignGallery() {
                 <div style={{ marginBottom: '18px' }}>
                     <input
                         type="search"
-                        placeholder="Search photos by brand or size…"
+                        placeholder="Search products by brand or size…"
                         value={photoSearch}
                         onChange={(e) => setPhotoSearch(e.target.value)}
                         style={{ width: '100%', maxWidth: '340px' }}
@@ -617,7 +617,7 @@ export default function DesignGallery() {
                 ) : filteredPhotos.length === 0 ? (
                     <div className="empty-state" style={{ padding: '32px 0' }}>
                         <div className="icon">🔍</div>
-                        <p>No photos match "{photoSearch}"</p>
+                        <p>No products match "{photoSearch}"</p>
                     </div>
                 ) : (
                     <div style={{
