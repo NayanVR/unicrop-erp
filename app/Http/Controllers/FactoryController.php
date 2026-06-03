@@ -307,7 +307,7 @@ class FactoryController extends Controller
             $salesUsers = $ownerIds
                 ? User::whereIn('id', $ownerIds)
                     ->where('is_active', true)
-                    ->whereHas('roles', fn ($q) => $q->where('slug', 'office'))
+                    ->whereHas('roles', fn ($q) => $q->where('slug', 'sales'))
                     ->get()
                 : collect();
 

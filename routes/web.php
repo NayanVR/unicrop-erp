@@ -164,7 +164,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->get(['id','name','is_active']);
 
         $officeUsers = \App\Models\User::where('is_active', true)
-            ->whereHas('roles', fn($q) => $q->where('slug', 'office'))
+            ->whereHas('roles', fn($q) => $q->where('slug', 'sales'))
             ->get(['id','name','is_active']);
 
         $allUsers = \App\Models\User::with('roles:id,slug,name')

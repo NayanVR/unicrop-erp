@@ -170,7 +170,7 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
 
     useDraggableModals();
 
-    const canReceiveNotifications = role === 'accountant' || role === 'office' || role === 'admin';
+    const canReceiveNotifications = role === 'accountant' || role === 'sales' || role === 'admin';
 
     const fetchNotifications = () => {
         if (!canReceiveNotifications) return;
@@ -278,7 +278,7 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
                 </div>
                 <div className="sidebar-user">
                     <div
-                        className={`u-avatar ${role ?? 'office'}`}
+                        className={`u-avatar ${role ?? 'sales'}`}
                         id="sb-avatar"
                     >
                         {initials(auth.user?.name)}
