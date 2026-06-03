@@ -295,7 +295,7 @@ class FactoryController extends Controller
 
             // All active accountants
             $accountants = User::where('is_active', true)
-                ->whereHas('roles', fn ($q) => $q->where('slug', Role::ACCOUNTANT))
+                ->whereHas('roles', fn ($q) => $q->where('slug', 'accountant'))
                 ->get();
 
             // Only the specific office user(s) tied to this order
@@ -307,7 +307,7 @@ class FactoryController extends Controller
             $salesUsers = $ownerIds
                 ? User::whereIn('id', $ownerIds)
                     ->where('is_active', true)
-                    ->whereHas('roles', fn ($q) => $q->where('slug', Role::OFFICE))
+                    ->whereHas('roles', fn ($q) => $q->where('slug', 'office'))
                     ->get()
                 : collect();
 

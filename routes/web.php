@@ -160,11 +160,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         $allReadyItems = $order->items->filter(fn($i) => in_array($i->status, ['ready','dispatched']))->count();
 
         $accountants = \App\Models\User::where('is_active', true)
-            ->whereHas('roles', fn($q) => $q->where('slug', \App\Models\Role::ACCOUNTANT))
+            ->whereHas('roles', fn($q) => $q->where('slug', 'accountant'))
             ->get(['id','name','is_active']);
 
         $officeUsers = \App\Models\User::where('is_active', true)
-            ->whereHas('roles', fn($q) => $q->where('slug', \App\Models\Role::OFFICE))
+            ->whereHas('roles', fn($q) => $q->where('slug', 'office'))
             ->get(['id','name','is_active']);
 
         $allUsers = \App\Models\User::with('roles:id,slug,name')
