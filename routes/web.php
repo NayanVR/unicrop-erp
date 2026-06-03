@@ -38,7 +38,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // Orders list — controller filters by role; sales see confirmed/dispatched only
-    Route::middleware(['role:admin,office,design,accountant,sales'])->group(function () {
+    Route::middleware(['role:admin,sales,design,accountant'])->group(function () {
         Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
     });
 
@@ -52,14 +52,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('orders/{order}/eway-not-required', [OrderController::class, 'setEwayNotRequired'])->name('orders.eway-not-required');
     });
 
-    Route::middleware(['role:admin,office,sales'])->group(function () {
+    Route::middleware(['role:admin,sales'])->group(function () {
         Route::get('orders/create', [OrderController::class, 'create'])->name('orders.create');
         Route::post('orders', [OrderController::class, 'store'])->name('orders.store');
         Route::get('orders/{order}/edit', [OrderController::class, 'edit'])->name('orders.edit');
         Route::patch('orders/{order}', [OrderController::class, 'update'])->name('orders.update');
     });
 
-    Route::middleware(['role:admin,office,sales'])->group(function () {
+    Route::middleware(['role:admin,sales'])->group(function () {
         Route::delete('orders/{order}', [OrderController::class, 'destroy'])->name('orders.destroy');
         Route::post('orders/{order}/confirm', [OrderController::class, 'confirm'])->name('orders.confirm');
         Route::post('orders/{order}/send-to-design', [OrderController::class, 'sendToDesign'])->name('orders.send-to-design');
@@ -110,8 +110,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('bom/runs/{run}', [BomController::class, 'destroyRun'])->name('bom.runs.destroy');
     });
 
-    // Inventory — view: admin, factory, accountant, office, sales
-    Route::middleware(['role:admin,factory,accountant,office,sales'])->group(function () {
+    // Inventory — view: admin, factory, accountant, sales
+    Route::middleware(['role:admin,factory,accountant,sales'])->group(function () {
         Route::get('inventory', [InventoryController::class, 'index'])->name('inventory.index');
     });
 
@@ -167,7 +167,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('design/{designOrder}', [DesignController::class, 'destroy'])->name('design.destroy');
     });
 
-    Route::middleware(['role:admin,office,design,sales'])->group(function () {
+    Route::middleware(['role:admin,sales,design'])->group(function () {
         Route::get('design/gallery', [ProductPhotoController::class, 'index'])->name('design.gallery.index');
         Route::post('design/gallery/folders', [ProductPhotoController::class, 'storeFolder'])->name('design.gallery.folders.store');
         Route::post('design/gallery', [ProductPhotoController::class, 'store'])->name('design.gallery.store');
@@ -175,7 +175,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('design/gallery/{photo}', [ProductPhotoController::class, 'destroy'])->name('design.gallery.destroy');
     });
 
-    Route::middleware(['role:admin,office,sales'])->group(function () {
+    Route::middleware(['role:admin,sales'])->group(function () {
         Route::get('parties', [PartyController::class, 'index'])->name('parties.index');
         Route::post('parties', [PartyController::class, 'store'])->name('parties.store');
         Route::patch('parties/{party}', [PartyController::class, 'update'])->name('parties.update');

@@ -60,18 +60,7 @@ class OrderController extends Controller
             });
         }
 
-        // Office/Sales users see confirmed and dispatched orders + their own submitted/draft
-        if ($role === Role::OFFICE) {
-            $ordersQuery->where(function ($q) use ($user) {
-                $q->whereIn('status', ['confirmed', 'dispatched'])
-                  ->orWhere(function ($q2) use ($user) {
-                      $q2->whereIn('status', ['submitted', 'draft'])
-                         ->where('created_by', $user->id);
-                  });
-            });
-        }
-
-        // Sales users see confirmed/dispatched orders + their own submitted/draft orders
+        // Sales users see confirmed/dispatched + their own submitted/draft orders
         if ($role === Role::SALES) {
             $ordersQuery->where(function ($q) use ($user) {
                 $q->whereIn('status', ['confirmed', 'dispatched'])
@@ -81,7 +70,7 @@ class OrderController extends Controller
                   });
             });
         }
-        // Admin and office see all orders
+        // Admin sees all orders
 
         $orders = $ordersQuery->get();
 
@@ -151,7 +140,7 @@ class OrderController extends Controller
 
         $salesUsers = User::query()
             ->where('is_active', true)
-            ->whereHas('roles', fn ($query) => $query->whereIn('slug', [Role::ADMIN, Role::OFFICE, Role::SALES]))
+            ->whereHas('roles', fn ($query) => $query->whereIn('slug', [Role::ADMIN, Role::SALES]))
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -357,7 +346,7 @@ class OrderController extends Controller
 
         $salesUsers = User::query()
             ->where('is_active', true)
-            ->whereHas('roles', fn ($query) => $query->whereIn('slug', [Role::ADMIN, Role::OFFICE, Role::SALES]))
+            ->whereHas('roles', fn ($query) => $query->whereIn('slug', [Role::ADMIN, Role::SALES]))
             ->orderBy('name')
             ->get(['id', 'name']);
 

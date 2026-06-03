@@ -56,7 +56,7 @@ const NAV_DEFS: Record<string, NavItem[]> = {
         { id: 'users', label: 'User Management', icon: '👥', href: usersIndex() },
         { id: 'settings', label: 'Settings', icon: '⚙️', href: settingsIndex() },
     ],
-    office: [
+    sales: [
         { id: 'dashboard', label: 'Dashboard', icon: '🌾', href: dashboard() },
         { id: 'new-order', label: 'New Order', icon: '🌱', href: ordersCreate() },
         { id: 'all-orders', label: 'All Orders', icon: '📋', href: ordersIndex() },
@@ -178,7 +178,7 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
 
     useDraggableModals();
 
-    const canReceiveNotifications = role === 'accountant' || role === 'office' || role === 'admin';
+    const canReceiveNotifications = role === 'accountant' || role === 'sales' || role === 'admin';
 
     const fetchNotifications = () => {
         if (!canReceiveNotifications) return;

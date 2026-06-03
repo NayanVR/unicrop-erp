@@ -21,7 +21,7 @@ class StoreOrderRequest extends FormRequest
 
         $user->loadMissing('roles');
 
-        return $user->hasAnyRole([Role::ADMIN, Role::OFFICE, Role::SALES]);
+        return $user->hasAnyRole([Role::ADMIN, Role::SALES, Role::SALES]);
     }
 
     /**

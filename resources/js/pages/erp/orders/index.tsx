@@ -208,8 +208,8 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
     const isAdmin       = userRole === 'admin';
     const isAccountant  = userRole === 'accountant';
     const isSales       = userRole === 'sales';
-    const canConfirm = userRole === 'admin' || userRole === 'office' || userRole === 'sales';
-    const canCreateOrder = isAdmin || userRole === 'office' || isSales;
+    const canConfirm = userRole === 'admin' || userRole === 'sales' || userRole === 'sales';
+    const canCreateOrder = isAdmin || userRole === 'sales' || isSales;
 
     const canEditOrder = (order: { status?: string | null; created_by?: number | null }) =>
         ['draft', 'submitted'].includes(order.status ?? '') &&

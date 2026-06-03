@@ -14,17 +14,11 @@ class Role extends Model
     /** @use HasFactory<RoleFactory> */
     use HasFactory;
 
-    public const ADMIN = 'admin';
-
-    public const OFFICE = 'office';
-
-    public const FACTORY = 'factory';
-
-    public const DESIGN = 'design';
-
+    public const ADMIN      = 'admin';
+    public const SALES      = 'sales';
+    public const FACTORY    = 'factory';
+    public const DESIGN     = 'design';
     public const ACCOUNTANT = 'accountant';
-
-    public const SALES = 'sales';
 
     /**
      * @return array<int, array{slug: string, name: string}>
@@ -32,10 +26,10 @@ class Role extends Model
     public static function defaultRoles(): array
     {
         return [
-            ['slug' => self::ADMIN, 'name' => 'Admin'],
-            ['slug' => self::OFFICE, 'name' => 'Sales'],
-            ['slug' => self::FACTORY, 'name' => 'Factory'],
-            ['slug' => self::DESIGN, 'name' => 'Design'],
+            ['slug' => self::ADMIN,      'name' => 'Admin'],
+            ['slug' => self::SALES,      'name' => 'Sales'],
+            ['slug' => self::FACTORY,    'name' => 'Factory'],
+            ['slug' => self::DESIGN,     'name' => 'Design'],
             ['slug' => self::ACCOUNTANT, 'name' => 'Accounts'],
         ];
     }
