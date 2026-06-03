@@ -276,7 +276,7 @@ export default function DesignGallery() {
     };
 
     const handleDelete = (photo: Photo) => {
-        if (!confirm('Delete this photo?')) return;
+        if (!confirm('Delete this product?')) return;
         setDeletingId(photo.id);
         router.delete(galleryDestroy(photo.id).url, {
             preserveScroll: true,
@@ -719,7 +719,7 @@ export default function DesignGallery() {
                 <div className="modal-overlay open" onClick={() => setEditingPhoto(null)}>
                     <div className="modal" style={{ width: '460px' }} onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h2 className="modal-title">✎ Edit Photo</h2>
+                            <h2 className="modal-title">✎ Edit Product</h2>
                             <button type="button" className="modal-close" onClick={() => setEditingPhoto(null)}>✕</button>
                         </div>
                         <div className="modal-body">
@@ -776,7 +776,7 @@ export default function DesignGallery() {
                             </div>
 
                             <div className="form-group">
-                                <label>Replace Photo (JPG, PNG, WEBP — max 8 MB)</label>
+                                <label>Replace Product Image (JPG, PNG, WEBP — max 8 MB)</label>
                                 <input
                                     ref={editFileRef}
                                     type="file"
@@ -784,7 +784,7 @@ export default function DesignGallery() {
                                     onChange={(e) => setEditFile(e.target.files?.[0] ?? null)}
                                 />
                                 <div style={{ fontSize: '11px', color: 'var(--tx-muted)', marginTop: '4px' }}>
-                                    Leave empty to keep the current photo.
+                                    Leave empty to keep the current image.
                                 </div>
                             </div>
                         </div>
@@ -1051,7 +1051,7 @@ function UploadModal({ form, fileRef, folders, ourBrands, allCategories, brandSu
 
                         {/* Photo file */}
                         <div className="form-group">
-                            <label>Photo * (JPG, PNG, WEBP — max 8 MB)</label>
+                            <label>Product Image * (JPG, PNG, WEBP — max 8 MB)</label>
                             <input
                                 ref={fileRef}
                                 type="file"
