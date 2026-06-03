@@ -178,12 +178,19 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
             .then((r) => r.ok ? r.json() : [])
             .then((data: NotificationItem[]) => {
                 setNotifications(data);
-                // Queue toast for any notification we haven't seen yet
-                const fresh = data.filter((n) => !seenIds.current.has(n.id));
+                // Queue toast for any notification we haven't seen yet.
+                // Accountants only see the toast for orders > ₹50k.
+                const fresh = data.filter((n) => {
+                    if (seenIds.current.has(n.id)) return false;
+                    if (role === 'accountant' && Number(n.data.total_amount) <= 50000) return false;
+                    return true;
+                });
                 if (fresh.length > 0) {
                     fresh.forEach((n) => seenIds.current.add(n.id));
                     setToastQueue((prev) => [...prev, ...fresh]);
                 }
+                // Mark skipped items as seen so they don't re-queue on next poll
+                data.filter((n) => !seenIds.current.has(n.id)).forEach((n) => seenIds.current.add(n.id));
             })
             .catch(() => {});
     };
