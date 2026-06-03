@@ -204,6 +204,8 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
     const partyRef = useRef<HTMLDivElement>(null);
     const [openBrandRow, setOpenBrandRow] = useState<number | null>(null);
     const [brandSearch, setBrandSearch] = useState('');
+    const [brandDropPos, setBrandDropPos] = useState({ top: 0, left: 0, width: 0 });
+    const brandInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
     useEffect(() => {
         const handler = (e: MouseEvent) => {
@@ -844,61 +846,23 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                                     )}
                                                 </td>
                                                 <td>
-                                                    <div style={{ position: 'relative' }}>
-                                                        <input
-                                                            type="text"
-                                                            value={openBrandRow === index ? brandSearch : row.our_brand}
-                                                            placeholder="Search brand..."
-                                                            onFocus={() => {
-                                                                setOpenBrandRow(index);
-                                                                setBrandSearch('');
-                                                            }}
-                                                            onChange={(e) => setBrandSearch(e.target.value)}
-                                                            onBlur={() => setTimeout(() => setOpenBrandRow(null), 160)}
-                                                        />
-                                                        {openBrandRow === index && (
-                                                            <div style={{
-                                                                position: 'absolute',
-                                                                top: 'calc(100% + 2px)',
-                                                                left: 0,
-                                                                minWidth: '220px',
-                                                                background: 'var(--bg-paper)',
-                                                                border: '1px solid var(--border)',
-                                                                borderRadius: '8px',
-                                                                boxShadow: '0 6px 20px rgba(0,0,0,0.14)',
-                                                                zIndex: 200,
-                                                                maxHeight: '260px',
-                                                                overflowY: 'auto',
-                                                            }}>
-                                                                {groupedBrands.length === 0 ? (
-                                                                    <div style={{ padding: '10px 14px', fontSize: '13px', color: 'var(--tx-muted)' }}>No products found</div>
-                                                                ) : groupedBrands.map(({ group, brands }) => (
-                                                                    <div key={group}>
-                                                                        {group && (
-                                                                            <div style={{ padding: '5px 12px', fontSize: '11px', fontWeight: 700, color: '#16a34a', background: '#f0fdf4', borderBottom: '1px solid var(--border)', letterSpacing: '0.02em' }}>
-                                                                                {group}
-                                                                            </div>
-                                                                        )}
-                                                                        {brands.map((brand) => (
-                                                                            <div
-                                                                                key={brand}
-                                                                                onMouseDown={(e) => {
-                                                                                    e.preventDefault();
-                                                                                    updateRow(index, 'our_brand', brand);
-                                                                                    setOpenBrandRow(null);
-                                                                                }}
-                                                                                style={{ padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}
-                                                                                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover, #f5f5f5)'; }}
-                                                                                onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}
-                                                                            >
-                                                                                {brand}
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                    <input
+                                                        ref={(el) => { brandInputRefs.current[index] = el; }}
+                                                        type="text"
+                                                        value={openBrandRow === index ? brandSearch : row.our_brand}
+                                                        placeholder="Search brand..."
+                                                        onFocus={() => {
+                                                            const el = brandInputRefs.current[index];
+                                                            if (el) {
+                                                                const r = el.getBoundingClientRect();
+                                                                setBrandDropPos({ top: r.bottom, left: r.left, width: r.width });
+                                                            }
+                                                            setOpenBrandRow(index);
+                                                            setBrandSearch('');
+                                                        }}
+                                                        onChange={(e) => setBrandSearch(e.target.value)}
+                                                        onBlur={() => setTimeout(() => setOpenBrandRow(null), 160)}
+                                                    />
                                                 </td>
                                                 <td>
                                                     <input
@@ -1021,6 +985,53 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                     </div>
                 </form>
             </div>
+
+            {openBrandRow !== null && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: brandDropPos.top + 2,
+                        left: brandDropPos.left,
+                        minWidth: Math.max(220, brandDropPos.width),
+                        background: 'var(--bg-paper)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '8px',
+                        boxShadow: '0 6px 24px rgba(0,0,0,0.16)',
+                        zIndex: 9999,
+                        maxHeight: '260px',
+                        overflowY: 'auto',
+                    }}
+                    onMouseDown={(e) => e.preventDefault()}
+                >
+                    {groupedBrands.length === 0 ? (
+                        <div style={{ padding: '10px 14px', fontSize: '13px', color: 'var(--tx-muted)' }}>No products found</div>
+                    ) : groupedBrands.map(({ group, brands }) => (
+                        <div key={group}>
+                            {group && (
+                                <div style={{ padding: '5px 12px', fontSize: '11px', fontWeight: 700, color: '#16a34a', background: '#f0fdf4', borderBottom: '1px solid var(--border)', letterSpacing: '0.02em' }}>
+                                    {group}
+                                </div>
+                            )}
+                            {brands.map((brand) => (
+                                <div
+                                    key={brand}
+                                    onMouseDown={() => {
+                                        if (openBrandRow !== null) {
+                                            updateRow(openBrandRow, 'our_brand', brand);
+                                            setOpenBrandRow(null);
+                                        }
+                                    }}
+                                    style={{ padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover, #f1f5f9)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}
+                                >
+                                    {brand}
+                                </div>
+                            ))}
+                        </div>
+                    ))}
+                </div>
+            )}
         </>
     );
 }
