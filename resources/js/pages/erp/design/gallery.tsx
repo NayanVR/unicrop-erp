@@ -1,7 +1,8 @@
 import { store as galleryStore, destroy as galleryDestroy } from '@/routes/design/gallery';
 import { store as foldersStore } from '@/routes/design/gallery/folders';
 import { router, useForm, usePage } from '@inertiajs/react';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 function SearchableSelect({
     value, onChange, options, placeholder, hasError,
@@ -14,38 +15,60 @@ function SearchableSelect({
 }) {
     const [query, setQuery] = useState('');
     const [open, setOpen] = useState(false);
-    const containerRef = useRef<HTMLDivElement>(null);
+    const [dropPos, setDropPos] = useState<{ top: number; left: number; width: number } | null>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     const filtered = query
         ? options.filter((o) => o.toLowerCase().includes(query.toLowerCase()))
         : options;
 
+    const handleFocus = () => {
+        setOpen(true);
+        setQuery('');
+        const rect = inputRef.current?.getBoundingClientRect();
+        if (rect) {
+            setDropPos({ top: rect.bottom + window.scrollY + 2, left: rect.left + window.scrollX, width: rect.width });
+        }
+    };
+
     const handleBlur = () => {
         setTimeout(() => {
-            if (!containerRef.current?.contains(document.activeElement)) {
+            if (document.activeElement !== inputRef.current) {
                 setOpen(false);
                 setQuery('');
             }
         }, 150);
     };
 
+    useEffect(() => {
+        if (!open) return;
+        const update = () => {
+            const rect = inputRef.current?.getBoundingClientRect();
+            if (rect) setDropPos({ top: rect.bottom + window.scrollY + 2, left: rect.left + window.scrollX, width: rect.width });
+        };
+        window.addEventListener('scroll', update, true);
+        window.addEventListener('resize', update);
+        return () => { window.removeEventListener('scroll', update, true); window.removeEventListener('resize', update); };
+    }, [open]);
+
     return (
-        <div ref={containerRef} style={{ position: 'relative' }}>
+        <div style={{ position: 'relative' }}>
             <input
+                ref={inputRef}
                 type="text"
                 className={hasError ? 'error' : ''}
                 value={open ? query : value}
                 placeholder={value ? value : placeholder}
-                onFocus={() => { setOpen(true); setQuery(''); }}
+                onFocus={handleFocus}
                 onBlur={handleBlur}
                 onChange={(e) => setQuery(e.target.value)}
                 autoComplete="off"
             />
-            {open && (
+            {open && dropPos && createPortal(
                 <div style={{
-                    position: 'absolute', top: 'calc(100% + 2px)', left: 0, right: 0,
+                    position: 'absolute', top: dropPos.top, left: dropPos.left, width: dropPos.width,
                     background: 'var(--bg-card, #fff)', border: '1px solid var(--border, #e5e7eb)',
-                    borderRadius: '6px', maxHeight: '220px', overflowY: 'auto', zIndex: 1000,
+                    borderRadius: '6px', maxHeight: '220px', overflowY: 'auto', zIndex: 9999,
                     boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
                 }}>
                     {filtered.length === 0 ? (
@@ -67,7 +90,8 @@ function SearchableSelect({
                             {opt}
                         </div>
                     ))}
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
