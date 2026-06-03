@@ -146,6 +146,43 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('erp/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
     Route::post('erp/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
 
+    // Temporary debug route — remove after fixing notification issue
+    Route::get('erp/debug/notify', function (\Illuminate\Http\Request $request) {
+        $user = $request->user();
+        if (! in_array($user->roles->first()?->slug, ['admin'])) {
+            return response()->json(['error' => 'Admin only'], 403);
+        }
+
+        $order = \App\Models\Order::with('items')->latest()->first();
+        if (! $order) return response()->json(['error' => 'No orders found']);
+
+        $itemStatuses = $order->items->pluck('status')->toArray();
+        $allReadyItems = $order->items->filter(fn($i) => in_array($i->status, ['ready','dispatched']))->count();
+
+        $accountants = \App\Models\User::where('is_active', true)
+            ->whereHas('roles', fn($q) => $q->where('slug', \App\Models\Role::ACCOUNTANT))
+            ->get(['id','name','is_active']);
+
+        $officeUsers = \App\Models\User::where('is_active', true)
+            ->whereHas('roles', fn($q) => $q->where('slug', \App\Models\Role::OFFICE))
+            ->get(['id','name','is_active']);
+
+        $allUsers = \App\Models\User::with('roles:id,slug,name')
+            ->get(['id','name','is_active'])
+            ->map(fn($u) => ['id'=>$u->id,'name'=>$u->name,'active'=>$u->is_active,'roles'=>$u->roles->pluck('slug')]);
+
+        return response()->json([
+            'latest_order'       => ['id'=>$order->id,'number'=>$order->order_number,'amount'=>$order->total_amount,'created_by'=>$order->created_by,'sales_user_id'=>$order->sales_user_id],
+            'item_count'         => $order->items->count(),
+            'item_statuses'      => $itemStatuses,
+            'ready_count'        => $allReadyItems,
+            'accountants_found'  => $accountants->toArray(),
+            'office_users_found' => $officeUsers->toArray(),
+            'all_users'          => $allUsers->toArray(),
+            'notifications_total'=> \DB::table('notifications')->count(),
+        ]);
+    });
+
     Route::middleware(['role:admin,factory'])->group(function () {
         Route::get('finished-goods', [FinishedGoodsController::class, 'index'])->name('finished-goods.index');
         Route::post('finished-goods', [FinishedGoodsController::class, 'store'])->name('finished-goods.store');
