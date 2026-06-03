@@ -120,17 +120,7 @@ class OrderController extends Controller
             'orders'        => $orders,
             'currentUserId' => $user?->id,
             'userRole'      => $role,
-            'productPhotos' => ProductPhoto::orderBy('our_brand')->orderBy('packing_size')
-                ->get()
-                ->map(fn ($p) => [
-                    'id'           => $p->id,
-                    'party_id'     => $p->party_id,
-                    'our_brand'    => $p->our_brand,
-                    'party_brand'  => $p->party_brand,
-                    'packing_size' => $p->packing_size,
-                    'mrp'          => $p->mrp,
-                    'photo_url'    => $p->photo_url,
-                ]),
+            'productPhotos' => $this->mapProductPhotos(),
         ]);
     }
 
@@ -153,17 +143,7 @@ class OrderController extends Controller
                 ->with(['productRates' => fn ($q) => $q->where('is_active', true)->orderBy('our_brand')->orderBy('packing_size')])
                 ->get(['id', 'name', 'customer_name', 'gst_no', 'pan_no', 'pan_card_path', 'phone', 'address', 'city', 'state', 'default_transport_type', 'default_transport_id']),
             'currentUser' => ['id' => $user?->id, 'name' => $user?->name],
-            'productPhotos' => ProductPhoto::orderBy('our_brand')->orderBy('packing_size')
-                ->get()
-                ->map(fn ($p) => [
-                    'id'           => $p->id,
-                    'party_id'     => $p->party_id,
-                    'our_brand'    => $p->our_brand,
-                    'party_brand'  => $p->party_brand,
-                    'packing_size' => $p->packing_size,
-                    'mrp'          => $p->mrp,
-                    'photo_url'    => $p->photo_url,
-                ]),
+            'productPhotos' => $this->mapProductPhotos(),
         ]);
     }
 
@@ -361,17 +341,7 @@ class OrderController extends Controller
                 ->with(['productRates' => fn ($q) => $q->where('is_active', true)->orderBy('our_brand')->orderBy('packing_size')])
                 ->get(['id', 'name', 'customer_name', 'gst_no', 'pan_no', 'pan_card_path', 'phone', 'address', 'city', 'state', 'default_transport_type', 'default_transport_id']),
             'currentUser'  => ['id' => $user?->id, 'name' => $user?->name],
-            'productPhotos' => ProductPhoto::orderBy('our_brand')->orderBy('packing_size')
-                ->get()
-                ->map(fn ($p) => [
-                    'id'           => $p->id,
-                    'party_id'     => $p->party_id,
-                    'our_brand'    => $p->our_brand,
-                    'party_brand'  => $p->party_brand,
-                    'packing_size' => $p->packing_size,
-                    'mrp'          => $p->mrp,
-                    'photo_url'    => $p->photo_url,
-                ]),
+            'productPhotos' => $this->mapProductPhotos(),
             'editingOrder' => [
                 'id'               => $order->id,
                 'order_number'     => $order->order_number,
@@ -688,5 +658,32 @@ class OrderController extends Controller
         $nextId = (Order::max('id') ?? 0) + 1;
 
         return 'ORD-'.str_pad((string) $nextId, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Flatten product photos into per-size rows so the frontend can map
+     * brand+size → {photo_url, mrp} correctly for all sizes of a product.
+     */
+    private function mapProductPhotos(): \Illuminate\Support\Collection
+    {
+        $rows = collect();
+
+        ProductPhoto::orderBy('our_brand')->get()->each(function ($p) use ($rows) {
+            $sizes = $p->sizes ?? [['packing_size' => $p->packing_size, 'mrp' => $p->mrp]];
+
+            foreach ($sizes as $size) {
+                $rows->push([
+                    'id'           => $p->id,
+                    'party_id'     => $p->party_id,
+                    'our_brand'    => $p->our_brand,
+                    'party_brand'  => $p->party_brand,
+                    'packing_size' => $size['packing_size'] ?? null,
+                    'mrp'          => $size['mrp'] ?? null,
+                    'photo_url'    => $p->photo_url,
+                ]);
+            }
+        });
+
+        return $rows;
     }
 }
