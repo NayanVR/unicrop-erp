@@ -85,14 +85,6 @@ const NAV_DEFS: Record<string, NavItem[]> = {
         { id: 'all-orders', label: 'Orders', icon: '📋', href: ordersIndex() },
         { id: 'inventory', label: 'Inventory', icon: '🗄️', href: inventoryIndex() },
     ],
-    sales: [
-        { id: 'dashboard', label: 'Dashboard', icon: '🌾', href: dashboard() },
-        { id: 'new-order', label: 'New Order', icon: '🌱', href: ordersCreate() },
-        { id: 'all-orders', label: 'All Orders', icon: '📋', href: ordersIndex() },
-        { id: 'parties', label: 'Parties', icon: '🏢', href: partiesIndex() },
-        { id: 'rate-calc', label: 'Rate Calculator', icon: '🧮', href: rateCalcIndex() },
-        { id: 'inventory', label: 'Inventory', icon: '🗄️', href: inventoryIndex() },
-    ],
 };
 
 const roleLabel = (roles?: Role[], role?: string | null): string => {
