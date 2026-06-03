@@ -12,12 +12,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'party_brand',
     'packing_size',
     'mrp',
+    'sizes',
     'photo_path',
     'uploaded_by',
     'updated_by',
 ])]
 class ProductPhoto extends Model
 {
+    protected $casts = [
+        'sizes' => 'array',
+    ];
+
     public function party(): BelongsTo
     {
         return $this->belongsTo(Party::class);

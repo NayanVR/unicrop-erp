@@ -30,7 +30,6 @@ class ProductPhotoController extends Controller
             ->orderBy('party_id')
             ->orderBy('our_brand')
             ->orderBy('party_brand')
-            ->orderBy('packing_size')
             ->get()
             ->map(fn($p) => [
                 'id'             => $p->id,
@@ -40,6 +39,7 @@ class ProductPhotoController extends Controller
                 'party_brand'    => $p->party_brand,
                 'packing_size'   => $p->packing_size,
                 'mrp'            => $p->mrp,
+                'sizes'          => $p->sizes ?? [['packing_size' => $p->packing_size ?? '', 'mrp' => $p->mrp ?? '']],
                 'photo_url'      => $p->photo_url,
                 'uploaded_by'    => $p->uploader?->name,
                 'updated_by'     => $p->updater?->name,
@@ -151,30 +151,32 @@ class ProductPhotoController extends Controller
             return redirect()->back()->with('error', 'Upload failed: ' . $e->getMessage());
         }
 
-        foreach ($data['sizes'] as $sizeRow) {
-            ProductPhoto::create([
-                'party_id'    => $data['party_id'] ?? null,
-                'our_brand'   => $data['our_brand'],
-                'party_brand' => $data['party_brand'] ?? null,
-                'packing_size'=> $sizeRow['packing_size'] ?: null,
-                'mrp'         => $sizeRow['mrp'] ?: null,
-                'photo_path'  => $path,
-                'uploaded_by' => $request->user()?->id,
-            ]);
-        }
+        $firstSize = $data['sizes'][0] ?? [];
+        ProductPhoto::create([
+            'party_id'    => $data['party_id'] ?? null,
+            'our_brand'   => $data['our_brand'],
+            'party_brand' => $data['party_brand'] ?? null,
+            'packing_size'=> $firstSize['packing_size'] ?: null,
+            'mrp'         => $firstSize['mrp'] ?: null,
+            'sizes'       => $data['sizes'],
+            'photo_path'  => $path,
+            'uploaded_by' => $request->user()?->id,
+        ]);
 
-        $count = count($data['sizes']);
-        return redirect()->back()->with('success', $count > 1 ? "{$count} photos uploaded." : 'Photo uploaded successfully.');
+        return redirect()->back()->with('success', 'Product uploaded successfully.');
     }
 
     public function update(Request $request, ProductPhoto $photo): RedirectResponse
     {
         $data = $request->validate([
-            'our_brand'    => 'required|string|max:255',
-            'party_brand'  => 'nullable|string|max:255',
-            'packing_size' => 'nullable|string|max:100',
-            'mrp'          => 'nullable|string|max:50',
-            'photo'        => 'nullable|image|mimes:jpg,jpeg,png,webp|max:8192',
+            'our_brand'             => 'required|string|max:255',
+            'party_brand'           => 'nullable|string|max:255',
+            'packing_size'          => 'nullable|string|max:100',
+            'mrp'                   => 'nullable|string|max:50',
+            'sizes'                 => 'nullable|array',
+            'sizes.*.packing_size'  => 'nullable|string|max:100',
+            'sizes.*.mrp'           => 'nullable|string|max:50',
+            'photo'                 => 'nullable|image|mimes:jpg,jpeg,png,webp|max:8192',
         ]);
 
         if ($request->hasFile('photo')) {
@@ -211,8 +213,17 @@ class ProductPhotoController extends Controller
 
         $photo->our_brand    = $data['our_brand'];
         $photo->party_brand  = $data['party_brand'] ?? null;
-        $photo->packing_size = $data['packing_size'] ?? null;
-        $photo->mrp          = $data['mrp'] ?? null;
+
+        if (!empty($data['sizes'])) {
+            $firstSize = $data['sizes'][0];
+            $photo->packing_size = $firstSize['packing_size'] ?: null;
+            $photo->mrp          = $firstSize['mrp'] ?: null;
+            $photo->sizes        = $data['sizes'];
+        } else {
+            $photo->packing_size = $data['packing_size'] ?? null;
+            $photo->mrp          = $data['mrp'] ?? null;
+        }
+
         $photo->updated_by   = auth()->id();
         $photo->save();
 

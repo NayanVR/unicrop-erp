@@ -77,6 +77,8 @@ type Party  = { id: number; name: string };
 type Folder = { id: number; party_id: number; party_name: string };
 type PartyRate = { party_id: number | null; our_brand: string; party_brand: string; packing_size: string };
 
+type SizeRow = { packing_size: string; mrp: string };
+
 type Photo = {
     id: number;
     party_id: number | null;
@@ -85,6 +87,7 @@ type Photo = {
     party_brand: string | null;
     packing_size: string | null;
     mrp: string | null;
+    sizes: SizeRow[];
     photo_url: string;
     uploaded_by: string | null;
     updated_by: string | null;
@@ -128,7 +131,8 @@ export default function DesignGallery() {
     const fileRef    = useRef<HTMLInputElement | null>(null);
 
     const [editingPhoto,   setEditingPhoto]   = useState<Photo | null>(null);
-    const [editForm,       setEditForm]       = useState({ our_brand: '', party_brand: '', packing_size: '', mrp: '' });
+    const [editForm,       setEditForm]       = useState({ our_brand: '', party_brand: '' });
+    const [editSizeRows,   setEditSizeRows]   = useState<SizeRow[]>([{ packing_size: '', mrp: '' }]);
     const [editFile,       setEditFile]       = useState<File | null>(null);
     const [editProcessing, setEditProcessing] = useState(false);
     const editFileRef = useRef<HTMLInputElement | null>(null);
@@ -286,11 +290,13 @@ export default function DesignGallery() {
 
     const openEdit = (photo: Photo) => {
         setEditForm({
-            our_brand:    photo.our_brand,
-            party_brand:  photo.party_brand ?? '',
-            packing_size: photo.packing_size ?? '',
-            mrp:          photo.mrp ?? '',
+            our_brand:   photo.our_brand,
+            party_brand: photo.party_brand ?? '',
         });
+        const sizes = photo.sizes?.length
+            ? photo.sizes.map(s => ({ packing_size: s.packing_size ?? '', mrp: s.mrp ?? '' }))
+            : [{ packing_size: photo.packing_size ?? '', mrp: photo.mrp ?? '' }];
+        setEditSizeRows(sizes);
         setEditFile(null);
         setEditingPhoto(photo);
         setLightbox(null);
@@ -300,10 +306,12 @@ export default function DesignGallery() {
         if (!editingPhoto) return;
         const fd = new FormData();
         fd.append('_method', 'PATCH');
-        fd.append('our_brand',    editForm.our_brand);
-        fd.append('party_brand',  editForm.party_brand);
-        fd.append('packing_size', editForm.packing_size);
-        fd.append('mrp',          editForm.mrp);
+        fd.append('our_brand',   editForm.our_brand);
+        fd.append('party_brand', editForm.party_brand);
+        editSizeRows.forEach((row, i) => {
+            fd.append(`sizes[${i}][packing_size]`, row.packing_size);
+            fd.append(`sizes[${i}][mrp]`, row.mrp);
+        });
         if (editFile) fd.append('photo', editFile);
         setEditProcessing(true);
         router.post(`/design/gallery/${editingPhoto.id}`, fd, {
@@ -446,12 +454,22 @@ export default function DesignGallery() {
                                                 {photo.our_brand}
                                             </div>
                                         )}
-                                        {photo.packing_size && (
-                                            <div style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>{photo.packing_size}{photo.mrp ? ` · MRP ${photo.mrp}` : ''}</div>
-                                        )}
-                                        {!photo.packing_size && photo.mrp && (
-                                            <div style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>MRP {photo.mrp}</div>
-                                        )}
+                                        {(() => {
+                                            const sizes = photo.sizes?.length
+                                                ? photo.sizes
+                                                : (photo.packing_size ? [{ packing_size: photo.packing_size, mrp: photo.mrp ?? '' }] : []);
+                                            const filled = sizes.filter(s => s.packing_size);
+                                            if (!filled.length) return null;
+                                            return (
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '3px' }}>
+                                                    {filled.map((s, i) => (
+                                                        <span key={i} style={{ fontSize: '10px', background: 'var(--bg-subtle, #f3f4f6)', border: '1px solid var(--border)', borderRadius: '4px', padding: '1px 5px', color: 'var(--tx-sub)' }}>
+                                                            {s.packing_size}{s.mrp ? ` · ₹${s.mrp}` : ''}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            );
+                                        })()}
                                         <button
                                             type="button"
                                             onClick={(e) => { e.stopPropagation(); goToFolder(photo.party_id ?? 'our-brand'); }}
@@ -754,25 +772,43 @@ export default function DesignGallery() {
                                 </div>
                             )}
 
-                            <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
-                                <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                                    <label>Packing Size</label>
-                                    <input
-                                        type="text"
-                                        value={editForm.packing_size}
-                                        onChange={(e) => setEditForm((p) => ({ ...p, packing_size: e.target.value }))}
-                                        placeholder="e.g. 500ml, 1ltr"
-                                    />
-                                </div>
-                                <div className="form-group" style={{ width: '130px', marginBottom: 0 }}>
-                                    <label>MRP</label>
-                                    <input
-                                        type="text"
-                                        value={editForm.mrp}
-                                        onChange={(e) => setEditForm((p) => ({ ...p, mrp: e.target.value }))}
-                                        placeholder="e.g. ₹120"
-                                    />
-                                </div>
+                            {/* Packing Sizes + MRP — dynamic rows */}
+                            <div className="form-group" style={{ marginBottom: '14px' }}>
+                                <label>Packing Sizes & MRP</label>
+                                <datalist id="edit-packing-sizes">
+                                    {packingSizes.map((s) => <option key={s} value={s} />)}
+                                </datalist>
+                                {editSizeRows.map((row, i) => (
+                                    <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '6px', alignItems: 'center' }}>
+                                        <input
+                                            type="text"
+                                            list="edit-packing-sizes"
+                                            value={row.packing_size}
+                                            onChange={(e) => setEditSizeRows(rows => rows.map((r, j) => j === i ? { ...r, packing_size: e.target.value } : r))}
+                                            placeholder="500ml, 1ltr…"
+                                            style={{ flex: 1 }}
+                                        />
+                                        <input
+                                            type="text"
+                                            value={row.mrp}
+                                            onChange={(e) => setEditSizeRows(rows => rows.map((r, j) => j === i ? { ...r, mrp: e.target.value } : r))}
+                                            placeholder="MRP ₹120"
+                                            style={{ width: '110px' }}
+                                        />
+                                        {editSizeRows.length > 1 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditSizeRows(rows => rows.filter((_, j) => j !== i))}
+                                                style={{ flexShrink: 0, background: 'none', border: '1px solid var(--border)', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', color: 'var(--tx-muted)', fontSize: '14px', lineHeight: 1 }}
+                                            >×</button>
+                                        )}
+                                    </div>
+                                ))}
+                                <button
+                                    type="button"
+                                    onClick={() => setEditSizeRows(rows => [...rows, { packing_size: '', mrp: '' }])}
+                                    style={{ marginTop: '4px', fontSize: '12px', color: 'var(--primary, #16a34a)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
+                                >＋ Add Size</button>
                             </div>
 
                             <div className="form-group">
@@ -898,9 +934,22 @@ function PhotoCard({ photo, deleting, onView, onEdit, onDelete }: {
                         Our brand: {photo.our_brand}
                     </div>
                 )}
-                {photo.packing_size && (
-                    <div style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>{photo.packing_size}</div>
-                )}
+                {(() => {
+                    const sizes = photo.sizes?.length
+                        ? photo.sizes
+                        : (photo.packing_size ? [{ packing_size: photo.packing_size, mrp: photo.mrp ?? '' }] : []);
+                    const filled = sizes.filter(s => s.packing_size);
+                    if (!filled.length) return null;
+                    return (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '4px' }}>
+                            {filled.map((s, i) => (
+                                <span key={i} style={{ fontSize: '10px', background: 'var(--bg-subtle, #f3f4f6)', border: '1px solid var(--border)', borderRadius: '4px', padding: '1px 5px', color: 'var(--tx-sub)' }}>
+                                    {s.packing_size}{s.mrp ? ` · ₹${s.mrp}` : ''}
+                                </span>
+                            ))}
+                        </div>
+                    );
+                })()}
                 <div style={{ fontSize: '10px', color: 'var(--tx-muted)', marginTop: '4px' }}>
                     {photo.updated_by
                         ? <>Edited by {photo.updated_by}</>
