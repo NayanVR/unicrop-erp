@@ -396,13 +396,17 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
             {/* ── Popup toast (top-center, auto-dismisses after 6 s) ── */}
             {toastQueue.length > 0 && (() => {
                 const n = toastQueue[0];
+                const isBig = Number(n.data.total_amount) > 50000;
+                const accent      = isBig ? '#dc2626' : '#22c55e';
+                const accentLight = isBig ? '#fef2f2' : '#dcfce7';
+                const textColor   = isBig ? '#7f1d1d' : '#14532d';
                 return (
                     <div style={{
                         position: 'fixed', top: '24px', left: '50%', transform: 'translateX(-50%)',
-                        zIndex: 99999, minWidth: 320, maxWidth: 440,
+                        zIndex: 99999, minWidth: 320, maxWidth: 460,
                         background: '#fff', borderRadius: 14,
                         boxShadow: '0 8px 40px rgba(0,0,0,0.22)',
-                        border: '2px solid #22c55e',
+                        border: `2px solid ${accent}`,
                         overflow: 'hidden',
                         animation: 'slideDownFade 0.35s ease',
                     }}>
@@ -412,12 +416,14 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
                         }}>
                             <div style={{
                                 flexShrink: 0, width: 44, height: 44, borderRadius: '50%',
-                                background: '#dcfce7', display: 'flex', alignItems: 'center',
+                                background: accentLight, display: 'flex', alignItems: 'center',
                                 justifyContent: 'center', fontSize: 22,
-                            }}>✅</div>
+                            }}>{isBig ? '🧾' : '✅'}</div>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontWeight: 700, fontSize: 15, color: '#14532d' }}>
-                                    Order #{n.data.order_number} — Ready!
+                                <div style={{ fontWeight: 700, fontSize: 15, color: textColor }}>
+                                    {isBig
+                                        ? `Order #${n.data.order_number} — Create Tax Invoice & E-Way Bill`
+                                        : `Order #${n.data.order_number} — Ready!`}
                                 </div>
                                 <div style={{ fontSize: 13, color: '#374151', marginTop: 2 }}>
                                     {n.data.company_name}
@@ -425,6 +431,11 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
                                         ? ` — ₹${Number(n.data.total_amount).toLocaleString('en-IN')}`
                                         : ''}
                                 </div>
+                                {isBig && (
+                                    <div style={{ fontSize: 12, color: '#dc2626', fontWeight: 600, marginTop: 4 }}>
+                                        Amount exceeds ₹50,000 — Tax Invoice &amp; E-Way Bill required
+                                    </div>
+                                )}
                             </div>
                             <button
                                 onClick={() => setToastQueue((prev) => prev.slice(1))}
@@ -433,9 +444,9 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
                             >×</button>
                         </div>
                         {/* Progress bar that shrinks over 6 s */}
-                        <div style={{ height: 3, background: '#dcfce7' }}>
+                        <div style={{ height: 3, background: accentLight }}>
                             <div style={{
-                                height: '100%', background: '#22c55e',
+                                height: '100%', background: accent,
                                 animation: 'shrinkBar 6s linear forwards',
                             }} />
                         </div>
