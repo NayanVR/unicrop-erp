@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Notifications\OrderAllItemsReady;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -273,43 +274,74 @@ class FactoryController extends Controller
      */
     private function notifyOrderReady(Order $order): void
     {
-        $allReady = $order->items()
-            ->whereNotIn('status', ['ready', 'dispatched'])
-            ->doesntExist();
-
-        if (! $allReady) {
-            return;
-        }
-
-        // All active accountants
-        $accountants = User::where('is_active', true)
-            ->whereHas('roles', fn ($q) => $q->where('slug', Role::ACCOUNTANT))
-            ->get();
-
-        // Only the specific office user(s) tied to this order
-        $ownerIds = array_values(array_filter(array_unique([
-            $order->created_by,
-            $order->sales_user_id,
-        ])));
-
-        $salesUsers = $ownerIds
-            ? User::whereIn('id', $ownerIds)
-                ->where('is_active', true)
-                ->whereHas('roles', fn ($q) => $q->where('slug', Role::OFFICE))
-                ->get()
-            : collect();
-
-        $toNotify = $accountants->merge($salesUsers)->unique('id');
-
-        foreach ($toNotify as $notifyUser) {
-            $alreadyNotified = $notifyUser->unreadNotifications()
-                ->where('type', OrderAllItemsReady::class)
-                ->where('data->order_id', $order->id)
+        try {
+            $itemStatuses = $order->items()->pluck('status')->toArray();
+            $allReady = ! $order->items()
+                ->whereNotIn('status', ['ready', 'dispatched'])
+                ->where(fn ($q) => $q->whereNotNull('status'))
                 ->exists();
 
-            if (! $alreadyNotified) {
-                $notifyUser->notify(new OrderAllItemsReady($order));
+            Log::info('[notify-ready] called', [
+                'order_id'     => $order->id,
+                'order_number' => $order->order_number,
+                'total_amount' => $order->total_amount,
+                'item_statuses'=> $itemStatuses,
+                'all_ready'    => $allReady,
+            ]);
+
+            if (! $allReady) {
+                return;
             }
+
+            // All active accountants
+            $accountants = User::where('is_active', true)
+                ->whereHas('roles', fn ($q) => $q->where('slug', Role::ACCOUNTANT))
+                ->get();
+
+            // Only the specific office user(s) tied to this order
+            $ownerIds = array_values(array_filter(array_unique([
+                $order->created_by,
+                $order->sales_user_id,
+            ])));
+
+            $salesUsers = $ownerIds
+                ? User::whereIn('id', $ownerIds)
+                    ->where('is_active', true)
+                    ->whereHas('roles', fn ($q) => $q->where('slug', Role::OFFICE))
+                    ->get()
+                : collect();
+
+            $toNotify = $accountants->merge($salesUsers)->unique('id');
+
+            Log::info('[notify-ready] recipients', [
+                'accountants' => $accountants->pluck('id', 'name'),
+                'sales_users' => $salesUsers->pluck('id', 'name'),
+                'owner_ids'   => $ownerIds,
+                'total'       => $toNotify->count(),
+            ]);
+
+            foreach ($toNotify as $notifyUser) {
+                $alreadyNotified = $notifyUser->unreadNotifications()
+                    ->where('type', OrderAllItemsReady::class)
+                    ->get()
+                    ->contains(fn ($n) => ($n->data['order_id'] ?? null) == $order->id);
+
+                Log::info('[notify-ready] notifying', [
+                    'user_id'          => $notifyUser->id,
+                    'user_name'        => $notifyUser->name,
+                    'already_notified' => $alreadyNotified,
+                ]);
+
+                if (! $alreadyNotified) {
+                    $notifyUser->notify(new OrderAllItemsReady($order));
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::error('[notify-ready] exception', [
+                'order_id' => $order->id,
+                'error'    => $e->getMessage(),
+                'trace'    => $e->getTraceAsString(),
+            ]);
         }
     }
 
