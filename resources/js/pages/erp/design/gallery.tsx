@@ -326,7 +326,7 @@ export default function DesignGallery() {
                 <div className="page-header">
                     <div className="page-header-left">
                         <h1>Product Gallery</h1>
-                        <p>Organize brand photos in party folders</p>
+                        <p>Organize brand products in party folders</p>
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
                         <button
@@ -485,7 +485,7 @@ export default function DesignGallery() {
                                     <p style={{ color: 'var(--tx-muted)', fontSize: '13px' }}>
                                         {parties.length === 0
                                             ? 'Add active parties from the Parties section first.'
-                                            : 'Every active party already has a folder. Upload photos directly into each folder.'}
+                                            : 'Every active party already has a folder. Upload products directly into each folder.'}
                                     </p>
                                     <div className="modal-footer" style={{ justifyContent: 'center', borderTop: 'none' }}>
                                         <button type="button" className="btn secondary" onClick={() => setShowCreate(false)}>Close</button>
@@ -575,12 +575,12 @@ export default function DesignGallery() {
                     <h1 style={{ margin: 0 }}>{activeFolderLabel}</h1>
                     <p style={{ margin: '2px 0 0' }}>
                         {photoQuery
-                            ? `${filteredPhotos.length} of ${displayedPhotos.length} photo${displayedPhotos.length !== 1 ? 's' : ''}`
-                            : `${displayedPhotos.length} photo${displayedPhotos.length !== 1 ? 's' : ''}`}
+                            ? `${filteredPhotos.length} of ${displayedPhotos.length} product${displayedPhotos.length !== 1 ? 's' : ''}`
+                            : `${displayedPhotos.length} product${displayedPhotos.length !== 1 ? 's' : ''}`}
                     </p>
                 </div>
                 <button type="button" className="btn primary" onClick={openFolderUpload}>
-                    ＋ Upload Photo
+                    ＋ Upload Product
                 </button>
             </div>
 
@@ -604,14 +604,14 @@ export default function DesignGallery() {
                 {displayedPhotos.length === 0 ? (
                     <div className="empty-state" style={{ padding: '32px 0' }}>
                         <div className="icon">📷</div>
-                        <p>No photos yet. Upload the first one!</p>
+                        <p>No products yet. Upload the first one!</p>
                         <button
                             type="button"
                             className="btn primary"
                             style={{ marginTop: '8px' }}
                             onClick={openFolderUpload}
                         >
-                            Upload Photo
+                            Upload Product
                         </button>
                     </div>
                 ) : filteredPhotos.length === 0 ? (
@@ -857,7 +857,7 @@ function FolderCard({
                     {label}
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--tx-muted)', marginBottom: '10px' }}>
-                    {count} photo{count !== 1 ? 's' : ''}
+                    {count} product{count !== 1 ? 's' : ''}
                 </div>
                 <button
                     type="button"
