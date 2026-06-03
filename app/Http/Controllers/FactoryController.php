@@ -150,30 +150,9 @@ class FactoryController extends Controller
             }
         }
 
-        // When an item reaches 'ready', check if all items are ready and amount > 50k
+        // When an item reaches 'ready', check if all items in the order are ready
         if ($nextStage === 'ready') {
-            $order = $item->order;
-            $allReady = $order->items()
-                ->whereNotIn('status', ['ready', 'dispatched'])
-                ->doesntExist();
-
-            if ($allReady && (float) $order->total_amount > 50000) {
-                $notifyUsers = User::where('is_active', true)
-                    ->whereHas('roles', fn ($q) => $q->whereIn('slug', [Role::ACCOUNTANT, Role::SALES]))
-                    ->get();
-
-                foreach ($notifyUsers as $notifyUser) {
-                    // Avoid duplicate — skip if unread notification for this order already exists
-                    $alreadyNotified = $notifyUser->unreadNotifications()
-                        ->where('type', OrderAllItemsReady::class)
-                        ->where('data->order_id', $order->id)
-                        ->exists();
-
-                    if (! $alreadyNotified) {
-                        $notifyUser->notify(new OrderAllItemsReady($order));
-                    }
-                }
-            }
+            $this->notifyOrderReady($item->order);
         }
 
         return redirect()->back()->with('success', "Item moved to {$nextStage}.");
@@ -257,6 +236,10 @@ class FactoryController extends Controller
             $order->update(['status' => 'confirmed']);
         }
 
+        if ($targetStage === 'ready') {
+            $this->notifyOrderReady($order);
+        }
+
         $label = $item->party_brand ?? $item->our_brand ?? 'Item';
         $stageName = ucfirst($targetStage);
         broadcast(new ErpActivity(
@@ -278,6 +261,56 @@ class FactoryController extends Controller
         $item->update($data);
 
         return redirect()->back()->with('success', 'Item updated.');
+    }
+
+    /**
+     * Send "order ready" notifications when all items in an order have reached
+     * the "ready" (or dispatched) stage.
+     *
+     * Recipients:
+     *  - All active accountants
+     *  - The specific office user who created/owns this order (created_by or sales_user_id)
+     */
+    private function notifyOrderReady(Order $order): void
+    {
+        $allReady = $order->items()
+            ->whereNotIn('status', ['ready', 'dispatched'])
+            ->doesntExist();
+
+        if (! $allReady) {
+            return;
+        }
+
+        // All active accountants
+        $accountants = User::where('is_active', true)
+            ->whereHas('roles', fn ($q) => $q->where('slug', Role::ACCOUNTANT))
+            ->get();
+
+        // Only the specific office user(s) tied to this order
+        $ownerIds = array_values(array_filter(array_unique([
+            $order->created_by,
+            $order->sales_user_id,
+        ])));
+
+        $salesUsers = $ownerIds
+            ? User::whereIn('id', $ownerIds)
+                ->where('is_active', true)
+                ->whereHas('roles', fn ($q) => $q->where('slug', Role::OFFICE))
+                ->get()
+            : collect();
+
+        $toNotify = $accountants->merge($salesUsers)->unique('id');
+
+        foreach ($toNotify as $notifyUser) {
+            $alreadyNotified = $notifyUser->unreadNotifications()
+                ->where('type', OrderAllItemsReady::class)
+                ->where('data->order_id', $order->id)
+                ->exists();
+
+            if (! $alreadyNotified) {
+                $notifyUser->notify(new OrderAllItemsReady($order));
+            }
+        }
     }
 
     /**

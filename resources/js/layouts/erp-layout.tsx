@@ -15,7 +15,7 @@ import { index as unitTransferIndex } from '@/routes/unit-transfer';
 import { index as usersIndex } from '@/routes/users';
 import type { Auth, Role } from '@/types';
 import { Link, usePage, type InertiaLinkProps } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type NavItem = {
     id: string;
@@ -136,6 +136,8 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
     const [isMobileOpen, setIsMobileOpen] = useState(false);
     const [timeLabel, setTimeLabel] = useState('');
     const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+    const [toastQueue, setToastQueue] = useState<NotificationItem[]>([]);
+    const seenIds = useRef<Set<string>>(new Set());
     const { resolvedAppearance, updateAppearance } = useAppearance();
 
     const role        = auth.user?.role ?? auth.user?.roles?.[0]?.slug ?? null;
@@ -182,7 +184,15 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
         if (!canReceiveNotifications) return;
         fetch('/erp/notifications', { headers: { Accept: 'application/json' } })
             .then((r) => r.ok ? r.json() : [])
-            .then((data: NotificationItem[]) => setNotifications(data))
+            .then((data: NotificationItem[]) => {
+                setNotifications(data);
+                // Queue toast for any notification we haven't seen yet
+                const fresh = data.filter((n) => !seenIds.current.has(n.id));
+                if (fresh.length > 0) {
+                    fresh.forEach((n) => seenIds.current.add(n.id));
+                    setToastQueue((prev) => [...prev, ...fresh]);
+                }
+            })
             .catch(() => {});
     };
 
@@ -212,6 +222,15 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [role]);
+
+    // Auto-dismiss each toast after 6 seconds
+    useEffect(() => {
+        if (toastQueue.length === 0) return;
+        const timer = window.setTimeout(() => {
+            setToastQueue((prev) => prev.slice(1));
+        }, 6000);
+        return () => window.clearTimeout(timer);
+    }, [toastQueue]);
 
     useEffect(() => {
         const updateTime = () => {
@@ -332,9 +351,10 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
                 <div className="content-area">{children}</div>
             </div>
 
+            {/* ── Persistent notification panel (bottom-right) ── */}
             {notifications.length > 0 && (
                 <div style={{
-                    position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999,
+                    position: 'fixed', bottom: '24px', right: '24px', zIndex: 9990,
                     maxWidth: '360px', width: '100%',
                     background: 'var(--card-bg, #fff)', border: '1.5px solid #fcd34d',
                     borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
@@ -380,6 +400,67 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
                     </div>
                 </div>
             )}
+
+            {/* ── Popup toast (top-center, auto-dismisses after 6 s) ── */}
+            {toastQueue.length > 0 && (() => {
+                const n = toastQueue[0];
+                return (
+                    <div style={{
+                        position: 'fixed', top: '24px', left: '50%', transform: 'translateX(-50%)',
+                        zIndex: 99999, minWidth: 320, maxWidth: 440,
+                        background: '#fff', borderRadius: 14,
+                        boxShadow: '0 8px 40px rgba(0,0,0,0.22)',
+                        border: '2px solid #22c55e',
+                        overflow: 'hidden',
+                        animation: 'slideDownFade 0.35s ease',
+                    }}>
+                        <div style={{
+                            display: 'flex', alignItems: 'center', gap: 12,
+                            padding: '14px 16px',
+                        }}>
+                            <div style={{
+                                flexShrink: 0, width: 44, height: 44, borderRadius: '50%',
+                                background: '#dcfce7', display: 'flex', alignItems: 'center',
+                                justifyContent: 'center', fontSize: 22,
+                            }}>✅</div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontWeight: 700, fontSize: 15, color: '#14532d' }}>
+                                    Order #{n.data.order_number} — Ready!
+                                </div>
+                                <div style={{ fontSize: 13, color: '#374151', marginTop: 2 }}>
+                                    {n.data.company_name}
+                                    {n.data.total_amount && Number(n.data.total_amount) > 0
+                                        ? ` — ₹${Number(n.data.total_amount).toLocaleString('en-IN')}`
+                                        : ''}
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setToastQueue((prev) => prev.slice(1))}
+                                style={{ flexShrink: 0, fontSize: 20, lineHeight: 1, background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}
+                                title="Close"
+                            >×</button>
+                        </div>
+                        {/* Progress bar that shrinks over 6 s */}
+                        <div style={{ height: 3, background: '#dcfce7' }}>
+                            <div style={{
+                                height: '100%', background: '#22c55e',
+                                animation: 'shrinkBar 6s linear forwards',
+                            }} />
+                        </div>
+                    </div>
+                );
+            })()}
+
+            <style>{`
+                @keyframes slideDownFade {
+                    from { opacity: 0; transform: translateX(-50%) translateY(-16px); }
+                    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+                }
+                @keyframes shrinkBar {
+                    from { width: 100%; }
+                    to   { width: 0%; }
+                }
+            `}</style>
         </div>
     );
 }
