@@ -280,6 +280,10 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         return parties.find((p) => String(p.id) === form.data.party_id)?.product_rates ?? [];
     }, [form.data.party_id, parties]);
 
+    // Ref so updateRow always sees the latest partyRates (avoids stale closure)
+    const partyRatesRef = useRef(partyRates);
+    useEffect(() => { partyRatesRef.current = partyRates; }, [partyRates]);
+
     const brandOptions = useMemo(
         () => [...new Set(partyRates.map((r) => r.our_brand))].sort(),
         [partyRates],
@@ -398,30 +402,28 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                 if (idx !== index) return row;
                 let updated = { ...row, [field]: value };
 
+                const rates = partyRatesRef.current;
                 if (field === 'our_brand') {
                     const v = value.trim().toLowerCase();
-                    const matches = partyRates.filter(
+                    const matches = rates.filter(
                         (r) => r.our_brand.trim().toLowerCase() === v,
                     );
                     if (matches.length === 1) {
-                        // Only one size for this brand — auto-fill everything
                         updated.party_brand  = matches[0].party_brand  ?? '';
                         updated.packing_size = matches[0].packing_size ?? '';
                         updated.rate         = String(matches[0].rate);
                         updated.gst_percent  = String(matches[0].gst_percent);
                     } else if (matches.length > 1) {
-                        // Multiple sizes — fill party_brand, let user pick size
                         updated.party_brand = matches[0].party_brand ?? '';
                         if (row.our_brand !== value) { updated.packing_size = ''; updated.rate = ''; }
                     } else {
-                        // No match in party rates — just clear size/rate if brand changed
                         if (row.our_brand !== value) { updated.packing_size = ''; updated.rate = ''; }
                     }
                 } else if (field === 'packing_size') {
-                    const match = partyRates.find(
+                    const match = rates.find(
                         (r) =>
-                            r.our_brand.toLowerCase() === row.our_brand.toLowerCase() &&
-                            r.packing_size.toLowerCase() === value.toLowerCase(),
+                            r.our_brand.trim().toLowerCase() === row.our_brand.trim().toLowerCase() &&
+                            r.packing_size.trim().toLowerCase() === value.trim().toLowerCase(),
                     );
                     if (match) { updated.rate = String(match.rate); updated.gst_percent = String(match.gst_percent); }
                 }
