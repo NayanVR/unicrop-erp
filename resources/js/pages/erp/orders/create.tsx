@@ -293,14 +293,6 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
 
     const groupedBrands = useMemo(() => {
         const q = brandSearch.toLowerCase().trim();
-
-        if (partyRates.length > 0) {
-            const brands: BrandItem[] = brandOptions
-                .filter((b) => !q || b.toLowerCase().includes(q))
-                .map((b) => ({ name: b, shape: null, stock: null, unit: '' }));
-            return brands.length > 0 ? [{ group: '', brands }] : [];
-        }
-
         const src = q
             ? finishGoodBrands.filter((b) =>
                 b.name.toLowerCase().includes(q) ||
@@ -316,7 +308,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         const out: { group: string; brands: BrandItem[] }[] = [];
         map.forEach((brands, group) => out.push({ group, brands }));
         return out;
-    }, [partyRates, brandOptions, finishGoodBrands, brandSearch]);
+    }, [finishGoodBrands, brandSearch]);
 
     type PhotoInfo = { url: string; mrp: string | null };
 
