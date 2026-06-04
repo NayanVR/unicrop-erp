@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'packing_size',
     'mrp',
     'sizes',
+    'bottle_jar',
+    'cap_color',
     'photo_path',
     'uploaded_by',
     'updated_by',

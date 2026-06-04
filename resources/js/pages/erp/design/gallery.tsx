@@ -112,6 +112,8 @@ type Photo = {
     packing_size: string | null;
     mrp: string | null;
     sizes: SizeRow[];
+    bottle_jar: string | null;
+    cap_color: string | null;
     photo_url: string;
     uploaded_by: string | null;
     updated_by: string | null;
@@ -126,17 +128,19 @@ type PageProps = {
     allCategories: string[];
     partyRates: PartyRate[];
     packingSizes: string[];
+    bottleJarOptions: string[];
+    capColorOptions: string[];
     flash?: { success?: string; error?: string };
 };
 
-type UploadForm   = { party_id: string; our_brand: string; party_brand: string; photo: File | null };
+type UploadForm   = { party_id: string; our_brand: string; party_brand: string; bottle_jar: string; cap_color: string; photo: File | null };
 type FolderForm   = { party_id: string };
 
 // null = folder list, 'our-brand' = Our Brand, number = party_id
 type ActiveFolder = null | 'our-brand' | number;
 
 export default function DesignGallery() {
-    const { photos, folders, parties, ourBrands, allCategories, partyRates, packingSizes, flash } =
+    const { photos, folders, parties, ourBrands, allCategories, partyRates, packingSizes, bottleJarOptions, capColorOptions, flash } =
         usePage<PageProps>().props;
 
     const [activeFolder,  setActiveFolder]  = useState<ActiveFolder>(null);
@@ -148,14 +152,14 @@ export default function DesignGallery() {
     const [photoSearch,   setPhotoSearch]   = useState('');
 
     const uploadForm = useForm<UploadForm>({
-        party_id: '', our_brand: '', party_brand: '', photo: null,
+        party_id: '', our_brand: '', party_brand: '', bottle_jar: '', cap_color: '', photo: null,
     });
     const [sizeRows, setSizeRows] = useState<{ packing_size: string; mrp: string }[]>([{ packing_size: '', mrp: '' }]);
     const folderForm = useForm<FolderForm>({ party_id: '' });
     const fileRef    = useRef<HTMLInputElement | null>(null);
 
     const [editingPhoto,   setEditingPhoto]   = useState<Photo | null>(null);
-    const [editForm,       setEditForm]       = useState({ our_brand: '', party_brand: '' });
+    const [editForm,       setEditForm]       = useState({ our_brand: '', party_brand: '', bottle_jar: '', cap_color: '' });
     const [editSizeRows,   setEditSizeRows]   = useState<SizeRow[]>([{ packing_size: '', mrp: '' }]);
     const [editFile,       setEditFile]       = useState<File | null>(null);
     const [editProcessing, setEditProcessing] = useState(false);
@@ -270,6 +274,8 @@ export default function DesignGallery() {
         if (uploadForm.data.party_id) fd.append('party_id', uploadForm.data.party_id);
         fd.append('our_brand', uploadForm.data.our_brand);
         if (uploadForm.data.party_brand) fd.append('party_brand', uploadForm.data.party_brand);
+        if (uploadForm.data.bottle_jar) fd.append('bottle_jar', uploadForm.data.bottle_jar);
+        if (uploadForm.data.cap_color)  fd.append('cap_color',  uploadForm.data.cap_color);
         if (uploadForm.data.photo) fd.append('photo', uploadForm.data.photo);
         sizeRows.forEach((row, i) => {
             fd.append(`sizes[${i}][packing_size]`, row.packing_size);
@@ -316,6 +322,8 @@ export default function DesignGallery() {
         setEditForm({
             our_brand:   photo.our_brand,
             party_brand: photo.party_brand ?? '',
+            bottle_jar:  photo.bottle_jar ?? '',
+            cap_color:   photo.cap_color ?? '',
         });
         const sizes = photo.sizes?.length
             ? photo.sizes.map(s => ({ packing_size: s.packing_size ?? '', mrp: s.mrp ?? '' }))
@@ -332,6 +340,8 @@ export default function DesignGallery() {
         fd.append('_method', 'PATCH');
         fd.append('our_brand',   editForm.our_brand);
         fd.append('party_brand', editForm.party_brand);
+        fd.append('bottle_jar',  editForm.bottle_jar);
+        fd.append('cap_color',   editForm.cap_color);
         editSizeRows.forEach((row, i) => {
             fd.append(`sizes[${i}][packing_size]`, row.packing_size);
             fd.append(`sizes[${i}][mrp]`, row.mrp);
@@ -579,6 +589,8 @@ export default function DesignGallery() {
                         allCategories={allCategories}
                         brandSuggestions={brandSuggestions}
                         sizeSuggestions={sizeSuggestions}
+                        bottleJarOptions={bottleJarOptions}
+                        capColorOptions={capColorOptions}
                         sizeRows={sizeRows}
                         onSizeRowChange={(i, f, v) => setSizeRows((r) => r.map((row, idx) => idx === i ? { ...row, [f]: v } : row))}
                         onAddSizeRow={() => setSizeRows((r) => [...r, { packing_size: '', mrp: '' }])}
@@ -747,6 +759,8 @@ export default function DesignGallery() {
                     allCategories={allCategories}
                     brandSuggestions={brandSuggestions}
                     sizeSuggestions={sizeSuggestions}
+                    bottleJarOptions={bottleJarOptions}
+                    capColorOptions={capColorOptions}
                     sizeRows={sizeRows}
                     onSizeRowChange={(i, f, v) => setSizeRows((r) => r.map((row, idx) => idx === i ? { ...row, [f]: v } : row))}
                     onAddSizeRow={() => setSizeRows((r) => [...r, { packing_size: '', mrp: '' }])}
@@ -833,6 +847,36 @@ export default function DesignGallery() {
                                     onClick={() => setEditSizeRows(rows => [...rows, { packing_size: '', mrp: '' }])}
                                     style={{ marginTop: '4px', fontSize: '12px', color: 'var(--primary, #16a34a)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
                                 >＋ Add Size</button>
+                            </div>
+
+                            {/* Bottle/Jar + Cap Color */}
+                            <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
+                                <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                                    <label>Bottle / Jar</label>
+                                    <input
+                                        type="text"
+                                        list="edit-bottle-jar"
+                                        value={editForm.bottle_jar}
+                                        onChange={(e) => setEditForm(p => ({ ...p, bottle_jar: e.target.value }))}
+                                        placeholder="e.g. 500ml HDPE bottle"
+                                    />
+                                    <datalist id="edit-bottle-jar">
+                                        {bottleJarOptions.map((b) => <option key={b} value={b} />)}
+                                    </datalist>
+                                </div>
+                                <div className="form-group" style={{ width: '140px', marginBottom: 0 }}>
+                                    <label>Cap Color</label>
+                                    <input
+                                        type="text"
+                                        list="edit-cap-colors"
+                                        value={editForm.cap_color}
+                                        onChange={(e) => setEditForm(p => ({ ...p, cap_color: e.target.value }))}
+                                        placeholder="e.g. Red"
+                                    />
+                                    <datalist id="edit-cap-colors">
+                                        {capColorOptions.map((c) => <option key={c} value={c} />)}
+                                    </datalist>
+                                </div>
                             </div>
 
                             <div className="form-group">
@@ -974,6 +1018,12 @@ function PhotoCard({ photo, deleting, onView, onEdit, onDelete }: {
                         </div>
                     );
                 })()}
+                {(photo.bottle_jar || photo.cap_color) && (
+                    <div style={{ fontSize: '10px', color: 'var(--tx-muted)', marginTop: '3px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        {photo.bottle_jar && <span>🫙 {photo.bottle_jar}</span>}
+                        {photo.cap_color  && <span>🎨 {photo.cap_color}</span>}
+                    </div>
+                )}
                 <div style={{ fontSize: '10px', color: 'var(--tx-muted)', marginTop: '4px' }}>
                     {photo.updated_by
                         ? <>Edited by {photo.updated_by}</>
@@ -1004,6 +1054,7 @@ function PhotoCard({ photo, deleting, onView, onEdit, onDelete }: {
 }
 
 function UploadModal({ form, fileRef, folders, ourBrands, allCategories, brandSuggestions, sizeSuggestions,
+    bottleJarOptions, capColorOptions,
     sizeRows, onSizeRowChange, onAddSizeRow, onRemoveSizeRow, onClose, onSubmit }: {
     form: ReturnType<typeof useForm<UploadForm>>;
     fileRef: React.RefObject<HTMLInputElement | null>;
@@ -1012,6 +1063,8 @@ function UploadModal({ form, fileRef, folders, ourBrands, allCategories, brandSu
     allCategories: string[];
     brandSuggestions: string[];
     sizeSuggestions: string[];
+    bottleJarOptions: string[];
+    capColorOptions: string[];
     sizeRows: { packing_size: string; mrp: string }[];
     onSizeRowChange: (index: number, field: 'packing_size' | 'mrp', value: string) => void;
     onAddSizeRow: () => void;
@@ -1120,6 +1173,36 @@ function UploadModal({ form, fileRef, folders, ourBrands, allCategories, brandSu
                                 onClick={onAddSizeRow}
                                 style={{ marginTop: '4px', fontSize: '12px', color: 'var(--primary, #16a34a)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
                             >＋ Add Size</button>
+                        </div>
+
+                        {/* Bottle/Jar + Cap Color */}
+                        <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
+                            <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                                <label>Bottle / Jar</label>
+                                <input
+                                    type="text"
+                                    list="upload-bottle-jar"
+                                    value={form.data.bottle_jar}
+                                    onChange={(e) => form.setData('bottle_jar', e.target.value)}
+                                    placeholder="e.g. 500ml HDPE bottle"
+                                />
+                                <datalist id="upload-bottle-jar">
+                                    {bottleJarOptions.map((b) => <option key={b} value={b} />)}
+                                </datalist>
+                            </div>
+                            <div className="form-group" style={{ width: '140px', marginBottom: 0 }}>
+                                <label>Cap Color</label>
+                                <input
+                                    type="text"
+                                    list="upload-cap-colors"
+                                    value={form.data.cap_color}
+                                    onChange={(e) => form.setData('cap_color', e.target.value)}
+                                    placeholder="e.g. Red"
+                                />
+                                <datalist id="upload-cap-colors">
+                                    {capColorOptions.map((c) => <option key={c} value={c} />)}
+                                </datalist>
+                            </div>
                         </div>
 
                         {/* Photo file */}

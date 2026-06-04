@@ -40,6 +40,8 @@ class ProductPhotoController extends Controller
                 'packing_size'   => $p->packing_size,
                 'mrp'            => $p->mrp,
                 'sizes'          => $p->sizes ?? [['packing_size' => $p->packing_size ?? '', 'mrp' => $p->mrp ?? '']],
+                'bottle_jar'     => $p->bottle_jar,
+                'cap_color'      => $p->cap_color,
                 'photo_url'      => $p->photo_url,
                 'uploaded_by'    => $p->uploader?->name,
                 'updated_by'     => $p->updater?->name,
@@ -81,6 +83,29 @@ class ProductPhotoController extends Controller
             ->orderBy('packing_size')
             ->pluck('packing_size');
 
+        // Bottle/Jar options — same finish-goods category as ourBrands, for autofill
+        $bottleJarOptions = RawMaterial::where('is_active', true)
+            ->whereRaw("LOWER(category) LIKE ?", ['%bottle%'])
+            ->orWhere(function ($q) {
+                $q->where('is_active', true)->whereRaw("LOWER(category) LIKE ?", ['%jar%']);
+            })
+            ->select('name')
+            ->orderBy('name')
+            ->pluck('name');
+
+        // Also include existing saved bottle_jar values
+        $savedBottleJars = ProductPhoto::whereNotNull('bottle_jar')
+            ->distinct()
+            ->orderBy('bottle_jar')
+            ->pluck('bottle_jar');
+
+        $bottleJarOptions = $bottleJarOptions->merge($savedBottleJars)->unique()->sort()->values();
+
+        $capColorOptions = ProductPhoto::whereNotNull('cap_color')
+            ->distinct()
+            ->orderBy('cap_color')
+            ->pluck('cap_color');
+
         return Inertia::render('erp/design/gallery', [
             'photos' => $photos,
             'folders' => $folders,
@@ -89,6 +114,8 @@ class ProductPhotoController extends Controller
             'allCategories' => $allCategories,
             'partyRates' => $partyRates,
             'packingSizes' => $packingSizes,
+            'bottleJarOptions' => $bottleJarOptions,
+            'capColorOptions' => $capColorOptions,
         ]);
     }
 
@@ -115,6 +142,8 @@ class ProductPhotoController extends Controller
             'sizes'                 => 'required|array|min:1',
             'sizes.*.packing_size'  => 'nullable|string|max:100',
             'sizes.*.mrp'           => 'nullable|string|max:50',
+            'bottle_jar'            => 'nullable|string|max:150',
+            'cap_color'             => 'nullable|string|max:100',
             'photo'                 => 'required|image|mimes:jpg,jpeg,png,webp|max:8192',
         ]);
 
@@ -159,6 +188,8 @@ class ProductPhotoController extends Controller
             'packing_size'=> $firstSize['packing_size'] ?: null,
             'mrp'         => $firstSize['mrp'] ?: null,
             'sizes'       => $data['sizes'],
+            'bottle_jar'  => $data['bottle_jar'] ?: null,
+            'cap_color'   => $data['cap_color'] ?: null,
             'photo_path'  => $path,
             'uploaded_by' => $request->user()?->id,
         ]);
@@ -176,6 +207,8 @@ class ProductPhotoController extends Controller
             'sizes'                 => 'nullable|array',
             'sizes.*.packing_size'  => 'nullable|string|max:100',
             'sizes.*.mrp'           => 'nullable|string|max:50',
+            'bottle_jar'            => 'nullable|string|max:150',
+            'cap_color'             => 'nullable|string|max:100',
             'photo'                 => 'nullable|image|mimes:jpg,jpeg,png,webp|max:8192',
         ]);
 
@@ -213,6 +246,8 @@ class ProductPhotoController extends Controller
 
         $photo->our_brand    = $data['our_brand'];
         $photo->party_brand  = $data['party_brand'] ?? null;
+        $photo->bottle_jar   = $data['bottle_jar'] ?: null;
+        $photo->cap_color    = $data['cap_color'] ?: null;
 
         if (!empty($data['sizes'])) {
             $firstSize = $data['sizes'][0];
