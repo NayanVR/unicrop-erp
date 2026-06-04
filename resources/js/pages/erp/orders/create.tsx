@@ -1,6 +1,7 @@
 import { store, update } from '@/routes/orders';
 import { Head, useForm } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 type SalesUser = { id: number; name: string };
 type TransportOption = { id: number; name: string };
@@ -984,29 +985,29 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                 </form>
             </div>
 
-            {openBrandRow !== null && (
+            {openBrandRow !== null && createPortal(
                 <div
                     style={{
                         position: 'fixed',
                         top: brandDropPos.top + 2,
                         left: brandDropPos.left,
                         minWidth: Math.max(220, brandDropPos.width),
-                        background: 'var(--bg-paper)',
-                        border: '1px solid var(--border)',
+                        background: '#fff',
+                        border: '1px solid #d1d5db',
                         borderRadius: '8px',
-                        boxShadow: '0 6px 24px rgba(0,0,0,0.16)',
-                        zIndex: 9999,
+                        boxShadow: '0 8px 28px rgba(0,0,0,0.18)',
+                        zIndex: 99999,
                         maxHeight: '260px',
                         overflowY: 'auto',
                     }}
                     onMouseDown={(e) => e.preventDefault()}
                 >
                     {groupedBrands.length === 0 ? (
-                        <div style={{ padding: '10px 14px', fontSize: '13px', color: 'var(--tx-muted)' }}>No products found</div>
+                        <div style={{ padding: '10px 14px', fontSize: '13px', color: '#6b7280' }}>No products found</div>
                     ) : groupedBrands.map(({ group, brands }) => (
                         <div key={group}>
                             {group && (
-                                <div style={{ padding: '5px 12px', fontSize: '11px', fontWeight: 700, color: '#16a34a', background: '#f0fdf4', borderBottom: '1px solid var(--border)', letterSpacing: '0.02em' }}>
+                                <div style={{ padding: '5px 12px', fontSize: '11px', fontWeight: 700, color: '#16a34a', background: '#f0fdf4', borderBottom: '1px solid #e5e7eb', letterSpacing: '0.02em' }}>
                                     {group}
                                 </div>
                             )}
@@ -1019,8 +1020,8 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                             setOpenBrandRow(null);
                                         }
                                     }}
-                                    style={{ padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}
-                                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover, #f1f5f9)'; }}
+                                    style={{ padding: '8px 14px', fontSize: '13px', cursor: 'pointer', color: '#111827' }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
                                     onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}
                                 >
                                     {brand}
@@ -1028,7 +1029,8 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                             ))}
                         </div>
                     ))}
-                </div>
+                </div>,
+                document.body
             )}
         </>
     );
