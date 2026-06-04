@@ -28,7 +28,7 @@ class FillingController extends Controller
         $materials = RawMaterial::query()
             ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'unit', 'stock_qty', 'cost_per_unit', 'category']);
+            ->get(['id', 'name', 'unit', 'stock_qty', 'cost_per_unit', 'category', 'shape']);
 
         $finishedGoodMaterials = $materials->filter(fn ($m) => strtolower(trim($m->category ?? '')) === 'finished good')->values();
 
@@ -122,8 +122,9 @@ class FillingController extends Controller
     public function runFilling(Request $request, FillingRecipe $recipe): RedirectResponse
     {
         $data = $request->validate([
-            'quantity' => 'required|numeric|min:0.001',
-            'notes'    => 'nullable|string|max:500',
+            'quantity'     => 'required|numeric|min:0.001',
+            'bottle_shape' => 'nullable|string|max:50',
+            'notes'        => 'nullable|string|max:500',
         ]);
 
         $qty = (float) $data['quantity'];
@@ -187,10 +188,13 @@ class FillingController extends Controller
 
             $costPerPc = $qty > 0 ? round($totalCost / $qty, 4) : 0;
 
+            $bottleShape = trim($data['bottle_shape'] ?? '');
+
             FillingRun::create([
                 'filling_recipe_id' => $recipe->id,
                 'our_brand'         => $recipe->name,
                 'packing_size'      => $recipe->packing_size,
+                'bottle_shape'      => $bottleShape ?: null,
                 'quantity'          => $qty,
                 'user_id'           => $request->user()?->id,
                 'items'             => $runItems,
@@ -207,28 +211,37 @@ class FillingController extends Controller
                 'total_cost'    => round($totalCost, 4),
             ]);
 
-            // Increment output material stock and update its cost_per_unit
-            if ($recipe->output_raw_material_id) {
+            // Find output material: prefer shape-specific match, fall back to recipe's output_raw_material_id
+            $output = null;
+            if ($bottleShape !== '') {
+                $output = RawMaterial::whereRaw('LOWER(TRIM(name)) = ?', [strtolower(trim($recipe->name))])
+                    ->whereRaw('LOWER(TRIM(COALESCE(shape,\'\'))) = ?', [strtolower($bottleShape)])
+                    ->first();
+            }
+            if (! $output && $recipe->output_raw_material_id) {
                 $output = RawMaterial::find($recipe->output_raw_material_id);
-                if ($output) {
-                    $prevStock = (float) $output->stock_qty;
-                    $newStock  = $prevStock + $qty;
-                    $output->stock_qty = $newStock;
-                    $output->cost_per_unit = $costPerPc;
-                    $output->save();
+            }
 
-                    InventoryTransaction::create([
-                        'raw_material_id' => $output->id,
-                        'user_id'         => $request->user()?->id,
-                        'type'            => 'purchase',
-                        'qty'             => $qty,
-                        'previous_stock'  => $prevStock,
-                        'new_stock'       => $newStock,
-                        'cost_per_unit'   => $costPerPc > 0 ? $costPerPc : null,
-                        'reference'       => "Filling: {$recipe->name}" . ($recipe->packing_size ? " {$recipe->packing_size}" : '') . " × {$qty}",
-                        'notes'           => $data['notes'] ?? null,
-                    ]);
-                }
+            // Increment output material stock and update its cost_per_unit
+            if ($output) {
+                $prevStock = (float) $output->stock_qty;
+                $newStock  = $prevStock + $qty;
+                $output->stock_qty = $newStock;
+                $output->cost_per_unit = $costPerPc;
+                $output->save();
+
+                $shapeLabel = $bottleShape ? " ({$bottleShape})" : '';
+                InventoryTransaction::create([
+                    'raw_material_id' => $output->id,
+                    'user_id'         => $request->user()?->id,
+                    'type'            => 'purchase',
+                    'qty'             => $qty,
+                    'previous_stock'  => $prevStock,
+                    'new_stock'       => $newStock,
+                    'cost_per_unit'   => $costPerPc > 0 ? $costPerPc : null,
+                    'reference'       => "Filling: {$recipe->name}{$shapeLabel}" . ($recipe->packing_size ? " {$recipe->packing_size}" : '') . " × {$qty}",
+                    'notes'           => $data['notes'] ?? null,
+                ]);
             }
 
             return redirect()->back()->with('success', "Filling done for {$recipe->name} ({$qty} pcs). Materials deducted, stock updated.");

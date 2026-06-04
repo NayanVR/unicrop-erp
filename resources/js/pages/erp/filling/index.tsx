@@ -11,6 +11,7 @@ type RawMaterial = {
     min_stock?: string | number | null;
     cost_per_unit: string | number;
     category?: string | null;
+    shape?: string | null;
 };
 
 type RecipeItem = {
@@ -62,7 +63,7 @@ type RecipeFormData = {
     items: { raw_material_id: string; qty_per_unit: string; unit: string }[];
 };
 
-type RunFormData = { quantity: string; notes: string };
+type RunFormData = { quantity: string; bottle_shape: string; notes: string };
 
 const formatQty = (v: string | number) =>
     Number(v).toLocaleString('en-IN', { maximumFractionDigits: 3 });
@@ -154,7 +155,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
     const form = useForm<RecipeFormData>({
         output_raw_material_id: '', group_name: '', packing_size: '', fill_quantity: '1', notes: '', is_active: true, items: [],
     });
-    const runForm = useForm<RunFormData>({ quantity: '1', notes: '' });
+    const runForm = useForm<RunFormData>({ quantity: '1', bottle_shape: '', notes: '' });
 
     const checkDuplicate = (outputMatId: string) => {
         if (!outputMatId) { setDupWarning(null); return; }
@@ -242,7 +243,11 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
 
     const openRun = (recipe: Recipe) => {
         runForm.reset();
-        runForm.setData('quantity', String(Math.round(Number(recipe.fill_quantity) || 1)));
+        runForm.setData({
+            quantity: String(Math.round(Number(recipe.fill_quantity) || 1)),
+            bottle_shape: recipe.output_material?.shape ?? '',
+            notes: '',
+        });
         setRunTarget(recipe);
         setRunModal(true);
     };
@@ -778,6 +783,30 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                 <label>Quantity to fill (pcs) *</label>
                                 <input type="number" value={runForm.data.quantity} onChange={(e) => runForm.setData('quantity', e.target.value)} min="1" step="1" />
+                            </div>
+                            {(() => {
+                                if (!runTarget) return null;
+                                const availableShapes = finishedGoodMaterials
+                                    .filter((m) => m.name.trim().toLowerCase() === runTarget.name.trim().toLowerCase() && m.shape)
+                                    .map((m) => m.shape as string);
+                                if (availableShapes.length === 0) return null;
+                                return (
+                                    <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                                        <label>Bottle Shape</label>
+                                        <select
+                                            value={runForm.data.bottle_shape}
+                                            onChange={(e) => runForm.setData('bottle_shape', e.target.value)}
+                                        >
+                                            <option value="">— Select shape —</option>
+                                            {availableShapes.map((s) => (
+                                                <option key={s} value={s}>{s}</option>
+                                            ))}
+                                        </select>
+                                        {runForm.errors.bottle_shape && <div className="form-error">{runForm.errors.bottle_shape}</div>}
+                                    </div>
+                                );
+                            })()}
+                            <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                 {(() => {
                                     const pcsPerBox = runTarget?.packing_size ? getBoxQty(runTarget.packing_size) : null;
                                     const qty = Number(runForm.data.quantity);
