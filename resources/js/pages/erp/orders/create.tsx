@@ -368,6 +368,30 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         form.setData('round_off', String(totals.roundOff));
     }, [totals.roundOff]);
 
+    // When party changes, re-apply auto-fill for all rows that have our_brand set
+    useEffect(() => {
+        if (partyRates.length === 0) return;
+        setRows((current) =>
+            current.map((row) => {
+                if (!row.our_brand) return row;
+                const v = row.our_brand.trim().toLowerCase();
+                const matches = partyRates.filter((r) => r.our_brand.trim().toLowerCase() === v);
+                if (matches.length === 1) {
+                    return {
+                        ...row,
+                        party_brand:  matches[0].party_brand  ?? row.party_brand,
+                        packing_size: matches[0].packing_size ?? row.packing_size,
+                        rate:         String(matches[0].rate),
+                        gst_percent:  String(matches[0].gst_percent),
+                    };
+                } else if (matches.length > 1) {
+                    return { ...row, party_brand: matches[0].party_brand ?? row.party_brand };
+                }
+                return row;
+            }),
+        );
+    }, [partyRates]);
+
     const updateRow = (index: number, field: keyof ProductRow, value: string) => {
         setRows((current) =>
             current.map((row, idx) => {
@@ -375,8 +399,9 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                 let updated = { ...row, [field]: value };
 
                 if (field === 'our_brand') {
+                    const v = value.trim().toLowerCase();
                     const matches = partyRates.filter(
-                        (r) => r.our_brand.toLowerCase() === value.toLowerCase(),
+                        (r) => r.our_brand.trim().toLowerCase() === v,
                     );
                     if (matches.length === 1) {
                         // Only one size for this brand — auto-fill everything
