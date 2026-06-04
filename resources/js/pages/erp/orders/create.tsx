@@ -75,7 +75,7 @@ type EditingOrder = {
     items: EditingOrderItem[];
 };
 
-type FinishGoodBrand = { name: string; group: string | null; stock: number | null };
+type FinishGoodBrand = { name: string; group: string | null; stock: number | null; unit: string };
 
 type Props = {
     pageTitle: string;
@@ -289,7 +289,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         [partyRates],
     );
 
-    type BrandItem = { name: string; stock: number | null };
+    type BrandItem = { name: string; stock: number | null; unit: string };
 
     const groupedBrands = useMemo(() => {
         const q = brandSearch.toLowerCase().trim();
@@ -298,7 +298,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
             // Party selected: show only this party's brands — guaranteed to match auto-fill
             const brands: BrandItem[] = brandOptions
                 .filter((b) => !q || b.toLowerCase().includes(q))
-                .map((b) => ({ name: b, stock: null }));
+                .map((b) => ({ name: b, stock: null, unit: '' }));
             return brands.length > 0 ? [{ group: '', brands }] : [];
         }
 
@@ -310,7 +310,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         for (const b of src) {
             const g = b.group ?? '';
             if (!map.has(g)) map.set(g, []);
-            map.get(g)!.push({ name: b.name, stock: b.stock });
+            map.get(g)!.push({ name: b.name, stock: b.stock, unit: b.unit });
         }
         const out: { group: string; brands: BrandItem[] }[] = [];
         map.forEach((brands, group) => out.push({ group, brands }));
@@ -1062,7 +1062,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                     {group}
                                 </div>
                             )}
-                            {brands.map(({ name, stock }) => (
+                            {brands.map(({ name, stock, unit }) => (
                                 <div
                                     key={name}
                                     onMouseDown={() => {
@@ -1085,7 +1085,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                             whiteSpace: 'nowrap',
                                             flexShrink: 0,
                                         }}>
-                                            {stock <= 0 ? 'Out' : `${stock} kg`}
+                                            {stock <= 0 ? 'Out' : `${stock}${unit ? ` ${unit}` : ''}`}
                                         </span>
                                     )}
                                 </div>
