@@ -124,13 +124,14 @@ class InventoryController extends Controller
     public function storeMaterial(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'name'          => 'required|string|max:255|unique:raw_materials,name',
+            'name'          => 'required|string|max:255',
             'sku'           => 'nullable|string|max:100|unique:raw_materials,sku',
             'hsn'           => 'nullable|string|max:50',
             'gst'           => 'nullable|numeric|min:0|max:100',
             'unit'          => 'required|string|max:20',
             'category'      => 'nullable|string|max:100',
             'group_name'    => 'nullable|string|max:100',
+            'packing_size'  => 'nullable|string|max:50',
             'min_stock'     => 'nullable|numeric|min:0',
             'reorder_level' => 'nullable|numeric|min:0',
             'cost_per_unit' => 'nullable|numeric|min:0',
@@ -150,13 +151,14 @@ class InventoryController extends Controller
     public function updateMaterial(Request $request, RawMaterial $material): RedirectResponse
     {
         $data = $request->validate([
-            'name'          => 'required|string|max:255|unique:raw_materials,name,' . $material->id,
+            'name'          => 'required|string|max:255',
             'sku'           => 'nullable|string|max:100|unique:raw_materials,sku,' . $material->id,
             'hsn'           => 'nullable|string|max:50',
             'gst'           => 'nullable|numeric|min:0|max:100',
             'unit'          => 'required|string|max:20',
             'category'      => 'nullable|string|max:100',
             'group_name'    => 'nullable|string|max:100',
+            'packing_size'  => 'nullable|string|max:50',
             'min_stock'     => 'nullable|numeric|min:0',
             'reorder_level' => 'nullable|numeric|min:0',
             'cost_per_unit' => 'nullable|numeric|min:0',

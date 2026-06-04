@@ -17,6 +17,7 @@ type RawMaterial = {
     gst: string | number;
     category: string | null;
     group_name: string | null;
+    packing_size: string | null;
     unit: string;
     stock_qty: string | number;
     min_stock: string | number;
@@ -414,6 +415,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         unit: 'kg',
         category: '',
         group_name: '',
+        packing_size: '',
         min_stock: '0',
         reorder_level: '0',
         cost_per_unit: '0',
@@ -573,6 +575,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             unit: m.unit,
             category: m.category ?? '',
             group_name: m.group_name ?? '',
+            packing_size: m.packing_size ?? '',
             min_stock: String(m.min_stock),
             reorder_level: String(m.reorder_level),
             cost_per_unit: String(m.cost_per_unit),
@@ -1867,6 +1870,16 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                                 </div>
                                             )}
                                             {matForm.errors.group_name && <div className="form-error">{matForm.errors.group_name}</div>}
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Packing Size <span style={{ fontSize: 11, color: 'var(--tx-muted)', fontWeight: 400 }}>(e.g. 500ml, 1ltr — leave blank if not applicable)</span></label>
+                                            <input
+                                                type="text"
+                                                value={matForm.data.packing_size}
+                                                onChange={(e) => matForm.setData('packing_size', e.target.value)}
+                                                placeholder="500ml"
+                                            />
+                                            {matForm.errors.packing_size && <div className="form-error">{matForm.errors.packing_size}</div>}
                                         </div>
                                     );
                                 })()}

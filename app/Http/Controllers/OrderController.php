@@ -243,7 +243,19 @@ class OrderController extends Controller
                     continue;
                 }
 
-                $material = RawMaterial::whereRaw('LOWER(TRIM(name)) = ?', [strtolower($brandName)])->first();
+                $packingSize = trim($item->packing_size ?? '');
+                $material = RawMaterial::whereRaw('LOWER(TRIM(name)) = ?', [strtolower($brandName)])
+                    ->when($packingSize !== '', fn ($q) =>
+                        $q->whereRaw('LOWER(TRIM(COALESCE(packing_size, \'\'))) = ?', [strtolower($packingSize)])
+                    )
+                    ->when($packingSize === '', fn ($q) =>
+                        $q->whereNull('packing_size')->orWhere('packing_size', '')
+                    )
+                    ->first()
+                    // fallback: if no exact packing match, find by name only (no packing_size set)
+                    ?? RawMaterial::whereRaw('LOWER(TRIM(name)) = ?', [strtolower($brandName)])
+                        ->whereNull('packing_size')
+                        ->first();
                 if (! $material) {
                     continue;
                 }
@@ -710,8 +722,14 @@ class OrderController extends Controller
             ->where('is_active', true)
             ->orderBy('group_name')
             ->orderBy('name')
-            ->get(['name', 'group_name', 'stock_qty', 'unit'])
-            ->map(fn ($m) => ['name' => $m->name, 'group' => $m->group_name, 'stock' => (float) $m->stock_qty, 'unit' => $m->unit ?? '']);
+            ->get(['name', 'group_name', 'packing_size', 'stock_qty', 'unit'])
+            ->map(fn ($m) => [
+                'name'         => $m->name,
+                'group'        => $m->group_name,
+                'packing_size' => $m->packing_size,
+                'stock'        => (float) $m->stock_qty,
+                'unit'         => $m->unit ?? '',
+            ]);
     }
 
     private function mapProductPhotos(): \Illuminate\Support\Collection

@@ -75,7 +75,7 @@ type EditingOrder = {
     items: EditingOrderItem[];
 };
 
-type FinishGoodBrand = { name: string; group: string | null; stock: number | null; unit: string };
+type FinishGoodBrand = { name: string; group: string | null; packing_size: string | null; stock: number | null; unit: string };
 
 type Props = {
     pageTitle: string;
@@ -289,7 +289,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         [partyRates],
     );
 
-    type BrandItem = { name: string; stock: number | null; unit: string };
+    type BrandItem = { name: string; packing_size: string | null; stock: number | null; unit: string };
 
     const groupedBrands = useMemo(() => {
         const q = brandSearch.toLowerCase().trim();
@@ -298,19 +298,22 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
             // Party selected: show only this party's brands — guaranteed to match auto-fill
             const brands: BrandItem[] = brandOptions
                 .filter((b) => !q || b.toLowerCase().includes(q))
-                .map((b) => ({ name: b, stock: null, unit: '' }));
+                .map((b) => ({ name: b, packing_size: null, stock: null, unit: '' }));
             return brands.length > 0 ? [{ group: '', brands }] : [];
         }
 
         // No party selected: show inventory finish-good brands grouped by group_name
         const src = q
-            ? finishGoodBrands.filter((b) => b.name.toLowerCase().includes(q))
+            ? finishGoodBrands.filter((b) =>
+                b.name.toLowerCase().includes(q) ||
+                (b.packing_size ?? '').toLowerCase().includes(q)
+              )
             : finishGoodBrands;
         const map = new Map<string, BrandItem[]>();
         for (const b of src) {
             const g = b.group ?? '';
             if (!map.has(g)) map.set(g, []);
-            map.get(g)!.push({ name: b.name, stock: b.stock, unit: b.unit });
+            map.get(g)!.push({ name: b.name, packing_size: b.packing_size ?? null, stock: b.stock, unit: b.unit });
         }
         const out: { group: string; brands: BrandItem[] }[] = [];
         map.forEach((brands, group) => out.push({ group, brands }));
@@ -1062,18 +1065,24 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                     {group}
                                 </div>
                             )}
-                            {brands.map(({ name, stock, unit }) => (
+                            {brands.map(({ name, packing_size, stock, unit }) => (
                                 <div
-                                    key={name}
+                                    key={`${name}|${packing_size ?? ''}`}
                                     onMouseDown={() => {
                                         updateRow(openBrandRow!, 'our_brand', name);
+                                        if (packing_size) updateRow(openBrandRow!, 'packing_size', packing_size);
                                         setOpenBrandRow(null);
                                     }}
                                     style={{ padding: '7px 14px', fontSize: '13px', cursor: 'pointer', color: '#111827', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}
                                     onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
                                     onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}
                                 >
-                                    <span>{name}</span>
+                                    <span>
+                                        {name}
+                                        {packing_size && (
+                                            <span style={{ marginLeft: '6px', fontSize: '12px', color: '#6b7280' }}>— {packing_size}</span>
+                                        )}
+                                    </span>
                                     {stock !== null && (
                                         <span style={{
                                             fontSize: '11px',
