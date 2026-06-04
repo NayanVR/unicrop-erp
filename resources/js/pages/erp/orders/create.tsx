@@ -1,6 +1,7 @@
 import { store, update } from '@/routes/orders';
 import { Head, useForm } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 type SalesUser = { id: number; name: string };
 type TransportOption = { id: number; name: string };
@@ -74,6 +75,8 @@ type EditingOrder = {
     items: EditingOrderItem[];
 };
 
+type FinishGoodBrand = { name: string; group: string | null };
+
 type Props = {
     pageTitle: string;
     salesUsers: SalesUser[];
@@ -82,6 +85,7 @@ type Props = {
     parties: Party[];
     currentUser: { id: number; name: string };
     productPhotos: ProductPhoto[];
+    finishGoodBrands: FinishGoodBrand[];
     editingOrder?: EditingOrder | null;
 };
 
@@ -170,7 +174,7 @@ const toNumber = (value: string) => {
 
 const todayDate = () => new Date().toISOString().split('T')[0];
 
-export default function OrdersCreate({ salesUsers, transports, couriers, parties, currentUser, productPhotos, editingOrder }: Props) {
+export default function OrdersCreate({ salesUsers, transports, couriers, parties, currentUser, productPhotos, finishGoodBrands, editingOrder }: Props) {
     const isEditing = !!editingOrder;
 
     const [rows, setRows] = useState<ProductRow[]>(() => {
@@ -199,6 +203,10 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
     });
     const [partyDropdownOpen, setPartyDropdownOpen] = useState(false);
     const partyRef = useRef<HTMLDivElement>(null);
+    const [openBrandRow, setOpenBrandRow] = useState<number | null>(null);
+    const [brandSearch, setBrandSearch] = useState('');
+    const [brandDropPos, setBrandDropPos] = useState({ top: 0, left: 0, width: 0 });
+    const brandInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
     useEffect(() => {
         const handler = (e: MouseEvent) => {
@@ -276,6 +284,22 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         () => [...new Set(partyRates.map((r) => r.our_brand))].sort(),
         [partyRates],
     );
+
+    const groupedBrands = useMemo(() => {
+        const q = brandSearch.toLowerCase().trim();
+        const src = q
+            ? finishGoodBrands.filter((b) => b.name.toLowerCase().includes(q))
+            : finishGoodBrands;
+        const map = new Map<string, string[]>();
+        for (const b of src) {
+            const g = b.group ?? '';
+            if (!map.has(g)) map.set(g, []);
+            map.get(g)!.push(b.name);
+        }
+        const out: { group: string; brands: string[] }[] = [];
+        map.forEach((brands, group) => out.push({ group, brands }));
+        return out;
+    }, [finishGoodBrands, brandSearch]);
 
     type PhotoInfo = { url: string; mrp: string | null };
 
@@ -822,15 +846,25 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                                 </td>
                                                 <td>
                                                     <input
+                                                        ref={(el) => { brandInputRefs.current[index] = el; }}
                                                         type="text"
-                                                        list={`brands-${index}`}
-                                                        value={row.our_brand}
-                                                        onChange={(e) => updateRow(index, 'our_brand', e.target.value)}
+                                                        value={openBrandRow === index ? brandSearch : row.our_brand}
                                                         placeholder="Brand"
+                                                        onFocus={() => {
+                                                            const el = brandInputRefs.current[index];
+                                                            if (el) {
+                                                                const r = el.getBoundingClientRect();
+                                                                setBrandDropPos({ top: r.bottom, left: r.left, width: r.width });
+                                                            }
+                                                            setOpenBrandRow(index);
+                                                            setBrandSearch('');
+                                                        }}
+                                                        onChange={(e) => {
+                                                            setBrandSearch(e.target.value);
+                                                            updateRow(index, 'our_brand', e.target.value);
+                                                        }}
+                                                        onBlur={() => setTimeout(() => setOpenBrandRow(null), 160)}
                                                     />
-                                                    <datalist id={`brands-${index}`}>
-                                                        {brandOptions.map((b) => <option key={b} value={b} />)}
-                                                    </datalist>
                                                 </td>
                                                 <td>
                                                     <input
@@ -954,6 +988,51 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                 </form>
             </div>
 
+            {openBrandRow !== null && createPortal(
+                <div
+                    onMouseDown={(e) => e.preventDefault()}
+                    style={{
+                        position: 'fixed',
+                        top: brandDropPos.top + 2,
+                        left: brandDropPos.left,
+                        minWidth: Math.max(220, brandDropPos.width),
+                        background: '#fff',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        boxShadow: '0 8px 28px rgba(0,0,0,0.18)',
+                        zIndex: 99999,
+                        maxHeight: '260px',
+                        overflowY: 'auto',
+                    }}
+                >
+                    {groupedBrands.length === 0 ? (
+                        <div style={{ padding: '10px 14px', fontSize: '13px', color: '#6b7280' }}>No brands found</div>
+                    ) : groupedBrands.map(({ group, brands }) => (
+                        <div key={group}>
+                            {group && (
+                                <div style={{ padding: '5px 12px', fontSize: '11px', fontWeight: 700, color: '#16a34a', background: '#f0fdf4', borderBottom: '1px solid #e5e7eb' }}>
+                                    {group}
+                                </div>
+                            )}
+                            {brands.map((brand) => (
+                                <div
+                                    key={brand}
+                                    onMouseDown={() => {
+                                        updateRow(openBrandRow!, 'our_brand', brand);
+                                        setOpenBrandRow(null);
+                                    }}
+                                    style={{ padding: '8px 14px', fontSize: '13px', cursor: 'pointer', color: '#111827' }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}
+                                >
+                                    {brand}
+                                </div>
+                            ))}
+                        </div>
+                    ))}
+                </div>,
+                document.body
+            )}
         </>
     );
 }
