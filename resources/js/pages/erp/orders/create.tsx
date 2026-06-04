@@ -869,7 +869,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                                                 setBrandDropPos({ top: r.bottom, left: r.left, width: r.width });
                                                             }
                                                             setOpenBrandRow(index);
-                                                            setBrandSearch('');
+                                                            setBrandSearch(row.our_brand);
                                                         }}
                                                         onChange={(e) => {
                                                             setBrandSearch(e.target.value);
