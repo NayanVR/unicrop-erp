@@ -10,7 +10,6 @@ use App\Models\Order;
 use App\Models\OrderAttachment;
 use App\Models\Party;
 use App\Models\ProductPhoto;
-use App\Models\RawMaterial;
 use App\Models\Role;
 use App\Models\Transport;
 use App\Models\User;
@@ -135,16 +134,6 @@ class OrderController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        $finishGoodBrands = RawMaterial::whereRaw(
-                "LOWER(category) LIKE ? AND LOWER(category) NOT LIKE ?",
-                ['%finish%good%', '%semi%']
-            )
-            ->where('is_active', true)
-            ->orderBy('group_name')
-            ->orderBy('name')
-            ->get(['name', 'group_name'])
-            ->map(fn ($m) => ['name' => $m->name, 'group' => $m->group_name]);
-
         return Inertia::render('erp/orders/create', [
             'pageTitle' => 'New Order',
             'salesUsers' => $salesUsers,
@@ -154,7 +143,6 @@ class OrderController extends Controller
                 ->with(['productRates' => fn ($q) => $q->where('is_active', true)->orderBy('our_brand')->orderBy('packing_size')])
                 ->get(['id', 'name', 'customer_name', 'gst_no', 'pan_no', 'pan_card_path', 'phone', 'address', 'city', 'state', 'default_transport_type', 'default_transport_id']),
             'currentUser' => ['id' => $user?->id, 'name' => $user?->name],
-            'finishGoodBrands' => $finishGoodBrands,
             'productPhotos' => $this->mapProductPhotos(),
         ]);
     }
@@ -344,16 +332,6 @@ class OrderController extends Controller
 
         $order->loadMissing('items');
 
-        $finishGoodBrands = RawMaterial::whereRaw(
-                "LOWER(category) LIKE ? AND LOWER(category) NOT LIKE ?",
-                ['%finish%good%', '%semi%']
-            )
-            ->where('is_active', true)
-            ->orderBy('group_name')
-            ->orderBy('name')
-            ->get(['name', 'group_name'])
-            ->map(fn ($m) => ['name' => $m->name, 'group' => $m->group_name]);
-
         return Inertia::render('erp/orders/create', [
             'pageTitle'    => 'Edit Order '.$order->order_number,
             'salesUsers'   => $salesUsers,
@@ -363,7 +341,6 @@ class OrderController extends Controller
                 ->with(['productRates' => fn ($q) => $q->where('is_active', true)->orderBy('our_brand')->orderBy('packing_size')])
                 ->get(['id', 'name', 'customer_name', 'gst_no', 'pan_no', 'pan_card_path', 'phone', 'address', 'city', 'state', 'default_transport_type', 'default_transport_id']),
             'currentUser'  => ['id' => $user?->id, 'name' => $user?->name],
-            'finishGoodBrands' => $finishGoodBrands,
             'productPhotos' => $this->mapProductPhotos(),
             'editingOrder' => [
                 'id'               => $order->id,
