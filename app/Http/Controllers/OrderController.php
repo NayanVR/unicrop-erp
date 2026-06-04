@@ -6,6 +6,7 @@ use App\Events\ErpActivity;
 use App\Http\Requests\StoreOrderRequest;
 use App\Http\Requests\UpdateOrderRequest;
 use App\Models\DesignOrder;
+use App\Models\InventoryTransaction;
 use App\Models\Order;
 use App\Models\OrderAttachment;
 use App\Models\Party;
@@ -226,13 +227,46 @@ class OrderController extends Controller
             return redirect()->back()->with('error', 'Urgent orders must be approved by factory before confirming.');
         }
 
-        $order->update([
-            'status' => 'confirmed',
-            'confirmed_by' => $request->user()?->id,
-            'confirmed_at' => now(),
-        ]);
-
         $user = $request->user();
+
+        DB::transaction(function () use ($order, $user) {
+            $order->update([
+                'status' => 'confirmed',
+                'confirmed_by' => $user?->id,
+                'confirmed_at' => now(),
+            ]);
+
+            $order->loadMissing('items');
+            foreach ($order->items as $item) {
+                $brandName = trim($item->our_brand ?? '');
+                if ($brandName === '') {
+                    continue;
+                }
+
+                $material = RawMaterial::whereRaw('LOWER(TRIM(name)) = ?', [strtolower($brandName)])->first();
+                if (! $material) {
+                    continue;
+                }
+
+                $qty = (float) $item->quantity;
+                $previousStock = (float) $material->stock_qty;
+                $newStock = $previousStock - $qty;
+
+                $material->decrement('stock_qty', $qty);
+
+                InventoryTransaction::create([
+                    'raw_material_id' => $material->id,
+                    'user_id'         => $user?->id,
+                    'type'            => 'issue',
+                    'qty'             => $qty,
+                    'previous_stock'  => $previousStock,
+                    'new_stock'       => $newStock,
+                    'reference'       => 'Order: '.$order->order_number,
+                    'notes'           => 'Auto-deducted on order confirmation',
+                ]);
+            }
+        });
+
         broadcast(new ErpActivity(
             type: 'order_confirmed',
             message: "{$user?->name} confirmed Order {$order->order_number} ({$order->company_name})",
