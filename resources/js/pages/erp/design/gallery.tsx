@@ -1086,7 +1086,7 @@ function UploadModal({ form, fileRef, folders, ourBrands, allCategories, brandSu
                     <h2 className="modal-title">Upload Product</h2>
                     <button type="button" className="modal-close" onClick={onClose}>✕</button>
                 </div>
-                <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                <form id="upload-product-form" onSubmit={onSubmit}>
                     <div className="modal-body">
                         {/* Folder / party */}
                         <div className="form-group" style={{ marginBottom: '14px' }}>
@@ -1230,13 +1230,13 @@ function UploadModal({ form, fileRef, folders, ourBrands, allCategories, brandSu
                             )}
                         </div>
                     </div>
-                    <div className="modal-footer">
-                        <button type="button" className="btn secondary" onClick={onClose}>Cancel</button>
-                        <button type="submit" className="btn primary" disabled={form.processing}>
-                            {form.processing ? 'Uploading…' : 'Upload Product'}
-                        </button>
-                    </div>
                 </form>
+                <div className="modal-footer">
+                    <button type="button" className="btn secondary" onClick={onClose}>Cancel</button>
+                    <button type="submit" form="upload-product-form" className="btn primary" disabled={form.processing}>
+                        {form.processing ? 'Uploading…' : 'Upload Product'}
+                    </button>
+                </div>
             </div>
         </div>
     );
