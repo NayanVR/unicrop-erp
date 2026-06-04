@@ -106,6 +106,13 @@ class ProductPhotoController extends Controller
             ->orderBy('cap_color')
             ->pluck('cap_color');
 
+        // Brand → bottle name lookup from filling config
+        $brandBottleMap = \App\Models\ProductFillingConfig::with('bottle:id,name')
+            ->whereNotNull('bottle_id')
+            ->get(['our_brand', 'bottle_id'])
+            ->mapWithKeys(fn ($c) => [$c->our_brand => $c->bottle?->name])
+            ->filter();
+
         return Inertia::render('erp/design/gallery', [
             'photos' => $photos,
             'folders' => $folders,
@@ -116,6 +123,7 @@ class ProductPhotoController extends Controller
             'packingSizes' => $packingSizes,
             'bottleJarOptions' => $bottleJarOptions,
             'capColorOptions' => $capColorOptions,
+            'brandBottleMap' => $brandBottleMap,
         ]);
     }
 

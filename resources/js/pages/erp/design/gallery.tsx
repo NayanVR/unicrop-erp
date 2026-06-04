@@ -130,6 +130,7 @@ type PageProps = {
     packingSizes: string[];
     bottleJarOptions: string[];
     capColorOptions: string[];
+    brandBottleMap: Record<string, string>;
     flash?: { success?: string; error?: string };
 };
 
@@ -140,7 +141,7 @@ type FolderForm   = { party_id: string };
 type ActiveFolder = null | 'our-brand' | number;
 
 export default function DesignGallery() {
-    const { photos, folders, parties, ourBrands, allCategories, partyRates, packingSizes, bottleJarOptions, capColorOptions, flash } =
+    const { photos, folders, parties, ourBrands, allCategories, partyRates, packingSizes, bottleJarOptions, capColorOptions, brandBottleMap, flash } =
         usePage<PageProps>().props;
 
     const [activeFolder,  setActiveFolder]  = useState<ActiveFolder>(null);
@@ -322,7 +323,7 @@ export default function DesignGallery() {
         setEditForm({
             our_brand:   photo.our_brand,
             party_brand: photo.party_brand ?? '',
-            bottle_jar:  photo.bottle_jar ?? '',
+            bottle_jar:  photo.bottle_jar ?? brandBottleMap[photo.our_brand] ?? '',
             cap_color:   photo.cap_color ?? '',
         });
         const sizes = photo.sizes?.length
@@ -591,6 +592,7 @@ export default function DesignGallery() {
                         sizeSuggestions={sizeSuggestions}
                         bottleJarOptions={bottleJarOptions}
                         capColorOptions={capColorOptions}
+                        brandBottleMap={brandBottleMap}
                         sizeRows={sizeRows}
                         onSizeRowChange={(i, f, v) => setSizeRows((r) => r.map((row, idx) => idx === i ? { ...row, [f]: v } : row))}
                         onAddSizeRow={() => setSizeRows((r) => [...r, { packing_size: '', mrp: '' }])}
@@ -761,6 +763,7 @@ export default function DesignGallery() {
                     sizeSuggestions={sizeSuggestions}
                     bottleJarOptions={bottleJarOptions}
                     capColorOptions={capColorOptions}
+                    brandBottleMap={brandBottleMap}
                     sizeRows={sizeRows}
                     onSizeRowChange={(i, f, v) => setSizeRows((r) => r.map((row, idx) => idx === i ? { ...row, [f]: v } : row))}
                     onAddSizeRow={() => setSizeRows((r) => [...r, { packing_size: '', mrp: '' }])}
@@ -792,7 +795,10 @@ export default function DesignGallery() {
                                 <label>Our Brand / Product Name *</label>
                                 <SearchableSelect
                                     value={editForm.our_brand}
-                                    onChange={(val) => setEditForm((p) => ({ ...p, our_brand: val }))}
+                                    onChange={(val) => {
+                                        const bottle = brandBottleMap[val];
+                                        setEditForm(p => ({ ...p, our_brand: val, bottle_jar: bottle ?? p.bottle_jar }));
+                                    }}
                                     options={ourBrands}
                                     placeholder="Search product…"
                                 />
@@ -1054,7 +1060,7 @@ function PhotoCard({ photo, deleting, onView, onEdit, onDelete }: {
 }
 
 function UploadModal({ form, fileRef, folders, ourBrands, allCategories, brandSuggestions, sizeSuggestions,
-    bottleJarOptions, capColorOptions,
+    bottleJarOptions, capColorOptions, brandBottleMap,
     sizeRows, onSizeRowChange, onAddSizeRow, onRemoveSizeRow, onClose, onSubmit }: {
     form: ReturnType<typeof useForm<UploadForm>>;
     fileRef: React.RefObject<HTMLInputElement | null>;
@@ -1065,6 +1071,7 @@ function UploadModal({ form, fileRef, folders, ourBrands, allCategories, brandSu
     sizeSuggestions: string[];
     bottleJarOptions: string[];
     capColorOptions: string[];
+    brandBottleMap: Record<string, string>;
     sizeRows: { packing_size: string; mrp: string }[];
     onSizeRowChange: (index: number, field: 'packing_size' | 'mrp', value: string) => void;
     onAddSizeRow: () => void;
@@ -1100,7 +1107,10 @@ function UploadModal({ form, fileRef, folders, ourBrands, allCategories, brandSu
                             <label>Our Brand / Product Name *</label>
                             <SearchableSelect
                                 value={form.data.our_brand}
-                                onChange={(val) => form.setData('our_brand', val)}
+                                onChange={(val) => {
+                                    const bottle = brandBottleMap[val] ?? '';
+                                    form.setData({ ...form.data, our_brand: val, bottle_jar: bottle || form.data.bottle_jar });
+                                }}
                                 options={ourBrands}
                                 placeholder="Search product…"
                                 hasError={!!form.errors.our_brand}
