@@ -710,8 +710,8 @@ class OrderController extends Controller
             ->where('is_active', true)
             ->orderBy('group_name')
             ->orderBy('name')
-            ->get(['name', 'group_name'])
-            ->map(fn ($m) => ['name' => $m->name, 'group' => $m->group_name]);
+            ->get(['name', 'group_name', 'stock_qty'])
+            ->map(fn ($m) => ['name' => $m->name, 'group' => $m->group_name, 'stock' => (float) $m->stock_qty]);
     }
 
     private function mapProductPhotos(): \Illuminate\Support\Collection

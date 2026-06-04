@@ -75,7 +75,7 @@ type EditingOrder = {
     items: EditingOrderItem[];
 };
 
-type FinishGoodBrand = { name: string; group: string | null };
+type FinishGoodBrand = { name: string; group: string | null; stock: number | null };
 
 type Props = {
     pageTitle: string;
@@ -289,12 +289,16 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         [partyRates],
     );
 
+    type BrandItem = { name: string; stock: number | null };
+
     const groupedBrands = useMemo(() => {
         const q = brandSearch.toLowerCase().trim();
 
         if (partyRates.length > 0) {
             // Party selected: show only this party's brands — guaranteed to match auto-fill
-            const brands = brandOptions.filter((b) => !q || b.toLowerCase().includes(q));
+            const brands: BrandItem[] = brandOptions
+                .filter((b) => !q || b.toLowerCase().includes(q))
+                .map((b) => ({ name: b, stock: null }));
             return brands.length > 0 ? [{ group: '', brands }] : [];
         }
 
@@ -302,13 +306,13 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         const src = q
             ? finishGoodBrands.filter((b) => b.name.toLowerCase().includes(q))
             : finishGoodBrands;
-        const map = new Map<string, string[]>();
+        const map = new Map<string, BrandItem[]>();
         for (const b of src) {
             const g = b.group ?? '';
             if (!map.has(g)) map.set(g, []);
-            map.get(g)!.push(b.name);
+            map.get(g)!.push({ name: b.name, stock: b.stock });
         }
-        const out: { group: string; brands: string[] }[] = [];
+        const out: { group: string; brands: BrandItem[] }[] = [];
         map.forEach((brands, group) => out.push({ group, brands }));
         return out;
     }, [partyRates, brandOptions, finishGoodBrands, brandSearch]);
@@ -1058,18 +1062,32 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                     {group}
                                 </div>
                             )}
-                            {brands.map((brand) => (
+                            {brands.map(({ name, stock }) => (
                                 <div
-                                    key={brand}
+                                    key={name}
                                     onMouseDown={() => {
-                                        updateRow(openBrandRow!, 'our_brand', brand);
+                                        updateRow(openBrandRow!, 'our_brand', name);
                                         setOpenBrandRow(null);
                                     }}
-                                    style={{ padding: '8px 14px', fontSize: '13px', cursor: 'pointer', color: '#111827' }}
+                                    style={{ padding: '7px 14px', fontSize: '13px', cursor: 'pointer', color: '#111827', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}
                                     onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
                                     onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}
                                 >
-                                    {brand}
+                                    <span>{name}</span>
+                                    {stock !== null && (
+                                        <span style={{
+                                            fontSize: '11px',
+                                            fontWeight: 600,
+                                            padding: '1px 7px',
+                                            borderRadius: '10px',
+                                            background: stock <= 0 ? '#fee2e2' : stock < 50 ? '#fef9c3' : '#dcfce7',
+                                            color: stock <= 0 ? '#dc2626' : stock < 50 ? '#854d0e' : '#15803d',
+                                            whiteSpace: 'nowrap',
+                                            flexShrink: 0,
+                                        }}>
+                                            {stock <= 0 ? 'Out' : `${stock} kg`}
+                                        </span>
+                                    )}
                                 </div>
                             ))}
                         </div>
