@@ -1810,7 +1810,7 @@ html.dark .badge.indigo {
     max-height: calc(100vh - 40px);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow-y: auto;
     animation: modalIn 0.24s cubic-bezier(0.22, 0.68, 0, 1.2);
     border-top: 3px solid var(--accent);
     border: 1px solid var(--border);
@@ -1864,10 +1864,6 @@ html.dark .badge.indigo {
 }
 .modal-body {
     padding: 0 24px 24px;
-    overflow-y: auto;
-    flex: 1;
-    min-height: 0;
-    max-height: calc(100vh - 180px);
 }
 .modal-footer {
     padding: 16px 24px;
@@ -1877,7 +1873,9 @@ html.dark .badge.indigo {
     justify-content: flex-end;
     background: var(--bg-paper);
     border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-    flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
 }
 
 .not-auth {
