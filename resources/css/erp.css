@@ -1876,6 +1876,7 @@ html.dark .badge.indigo {
     justify-content: flex-end;
     background: var(--bg-paper);
     border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    flex-shrink: 0;
 }
 
 .not-auth {
