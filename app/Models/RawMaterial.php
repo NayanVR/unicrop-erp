@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'sku', 'hsn', 'gst', 'unit', 'category', 'group_name', 'packing_size', 'stock_qty', 'min_stock', 'reorder_level', 'cost_per_unit', 'selling_rate', 'dim_l', 'dim_w', 'dim_h', 'supplier', 'notes', 'is_active'])]
+#[Fillable(['name', 'sku', 'hsn', 'gst', 'unit', 'category', 'group_name', 'shape', 'stock_qty', 'min_stock', 'reorder_level', 'cost_per_unit', 'selling_rate', 'dim_l', 'dim_w', 'dim_h', 'supplier', 'notes', 'is_active'])]
 class RawMaterial extends Model
 {
     /**

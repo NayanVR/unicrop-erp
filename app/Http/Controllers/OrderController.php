@@ -243,18 +243,17 @@ class OrderController extends Controller
                     continue;
                 }
 
-                $packingSize = trim($item->packing_size ?? '');
+                $shape = trim($item->shape ?? '');
                 $material = RawMaterial::whereRaw('LOWER(TRIM(name)) = ?', [strtolower($brandName)])
-                    ->when($packingSize !== '', fn ($q) =>
-                        $q->whereRaw('LOWER(TRIM(COALESCE(packing_size, \'\'))) = ?', [strtolower($packingSize)])
+                    ->when($shape !== '', fn ($q) =>
+                        $q->whereRaw('LOWER(TRIM(COALESCE(shape, \'\'))) = ?', [strtolower($shape)])
                     )
-                    ->when($packingSize === '', fn ($q) =>
-                        $q->whereNull('packing_size')->orWhere('packing_size', '')
+                    ->when($shape === '', fn ($q) =>
+                        $q->where(fn ($q2) => $q2->whereNull('shape')->orWhere('shape', ''))
                     )
                     ->first()
-                    // fallback: if no exact packing match, find by name only (no packing_size set)
                     ?? RawMaterial::whereRaw('LOWER(TRIM(name)) = ?', [strtolower($brandName)])
-                        ->whereNull('packing_size')
+                        ->whereNull('shape')
                         ->first();
                 if (! $material) {
                     continue;
@@ -722,13 +721,13 @@ class OrderController extends Controller
             ->where('is_active', true)
             ->orderBy('group_name')
             ->orderBy('name')
-            ->get(['name', 'group_name', 'packing_size', 'stock_qty', 'unit'])
+            ->get(['name', 'group_name', 'shape', 'stock_qty', 'unit'])
             ->map(fn ($m) => [
-                'name'         => $m->name,
-                'group'        => $m->group_name,
-                'packing_size' => $m->packing_size,
-                'stock'        => (float) $m->stock_qty,
-                'unit'         => $m->unit ?? '',
+                'name'  => $m->name,
+                'group' => $m->group_name,
+                'shape' => $m->shape,
+                'stock' => (float) $m->stock_qty,
+                'unit'  => $m->unit ?? '',
             ]);
     }
 
