@@ -107,6 +107,7 @@ type Reorder = {
     notes: string | null;
     status: 'pending' | 'received';
     received_at: string | null;
+    billed_at: string | null;
     received_by_user: { id: number; name: string } | null;
     raw_material: { id: number; name: string } | null;
 };
@@ -307,6 +308,37 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const [txnTarget, setTxnTarget] = useState<RawMaterial | null>(null);
     const [expandedBill, setExpandedBill] = useState<number | null>(null);
     const [viewReorder, setViewReorder] = useState<Reorder | null>(null);
+
+    // Bill-pending → enter purchase bill for a received reorder
+    const [billReorder, setBillReorder] = useState<Reorder | null>(null);
+    const [billReorderForm, setBillReorderForm] = useState({ vendor_name: '', bill_number: '', bill_date: '', rate: '', total_amount: '' });
+    const [billReorderFile, setBillReorderFile] = useState<File | null>(null);
+    const [billReorderProcessing, setBillReorderProcessing] = useState(false);
+
+    const openBillReorder = (r: Reorder) => {
+        setBillReorderForm({ vendor_name: r.supplier ?? '', bill_number: '', bill_date: '', rate: '', total_amount: '' });
+        setBillReorderFile(null);
+        setBillReorder(r);
+    };
+
+    const submitBillReorder = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!billReorder) return;
+        const fd = new FormData();
+        fd.append('vendor_name', billReorderForm.vendor_name);
+        if (billReorderForm.bill_number) fd.append('bill_number', billReorderForm.bill_number);
+        if (billReorderForm.bill_date) fd.append('bill_date', billReorderForm.bill_date);
+        if (billReorderForm.rate) fd.append('rate', billReorderForm.rate);
+        if (billReorderForm.total_amount) fd.append('total_amount', billReorderForm.total_amount);
+        if (billReorderFile) fd.append('bill_file', billReorderFile);
+        setBillReorderProcessing(true);
+        router.post(`/inventory/reorders/${billReorder.id}/receive-with-bill`, fd, {
+            preserveScroll: true,
+            forceFormData: true,
+            onSuccess: () => setBillReorder(null),
+            onFinish: () => setBillReorderProcessing(false),
+        });
+    };
 
     // Selling rate mode for material form and packing form
     const [matSellMode, setMatSellMode]   = useState<'manual' | 'profit'>('manual');
@@ -515,10 +547,11 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const alertMaterials = materials.filter((m) => {
         const s = stockStatus(m);
         if (s !== 'low' && s !== 'out') return false;
-        return !reorders.some((r) => r.raw_material_id === m.id && (r.status === 'pending' || r.status === 'received'));
+        return !reorders.some((r) => r.raw_material_id === m.id && (r.status === 'pending' || (r.status === 'received' && !r.billed_at)));
     });
 
     const pendingReorders = reorders.filter((r) => r.status === 'pending');
+    const billPendingReorders = reorders.filter((r) => r.status === 'received' && !r.billed_at);
 
     const isDuplicateBillNumber =
         billForm.bill_number.trim() !== '' &&
@@ -1044,6 +1077,40 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                 </div>
             )}
 
+            {/* Bill Pending — received, awaiting purchase bill */}
+            {!isSales && role !== 'accountant' && billPendingReorders.length > 0 && (
+                <div className="card" style={{ marginBottom: 16 }}>
+                    <div className="card-title" style={{ marginBottom: 8 }}>🧾 Bill Pending</div>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                        {billPendingReorders.map((r) => (
+                            <div
+                                key={r.id}
+                                style={{
+                                    background: '#fffbeb',
+                                    border: '1px solid #fde68a',
+                                    borderRadius: 8,
+                                    padding: '8px 14px',
+                                    fontSize: 13,
+                                }}
+                            >
+                                <div style={{ fontWeight: 700, color: '#92400e' }}>{r.raw_material?.name ?? '—'}</div>
+                                <div style={{ color: '#6b7280', marginTop: 2 }}>
+                                    {fmt(r.qty_ordered)} {r.unit}
+                                    {r.supplier ? ` · ${r.supplier}` : ''}
+                                </div>
+                                {canMarkReceived && (
+                                    <button
+                                        className="btn sm primary"
+                                        style={{ marginTop: 6 }}
+                                        onClick={() => openBillReorder(r)}
+                                    >🧾 Enter Bill</button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Tabs */}
             <div className="filter-bar" style={{ marginBottom: 0, borderBottom: '1px solid #e5e7eb' }}>
                 {(['materials', 'log', 'bills', 'reorders', 'categories', 'godowns'] as const).filter((t) => {
@@ -1527,6 +1594,9 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                                 {r.status === 'received' ? (
                                                     <div>
                                                         <span className="badge teal">✓ Received</span>
+                                                        {!r.billed_at && (
+                                                            <span className="badge amber" style={{ marginLeft: 4 }}>Bill Pending</span>
+                                                        )}
                                                         {r.received_by_user && (
                                                             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
                                                                 by {r.received_by_user.name}
@@ -1546,6 +1616,9 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                                 <div style={{ display: 'flex', gap: 4 }}>
                                                     {r.status === 'pending' && canMarkReceived && (
                                                         <button className="btn sm primary" onClick={() => receiveReorder(r.id)}>✓ Mark Received</button>
+                                                    )}
+                                                    {r.status === 'received' && !r.billed_at && canMarkReceived && (
+                                                        <button className="btn sm primary" onClick={() => openBillReorder(r)}>🧾 Enter Bill</button>
                                                     )}
                                                     <button className="btn danger sm" onClick={() => deleteReorder(r.id)}>🗑</button>
                                                 </div>
@@ -3059,7 +3132,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                             <button
                                 className="btn primary"
                                 onClick={() => {
-                                    if (!confirm('Mark as received and add to stock?')) return;
+                                    if (!confirm('Mark as received? You can enter the purchase bill next to update stock.')) return;
                                     router.post(
                                         `/inventory/reorders/${viewReorder.id}/receive`,
                                         {},
@@ -3074,6 +3147,88 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                             </button>
                         )}
                     </div>
+                </div>
+            </div>
+
+            {/* ── Enter Bill (for received reorder) Modal ───────────────────── */}
+            <div className={`modal-overlay${billReorder ? ' open' : ''}`} onClick={() => setBillReorder(null)}>
+                <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460, width: '95%' }}>
+                    <div className="modal-header">
+                        <h3>🧾 Enter Purchase Bill</h3>
+                        <button className="modal-close" onClick={() => setBillReorder(null)}>×</button>
+                    </div>
+                    <form onSubmit={submitBillReorder}>
+                        <div className="modal-body">
+                            {billReorder && (
+                                <div style={{ marginBottom: 12, fontSize: 13, color: '#374151' }}>
+                                    <strong>{billReorder.raw_material?.name ?? '—'}</strong> · {fmt(billReorder.qty_ordered)} {billReorder.unit}
+                                </div>
+                            )}
+                            <div className="form-group">
+                                <label>Vendor / Supplier *</label>
+                                <input
+                                    type="text"
+                                    value={billReorderForm.vendor_name}
+                                    onChange={(e) => setBillReorderForm((p) => ({ ...p, vendor_name: e.target.value }))}
+                                    placeholder="Supplier name"
+                                    required
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Bill / Invoice Number</label>
+                                <input
+                                    type="text"
+                                    value={billReorderForm.bill_number}
+                                    onChange={(e) => setBillReorderForm((p) => ({ ...p, bill_number: e.target.value }))}
+                                    placeholder="e.g. INV-2024-001"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Bill Date</label>
+                                <input
+                                    type="date"
+                                    value={billReorderForm.bill_date}
+                                    onChange={(e) => setBillReorderForm((p) => ({ ...p, bill_date: e.target.value }))}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', gap: 10 }}>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label>Rate (per {billReorder?.unit ?? 'unit'})</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={billReorderForm.rate}
+                                        onChange={(e) => setBillReorderForm((p) => ({ ...p, rate: e.target.value }))}
+                                        placeholder="0.00"
+                                    />
+                                </div>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label>Total Amount</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={billReorderForm.total_amount}
+                                        onChange={(e) => setBillReorderForm((p) => ({ ...p, total_amount: e.target.value }))}
+                                        placeholder="0.00"
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label>Bill File (JPG, PNG, PDF — max 10 MB)</label>
+                                <input
+                                    type="file"
+                                    accept="image/jpeg,image/png,application/pdf"
+                                    onChange={(e) => setBillReorderFile(e.target.files?.[0] ?? null)}
+                                />
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button type="button" className="btn" onClick={() => setBillReorder(null)}>Cancel</button>
+                            <button type="submit" className="btn primary" disabled={billReorderProcessing || !billReorderForm.vendor_name.trim()}>
+                                {billReorderProcessing ? 'Saving…' : 'Save Bill & Update Stock'}
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
 

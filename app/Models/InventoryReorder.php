@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['raw_material_id', 'qty_ordered', 'unit', 'supplier', 'order_date', 'expected_delivery', 'transport_name', 'lr_number', 'notes', 'status', 'received_at', 'received_by'])]
+#[Fillable(['raw_material_id', 'qty_ordered', 'unit', 'supplier', 'order_date', 'expected_delivery', 'transport_name', 'lr_number', 'notes', 'status', 'received_at', 'received_by', 'billed_at'])]
 class InventoryReorder extends Model
 {
     /**
@@ -19,6 +19,7 @@ class InventoryReorder extends Model
             'order_date' => 'date',
             'expected_delivery' => 'date',
             'received_at' => 'datetime',
+            'billed_at' => 'datetime',
         ];
     }
 
