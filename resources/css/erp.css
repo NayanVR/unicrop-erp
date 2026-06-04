@@ -1867,6 +1867,7 @@ html.dark .badge.indigo {
     overflow-y: auto;
     flex: 1;
     min-height: 0;
+    max-height: calc(100vh - 180px);
 }
 .modal-footer {
     padding: 16px 24px;
