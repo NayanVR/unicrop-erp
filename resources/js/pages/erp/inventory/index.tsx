@@ -515,7 +515,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const alertMaterials = materials.filter((m) => {
         const s = stockStatus(m);
         if (s !== 'low' && s !== 'out') return false;
-        return !reorders.some((r) => r.raw_material_id === m.id && r.status === 'pending');
+        return !reorders.some((r) => r.raw_material_id === m.id && (r.status === 'pending' || r.status === 'received'));
     });
 
     const pendingReorders = reorders.filter((r) => r.status === 'pending');
