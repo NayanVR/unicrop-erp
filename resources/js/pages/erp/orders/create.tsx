@@ -375,11 +375,23 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                 let updated = { ...row, [field]: value };
 
                 if (field === 'our_brand') {
-                    const match = partyRates.find(
+                    const matches = partyRates.filter(
                         (r) => r.our_brand.toLowerCase() === value.toLowerCase(),
                     );
-                    if (match) updated.party_brand = match.party_brand ?? '';
-                    if (row.our_brand !== value) { updated.packing_size = ''; updated.rate = ''; }
+                    if (matches.length === 1) {
+                        // Only one size for this brand — auto-fill everything
+                        updated.party_brand  = matches[0].party_brand  ?? '';
+                        updated.packing_size = matches[0].packing_size ?? '';
+                        updated.rate         = String(matches[0].rate);
+                        updated.gst_percent  = String(matches[0].gst_percent);
+                    } else if (matches.length > 1) {
+                        // Multiple sizes — fill party_brand, let user pick size
+                        updated.party_brand = matches[0].party_brand ?? '';
+                        if (row.our_brand !== value) { updated.packing_size = ''; updated.rate = ''; }
+                    } else {
+                        // No match in party rates — just clear size/rate if brand changed
+                        if (row.our_brand !== value) { updated.packing_size = ''; updated.rate = ''; }
+                    }
                 } else if (field === 'packing_size') {
                     const match = partyRates.find(
                         (r) =>
