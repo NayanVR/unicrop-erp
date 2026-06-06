@@ -1894,6 +1894,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                     );
 
                                     return (
+                                        <>
                                         <div className="form-group" ref={groupNameRef} style={{ position: 'relative' }}>
                                             <label>Product Group <span style={{ fontSize: 11, color: 'var(--tx-muted)', fontWeight: 400 }}>(groups same-brand items)</span></label>
                                             <input
@@ -1954,6 +1955,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                             />
                                             {matForm.errors.shape && <div className="form-error">{matForm.errors.shape}</div>}
                                         </div>
+                                        </>
                                     );
                                 })()}
                                 <div className="form-group">
