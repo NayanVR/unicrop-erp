@@ -284,6 +284,9 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
     const partyRatesRef = useRef(partyRates);
     useEffect(() => { partyRatesRef.current = partyRates; }, [partyRates]);
 
+    const partyIdRef = useRef(form.data.party_id);
+    useEffect(() => { partyIdRef.current = form.data.party_id; }, [form.data.party_id]);
+
     const brandOptions = useMemo(
         () => [...new Set(partyRates.map((r) => r.our_brand))].sort(),
         [partyRates],
@@ -424,20 +427,29 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                 let updated = { ...row, [field]: value };
 
                 const rates = partyRatesRef.current;
+                const partyId = partyIdRef.current;
                 if (field === 'our_brand') {
                     const v = value.trim().toLowerCase();
                     const matches = rates.filter(
                         (r) => r.our_brand.trim().toLowerCase() === v,
                     );
-                    if (matches.length === 1) {
+                    if (matches.length >= 1) {
                         updated.party_brand  = matches[0].party_brand  ?? '';
                         updated.packing_size = matches[0].packing_size ?? '';
                         updated.rate         = String(matches[0].rate);
                         updated.gst_percent  = String(matches[0].gst_percent);
-                    } else if (matches.length > 1) {
-                        updated.party_brand = matches[0].party_brand ?? '';
-                        if (row.our_brand !== value) { updated.packing_size = ''; updated.rate = ''; }
                     } else {
+                        // No product_rates match — try product gallery link for party_brand
+                        if (partyId) {
+                            const photo = productPhotos.find(
+                                (p) => p.party_id !== null &&
+                                    String(p.party_id) === partyId &&
+                                    p.our_brand.trim().toLowerCase() === v,
+                            );
+                            if (photo?.party_brand) {
+                                updated.party_brand = photo.party_brand;
+                            }
+                        }
                         if (row.our_brand !== value) { updated.packing_size = ''; updated.rate = ''; }
                     }
                 } else if (field === 'packing_size') {

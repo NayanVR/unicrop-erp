@@ -244,7 +244,11 @@ class OrderController extends Controller
                 }
 
                 $shape = trim($item->shape ?? '');
-                $material = RawMaterial::whereRaw('LOWER(TRIM(name)) = ?', [strtolower($brandName)])
+                $baseQuery = fn () => RawMaterial::whereRaw('LOWER(TRIM(name)) = ?', [strtolower($brandName)])
+                    ->whereRaw("LOWER(category) LIKE '%finish%good%'")
+                    ->whereRaw("LOWER(category) NOT LIKE '%semi%'");
+
+                $material = $baseQuery()
                     ->when($shape !== '', fn ($q) =>
                         $q->whereRaw('LOWER(TRIM(COALESCE(shape, \'\'))) = ?', [strtolower($shape)])
                     )
@@ -252,9 +256,7 @@ class OrderController extends Controller
                         $q->where(fn ($q2) => $q2->whereNull('shape')->orWhere('shape', ''))
                     )
                     ->first()
-                    ?? RawMaterial::whereRaw('LOWER(TRIM(name)) = ?', [strtolower($brandName)])
-                        ->whereNull('shape')
-                        ->first();
+                    ?? $baseQuery()->whereNull('shape')->first();
                 if (! $material) {
                     continue;
                 }
