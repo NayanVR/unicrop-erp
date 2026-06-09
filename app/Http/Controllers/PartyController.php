@@ -21,14 +21,15 @@ class PartyController extends Controller
     {
         $parties = Party::withCount('documents')
             ->with(['productRates' => fn ($q) => $q->orderBy('our_brand')->orderBy('packing_size')])
+            ->where('type', 'customer')
             ->latest()
             ->get();
 
         $stats = [
-            'total' => $parties->count(),
-            'customers' => $parties->whereIn('type', ['customer', 'both'])->count(),
-            'suppliers' => $parties->whereIn('type', ['supplier', 'both'])->count(),
-            'active' => $parties->where('is_active', true)->count(),
+            'total'     => $parties->count(),
+            'customers' => $parties->count(),
+            'suppliers' => 0,
+            'active'    => $parties->where('is_active', true)->count(),
         ];
 
         $transports = Transport::transports()->orderBy('name')->get(['id', 'name']);

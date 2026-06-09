@@ -386,8 +386,8 @@ export default function PartiesIndex() {
                 <div className="card-toolbar">
                     <input className="search-input" placeholder="Search by name..." value={search} onChange={(e) => setSearch(e.target.value)} />
                     <div className="filter-tabs">
-                        {(['all', 'customer', 'supplier', 'both'] as const).map((f) => (
-                            <button key={f} className={`filter-tab${filter === f ? ' active' : ''}`} onClick={() => setFilter(f)}>
+                        {(pageTitle ? (['all', 'supplier', 'both'] as const) : (['all', 'customer'] as const)).map((f) => (
+                            <button key={f} className={`filter-tab${filter === f ? ' active' : ''}`} onClick={() => setFilter(f as typeof filter)}>
                                 {f.charAt(0).toUpperCase() + f.slice(1)}
                             </button>
                         ))}
