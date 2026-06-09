@@ -141,7 +141,9 @@ class OrderController extends Controller
             'salesUsers' => $salesUsers,
             'transports' => Transport::transports()->orderBy('name')->get(['id', 'name']),
             'couriers' => Transport::couriers()->orderBy('name')->get(['id', 'name']),
-            'parties' => Party::where('is_active', true)->orderBy('name')
+            'parties' => Party::where('is_active', true)
+                ->whereNotIn('type', ['supplier', 'vendor'])
+                ->orderBy('name')
                 ->with(['productRates' => fn ($q) => $q->where('is_active', true)->orderBy('our_brand')->orderBy('packing_size')])
                 ->get(['id', 'name', 'customer_name', 'gst_no', 'pan_no', 'pan_card_path', 'phone', 'address', 'city', 'state', 'default_transport_type', 'default_transport_id']),
             'currentUser' => ['id' => $user?->id, 'name' => $user?->name],
