@@ -983,11 +983,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                                 <td><input type="number" value={row.rate} onChange={(e) => updateRow(index, 'rate', e.target.value)} min="0" step="0.01" /></td>
                                                 <td><input type="number" value={row.gst_percent} onChange={(e) => updateRow(index, 'gst_percent', e.target.value)} min="0" step="0.01" /></td>
                                                 <td>
-                                                    <select value={row.shape} onChange={(e) => updateRow(index, 'shape', e.target.value)}>
-                                                        <option value="">—</option>
-                                                        <option value="Bottle">Bottle</option>
-                                                        <option value="Jar">Jar</option>
-                                                    </select>
+                                                    <input type="text" value={row.shape} onChange={(e) => updateRow(index, 'shape', e.target.value)} placeholder="Bottle/Jar" />
                                                 </td>
                                                 <td><input type="text" value={row.cap_color} onChange={(e) => updateRow(index, 'cap_color', e.target.value)} placeholder="Green" /></td>
                                                 <td>
