@@ -47,6 +47,40 @@ class PartyController extends Controller
         return Inertia::render('erp/parties/index', compact('parties', 'stats', 'transports', 'couriers', 'partyPhotos'));
     }
 
+    public function suppliersIndex(): Response
+    {
+        $parties = Party::withCount('documents')
+            ->with(['productRates' => fn ($q) => $q->orderBy('our_brand')->orderBy('packing_size')])
+            ->whereIn('type', ['supplier', 'vendor', 'both'])
+            ->latest()
+            ->get();
+
+        $stats = [
+            'total'     => $parties->count(),
+            'customers' => 0,
+            'suppliers' => $parties->count(),
+            'active'    => $parties->where('is_active', true)->count(),
+        ];
+
+        $transports = Transport::transports()->orderBy('name')->get(['id', 'name']);
+        $couriers   = Transport::couriers()->orderBy('name')->get(['id', 'name']);
+
+        $partyPhotos = ProductPhoto::whereNotNull('party_id')
+            ->get()
+            ->map(fn ($p) => [
+                'id'          => $p->id,
+                'party_id'    => $p->party_id,
+                'our_brand'   => $p->our_brand,
+                'party_brand' => $p->party_brand,
+                'photo_url'   => $p->photo_url,
+            ]);
+
+        $defaultFilter = 'all';
+        $pageTitle     = 'Supplier / Vendor';
+
+        return Inertia::render('erp/parties/index', compact('parties', 'stats', 'transports', 'couriers', 'partyPhotos', 'defaultFilter', 'pageTitle'));
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([

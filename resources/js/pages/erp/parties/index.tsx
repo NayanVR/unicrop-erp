@@ -80,6 +80,8 @@ type PageProps = {
     stats: Stats;
     transports: Transport[];
     couriers: Transport[];
+    defaultFilter?: 'all' | 'customer' | 'supplier' | 'both';
+    pageTitle?: string;
     flash?: { success?: string; error?: string };
 };
 
@@ -110,7 +112,7 @@ const defaultPartyForm = {
 };
 
 export default function PartiesIndex() {
-    const { parties, partyPhotos, stats, transports, couriers, flash } = usePage<PageProps>().props;
+    const { parties, partyPhotos, stats, transports, couriers, defaultFilter, pageTitle, flash } = usePage<PageProps>().props;
 
     // ── Party modal state ──────────────────────────────────────────────────
     const [showModal,   setShowModal]   = useState(false);
@@ -130,7 +132,7 @@ export default function PartiesIndex() {
 
     // ── Filters ────────────────────────────────────────────────────────────
     const [search, setSearch] = useState('');
-    const [filter, setFilter] = useState<'all' | 'customer' | 'supplier' | 'both'>('all');
+    const [filter, setFilter] = useState<'all' | 'customer' | 'supplier' | 'both'>(defaultFilter ?? 'all');
 
     // ── Refs ───────────────────────────────────────────────────────────────
     const docFileRef    = useRef<HTMLInputElement>(null);
@@ -366,7 +368,7 @@ export default function PartiesIndex() {
     return (
         <ErpLayout>
             <div className="page-header">
-                <h1 className="page-title">Parties</h1>
+                <h1 className="page-title">{pageTitle ?? 'Parties'}</h1>
                 <button className="btn-primary" onClick={openAdd}>+ Add Party</button>
             </div>
 
