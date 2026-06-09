@@ -368,8 +368,8 @@ export default function PartiesIndex() {
     return (
         <ErpLayout>
             <div className="page-header">
-                <h1 className="page-title">{pageTitle ?? 'Parties'}</h1>
-                <button className="btn-primary" onClick={openAdd}>+ Add Party</button>
+                {!pageTitle && <h1 className="page-title">Parties</h1>}
+                <button className="btn-primary" style={pageTitle ? { marginLeft: 'auto' } : undefined} onClick={openAdd}>+ Add Party</button>
             </div>
 
             {flash?.success && <div className="alert-success">{flash.success}</div>}
