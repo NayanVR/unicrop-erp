@@ -37,6 +37,8 @@ type ProductPhoto = {
     packing_size: string | null;
     mrp: string | null;
     photo_url: string;
+    bottle_jar: string | null;
+    cap_color: string | null;
 };
 
 type EditingOrderItem = {
@@ -423,18 +425,35 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                         updated.rate         = String(matches[0].rate);
                         updated.gst_percent  = String(matches[0].gst_percent);
                     } else {
-                        // No product_rates match — try product gallery link for party_brand
+                        // No product_rates match — try product gallery link for party_brand + bottle/cap
                         if (partyId) {
                             const photo = productPhotos.find(
                                 (p) => p.party_id !== null &&
                                     String(p.party_id) === partyId &&
                                     p.our_brand.trim().toLowerCase() === v,
                             );
-                            if (photo?.party_brand) {
-                                updated.party_brand = photo.party_brand;
-                            }
+                            if (photo?.party_brand) updated.party_brand = photo.party_brand;
+                            if (photo?.bottle_jar)  updated.shape = photo.bottle_jar;
+                            if (photo?.cap_color)   updated.cap_color = photo.cap_color;
+                        } else {
+                            // No party — still try to get bottle/cap from generic photo (party_id null)
+                            const photo = productPhotos.find(
+                                (p) => p.party_id === null && p.our_brand.trim().toLowerCase() === v,
+                            );
+                            if (photo?.bottle_jar) updated.shape = photo.bottle_jar;
+                            if (photo?.cap_color)  updated.cap_color = photo.cap_color;
                         }
                         if (row.our_brand !== value) { updated.packing_size = ''; updated.rate = ''; }
+                    }
+                    // Also fill bottle/cap from product_rates match (photo link overrides if present)
+                    if (matches.length >= 1 && partyId) {
+                        const photo = productPhotos.find(
+                            (p) => p.party_id !== null &&
+                                String(p.party_id) === partyId &&
+                                p.our_brand.trim().toLowerCase() === value.trim().toLowerCase(),
+                        );
+                        if (photo?.bottle_jar) updated.shape = photo.bottle_jar;
+                        if (photo?.cap_color)  updated.cap_color = photo.cap_color;
                     }
                 } else if (field === 'packing_size') {
                     const match = rates.find(
@@ -862,8 +881,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                         <th>Qty</th>
                                         <th>Rate</th>
                                         <th>GST %</th>
-                                        <th>Type</th>
-                                        <th>Shape</th>
+                                        <th>Bottle/Jar</th>
                                         <th>Cap Color</th>
                                         <th></th>
                                     </tr>
@@ -964,8 +982,13 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                                 </td>
                                                 <td><input type="number" value={row.rate} onChange={(e) => updateRow(index, 'rate', e.target.value)} min="0" step="0.01" /></td>
                                                 <td><input type="number" value={row.gst_percent} onChange={(e) => updateRow(index, 'gst_percent', e.target.value)} min="0" step="0.01" /></td>
-                                                <td><input type="text" value={row.type} onChange={(e) => updateRow(index, 'type', e.target.value)} placeholder="Liquid" /></td>
-                                                <td><input type="text" value={row.shape} onChange={(e) => updateRow(index, 'shape', e.target.value)} placeholder="Bottle" /></td>
+                                                <td>
+                                                    <select value={row.shape} onChange={(e) => updateRow(index, 'shape', e.target.value)}>
+                                                        <option value="">—</option>
+                                                        <option value="Bottle">Bottle</option>
+                                                        <option value="Jar">Jar</option>
+                                                    </select>
+                                                </td>
                                                 <td><input type="text" value={row.cap_color} onChange={(e) => updateRow(index, 'cap_color', e.target.value)} placeholder="Green" /></td>
                                                 <td>
                                                     <button type="button" className="btn danger-xs" onClick={() => removeRow(index)}>✕</button>

@@ -749,6 +749,8 @@ class OrderController extends Controller
                     'packing_size' => $size['packing_size'] ?? null,
                     'mrp'          => $size['mrp'] ?? null,
                     'photo_url'    => $p->photo_url,
+                    'bottle_jar'   => $p->bottle_jar,
+                    'cap_color'    => $p->cap_color,
                 ]);
             }
         });
