@@ -1,0 +1,25 @@
+{
+    "name": "Unicrop Biochem ERP",
+    "short_name": "Unicrop ERP",
+    "description": "Agrochemical Order Management Portal",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "portrait-primary",
+    "background_color": "#0f172a",
+    "theme_color": "#0f766e",
+    "icons": [
+        {
+            "src": "/favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        },
+        {
+            "src": "/apple-touch-icon.png",
+            "sizes": "166x166",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}

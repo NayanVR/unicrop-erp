@@ -8,6 +8,7 @@ export default function Login({ status }: Props) {
     const { data, setData, post, processing, errors } = useForm({
         email: '',
         password: '',
+        remember: true,
     });
 
     const submit = (e: React.FormEvent) => {
@@ -103,6 +104,14 @@ export default function Login({ status }: Props) {
                                         onChange={(e) => setData('password', e.target.value)}
                                     />
                                 </div>
+                                <label className="lf-remember">
+                                    <input
+                                        type="checkbox"
+                                        checked={data.remember}
+                                        onChange={(e) => setData('remember', e.target.checked)}
+                                    />
+                                    <span>Keep me signed in on this device</span>
+                                </label>
                                 <button
                                     className="login-btn"
                                     type="submit"

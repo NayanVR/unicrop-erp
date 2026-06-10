@@ -347,6 +347,24 @@ body {
     background: rgba(15, 118, 110, 0.1);
     box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.2);
 }
+.lf-remember {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    cursor: pointer;
+    user-select: none;
+}
+.lf-remember input[type='checkbox'] {
+    width: 15px;
+    height: 15px;
+    accent-color: #0f766e;
+    cursor: pointer;
+}
+.lf-remember span {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.55);
+}
 .login-btn {
     width: 100%;
     padding: 12px;
