@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\AppSetting;
+use App\Models\InventoryPurchaseBillItem;
+use App\Models\Party;
 use App\Models\RawMaterial;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -39,6 +41,8 @@ class LowStockAlertService
         } catch (\Throwable $e) {
             Log::error("LowStockAlertService error for material #{$material->id}: " . $e->getMessage());
         }
+
+        $this->notifySupplier($material);
     }
 
     public function sendTest(string $message): array
@@ -170,6 +174,76 @@ class LowStockAlertService
         }
 
         return $response->json('request_id') ?? 'sent';
+    }
+
+    // ── Supplier notification ────────────────────────────────────────────────
+
+    private function notifySupplier(RawMaterial $material): void
+    {
+        $party = $this->resolveSupplierParty($material);
+
+        if (! $party || empty($party->phone)) {
+            return;
+        }
+
+        $message = $this->formatSupplierMessage($material, $party);
+        $phone   = $this->normalizePhone($party->phone);
+
+        try {
+            if (AppSetting::get('alert_provider', 'twilio') === 'twilio') {
+                $sid   = AppSetting::get('alert_twilio_sid');
+                $token = AppSetting::get('alert_twilio_token');
+                $from  = AppSetting::get('alert_twilio_from');
+
+                if (!$sid || !$token || !$from) {
+                    return;
+                }
+
+                $this->twilioSend($sid, $token, "whatsapp:{$from}", "whatsapp:{$phone}", $message);
+            } else {
+                $this->sendViaMSG91($message, [$phone]);
+            }
+        } catch (\Throwable $e) {
+            Log::error("LowStockAlertService supplier notify error for material #{$material->id}: " . $e->getMessage());
+        }
+    }
+
+    private function resolveSupplierParty(RawMaterial $material): ?Party
+    {
+        if (! empty($material->supplier)) {
+            $party = Party::where('is_active', true)
+                ->whereIn('type', ['supplier', 'both'])
+                ->whereNotNull('phone')
+                ->whereRaw('LOWER(name) = ?', [mb_strtolower(trim($material->supplier))])
+                ->first();
+
+            if ($party) {
+                return $party;
+            }
+        }
+
+        $item = InventoryPurchaseBillItem::where('raw_material_id', $material->id)
+            ->whereHas('inventoryPurchaseBill.party', function ($q) {
+                $q->where('is_active', true)
+                    ->whereNotNull('phone')
+                    ->whereIn('type', ['supplier', 'both']);
+            })
+            ->with('inventoryPurchaseBill.party')
+            ->latest('id')
+            ->first();
+
+        return $item?->inventoryPurchaseBill?->party;
+    }
+
+    private function formatSupplierMessage(RawMaterial $material, Party $party): string
+    {
+        $stock = round((float) $material->stock_qty, 2);
+        $unit  = $material->unit ?? '';
+
+        return "Hello {$party->name},\n"
+            . "🙏 We are running low on *{$material->name}* (current stock: {$stock} {$unit}).\n"
+            . "Kindly arrange the supply at the earliest.\n"
+            . "Thank you - Unicrop Biochem";
     }
 
     // ── helpers ────────────────────────────────────────────────────────────

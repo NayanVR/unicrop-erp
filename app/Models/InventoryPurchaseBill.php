@@ -39,4 +39,12 @@ class InventoryPurchaseBill extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    /**
+     * @return BelongsTo<Party, InventoryPurchaseBill>
+     */
+    public function party(): BelongsTo
+    {
+        return $this->belongsTo(Party::class);
+    }
 }
