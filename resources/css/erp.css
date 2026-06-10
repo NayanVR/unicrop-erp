@@ -1858,9 +1858,20 @@ html.dark .badge.indigo {
     user-select: none;
     flex-shrink: 0;
 }
-/* Form wrapper must not break the modal's flex column (body scroll / fixed footer) */
+/* Form wrapper must not break the modal's flex column (body scroll / fixed footer).
+   display:contents is NOT used here — it would erase the form's box, dropping the
+   .modal-form padding and making long forms unscrollable. */
 .modal > form {
-    display: contents;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+/* The modal body scrolls — whether .modal-form is the form itself or an inner div */
+.modal .modal-form {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
 }
 .modal-header h2 {
     font-family: var(--font-head);
@@ -4089,6 +4100,7 @@ html.dark .badge.indigo {
     padding: 16px 0 20px;
     border-top: 1px solid var(--border);
     margin-top: 8px;
+    flex-shrink: 0;
 }
 .btn-secondary {
     display: inline-flex;
