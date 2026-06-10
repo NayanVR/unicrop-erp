@@ -978,73 +978,65 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                 )}
             </div>
 
-            {/* Low Stock Alerts — BOM outputs / Filling outputs / Purchase needed */}
+            {/* Stock Alerts — one banner per status: Out of Stock / Low Stock / Reorder Level */}
             {!isSales && role !== 'accountant' && alertMaterials.length > 0 && (() => {
                 const bomOutputIds     = Object.keys(bomOutputMap).map(Number);
                 const fillingOutputIds = Object.keys(fillingOutputMap).map(Number);
 
-                const bomAlerts     = alertMaterials.filter((m) => bomOutputIds.includes(m.id));
-                const fillingAlerts = alertMaterials.filter((m) => fillingOutputIds.includes(m.id) && !bomOutputIds.includes(m.id));
-                const otherAlerts   = alertMaterials.filter((m) => !bomOutputIds.includes(m.id) && !fillingOutputIds.includes(m.id));
+                const outAlerts     = alertMaterials.filter((m) => stockStatus(m) === 'out');
+                const lowAlerts     = alertMaterials.filter((m) => stockStatus(m) === 'low');
+                const reorderAlerts = alertMaterials.filter((m) => stockStatus(m) === 'reorder');
 
-                const alertColors = (s: ReturnType<typeof stockStatus>) => {
-                    if (s === 'out') return { border: '#fca5a5', bg: '#fef2f2', text: '#dc2626', icon: '🔴' };
-                    if (s === 'low') return { border: '#fcd34d', bg: '#fffbeb', text: '#d97706', icon: '🟡' };
-                    return { border: '#bae6fd', bg: '#f0f9ff', text: '#0284c7', icon: '🔵' };
+                const recipesFor = (m: RawMaterial): string[] | null => {
+                    if (bomOutputIds.includes(m.id)) return bomOutputMap[String(m.id)] ?? [];
+                    if (fillingOutputIds.includes(m.id)) return fillingOutputMap[String(m.id)] ?? [];
+                    return null;
                 };
 
-                const renderProductionAlert = (m: RawMaterial, recipeNames: string[], accent: string) => {
-                    const c = alertColors(stockStatus(m));
+                const renderChip = (m: RawMaterial, c: { border: string; bg: string; text: string; icon: string }) => {
+                    const recipes = recipesFor(m);
                     return (
                         <div key={m.id} style={{ borderRadius: 8, border: `1px solid ${c.border}`, background: c.bg, padding: '8px 12px', fontSize: 13, minWidth: 200 }}>
-                            <div style={{ fontWeight: 700, color: c.text, marginBottom: 2, cursor: 'pointer' }} onClick={() => { setSearch(m.name); setTab('materials'); }}>
-                                {c.icon} {m.name}: {fmt(m.stock_qty)} {m.unit}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ cursor: 'pointer', fontWeight: 700, color: c.text }} onClick={() => { setSearch(m.name); setTab('materials'); }}>
+                                    {c.icon} {m.name}: {fmt(m.stock_qty)} {m.unit}
+                                </span>
+                                {!recipes && (
+                                    <button type="button" className="btn sm primary" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => openOrderPlaced(m)}>
+                                        + Order Placed
+                                    </button>
+                                )}
                             </div>
-                            <div style={{ fontSize: 11, color: accent, fontWeight: 600, marginTop: 2 }}>
-                                Run: {recipeNames.join(', ')}
-                            </div>
+                            {recipes && recipes.length > 0 && (
+                                <div style={{ fontSize: 11, color: '#1e40af', fontWeight: 600, marginTop: 2 }}>
+                                    🏭 Run: {recipes.join(', ')}
+                                </div>
+                            )}
                         </div>
                     );
                 };
 
-                const renderPurchaseAlert = (m: RawMaterial) => {
-                    const c = alertColors(stockStatus(m));
-                    return (
-                        <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, border: `1px solid ${c.border}`, background: c.bg, fontSize: 13 }}>
-                            <span style={{ cursor: 'pointer', fontWeight: 600, color: c.text }} onClick={() => { setSearch(m.name); setTab('materials'); }}>
-                                {c.icon} {m.name}: {fmt(m.stock_qty)} {m.unit}
-                            </span>
-                            <button type="button" className="btn sm primary" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => openOrderPlaced(m)}>
-                                + Order Placed
-                            </button>
+                const banner = (
+                    title: string,
+                    items: RawMaterial[],
+                    c: { border: string; bg: string; text: string; icon: string },
+                ) => items.length > 0 && (
+                    <div className="card" style={{ borderLeft: `4px solid ${c.text}` }}>
+                        <div className="card-title" style={{ marginBottom: 8, color: c.text }}>
+                            {c.icon} {title}
+                            <span className="ct-badge" style={{ background: c.text, color: '#fff' }}>{items.length}</span>
                         </div>
-                    );
-                };
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                            {items.map((m) => renderChip(m, c))}
+                        </div>
+                    </div>
+                );
 
                 return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-                        {bomAlerts.length > 0 && (
-                            <div className="card">
-                                <div className="card-title" style={{ marginBottom: 8 }}>⚗️ BOM Production Required ({bomAlerts.length})</div>
-                                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                                    {bomAlerts.map((m) => renderProductionAlert(m, bomOutputMap[String(m.id)] ?? [], '#1e40af'))}
-                                </div>
-                            </div>
-                        )}
-                        {fillingAlerts.length > 0 && (
-                            <div className="card">
-                                <div className="card-title" style={{ marginBottom: 8 }}>🧪 Filling Production Required ({fillingAlerts.length})</div>
-                                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                                    {fillingAlerts.map((m) => renderProductionAlert(m, fillingOutputMap[String(m.id)] ?? [], '#065f46'))}
-                                </div>
-                            </div>
-                        )}
-                        {otherAlerts.length > 0 && (
-                            <div className="card">
-                                <div className="card-title" style={{ marginBottom: 8 }}>⚠ Purchase Required ({otherAlerts.length})</div>
-                                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>{otherAlerts.map(renderPurchaseAlert)}</div>
-                            </div>
-                        )}
+                        {banner('Out of Stock', outAlerts, { border: '#fca5a5', bg: '#fef2f2', text: '#dc2626', icon: '🔴' })}
+                        {banner('Low Stock Alert', lowAlerts, { border: '#fcd34d', bg: '#fffbeb', text: '#d97706', icon: '🟡' })}
+                        {banner('Reorder Level', reorderAlerts, { border: '#bae6fd', bg: '#f0f9ff', text: '#0284c7', icon: '🔵' })}
                     </div>
                 );
             })()}
