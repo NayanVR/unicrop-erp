@@ -54,6 +54,7 @@ const NAV_DEFS: Record<string, NavItem[]> = {
         { id: 'photo-gallery', label: 'Product Gallery', icon: '📷', href: galleryIndex() },
         { id: 'parties', label: 'Parties', icon: '🏢', href: partiesIndex() },
         { id: 'suppliers', label: 'Supplier / Vendor', icon: '🏭', href: '/suppliers' as NonNullable<InertiaLinkProps['href']> },
+        { id: 'profit-loss', label: 'Profit / Loss', icon: '📈', href: '/reports/profit-loss' as NonNullable<InertiaLinkProps['href']> },
         { id: 'users', label: 'User Management', icon: '👥', href: usersIndex() },
         { id: 'settings', label: 'Settings', icon: '⚙️', href: settingsIndex() },
     ],
