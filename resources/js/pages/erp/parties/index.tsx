@@ -1,4 +1,4 @@
-import ErpLayout from '@/layouts/erp-layout';
+
 import {
     destroy as partyDestroy,
     store as partyStore,
@@ -366,7 +366,7 @@ export default function PartiesIndex() {
 
     // ──────────────────────────────────────────────────────────────────────
     return (
-        <ErpLayout>
+        <>
             <div className="page-header">
                 {!pageTitle && <h1 className="page-title">Parties</h1>}
                 <button className="btn-primary" style={pageTitle ? { marginLeft: 'auto' } : undefined} onClick={openAdd}>+ Add Party</button>
@@ -857,6 +857,6 @@ export default function PartiesIndex() {
                     </div>
                 </div>
             )}
-        </ErpLayout>
+        </>
     );
 }

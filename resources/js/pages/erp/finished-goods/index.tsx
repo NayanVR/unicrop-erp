@@ -1,5 +1,5 @@
 import type { Auth } from '@/types/auth';
-import ErpLayout from '@/layouts/erp-layout';
+
 import {
     destroy as finishedGoodsDestroy,
     store as finishedGoodsStore,
@@ -174,7 +174,7 @@ export default function FinishedGoodsIndex() {
     }, [filtered]);
 
     return (
-        <ErpLayout>
+        <>
             <div className="page-header">
                 <h1 className="page-title">Finished Goods</h1>
                 <button className="btn-primary" onClick={openAdd}>+ Add Entry</button>
@@ -405,6 +405,6 @@ export default function FinishedGoodsIndex() {
                     </div>
                 </div>
             )}
-        </ErpLayout>
+        </>
     );
 }

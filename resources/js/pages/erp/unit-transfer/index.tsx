@@ -1,4 +1,4 @@
-import ErpLayout from '@/layouts/erp-layout';
+
 import {
     destroy as transferDestroy,
     status as transferStatus,
@@ -102,7 +102,7 @@ export default function UnitTransferIndex() {
     });
 
     return (
-        <ErpLayout>
+        <>
             <div className="page-header">
                 <h1 className="page-title">Unit Transfers</h1>
                 <button className="btn-primary" onClick={() => { reset(); setShowModal(true); }}>+ New Transfer</button>
@@ -277,6 +277,6 @@ export default function UnitTransferIndex() {
                     </div>
                 </div>
             )}
-        </ErpLayout>
+        </>
     );
 }

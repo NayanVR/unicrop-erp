@@ -1,4 +1,4 @@
-import ErpLayout from '@/layouts/erp-layout';
+
 import {
     destroy as designDestroy,
     store as designStore,
@@ -113,7 +113,7 @@ export default function DesignIndex() {
     });
 
     return (
-        <ErpLayout>
+        <>
             <div className="page-header">
                 <div className="page-header-left">
                     <h1>Design Workflow</h1>
@@ -302,6 +302,6 @@ export default function DesignIndex() {
                     </div>
                 </div>
             )}
-        </ErpLayout>
+        </>
     );
 }
