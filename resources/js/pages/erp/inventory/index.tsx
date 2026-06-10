@@ -546,7 +546,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
 
     const alertMaterials = materials.filter((m) => {
         const s = stockStatus(m);
-        if (s !== 'low' && s !== 'out') return false;
+        if (s !== 'low' && s !== 'out' && s !== 'reorder') return false;
         return !reorders.some((r) => r.raw_material_id === m.id && (r.status === 'pending' || (r.status === 'received' && !r.billed_at)));
     });
 
@@ -987,12 +987,18 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                 const fillingAlerts = alertMaterials.filter((m) => fillingOutputIds.includes(m.id) && !bomOutputIds.includes(m.id));
                 const otherAlerts   = alertMaterials.filter((m) => !bomOutputIds.includes(m.id) && !fillingOutputIds.includes(m.id));
 
+                const alertColors = (s: ReturnType<typeof stockStatus>) => {
+                    if (s === 'out') return { border: '#fca5a5', bg: '#fef2f2', text: '#dc2626', icon: '🔴' };
+                    if (s === 'low') return { border: '#fcd34d', bg: '#fffbeb', text: '#d97706', icon: '🟡' };
+                    return { border: '#bae6fd', bg: '#f0f9ff', text: '#0284c7', icon: '🔵' };
+                };
+
                 const renderProductionAlert = (m: RawMaterial, recipeNames: string[], accent: string) => {
-                    const s = stockStatus(m);
+                    const c = alertColors(stockStatus(m));
                     return (
-                        <div key={m.id} style={{ borderRadius: 8, border: `1px solid ${s === 'out' ? '#fca5a5' : '#fcd34d'}`, background: s === 'out' ? '#fef2f2' : '#fffbeb', padding: '8px 12px', fontSize: 13, minWidth: 200 }}>
-                            <div style={{ fontWeight: 700, color: s === 'out' ? '#dc2626' : '#d97706', marginBottom: 2, cursor: 'pointer' }} onClick={() => { setSearch(m.name); setTab('materials'); }}>
-                                {s === 'out' ? '🔴' : '🟡'} {m.name}: {fmt(m.stock_qty)} {m.unit}
+                        <div key={m.id} style={{ borderRadius: 8, border: `1px solid ${c.border}`, background: c.bg, padding: '8px 12px', fontSize: 13, minWidth: 200 }}>
+                            <div style={{ fontWeight: 700, color: c.text, marginBottom: 2, cursor: 'pointer' }} onClick={() => { setSearch(m.name); setTab('materials'); }}>
+                                {c.icon} {m.name}: {fmt(m.stock_qty)} {m.unit}
                             </div>
                             <div style={{ fontSize: 11, color: accent, fontWeight: 600, marginTop: 2 }}>
                                 Run: {recipeNames.join(', ')}
@@ -1002,11 +1008,11 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                 };
 
                 const renderPurchaseAlert = (m: RawMaterial) => {
-                    const s = stockStatus(m);
+                    const c = alertColors(stockStatus(m));
                     return (
-                        <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, border: `1px solid ${s === 'out' ? '#fca5a5' : '#fcd34d'}`, background: s === 'out' ? '#fef2f2' : '#fffbeb', fontSize: 13 }}>
-                            <span style={{ cursor: 'pointer', fontWeight: 600, color: s === 'out' ? '#dc2626' : '#d97706' }} onClick={() => { setSearch(m.name); setTab('materials'); }}>
-                                {s === 'out' ? '🔴' : '🟡'} {m.name}: {fmt(m.stock_qty)} {m.unit}
+                        <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, border: `1px solid ${c.border}`, background: c.bg, fontSize: 13 }}>
+                            <span style={{ cursor: 'pointer', fontWeight: 600, color: c.text }} onClick={() => { setSearch(m.name); setTab('materials'); }}>
+                                {c.icon} {m.name}: {fmt(m.stock_qty)} {m.unit}
                             </span>
                             <button type="button" className="btn sm primary" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => openOrderPlaced(m)}>
                                 + Order Placed
