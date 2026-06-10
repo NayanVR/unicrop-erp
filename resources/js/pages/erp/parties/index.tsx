@@ -114,6 +114,10 @@ const defaultPartyForm = {
 export default function PartiesIndex() {
     const { parties, partyPhotos, stats, transports, couriers, defaultFilter, pageTitle, flash } = usePage<PageProps>().props;
 
+    // pageTitle is only set on the Supplier / Vendor page; the plain Parties page has none
+    const isSupplierPage = !!pageTitle;
+    const entityLabel = isSupplierPage ? 'Supplier / Vendor' : 'Party';
+
     // ── Party modal state ──────────────────────────────────────────────────
     const [showModal,   setShowModal]   = useState(false);
     const [editing,     setEditing]     = useState<Party | null>(null);
@@ -205,6 +209,7 @@ export default function PartiesIndex() {
     // ── Party CRUD ─────────────────────────────────────────────────────────
     const openAdd = () => {
         reset();
+        if (isSupplierPage) setData('type', 'supplier');
         setEditing(null);
         setShowModal(true);
         if (panFileRef.current) panFileRef.current.value = '';
@@ -369,7 +374,7 @@ export default function PartiesIndex() {
         <>
             <div className="page-header">
                 {!pageTitle && <h1 className="page-title">Parties</h1>}
-                <button className="btn-primary" style={pageTitle ? { marginLeft: 'auto' } : undefined} onClick={openAdd}>+ Add Party</button>
+                <button className="btn-primary" style={pageTitle ? { marginLeft: 'auto' } : undefined} onClick={openAdd}>+ Add {entityLabel}</button>
             </div>
 
             {flash?.success && <div className="alert-success">{flash.success}</div>}
@@ -444,10 +449,11 @@ export default function PartiesIndex() {
                 <div className="modal-overlay open" onClick={() => setShowModal(false)}>
                     <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h2>{editing ? 'Edit Party' : 'Add Party'}</h2>
+                            <h2>{editing ? `Edit ${entityLabel}` : `Add ${entityLabel}`}</h2>
                             <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
                         </div>
-                        <form onSubmit={submit} className="modal-form">
+                        <form onSubmit={submit}>
+                            <div className="modal-form" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
                             <div className="form-row">
                                 <div className="form-group" style={{ flex: 2 }}>
                                     <label>Company Name *</label>
@@ -457,9 +463,20 @@ export default function PartiesIndex() {
                                 <div className="form-group">
                                     <label>Type *</label>
                                     <select value={data.type} onChange={(e) => setData('type', e.target.value as typeof data.type)}>
-                                        <option value="customer">Customer</option>
-                                        <option value="supplier">Supplier</option>
-                                        <option value="both">Both</option>
+                                        {isSupplierPage ? (
+                                            <>
+                                                <option value="supplier">Supplier</option>
+                                                {editing && data.type !== 'supplier' && (
+                                                    <option value={data.type}>{data.type.charAt(0).toUpperCase() + data.type.slice(1)}</option>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <option value="customer">Customer</option>
+                                                <option value="supplier">Supplier</option>
+                                                <option value="both">Both</option>
+                                            </>
+                                        )}
                                     </select>
                                 </div>
                             </div>
@@ -517,9 +534,10 @@ export default function PartiesIndex() {
                                     </select>
                                 </div>
                             </div>
-                            <div className="modal-actions">
+                            </div>
+                            <div className="modal-actions" style={{ padding: '16px 24px 20px', marginTop: 0 }}>
                                 <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                                <button type="submit" className="btn-primary" disabled={processing}>{processing ? 'Saving…' : editing ? 'Update' : 'Add Party'}</button>
+                                <button type="submit" className="btn-primary" disabled={processing}>{processing ? 'Saving…' : editing ? 'Update' : `Add ${entityLabel}`}</button>
                             </div>
                         </form>
                     </div>
