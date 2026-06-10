@@ -700,7 +700,8 @@ body {
     flex: 1;
     padding: 24px 28px;
     position: relative;
-    z-index: 1;
+    /* No z-index here: it would trap fixed modals (.modal-overlay, z-index 1000)
+       in a stacking context below the sidebar (100) and sticky topbar (50). */
 }
 
 .view {
