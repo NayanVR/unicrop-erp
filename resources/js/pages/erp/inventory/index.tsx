@@ -978,23 +978,28 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                 )}
             </div>
 
-            {/* Stock Alerts — one banner per status: Out of Stock / Low Stock / Reorder Level */}
+            {/* Stock Alerts — Out of Stock / Low Stock / BOM Production / Filling Production / Reorder Level */}
             {!isSales && role !== 'accountant' && alertMaterials.length > 0 && (() => {
                 const bomOutputIds     = Object.keys(bomOutputMap).map(Number);
                 const fillingOutputIds = Object.keys(fillingOutputMap).map(Number);
+                const isProduced = (m: RawMaterial) => bomOutputIds.includes(m.id) || fillingOutputIds.includes(m.id);
 
-                const outAlerts     = alertMaterials.filter((m) => stockStatus(m) === 'out');
-                const lowAlerts     = alertMaterials.filter((m) => stockStatus(m) === 'low');
-                const reorderAlerts = alertMaterials.filter((m) => stockStatus(m) === 'reorder');
+                // Produced (BOM/Filling output) materials go to the production banners;
+                // purchased materials are split by status.
+                const outAlerts     = alertMaterials.filter((m) => !isProduced(m) && stockStatus(m) === 'out');
+                const lowAlerts     = alertMaterials.filter((m) => !isProduced(m) && stockStatus(m) === 'low');
+                const reorderAlerts = alertMaterials.filter((m) => !isProduced(m) && stockStatus(m) === 'reorder');
+                const bomAlerts     = alertMaterials.filter((m) => bomOutputIds.includes(m.id));
+                const fillingAlerts = alertMaterials.filter((m) => fillingOutputIds.includes(m.id) && !bomOutputIds.includes(m.id));
 
-                const recipesFor = (m: RawMaterial): string[] | null => {
-                    if (bomOutputIds.includes(m.id)) return bomOutputMap[String(m.id)] ?? [];
-                    if (fillingOutputIds.includes(m.id)) return fillingOutputMap[String(m.id)] ?? [];
-                    return null;
+                const statusColors = (s: ReturnType<typeof stockStatus>) => {
+                    if (s === 'out') return { border: '#fca5a5', bg: '#fef2f2', text: '#dc2626', icon: '🔴' };
+                    if (s === 'low') return { border: '#fcd34d', bg: '#fffbeb', text: '#d97706', icon: '🟡' };
+                    return { border: '#bae6fd', bg: '#f0f9ff', text: '#0284c7', icon: '🔵' };
                 };
 
-                const renderChip = (m: RawMaterial, c: { border: string; bg: string; text: string; icon: string }) => {
-                    const recipes = recipesFor(m);
+                const renderChip = (m: RawMaterial, recipes: string[] | null) => {
+                    const c = statusColors(stockStatus(m));
                     return (
                         <div key={m.id} style={{ borderRadius: 8, border: `1px solid ${c.border}`, background: c.bg, padding: '8px 12px', fontSize: 13, minWidth: 200 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1018,25 +1023,29 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
 
                 const banner = (
                     title: string,
+                    icon: string,
+                    accent: string,
                     items: RawMaterial[],
-                    c: { border: string; bg: string; text: string; icon: string },
+                    recipesFor: ((m: RawMaterial) => string[]) | null,
                 ) => items.length > 0 && (
-                    <div className="card" style={{ borderLeft: `4px solid ${c.text}` }}>
-                        <div className="card-title" style={{ marginBottom: 8, color: c.text }}>
-                            {c.icon} {title}
-                            <span className="ct-badge" style={{ background: c.text, color: '#fff' }}>{items.length}</span>
+                    <div className="card" style={{ borderLeft: `4px solid ${accent}` }}>
+                        <div className="card-title" style={{ marginBottom: 8, color: accent }}>
+                            {icon} {title}
+                            <span className="ct-badge" style={{ background: accent, color: '#fff' }}>{items.length}</span>
                         </div>
                         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                            {items.map((m) => renderChip(m, c))}
+                            {items.map((m) => renderChip(m, recipesFor ? recipesFor(m) : null))}
                         </div>
                     </div>
                 );
 
                 return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-                        {banner('Out of Stock', outAlerts, { border: '#fca5a5', bg: '#fef2f2', text: '#dc2626', icon: '🔴' })}
-                        {banner('Low Stock Alert', lowAlerts, { border: '#fcd34d', bg: '#fffbeb', text: '#d97706', icon: '🟡' })}
-                        {banner('Reorder Level', reorderAlerts, { border: '#bae6fd', bg: '#f0f9ff', text: '#0284c7', icon: '🔵' })}
+                        {banner('Out of Stock', '🔴', '#dc2626', outAlerts, null)}
+                        {banner('Low Stock Alert', '🟡', '#d97706', lowAlerts, null)}
+                        {banner('BOM Production Required', '⚗️', '#7c3aed', bomAlerts, (m) => bomOutputMap[String(m.id)] ?? [])}
+                        {banner('Filling Production Required', '🧪', '#0891b2', fillingAlerts, (m) => fillingOutputMap[String(m.id)] ?? [])}
+                        {banner('Reorder Level', '🔵', '#0284c7', reorderAlerts, null)}
                     </div>
                 );
             })()}
