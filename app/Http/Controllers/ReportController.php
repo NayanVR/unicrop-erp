@@ -16,8 +16,9 @@ class ReportController extends Controller
      *
      * Sales come from confirmed/dispatched order items (ex-GST amounts).
      * Cost per unit is resolved per product (our_brand + packing_size):
-     * first from the matching filling recipe (live raw-material costs),
-     * falling back to the latest finished-goods batch cost.
+     * first from the matching filling recipe's output material cost
+     * (kept in sync with the recipe by FillingController::syncOutputCost,
+     * unit-converted), falling back to the latest finished-goods batch cost.
      */
     public function profitLoss(Request $request): Response
     {
@@ -74,12 +75,12 @@ class ReportController extends Controller
             ->map(fn ($r) => mb_strtolower($r['our_brand']) . '|' . mb_strtolower($r['packing_size']))
             ->unique();
 
-        $recipes = FillingRecipe::with('items.rawMaterial:id,cost_per_unit')
+        $recipes = FillingRecipe::with('outputMaterial:id,cost_per_unit')
             ->where('is_active', true)
-            ->get(['id', 'name', 'packing_size']);
+            ->get(['id', 'name', 'packing_size', 'output_raw_material_id']);
 
         $latestFg = FinishedGood::query()
-            ->orderByDesc('id')
+            ->orderBy('id')
             ->get(['name', 'packing_size', 'cost_per_unit'])
             ->keyBy(fn ($fg) => mb_strtolower(trim((string) $fg->name)) . '|' . mb_strtolower(trim((string) $fg->packing_size)));
 
@@ -90,7 +91,7 @@ class ReportController extends Controller
                 && mb_strtolower(trim((string) $r->packing_size)) === $size);
 
             if ($recipe) {
-                $cost = $recipe->items->sum(fn ($i) => (float) $i->qty_per_unit * (float) ($i->rawMaterial->cost_per_unit ?? 0));
+                $cost = (float) ($recipe->outputMaterial->cost_per_unit ?? 0);
                 if ($cost > 0) {
                     $costs[$key] = round($cost, 4);
                     continue;
