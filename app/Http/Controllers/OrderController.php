@@ -219,6 +219,25 @@ class OrderController extends Controller
         }
     }
 
+    public function print(Request $request, Order $order): \Illuminate\View\View
+    {
+        $user = $request->user();
+        $user->loadMissing('roles');
+        $role = $user->roles->first()?->slug;
+
+        // Sales users may only print their own draft/submitted orders, plus
+        // any confirmed/dispatched order (mirrors the visibility rules in index()).
+        if ($role === Role::SALES
+            && ! in_array($order->status, ['confirmed', 'dispatched'], true)
+            && $order->created_by !== $user->id) {
+            abort(403);
+        }
+
+        $order->load('items');
+
+        return view('orders.print', ['order' => $order]);
+    }
+
     public function confirm(Request $request, Order $order): RedirectResponse
     {
         if ($order->status !== 'submitted') {

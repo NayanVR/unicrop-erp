@@ -963,6 +963,19 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                         )}
                                     </div>
 
+                                    {/* Print / Download PDF — available to anyone who can see this order */}
+                                    <div className="activity-row" style={{ gap: '6px' }}>
+                                        <a
+                                            href={`/orders/${order.id}/print`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="btn sm"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            🖨️ Print / PDF
+                                        </a>
+                                    </div>
+
                                     {/* Edit / Delete — shown based on role and order status */}
                                     {!isDesign && (canEditOrder(order) || canDeleteOrder(order)) && (
                                         <div className="activity-row" style={{ gap: '6px' }}>
