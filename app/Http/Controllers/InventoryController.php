@@ -37,6 +37,18 @@ class InventoryController extends Controller
             ->get();
 
         if ($isSales) {
+            // Admin controls which categories the sales team can see
+            $hiddenCategories = InventoryCategory::query()
+                ->where('visible_to_sales', false)
+                ->pluck('name')
+                ->map(fn ($n) => mb_strtolower(trim($n)));
+
+            $materials = $materials->reject(
+                fn ($m) => $hiddenCategories->contains(mb_strtolower(trim((string) $m->category)))
+            )->values();
+        }
+
+        if ($isSales) {
             $materials->each(function ($m) {
                 $m->cost_per_unit = null;
                 $m->supplier      = null;
@@ -87,6 +99,9 @@ class InventoryController extends Controller
         ];
 
         $inventoryCategories = InventoryCategory::orderBy('name')->get();
+        if ($isSales) {
+            $inventoryCategories = $inventoryCategories->where('visible_to_sales', true)->values();
+        }
 
         $bomOutputMap    = $isSales ? [] : Bom::whereNotNull('output_raw_material_id')
             ->where('is_active', true)
@@ -574,8 +589,9 @@ class InventoryController extends Controller
     public function storeCategory(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'name'  => 'required|string|max:100|unique:inventory_categories,name',
-            'color' => 'nullable|string|max:20',
+            'name'             => 'required|string|max:100|unique:inventory_categories,name',
+            'color'            => 'nullable|string|max:20',
+            'visible_to_sales' => 'boolean',
         ]);
         InventoryCategory::create($data);
         return redirect()->back()->with('success', 'Category created.');
@@ -584,8 +600,9 @@ class InventoryController extends Controller
     public function updateCategory(Request $request, InventoryCategory $category): RedirectResponse
     {
         $data = $request->validate([
-            'name'  => 'required|string|max:100|unique:inventory_categories,name,' . $category->id,
-            'color' => 'nullable|string|max:20',
+            'name'             => 'required|string|max:100|unique:inventory_categories,name,' . $category->id,
+            'color'            => 'nullable|string|max:20',
+            'visible_to_sales' => 'boolean',
         ]);
 
         $oldName = $category->name;

@@ -123,6 +123,7 @@ type InventoryCategory = {
     id: number;
     name: string;
     color: string | null;
+    visible_to_sales: boolean;
 };
 
 type GodownStock = {
@@ -258,7 +259,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     // Category management
     const [catMgmtModal, setCatMgmtModal] = useState(false);
     const [editingCat, setEditingCat] = useState<InventoryCategory | null>(null);
-    const [catForm, setCatForm] = useState({ name: '', color: '' });
+    const [catForm, setCatForm] = useState({ name: '', color: '', visible_to_sales: true });
     const [catSaving, setCatSaving] = useState(false);
 
     // Filters
@@ -561,13 +562,13 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
 
     const openNewCat = () => {
         setEditingCat(null);
-        setCatForm({ name: '', color: '' });
+        setCatForm({ name: '', color: '', visible_to_sales: true });
         setCatMgmtModal(true);
     };
 
     const openEditCat = (cat: InventoryCategory) => {
         setEditingCat(cat);
-        setCatForm({ name: cat.name, color: cat.color ?? '' });
+        setCatForm({ name: cat.name, color: cat.color ?? '', visible_to_sales: cat.visible_to_sales !== false });
         setCatMgmtModal(true);
     };
 
@@ -1673,6 +1674,11 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                     <span style={{ color: '#6b7280', fontSize: 12 }}>
                                         ({materials.filter((m) => m.category === cat.name).length} items)
                                     </span>
+                                    {cat.visible_to_sales === false && (
+                                        <span style={{ fontSize: 11, fontWeight: 600, color: '#dc2626', background: '#fee2e2', borderRadius: 6, padding: '2px 8px' }}>
+                                            🚫 Hidden from sales
+                                        </span>
+                                    )}
                                     <button
                                         className="btn sm"
                                         style={{ padding: '1px 8px', fontSize: 12, marginLeft: 4 }}
@@ -3386,6 +3392,20 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                         Clear
                                     </button>
                                 )}
+                            </div>
+                        </div>
+                        <div className="form-group">
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={catForm.visible_to_sales}
+                                    onChange={(e) => setCatForm((f) => ({ ...f, visible_to_sales: e.target.checked }))}
+                                    style={{ width: 16, height: 16 }}
+                                />
+                                Visible to sales team
+                            </label>
+                            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                                If unchecked, sales users will not see this category's products in inventory.
                             </div>
                         </div>
                     </div>
