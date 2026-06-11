@@ -40,6 +40,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Orders list — controller filters by role; sales see confirmed/dispatched only
     Route::middleware(['role:admin,sales,design,accountant'])->group(function () {
         Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
+    });
+
+    // Order print/PDF — also needed by factory for production orders
+    Route::middleware(['role:admin,sales,design,accountant,factory'])->group(function () {
         Route::get('orders/{order}/print', [OrderController::class, 'print'])->name('orders.print');
     });
 

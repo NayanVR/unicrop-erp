@@ -756,9 +756,15 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                         <button type="button" className="btn sm" onClick={() => toggleOrder(order.id)}>
                                             👁 {isOpen ? 'Hide' : 'View'}
                                         </button>
-                                        <button type="button" className="btn sm" onClick={() => window.print()}>
+                                        <a
+                                            href={`/orders/${order.id}/print`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="btn sm"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
                                             🖨 Print
-                                        </button>
+                                        </a>
                                         {canAdvance && (
                                             <button
                                                 type="button"
