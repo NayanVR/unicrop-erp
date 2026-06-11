@@ -8,6 +8,11 @@ import {
     store as transportStore,
     update as transportUpdate,
 } from '@/routes/settings/transports';
+import {
+    destroy as packingSizeDestroy,
+    store as packingSizeStore,
+    update as packingSizeUpdate,
+} from '@/routes/settings/packing-sizes';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 
@@ -28,6 +33,12 @@ type TransportEntry = {
     is_active: boolean;
 };
 
+type PackingSizeEntry = {
+    id: number;
+    name: string;
+    multiplier: string | number;
+};
+
 type AlertSettings = {
     alert_enabled: string;
     alert_provider: string;
@@ -46,6 +57,7 @@ type Props = {
     products: Product[];
     transports: TransportEntry[];
     alertSettings: AlertSettings;
+    packingSizes: PackingSizeEntry[];
 };
 
 type ProductForm = {
@@ -62,15 +74,23 @@ type TransportForm = {
     type: 'transport' | 'courier';
 };
 
+type PackingSizeForm = {
+    name: string;
+    multiplier: string;
+};
+
 const GST_OPTIONS = ['0', '5', '12', '18', '28'];
 
-export default function SettingsIndex({ products, transports, alertSettings }: Props) {
+export default function SettingsIndex({ products, transports, alertSettings, packingSizes }: Props) {
     const [modalOpen, setModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
     const [transportModalOpen, setTransportModalOpen] = useState(false);
     const [editingTransport, setEditingTransport] = useState<TransportEntry | null>(null);
     const [transportTab, setTransportTab] = useState<'transport' | 'courier'>('transport');
+
+    const [packingSizeModalOpen, setPackingSizeModalOpen] = useState(false);
+    const [editingPackingSize, setEditingPackingSize] = useState<PackingSizeEntry | null>(null);
 
     const [alertSaving, setAlertSaving] = useState(false);
     const [alertTesting, setAlertTesting] = useState(false);
@@ -130,6 +150,11 @@ export default function SettingsIndex({ products, transports, alertSettings }: P
     const transportForm = useForm<TransportForm>({
         name: '',
         type: 'transport',
+    });
+
+    const packingSizeForm = useForm<PackingSizeForm>({
+        name: '',
+        multiplier: '1',
     });
 
     // ── Product handlers ──────────────────────────────────────────────────
@@ -208,6 +233,40 @@ export default function SettingsIndex({ products, transports, alertSettings }: P
     };
 
     const filteredTransports = transports.filter((t) => t.type === transportTab);
+
+    // ── Packing size handlers ─────────────────────────────────────────────
+    const openNewPackingSize = () => {
+        packingSizeForm.setData({ name: '', multiplier: '1' });
+        packingSizeForm.clearErrors();
+        setEditingPackingSize(null);
+        setPackingSizeModalOpen(true);
+    };
+
+    const openEditPackingSize = (p: PackingSizeEntry) => {
+        packingSizeForm.setData({ name: p.name, multiplier: String(p.multiplier) });
+        packingSizeForm.clearErrors();
+        setEditingPackingSize(p);
+        setPackingSizeModalOpen(true);
+    };
+
+    const closePackingSizeModal = () => {
+        setPackingSizeModalOpen(false);
+        packingSizeForm.reset();
+        setEditingPackingSize(null);
+    };
+
+    const savePackingSize = () => {
+        if (editingPackingSize) {
+            packingSizeForm.patch(packingSizeUpdate(editingPackingSize.id).url, { preserveScroll: true, onSuccess: closePackingSizeModal });
+        } else {
+            packingSizeForm.post(packingSizeStore().url, { preserveScroll: true, onSuccess: closePackingSizeModal });
+        }
+    };
+
+    const deletePackingSize = (p: PackingSizeEntry) => {
+        if (!confirm(`Delete "${p.name}"?`)) return;
+        packingSizeForm.delete(packingSizeDestroy(p.id).url, { preserveScroll: true });
+    };
 
     return (
         <>
@@ -328,6 +387,56 @@ export default function SettingsIndex({ products, transports, alertSettings }: P
                                                 <div style={{ display: 'flex', gap: '6px' }}>
                                                     <button className="btn sm" onClick={() => openEditTransport(t)}>Rename</button>
                                                     <button className="btn danger-xs" onClick={() => deleteTransport(t)}>Delete</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+
+                {/* Packing Sizes */}
+                <div className="card" style={{ marginTop: '16px' }}>
+                    <div className="card-title" style={{ marginBottom: '12px' }}>
+                        📐 Packing Sizes
+                        <span className="ct-badge">{packingSizes.length} sizes</span>
+                    </div>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '14px' }}>
+                        Define every packing size used in orders and how many inventory units (kg / L / pcs) one unit of that size consumes.
+                        These appear in the packing-size dropdown on the New Order page and drive automatic stock deduction.
+                    </p>
+                    <div style={{ marginBottom: '14px' }}>
+                        <button className="btn primary" style={{ padding: '6px 14px', fontSize: '12px' }} onClick={openNewPackingSize}>
+                            ＋ Add Packing Size
+                        </button>
+                    </div>
+
+                    {packingSizes.length === 0 ? (
+                        <div className="empty-state" style={{ padding: '28px 20px' }}>
+                            <div className="icon">📐</div>
+                            <p>No packing sizes added yet.</p>
+                        </div>
+                    ) : (
+                        <div className="prod-wrap">
+                            <table className="prod-table">
+                                <thead>
+                                    <tr>
+                                        <th>Packing Size</th>
+                                        <th>Stock Multiplier</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {packingSizes.map((p) => (
+                                        <tr key={p.id}>
+                                            <td><div className="prod-name">{p.name}</div></td>
+                                            <td>{p.multiplier}</td>
+                                            <td>
+                                                <div style={{ display: 'flex', gap: '6px' }}>
+                                                    <button className="btn sm" onClick={() => openEditPackingSize(p)}>Edit</button>
+                                                    <button className="btn danger-xs" onClick={() => deletePackingSize(p)}>Delete</button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -580,6 +689,49 @@ export default function SettingsIndex({ products, transports, alertSettings }: P
                         <button className="btn" onClick={closeTransportModal}>Cancel</button>
                         <button className="btn primary" onClick={saveTransport} disabled={transportForm.processing}>
                             {editingTransport ? 'Save Changes' : 'Add'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Packing Size Modal */}
+            <div className={`modal-overlay${packingSizeModalOpen ? ' open' : ''}`}>
+                <div className="modal" style={{ maxWidth: '420px' }}>
+                    <div className="modal-header">
+                        <h2>{editingPackingSize ? 'Edit' : 'Add'} Packing Size</h2>
+                        <button className="modal-close" onClick={closePackingSizeModal}>✕</button>
+                    </div>
+                    <div className="modal-body">
+                        <div className="form-group" style={{ marginBottom: '14px' }}>
+                            <label>Packing Size *</label>
+                            <input
+                                type="text"
+                                value={packingSizeForm.data.name}
+                                onChange={(e) => packingSizeForm.setData('name', e.target.value)}
+                                placeholder="e.g. 25kg, 500ml, 1ltr"
+                                autoFocus
+                            />
+                            {packingSizeForm.errors.name && <span className="field-error">{packingSizeForm.errors.name}</span>}
+                        </div>
+                        <div className="form-group">
+                            <label>Stock Multiplier *</label>
+                            <input
+                                type="number"
+                                value={packingSizeForm.data.multiplier}
+                                onChange={(e) => packingSizeForm.setData('multiplier', e.target.value)}
+                                step="0.001" min="0.001"
+                                placeholder="e.g. 25"
+                            />
+                            <small style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                                Inventory units deducted per unit ordered (e.g. "25kg" → 25).
+                            </small>
+                            {packingSizeForm.errors.multiplier && <span className="field-error">{packingSizeForm.errors.multiplier}</span>}
+                        </div>
+                    </div>
+                    <div className="modal-footer">
+                        <button className="btn" onClick={closePackingSizeModal}>Cancel</button>
+                        <button className="btn primary" onClick={savePackingSize} disabled={packingSizeForm.processing}>
+                            {editingPackingSize ? 'Save Changes' : 'Add'}
                         </button>
                     </div>
                 </div>

@@ -88,6 +88,7 @@ type Props = {
     currentUser: { id: number; name: string };
     productPhotos: ProductPhoto[];
     finishGoodBrands: FinishGoodBrand[];
+    packingSizes: { name: string; multiplier: string | number }[];
     editingOrder?: EditingOrder | null;
 };
 
@@ -176,7 +177,7 @@ const toNumber = (value: string) => {
 
 const todayDate = () => new Date().toISOString().split('T')[0];
 
-export default function OrdersCreate({ salesUsers, transports, couriers, parties, currentUser, productPhotos, finishGoodBrands, editingOrder }: Props) {
+export default function OrdersCreate({ salesUsers, transports, couriers, parties, currentUser, productPhotos, finishGoodBrands, packingSizes, editingOrder }: Props) {
     const isEditing = !!editingOrder;
 
     const [rows, setRows] = useState<ProductRow[]>(() => {
@@ -965,8 +966,11 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                                         placeholder="500ml"
                                                     />
                                                     <datalist id={`sizes-${index}`}>
-                                                        {(sizeOptions.length > 0 ? sizeOptions : partyRates).map((r) => (
-                                                            <option key={r.packing_size} value={r.packing_size} />
+                                                        {[...new Set([
+                                                            ...(sizeOptions.length > 0 ? sizeOptions : partyRates).map((r) => r.packing_size),
+                                                            ...packingSizes.map((p) => p.name),
+                                                        ])].map((size) => (
+                                                            <option key={size} value={size} />
                                                         ))}
                                                     </datalist>
                                                     {rowPhoto?.mrp && (

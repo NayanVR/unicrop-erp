@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
+use App\Models\PackingSize;
 use App\Models\Product;
 use App\Models\Transport;
 use App\Services\LowStockAlertService;
@@ -35,7 +36,39 @@ class SettingsController extends Controller
             'products'      => Product::query()->orderBy('name')->get(),
             'transports'    => Transport::query()->orderBy('type')->orderBy('name')->get(),
             'alertSettings' => $alertSettings,
+            'packingSizes'  => PackingSize::query()->orderBy('name')->get(),
         ]);
+    }
+
+    public function storePackingSize(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'name'       => 'required|string|max:50|unique:packing_sizes,name',
+            'multiplier' => 'required|numeric|min:0.001|max:999999',
+        ]);
+
+        PackingSize::create($data);
+
+        return redirect()->back()->with('success', 'Packing size added.');
+    }
+
+    public function updatePackingSize(Request $request, PackingSize $packingSize): RedirectResponse
+    {
+        $data = $request->validate([
+            'name'       => 'required|string|max:50|unique:packing_sizes,name,' . $packingSize->id,
+            'multiplier' => 'required|numeric|min:0.001|max:999999',
+        ]);
+
+        $packingSize->update($data);
+
+        return redirect()->back()->with('success', 'Packing size updated.');
+    }
+
+    public function destroyPackingSize(PackingSize $packingSize): RedirectResponse
+    {
+        $packingSize->delete();
+
+        return redirect()->back()->with('success', 'Packing size deleted.');
     }
 
     public function updateAlertSettings(Request $request): RedirectResponse

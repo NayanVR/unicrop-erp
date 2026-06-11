@@ -9,6 +9,7 @@ use App\Models\DesignOrder;
 use App\Models\InventoryTransaction;
 use App\Models\Order;
 use App\Models\OrderAttachment;
+use App\Models\PackingSize;
 use App\Models\Party;
 use App\Models\ProductPhoto;
 use App\Models\RawMaterial;
@@ -149,6 +150,7 @@ class OrderController extends Controller
             'currentUser' => ['id' => $user?->id, 'name' => $user?->name],
             'finishGoodBrands' => $this->finishGoodBrands(),
             'productPhotos' => $this->mapProductPhotos(),
+            'packingSizes' => PackingSize::query()->orderBy('name')->get(['name', 'multiplier']),
         ]);
     }
 
@@ -257,6 +259,10 @@ class OrderController extends Controller
                 'confirmed_at' => now(),
             ]);
 
+            $packingMultipliers = PackingSize::query()
+                ->get(['name', 'multiplier'])
+                ->mapWithKeys(fn ($p) => [strtolower(trim($p->name)) => (float) $p->multiplier]);
+
             $order->loadMissing('items');
             foreach ($order->items as $item) {
                 $brandName = trim($item->our_brand ?? '');
@@ -282,7 +288,10 @@ class OrderController extends Controller
                     continue;
                 }
 
-                $qty = (float) $item->quantity;
+                $packingKey = strtolower(trim($item->packing_size ?? ''));
+                $multiplier = $packingMultipliers->get($packingKey, 1.0);
+
+                $qty = (float) $item->quantity * $multiplier;
                 $previousStock = (float) $material->stock_qty;
                 $newStock = $previousStock - $qty;
 
@@ -413,6 +422,7 @@ class OrderController extends Controller
             'currentUser'  => ['id' => $user?->id, 'name' => $user?->name],
             'finishGoodBrands' => $this->finishGoodBrands(),
             'productPhotos' => $this->mapProductPhotos(),
+            'packingSizes' => PackingSize::query()->orderBy('name')->get(['name', 'multiplier']),
             'editingOrder' => [
                 'id'               => $order->id,
                 'order_number'     => $order->order_number,
