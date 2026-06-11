@@ -416,6 +416,18 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                 const partyId = partyIdRef.current;
                 if (field === 'our_brand') {
                     const v = value.trim().toLowerCase();
+
+                    // Product changed — clear all product-dependent details so
+                    // stale values from the previous brand never stick around.
+                    if (row.our_brand !== value) {
+                        updated.party_brand  = '';
+                        updated.packing_size = '';
+                        updated.rate         = '';
+                        updated.gst_percent  = '18';
+                        updated.shape        = '';
+                        updated.cap_color    = '';
+                    }
+
                     const matches = rates.filter(
                         (r) => r.our_brand.trim().toLowerCase() === v,
                     );
@@ -443,7 +455,6 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                             if (photo?.bottle_jar) updated.shape = photo.bottle_jar;
                             if (photo?.cap_color)  updated.cap_color = photo.cap_color;
                         }
-                        if (row.our_brand !== value) { updated.packing_size = ''; updated.rate = ''; }
                     }
                     // Also fill bottle/cap from product_rates match (photo link overrides if present)
                     if (matches.length >= 1 && partyId) {
