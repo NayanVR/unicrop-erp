@@ -587,7 +587,17 @@ class InventoryController extends Controller
             'name'  => 'required|string|max:100|unique:inventory_categories,name,' . $category->id,
             'color' => 'nullable|string|max:20',
         ]);
-        $category->update($data);
+
+        $oldName = $category->name;
+
+        DB::transaction(function () use ($category, $data, $oldName) {
+            $category->update($data);
+
+            if ($oldName !== $data['name']) {
+                RawMaterial::where('category', $oldName)->update(['category' => $data['name']]);
+            }
+        });
+
         return redirect()->back()->with('success', 'Category updated.');
     }
 
