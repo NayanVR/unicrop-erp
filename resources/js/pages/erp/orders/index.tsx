@@ -220,7 +220,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
         return ['draft', 'submitted'].includes(order.status ?? '') && order.created_by === currentUserId;
     };
 
-    const [activeFilter, setActiveFilter] = useState<'mine' | 'mine-confirmed' | 'mine-dispatched' | 'all' | 'all-dispatched'>('all');
+    const [activeFilter, setActiveFilter] = useState<'mine' | 'mine-confirmed' | 'mine-dispatched' | 'all' | 'all-dispatched'>('mine');
     const [openOrders, setOpenOrders] = useState<number[]>([]);
     const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
     const [confirmStep, setConfirmStep] = useState<'factory' | 'design'>('factory');
@@ -250,6 +250,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
     const photoMap = useMemo(() => buildPhotoMap(productPhotos), [productPhotos]);
 
     const visibleOrders = useMemo(() => {
+        if (isDesign) return orders;
         const isMine = (o: Order) => o.created_by === currentUserId || o.sales_user_id === currentUserId;
         switch (activeFilter) {
             case 'mine':
@@ -264,7 +265,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
             default:
                 return orders;
         }
-    }, [activeFilter, orders, currentUserId]);
+    }, [activeFilter, orders, currentUserId, isDesign]);
 
     const toggleOrder = (id: number) =>
         setOpenOrders((cur) => cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
