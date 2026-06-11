@@ -220,7 +220,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
         return ['draft', 'submitted'].includes(order.status ?? '') && order.created_by === currentUserId;
     };
 
-    const [activeFilter, setActiveFilter] = useState<'all' | 'mine'>('all');
+    const [activeFilter, setActiveFilter] = useState<'mine' | 'mine-confirmed' | 'mine-dispatched' | 'all' | 'all-dispatched'>('all');
     const [openOrders, setOpenOrders] = useState<number[]>([]);
     const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
     const [confirmStep, setConfirmStep] = useState<'factory' | 'design'>('factory');
@@ -250,10 +250,20 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
     const photoMap = useMemo(() => buildPhotoMap(productPhotos), [productPhotos]);
 
     const visibleOrders = useMemo(() => {
-        if (activeFilter === 'all') return orders;
-        return orders.filter(
-            (o) => o.created_by === currentUserId || o.sales_user_id === currentUserId,
-        );
+        const isMine = (o: Order) => o.created_by === currentUserId || o.sales_user_id === currentUserId;
+        switch (activeFilter) {
+            case 'mine':
+                // Only new (not yet confirmed/dispatched) orders of mine
+                return orders.filter((o) => isMine(o) && ['draft', 'submitted'].includes(o.status ?? ''));
+            case 'mine-confirmed':
+                return orders.filter((o) => isMine(o) && o.status === 'confirmed');
+            case 'mine-dispatched':
+                return orders.filter((o) => isMine(o) && o.status === 'dispatched');
+            case 'all-dispatched':
+                return orders.filter((o) => o.status === 'dispatched');
+            default:
+                return orders;
+        }
     }, [activeFilter, orders, currentUserId]);
 
     const toggleOrder = (id: number) =>
@@ -822,27 +832,35 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                 {!isDesign && (
                     <div className="filter-bar">
                         <h2>Orders</h2>
-                        <button
-                            type="button"
-                            className={`pill ${activeFilter === 'all' ? 'active' : ''}`}
-                            onClick={() => setActiveFilter('all')}
-                        >
-                            All Orders
-                        </button>
-                        <button
-                            type="button"
-                            className={`pill ${activeFilter === 'mine' ? 'active' : ''}`}
-                            onClick={() => setActiveFilter('mine')}
-                        >
-                            My Orders
-                        </button>
+                        {([
+                            ['mine', 'My Orders'],
+                            ['mine-confirmed', 'My Confirmed Orders'],
+                            ['mine-dispatched', 'My Dispatched Orders'],
+                            ['all', 'All Orders'],
+                            ['all-dispatched', 'All Dispatched Orders'],
+                        ] as const).map(([key, label]) => (
+                            <button
+                                key={key}
+                                type="button"
+                                className={`pill ${activeFilter === key ? 'active' : ''}`}
+                                onClick={() => setActiveFilter(key)}
+                            >
+                                {label}
+                            </button>
+                        ))}
                     </div>
                 )}
 
                 {visibleOrders.length === 0 ? (
                     <div className="empty-state">
                         <div className="icon">📋</div>
-                        <p>{isDesign ? 'No design orders yet.' : 'No orders yet.'}</p>
+                        <p>
+                            {isDesign
+                                ? 'No design orders yet.'
+                                : orders.length === 0
+                                  ? 'No orders yet.'
+                                  : 'No orders match this filter.'}
+                        </p>
                     </div>
                 ) : (() => {
                     const billingDone = (order: Order) => {
