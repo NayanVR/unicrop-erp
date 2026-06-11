@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 type PackagingMaterial = {
     id: number;
     name: string;
-    category: string;
+    category: string | null;
     unit: string;
     cost_per_unit: string | number;
 };
@@ -17,8 +17,22 @@ type Props = {
 const formatAmt = (v: number) =>
     '₹' + (Number.isFinite(v) ? v : 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const BOTTLE_JAR_CATEGORIES = ['Bottle', 'Jar'];
-const OUTER_BOX_CATEGORIES = ['Box/Carton', 'Printed Box'];
+// Match by keyword (case-insensitive substring) so renamed categories
+// like "Box/Carton" -> "Box" or "Bottles" still get picked up.
+const isBottleJar = (cat: string | null | undefined) => /bottle|botal|jar|dabba/i.test(cat ?? '');
+const isOuterBox = (cat: string | null | undefined) => /box|carton|cartoon/i.test(cat ?? '');
+const isOtherPackaging = (cat: string | null | undefined) =>
+    /label|pouch|drum|cap|closure|print|pack|seal|tape|sticker/i.test(cat ?? '');
+
+function groupByCategory(items: PackagingMaterial[]): [string, PackagingMaterial[]][] {
+    const map = new Map<string, PackagingMaterial[]>();
+    for (const m of items) {
+        const key = m.category || 'Uncategorized';
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push(m);
+    }
+    return [...map.entries()];
+}
 
 export default function RateCalculator({ packagingMaterials, marginPercent }: Props) {
     const [materialAmount, setMaterialAmount] = useState('');
@@ -28,19 +42,31 @@ export default function RateCalculator({ packagingMaterials, marginPercent }: Pr
     const [extraIds, setExtraIds] = useState<number[]>([]);
 
     const bottleOptions = useMemo(
-        () => packagingMaterials.filter((m) => BOTTLE_JAR_CATEGORIES.includes(m.category)),
+        () => packagingMaterials.filter((m) => isBottleJar(m.category)),
         [packagingMaterials],
     );
 
     const outerBoxOptions = useMemo(
-        () => packagingMaterials.filter((m) => OUTER_BOX_CATEGORIES.includes(m.category)),
+        () => packagingMaterials.filter((m) => isOuterBox(m.category) && !isBottleJar(m.category)),
         [packagingMaterials],
     );
 
     const extraOptions = useMemo(
         () => packagingMaterials.filter(
-            (m) => !BOTTLE_JAR_CATEGORIES.includes(m.category) && !OUTER_BOX_CATEGORIES.includes(m.category),
+            (m) => isOtherPackaging(m.category) && !isBottleJar(m.category) && !isOuterBox(m.category),
         ),
+        [packagingMaterials],
+    );
+
+    // Fallback pools so a material is always findable even when its
+    // category name doesn't match any keyword.
+    const bottleFallback = useMemo(
+        () => packagingMaterials.filter((m) => !isBottleJar(m.category)),
+        [packagingMaterials],
+    );
+
+    const outerBoxFallback = useMemo(
+        () => packagingMaterials.filter((m) => !(isOuterBox(m.category) && !isBottleJar(m.category))),
         [packagingMaterials],
     );
 
@@ -112,11 +138,24 @@ export default function RateCalculator({ packagingMaterials, marginPercent }: Pr
                                     <label>Select Bottle / Jar</label>
                                     <select value={bottleId} onChange={(e) => setBottleId(e.target.value)}>
                                         <option value="">— None —</option>
-                                        {bottleOptions.map((m) => (
-                                            <option key={m.id} value={m.id}>
-                                                {m.name} ({formatAmt(Number(m.cost_per_unit) || 0)} / {m.unit})
-                                            </option>
+                                        {groupByCategory(bottleOptions).map(([cat, items]) => (
+                                            <optgroup key={cat} label={cat}>
+                                                {items.map((m) => (
+                                                    <option key={m.id} value={m.id}>
+                                                        {m.name} ({formatAmt(Number(m.cost_per_unit) || 0)} / {m.unit})
+                                                    </option>
+                                                ))}
+                                            </optgroup>
                                         ))}
+                                        {bottleFallback.length > 0 && (
+                                            <optgroup label="— Other Materials —">
+                                                {bottleFallback.map((m) => (
+                                                    <option key={m.id} value={m.id}>
+                                                        {m.name} ({formatAmt(Number(m.cost_per_unit) || 0)} / {m.unit})
+                                                    </option>
+                                                ))}
+                                            </optgroup>
+                                        )}
                                     </select>
                                 </div>
                             </div>
@@ -129,11 +168,24 @@ export default function RateCalculator({ packagingMaterials, marginPercent }: Pr
                                     <label>Select Outer Box</label>
                                     <select value={outerBoxId} onChange={(e) => setOuterBoxId(e.target.value)}>
                                         <option value="">— None —</option>
-                                        {outerBoxOptions.map((m) => (
-                                            <option key={m.id} value={m.id}>
-                                                {m.name} ({formatAmt(Number(m.cost_per_unit) || 0)} / {m.unit})
-                                            </option>
+                                        {groupByCategory(outerBoxOptions).map(([cat, items]) => (
+                                            <optgroup key={cat} label={cat}>
+                                                {items.map((m) => (
+                                                    <option key={m.id} value={m.id}>
+                                                        {m.name} ({formatAmt(Number(m.cost_per_unit) || 0)} / {m.unit})
+                                                    </option>
+                                                ))}
+                                            </optgroup>
                                         ))}
+                                        {outerBoxFallback.length > 0 && (
+                                            <optgroup label="— Other Materials —">
+                                                {outerBoxFallback.map((m) => (
+                                                    <option key={m.id} value={m.id}>
+                                                        {m.name} ({formatAmt(Number(m.cost_per_unit) || 0)} / {m.unit})
+                                                    </option>
+                                                ))}
+                                            </optgroup>
+                                        )}
                                     </select>
                                 </div>
                                 <div className="form-group">

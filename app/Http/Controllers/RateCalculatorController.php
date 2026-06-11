@@ -9,15 +9,12 @@ use Inertia\Response;
 
 class RateCalculatorController extends Controller
 {
-    public const PACKAGING_CATEGORIES = [
-        'Bottle', 'Jar', 'Box/Carton', 'Printed Box', 'Label', 'Drum', 'Pouch', 'Cap/Closure',
-    ];
-
     public function index(): Response
     {
+        // Send all active materials; the page classifies them by category
+        // keywords so renamed categories (e.g. "Box/Carton" -> "Box") still work.
         $materials = RawMaterial::query()
             ->where('is_active', true)
-            ->whereIn('category', self::PACKAGING_CATEGORIES)
             ->orderBy('category')
             ->orderBy('name')
             ->get(['id', 'name', 'category', 'unit', 'cost_per_unit']);
