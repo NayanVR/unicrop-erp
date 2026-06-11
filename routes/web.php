@@ -135,7 +135,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('erp/settings/transports/{transport}', [SettingsController::class, 'updateTransport'])->name('settings.transports.update');
         Route::post('erp/settings/alert', [SettingsController::class, 'updateAlertSettings'])->name('settings.alert.update');
         Route::post('erp/settings/alert/test', [SettingsController::class, 'testAlert'])->name('settings.alert.test');
-        Route::post('erp/settings/rate-calculator', [SettingsController::class, 'updateRateCalculatorSettings'])->name('settings.rate-calculator.update');
 
         Route::get('purchase-bills', [PurchaseBillController::class, 'index'])->name('purchase-bills.index');
         Route::post('purchase-bills', [PurchaseBillController::class, 'store'])->name('purchase-bills.store');

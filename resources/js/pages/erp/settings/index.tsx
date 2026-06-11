@@ -46,7 +46,6 @@ type Props = {
     products: Product[];
     transports: TransportEntry[];
     alertSettings: AlertSettings;
-    rateCalcMarginPercent: number;
 };
 
 type ProductForm = {
@@ -65,7 +64,7 @@ type TransportForm = {
 
 const GST_OPTIONS = ['0', '5', '12', '18', '28'];
 
-export default function SettingsIndex({ products, transports, alertSettings, rateCalcMarginPercent }: Props) {
+export default function SettingsIndex({ products, transports, alertSettings }: Props) {
     const [modalOpen, setModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
@@ -89,17 +88,6 @@ export default function SettingsIndex({ products, transports, alertSettings, rat
         alert_msg91_template_id: alertSettings.alert_msg91_template_id ?? '',
         alert_cooldown_hours:    alertSettings.alert_cooldown_hours || '6',
     });
-
-    const [rateCalcMargin, setRateCalcMargin] = useState(String(rateCalcMarginPercent ?? 20));
-    const [rateCalcSaving, setRateCalcSaving] = useState(false);
-
-    const saveRateCalcSettings = () => {
-        setRateCalcSaving(true);
-        router.post('/erp/settings/rate-calculator', { rate_calc_margin_percent: rateCalcMargin }, {
-            preserveScroll: true,
-            onFinish: () => setRateCalcSaving(false),
-        });
-    };
 
     const saveAlertSettings = () => {
         setAlertSaving(true);
@@ -507,33 +495,6 @@ export default function SettingsIndex({ products, transports, alertSettings, rat
                     </div>
                 </div>
 
-                {/* Product Rate Calculator Settings */}
-                <div className="card" style={{ marginTop: '16px' }}>
-                    <div className="card-title" style={{ marginBottom: '12px' }}>
-                        🧮 Product Rate Calculator
-                    </div>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '18px' }}>
-                        Set the profit margin % added on top of material + packaging cost to get the final rate shown to sales users.
-                    </p>
-
-                    <div className="form-grid" style={{ maxWidth: '640px' }}>
-                        <div className="form-group">
-                            <label>Profit Margin %</label>
-                            <input
-                                type="number"
-                                min={0} max={1000} step="0.5"
-                                value={rateCalcMargin}
-                                onChange={(e) => setRateCalcMargin(e.target.value)}
-                                style={{ maxWidth: '160px' }}
-                            />
-                        </div>
-                        <div className="form-group" style={{ gridColumn: '1/-1' }}>
-                            <button className="btn primary" onClick={saveRateCalcSettings} disabled={rateCalcSaving}>
-                                {rateCalcSaving ? 'Saving…' : '💾 Save Margin'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             {/* Product Modal */}

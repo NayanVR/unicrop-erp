@@ -31,23 +31,11 @@ class SettingsController extends Controller
         $alertSettings['alert_enabled'] = AppSetting::get('alert_enabled', '0');
 
         return Inertia::render('erp/settings/index', [
-            'pageTitle'           => 'Settings',
-            'products'            => Product::query()->orderBy('name')->get(),
-            'transports'          => Transport::query()->orderBy('type')->orderBy('name')->get(),
-            'alertSettings'       => $alertSettings,
-            'rateCalcMarginPercent' => (float) AppSetting::get('rate_calc_margin_percent', 20),
+            'pageTitle'     => 'Settings',
+            'products'      => Product::query()->orderBy('name')->get(),
+            'transports'    => Transport::query()->orderBy('type')->orderBy('name')->get(),
+            'alertSettings' => $alertSettings,
         ]);
-    }
-
-    public function updateRateCalculatorSettings(Request $request): RedirectResponse
-    {
-        $data = $request->validate([
-            'rate_calc_margin_percent' => 'required|numeric|min:0|max:1000',
-        ]);
-
-        AppSetting::set('rate_calc_margin_percent', (string) $data['rate_calc_margin_percent']);
-
-        return redirect()->back()->with('success', 'Product Rate Calculator settings saved.');
     }
 
     public function updateAlertSettings(Request $request): RedirectResponse

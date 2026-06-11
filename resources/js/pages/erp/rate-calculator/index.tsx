@@ -6,12 +6,11 @@ type PackagingMaterial = {
     name: string;
     category: string | null;
     unit: string;
-    cost_per_unit: string | number;
+    selling_rate: string | number;
 };
 
 type Props = {
     packagingMaterials: PackagingMaterial[];
-    marginPercent: number;
 };
 
 const formatAmt = (v: number) =>
@@ -34,7 +33,7 @@ function groupByCategory(items: PackagingMaterial[]): [string, PackagingMaterial
     return [...map.entries()];
 }
 
-export default function RateCalculator({ packagingMaterials, marginPercent }: Props) {
+export default function RateCalculator({ packagingMaterials }: Props) {
     const [materialAmount, setMaterialAmount] = useState('');
     const [bottleId, setBottleId] = useState<string>('');
     const [outerBoxId, setOuterBoxId] = useState<string>('');
@@ -74,20 +73,20 @@ export default function RateCalculator({ packagingMaterials, marginPercent }: Pr
 
     const bottleCost = useMemo(() => {
         const m = findMaterial(bottleId);
-        return m ? Number(m.cost_per_unit) || 0 : 0;
+        return m ? Number(m.selling_rate) || 0 : 0;
     }, [bottleId, packagingMaterials]);
 
     const outerBoxCost = useMemo(() => {
         const m = findMaterial(outerBoxId);
         if (!m) return 0;
         const units = parseFloat(unitsPerBox) || 1;
-        return (Number(m.cost_per_unit) || 0) / units;
+        return (Number(m.selling_rate) || 0) / units;
     }, [outerBoxId, unitsPerBox, packagingMaterials]);
 
     const extraTotal = useMemo(() => {
         return extraIds.reduce((sum, id) => {
             const m = findMaterial(String(id));
-            return sum + (m ? Number(m.cost_per_unit) || 0 : 0);
+            return sum + (m ? Number(m.selling_rate) || 0 : 0);
         }, 0);
     }, [extraIds, packagingMaterials]);
 
@@ -97,9 +96,7 @@ export default function RateCalculator({ packagingMaterials, marginPercent }: Pr
 
     const matAmt = parseFloat(materialAmount) || 0;
     const packagingCost = bottleCost + outerBoxCost + extraTotal;
-    const subtotal = matAmt + packagingCost;
-    const marginAmt = subtotal * (marginPercent / 100);
-    const finalRate = subtotal + marginAmt;
+    const finalRate = matAmt + packagingCost;
 
     return (
         <>
@@ -108,7 +105,7 @@ export default function RateCalculator({ packagingMaterials, marginPercent }: Pr
                 <div className="page-header">
                     <div className="page-header-left">
                         <h1>Product Rate Calculator</h1>
-                        <p>Enter the material cost — packaging costs are pulled automatically from inventory</p>
+                        <p>Enter the material cost — packaging rates are pulled automatically from inventory</p>
                     </div>
                 </div>
 
@@ -142,7 +139,7 @@ export default function RateCalculator({ packagingMaterials, marginPercent }: Pr
                                             <optgroup key={cat} label={cat}>
                                                 {items.map((m) => (
                                                     <option key={m.id} value={m.id}>
-                                                        {m.name} ({formatAmt(Number(m.cost_per_unit) || 0)} / {m.unit})
+                                                        {m.name} ({formatAmt(Number(m.selling_rate) || 0)} / {m.unit})
                                                     </option>
                                                 ))}
                                             </optgroup>
@@ -151,7 +148,7 @@ export default function RateCalculator({ packagingMaterials, marginPercent }: Pr
                                             <optgroup label="— Other Materials —">
                                                 {bottleFallback.map((m) => (
                                                     <option key={m.id} value={m.id}>
-                                                        {m.name} ({formatAmt(Number(m.cost_per_unit) || 0)} / {m.unit})
+                                                        {m.name} ({formatAmt(Number(m.selling_rate) || 0)} / {m.unit})
                                                     </option>
                                                 ))}
                                             </optgroup>
@@ -172,7 +169,7 @@ export default function RateCalculator({ packagingMaterials, marginPercent }: Pr
                                             <optgroup key={cat} label={cat}>
                                                 {items.map((m) => (
                                                     <option key={m.id} value={m.id}>
-                                                        {m.name} ({formatAmt(Number(m.cost_per_unit) || 0)} / {m.unit})
+                                                        {m.name} ({formatAmt(Number(m.selling_rate) || 0)} / {m.unit})
                                                     </option>
                                                 ))}
                                             </optgroup>
@@ -181,7 +178,7 @@ export default function RateCalculator({ packagingMaterials, marginPercent }: Pr
                                             <optgroup label="— Other Materials —">
                                                 {outerBoxFallback.map((m) => (
                                                     <option key={m.id} value={m.id}>
-                                                        {m.name} ({formatAmt(Number(m.cost_per_unit) || 0)} / {m.unit})
+                                                        {m.name} ({formatAmt(Number(m.selling_rate) || 0)} / {m.unit})
                                                     </option>
                                                 ))}
                                             </optgroup>
@@ -214,7 +211,7 @@ export default function RateCalculator({ packagingMaterials, marginPercent }: Pr
                                             />
                                             <span>{m.name}</span>
                                             <span style={{ marginLeft: 'auto', color: 'var(--tx-muted)' }}>
-                                                {formatAmt(Number(m.cost_per_unit) || 0)} / {m.unit}
+                                                {formatAmt(Number(m.selling_rate) || 0)} / {m.unit}
                                             </span>
                                         </label>
                                     ))}
@@ -233,24 +230,16 @@ export default function RateCalculator({ packagingMaterials, marginPercent }: Pr
                                 <strong>{formatAmt(matAmt)}</strong>
                             </div>
                             <div className="rc-summary-bar">
-                                <span>Bottle / Jar Cost:</span>
+                                <span>Bottle / Jar Rate:</span>
                                 <strong>{formatAmt(bottleCost)}</strong>
                             </div>
                             <div className="rc-summary-bar">
-                                <span>Outer Box Cost (per unit):</span>
+                                <span>Outer Box Rate (per unit):</span>
                                 <strong>{formatAmt(outerBoxCost)}</strong>
                             </div>
                             <div className="rc-summary-bar">
-                                <span>Other Packaging Cost:</span>
+                                <span>Other Packaging Rate:</span>
                                 <strong>{formatAmt(extraTotal)}</strong>
-                            </div>
-                            <div className="rc-summary-bar" style={{ marginTop: '10px', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
-                                <span>Subtotal:</span>
-                                <strong>{formatAmt(subtotal)}</strong>
-                            </div>
-                            <div className="rc-summary-bar">
-                                <span>Margin ({marginPercent}%):</span>
-                                <strong>{formatAmt(marginAmt)}</strong>
                             </div>
                             <div className="rc-cost-bar">
                                 <span>Final Rate:</span>

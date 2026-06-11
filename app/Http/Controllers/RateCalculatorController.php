@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AppSetting;
 use App\Models\RawMaterial;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -17,12 +16,11 @@ class RateCalculatorController extends Controller
             ->where('is_active', true)
             ->orderBy('category')
             ->orderBy('name')
-            ->get(['id', 'name', 'category', 'unit', 'cost_per_unit']);
+            ->get(['id', 'name', 'category', 'unit', 'selling_rate']);
 
         return Inertia::render('erp/rate-calculator/index', [
             'pageTitle'          => 'Product Rate Calculator',
             'packagingMaterials' => $materials,
-            'marginPercent'      => (float) AppSetting::get('rate_calc_margin_percent', 20),
         ]);
     }
 }
