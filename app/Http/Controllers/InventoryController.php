@@ -594,7 +594,8 @@ class InventoryController extends Controller
             $category->update($data);
 
             if ($oldName !== $data['name']) {
-                RawMaterial::where('category', $oldName)->update(['category' => $data['name']]);
+                RawMaterial::whereRaw('LOWER(TRIM(category)) = ?', [mb_strtolower(trim($oldName))])
+                    ->update(['category' => $data['name']]);
             }
         });
 
