@@ -299,6 +299,11 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
     const [dispatchModal, setDispatchModal] = useState<Order | null>(null);
     const [dispatchQtys, setDispatchQtys] = useState<Record<number, string>>({});
 
+    // Urgent approve/reject modal — days on approve, reason on reject
+    const [urgentModal, setUrgentModal] = useState<{ order: UrgentPendingOrder; mode: 'approve' | 'reject' } | null>(null);
+    const [urgentDays, setUrgentDays] = useState('');
+    const [urgentReason, setUrgentReason] = useState('');
+
     const openTransfer = (order: Order, item: OrderItem) => {
         setTransferForm({
             from_unit: '',
@@ -399,15 +404,34 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
         });
     };
 
-    const approveUrgent = (orderId: number) => {
-        setApprovingId(orderId);
-        router.post(ordersApproveUrgent(orderId).url, {}, { preserveScroll: true, onFinish: () => setApprovingId(null) });
+    const approveUrgent = (order: UrgentPendingOrder) => {
+        setUrgentDays('');
+        setUrgentModal({ order, mode: 'approve' });
     };
 
-    const rejectUrgent = (orderId: number) => {
-        if (!confirm('Reject this urgent order? The sales team will need to address it.')) return;
-        setRejectingId(orderId);
-        router.post(ordersRejectUrgent(orderId).url, {}, { preserveScroll: true, onFinish: () => setRejectingId(null) });
+    const rejectUrgent = (order: UrgentPendingOrder) => {
+        setUrgentReason('');
+        setUrgentModal({ order, mode: 'reject' });
+    };
+
+    const submitUrgent = () => {
+        if (!urgentModal) return;
+        const { order, mode } = urgentModal;
+        if (mode === 'approve') {
+            setApprovingId(order.id);
+            router.post(
+                ordersApproveUrgent(order.id).url,
+                { days: urgentDays.trim() === '' ? null : parseInt(urgentDays, 10) },
+                { preserveScroll: true, onSuccess: () => setUrgentModal(null), onFinish: () => setApprovingId(null) },
+            );
+        } else {
+            setRejectingId(order.id);
+            router.post(
+                ordersRejectUrgent(order.id).url,
+                { reason: urgentReason.trim() === '' ? null : urgentReason.trim() },
+                { preserveScroll: true, onSuccess: () => setUrgentModal(null), onFinish: () => setRejectingId(null) },
+            );
+        }
     };
 
     const saveNotes = (order: Order) => {
@@ -662,7 +686,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                             type="button"
                                             className="btn primary"
                                             style={{ padding: '6px 16px', fontSize: '13px' }}
-                                            onClick={() => approveUrgent(order.id)}
+                                            onClick={() => approveUrgent(order)}
                                             disabled={approvingId === order.id || rejectingId === order.id}
                                         >
                                             {approvingId === order.id ? '…' : '✓ Approve'}
@@ -671,7 +695,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                             type="button"
                                             className="btn danger-xs"
                                             style={{ padding: '6px 14px', fontSize: '13px' }}
-                                            onClick={() => rejectUrgent(order.id)}
+                                            onClick={() => rejectUrgent(order)}
                                             disabled={approvingId === order.id || rejectingId === order.id}
                                         >
                                             {rejectingId === order.id ? '…' : '✕ Reject'}
@@ -1201,6 +1225,67 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                     <button type="button" className="btn-secondary" onClick={() => setDispatchModal(null)} disabled={saving}>Cancel</button>
                                     <button type="button" className="btn-primary" onClick={submitDispatch} disabled={saving || readyItems.length === 0}>
                                         {saving ? 'Dispatching…' : `✓ Dispatch ${readyItems.length} item(s)`}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* ── Urgent approve / reject modal ── */}
+            {urgentModal && (() => {
+                const saving = approvingId === urgentModal.order.id || rejectingId === urgentModal.order.id;
+                const isApprove = urgentModal.mode === 'approve';
+                return (
+                    <div className="modal-overlay open" onClick={() => !saving && setUrgentModal(null)}>
+                        <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', width: '100%' }}>
+                            <div className="modal-header">
+                                <h2>{isApprove ? '✓ Approve Urgent' : '✕ Reject Urgent'} — {urgentModal.order.order_number}</h2>
+                                <button className="modal-close" onClick={() => setUrgentModal(null)} disabled={saving}>✕</button>
+                            </div>
+                            <div className="modal-form">
+                                <p style={{ fontSize: '13px', color: 'var(--tx-muted)', marginBottom: '14px' }}>
+                                    {urgentModal.order.company_name} · {urgentModal.order.customer_name}
+                                </p>
+                                {isApprove ? (
+                                    <div className="form-group">
+                                        <label>Days to complete (shown to sales)</label>
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={365}
+                                            value={urgentDays}
+                                            onChange={(e) => setUrgentDays(e.target.value)}
+                                            placeholder="e.g. 5"
+                                            disabled={saving}
+                                            autoFocus
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="form-group">
+                                        <label>Reason for rejection (shown to sales)</label>
+                                        <textarea
+                                            rows={3}
+                                            maxLength={500}
+                                            value={urgentReason}
+                                            onChange={(e) => setUrgentReason(e.target.value)}
+                                            placeholder="e.g. Material not available, production full…"
+                                            disabled={saving}
+                                            autoFocus
+                                        />
+                                    </div>
+                                )}
+                                <div className="modal-actions" style={{ justifyContent: 'flex-end', marginTop: '16px' }}>
+                                    <button type="button" className="btn-secondary" onClick={() => setUrgentModal(null)} disabled={saving}>Cancel</button>
+                                    <button
+                                        type="button"
+                                        className="btn-primary"
+                                        style={!isApprove ? { background: '#dc2626' } : undefined}
+                                        onClick={submitUrgent}
+                                        disabled={saving}
+                                    >
+                                        {saving ? 'Saving…' : isApprove ? '✓ Approve' : '✕ Reject'}
                                     </button>
                                 </div>
                             </div>

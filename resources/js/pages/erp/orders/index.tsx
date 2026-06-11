@@ -99,6 +99,8 @@ type Order = {
     priority?: string | null;
     status?: string | null;
     urgent_approved?: boolean | null;
+    urgent_days?: number | null;
+    urgent_reject_reason?: string | null;
     subtotal?: string | number;
     gst_total?: string | number;
     total_amount?: string | number;
@@ -946,23 +948,37 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                         {canConfirm && order.status === 'submitted' && (
                                             <div className="confirm-btn">
                                                 {order.priority === 'urgent' && order.urgent_approved !== true ? (
-                                                    <span
-                                                        className={`badge ${order.urgent_approved === false ? 'red' : 'orange'}`}
-                                                        style={{ fontSize: '11px' }}
-                                                        title={order.urgent_approved === false
-                                                            ? 'Rejected by factory — please review'
-                                                            : 'Waiting for factory approval'}
-                                                    >
-                                                        {order.urgent_approved === false ? '✕ Factory Rejected' : '⏳ Awaiting Factory'}
+                                                    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
+                                                        <span
+                                                            className={`badge ${order.urgent_approved === false ? 'red' : 'orange'}`}
+                                                            style={{ fontSize: '11px' }}
+                                                            title={order.urgent_approved === false
+                                                                ? 'Rejected by factory — please review'
+                                                                : 'Waiting for factory approval'}
+                                                        >
+                                                            {order.urgent_approved === false ? '✕ Rejected by Factory' : '⏳ Awaiting Factory'}
+                                                        </span>
+                                                        {order.urgent_approved === false && order.urgent_reject_reason && (
+                                                            <span style={{ fontSize: '11px', color: '#dc2626', maxWidth: '260px' }}>
+                                                                Reason: {order.urgent_reject_reason}
+                                                            </span>
+                                                        )}
                                                     </span>
                                                 ) : (
-                                                    <button
-                                                        type="button"
-                                                        className="btn sm primary"
-                                                        onClick={(e) => openConfirm(order, e)}
-                                                    >
-                                                        ✓ Confirm Order
-                                                    </button>
+                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                        {order.priority === 'urgent' && order.urgent_approved === true && (
+                                                            <span className="badge green" style={{ fontSize: '11px' }}>
+                                                                ✓ Factory Approved{order.urgent_days ? ` · ${order.urgent_days} day${order.urgent_days === 1 ? '' : 's'}` : ''}
+                                                            </span>
+                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            className="btn sm primary"
+                                                            onClick={(e) => openConfirm(order, e)}
+                                                        >
+                                                            ✓ Confirm Order
+                                                        </button>
+                                                    </span>
                                                 )}
                                             </div>
                                         )}

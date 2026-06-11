@@ -366,10 +366,16 @@ class OrderController extends Controller
             return redirect()->back()->with('error', 'Order is not pending urgent approval.');
         }
 
+        $data = $request->validate([
+            'days' => 'nullable|integer|min:1|max:365',
+        ]);
+
         $order->update([
             'urgent_approved' => true,
             'urgent_approved_by' => $request->user()?->id,
             'urgent_approved_at' => now(),
+            'urgent_days' => $data['days'] ?? null,
+            'urgent_reject_reason' => null,
         ]);
 
         return redirect()->back()->with('success', "Urgent order {$order->order_number} approved for production.");
@@ -381,10 +387,16 @@ class OrderController extends Controller
             return redirect()->back()->with('error', 'Order is not pending urgent approval.');
         }
 
+        $data = $request->validate([
+            'reason' => 'nullable|string|max:500',
+        ]);
+
         $order->update([
             'urgent_approved' => false,
             'urgent_approved_by' => $request->user()?->id,
             'urgent_approved_at' => now(),
+            'urgent_days' => null,
+            'urgent_reject_reason' => $data['reason'] ?? null,
         ]);
 
         return redirect()->back()->with('success', "Urgent order {$order->order_number} rejected.");
