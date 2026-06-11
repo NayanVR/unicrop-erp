@@ -398,6 +398,15 @@ class FactoryController extends Controller
             return redirect()->back()->with('error', 'No items are ready for dispatch.');
         }
 
+        $data = $request->validate([
+            'items'                  => 'nullable|array',
+            'items.*.id'             => 'required|integer',
+            'items.*.dispatched_qty' => 'required|numeric|min:0',
+        ]);
+
+        $qtyById = collect($data['items'] ?? [])
+            ->mapWithKeys(fn ($i) => [(int) $i['id'] => (float) $i['dispatched_qty']]);
+
         foreach ($readyItems as $item) {
             $stageLog = (array) ($item->stage_log ?? []);
             $stageLog[] = [
@@ -407,7 +416,11 @@ class FactoryController extends Controller
                 'name' => $user?->name,
                 'at' => now()->toISOString(),
             ];
-            $item->update(['status' => 'dispatched', 'stage_log' => $stageLog]);
+            $item->update([
+                'status'         => 'dispatched',
+                'dispatched_qty' => $qtyById->get($item->id, (float) $item->quantity),
+                'stage_log'      => $stageLog,
+            ]);
         }
 
         $allDispatched = $order->items()->where('status', '!=', 'dispatched')->doesntExist();

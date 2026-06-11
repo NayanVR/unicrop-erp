@@ -64,6 +64,7 @@ type OrderItem = {
     box_size?: number | null;
     labels_received?: number | null;
     quantity: string | number;
+    dispatched_qty?: string | number | null;
     rate: string | number;
     amount: string | number;
     type?: string | null;
@@ -294,6 +295,10 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
     const [transferForm, setTransferForm] = useState({ from_unit: '', to_unit: '', unit: 'pcs', notes: '', quantity: '' });
     const [transferSaving, setTransferSaving] = useState(false);
 
+    // Dispatch modal — adjust per-item quantities before dispatching
+    const [dispatchModal, setDispatchModal] = useState<Order | null>(null);
+    const [dispatchQtys, setDispatchQtys] = useState<Record<number, string>>({});
+
     const openTransfer = (order: Order, item: OrderItem) => {
         setTransferForm({
             from_unit: '',
@@ -366,11 +371,32 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
 
     const dispatchReady = (order: Order, e: React.MouseEvent) => {
         e.stopPropagation();
-        const ready = order.items.filter((i) => i.status === 'ready').length;
-        if (ready === 0) return;
-        if (!confirm(`Dispatch ${ready} ready item(s) for ${order.order_number}?`)) return;
-        setDispatchingOrder(order.id);
-        router.post(orderDispatch(order.id).url, {}, { preserveScroll: true, onFinish: () => setDispatchingOrder(null) });
+        const readyItems = order.items.filter((i) => i.status === 'ready');
+        if (readyItems.length === 0) return;
+        setDispatchQtys(Object.fromEntries(readyItems.map((i) => [i.id, String(Number(i.quantity))])));
+        setDispatchModal(order);
+    };
+
+    const stepDispatchQty = (itemId: number, delta: number) => {
+        setDispatchQtys((prev) => {
+            const next = Math.max(0, (parseFloat(prev[itemId]) || 0) + delta);
+            return { ...prev, [itemId]: String(next) };
+        });
+    };
+
+    const submitDispatch = () => {
+        if (!dispatchModal) return;
+        const readyItems = dispatchModal.items.filter((i) => i.status === 'ready');
+        const items = readyItems.map((i) => ({
+            id: i.id,
+            dispatched_qty: parseFloat(dispatchQtys[i.id]) || 0,
+        }));
+        setDispatchingOrder(dispatchModal.id);
+        router.post(orderDispatch(dispatchModal.id).url, { items }, {
+            preserveScroll: true,
+            onSuccess: () => setDispatchModal(null),
+            onFinish: () => setDispatchingOrder(null),
+        });
     };
 
     const approveUrgent = (orderId: number) => {
@@ -911,6 +937,11 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                 <div style={{ fontSize: '13px' }}>
                                                                     {item.packing_size ? `${item.packing_size} · ` : ''}Qty: {item.quantity}
                                                                 </div>
+                                                                {isDispatched && item.dispatched_qty != null && Number(item.dispatched_qty) !== Number(item.quantity) && (
+                                                                    <div style={{ fontSize: '12px', fontWeight: 600, color: Number(item.dispatched_qty) < Number(item.quantity) ? '#dc2626' : '#d97706' }}>
+                                                                        Dispatched: {Number(item.dispatched_qty)}
+                                                                    </div>
+                                                                )}
                                                                 {/* Per-box pcs — auto from packing size, overridable */}
                                                                 {(() => {
                                                                     const auto = stdPcsPerBox(item.packing_size);
@@ -1095,6 +1126,82 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                     })
                 )}
             </div>
+
+            {/* ── Dispatch modal ── */}
+            {dispatchModal && (() => {
+                const readyItems = dispatchModal.items.filter((i) => i.status === 'ready');
+                const saving = dispatchingOrder === dispatchModal.id;
+                return (
+                    <div className="modal-overlay open" onClick={() => !saving && setDispatchModal(null)}>
+                        <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px', width: '100%', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 40px)' }}>
+                            <div className="modal-header">
+                                <h2>📦 Dispatch — {dispatchModal.order_number}</h2>
+                                <button className="modal-close" onClick={() => setDispatchModal(null)} disabled={saving}>✕</button>
+                            </div>
+                            <div className="modal-form" style={{ overflowY: 'auto' }}>
+                                <p style={{ fontSize: '13px', color: 'var(--tx-muted)', marginBottom: '14px' }}>
+                                    {dispatchModal.company_name} · Confirm the quantity being dispatched for each product.
+                                </p>
+                                {readyItems.map((item) => {
+                                    const ordered = Number(item.quantity);
+                                    const current = parseFloat(dispatchQtys[item.id]) || 0;
+                                    return (
+                                        <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div className="prod-name" style={{ fontSize: '13px' }}>{item.our_brand ?? '—'}</div>
+                                                <div className="prod-detail" style={{ fontSize: '12px' }}>
+                                                    {item.party_brand ? `${item.party_brand} · ` : ''}
+                                                    {item.packing_size ? `${item.packing_size} · ` : ''}
+                                                    Ordered: {ordered}
+                                                </div>
+                                                {current !== ordered && (
+                                                    <div style={{ fontSize: '11px', fontWeight: 600, color: current < ordered ? '#dc2626' : '#d97706', marginTop: '2px' }}>
+                                                        {current < ordered ? `${ordered - current} short` : `${current - ordered} extra`}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                                <button
+                                                    type="button"
+                                                    className="btn sm"
+                                                    onClick={() => stepDispatchQty(item.id, -1)}
+                                                    disabled={saving || current <= 0}
+                                                    style={{ width: '32px', padding: '4px 0', fontWeight: 700 }}
+                                                >
+                                                    −
+                                                </button>
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    value={dispatchQtys[item.id] ?? ''}
+                                                    onChange={(e) => setDispatchQtys((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                                                    disabled={saving}
+                                                    style={{ width: '76px', padding: '6px 8px', fontSize: '13px', textAlign: 'center', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-input, #fff)' }}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="btn sm"
+                                                    onClick={() => stepDispatchQty(item.id, 1)}
+                                                    disabled={saving}
+                                                    style={{ width: '32px', padding: '4px 0', fontWeight: 700 }}
+                                                >
+                                                    ＋
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                <div className="modal-actions" style={{ justifyContent: 'flex-end', marginTop: '16px' }}>
+                                    <button type="button" className="btn-secondary" onClick={() => setDispatchModal(null)} disabled={saving}>Cancel</button>
+                                    <button type="button" className="btn-primary" onClick={submitDispatch} disabled={saving || readyItems.length === 0}>
+                                        {saving ? 'Dispatching…' : `✓ Dispatch ${readyItems.length} item(s)`}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* ── Fill progress modal ── */}
             {labelsModal && (
