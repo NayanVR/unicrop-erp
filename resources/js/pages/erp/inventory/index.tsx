@@ -140,6 +140,7 @@ type Godown = {
     location: string | null;
     notes: string | null;
     is_active: boolean;
+    is_default: boolean;
     stocks: GodownStock[];
 };
 
@@ -172,6 +173,7 @@ const ROUTES = {
     storeGodown: '/inventory/godowns',
     updateGodown: (id: number) => `/inventory/godowns/${id}`,
     destroyGodown: (id: number) => `/inventory/godowns/${id}`,
+    setDefaultGodown: (id: number) => `/inventory/godowns/${id}/set-default`,
     updateCategory: (id: number) => `/inventory/categories/${id}`,
     destroyCategory: (id: number) => `/inventory/categories/${id}`,
 };
@@ -252,6 +254,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const canEditMaterial  = role === 'admin' || role === 'factory' || role === 'accountant';
     const canEnterBill    = role === 'admin' || role === 'factory' || role === 'accountant';
     const isSales         = !['admin', 'factory', 'accountant'].includes(role);
+    const defaultGodownId = godowns.find((g) => g.is_default)?.id;
 
     // Tab
     const [tab, setTab] = useState<'materials' | 'log' | 'bills' | 'reorders' | 'categories' | 'godowns'>('materials');
@@ -376,7 +379,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         freight_charges: '0',
         round_off: '0',
         add_to_stock: true,
-        godown_id: '',
+        godown_id: defaultGodownId ? String(defaultGodownId) : '',
     });
     const [billFile, setBillFile] = useState<File | null>(null);
     const [billRows, setBillRows] = useState<
@@ -649,6 +652,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const openTxn = (m: RawMaterial) => {
         txnForm.reset();
         txnForm.clearErrors();
+        if (defaultGodownId) txnForm.setData('godown_id', String(defaultGodownId));
         setTxnTarget(m);
         setTxnModal(true);
     };
@@ -750,7 +754,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     };
 
     const resetBillForm = () => {
-        setBillForm({ party_id: '', vendor_name: '', bill_number: '', bill_date: '', freight_charges: '0', round_off: '0', add_to_stock: true, godown_id: '' });
+        setBillForm({ party_id: '', vendor_name: '', bill_number: '', bill_date: '', freight_charges: '0', round_off: '0', add_to_stock: true, godown_id: defaultGodownId ? String(defaultGodownId) : '' });
         setBillFile(null);
         setBillRows([]);
         setBillMatDropdown(null);
@@ -1728,15 +1732,32 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                     <div key={g.id} className="card" style={{ padding: 16 }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                                             <div>
-                                                <div style={{ fontWeight: 700, fontSize: 15 }}>{g.name}</div>
+                                                <div style={{ fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    {g.name}
+                                                    {g.is_default && (
+                                                        <span style={{ fontSize: 11, fontWeight: 600, color: '#1d4ed8', background: '#dbeafe', borderRadius: 6, padding: '2px 8px' }}>
+                                                            ⭐ Default
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 {g.location && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>📍 {g.location}</div>}
                                             </div>
                                             {!isSales && (
-                                                <button className="btn sm" style={{ flexShrink: 0 }} onClick={() => {
-                                                    setEditingGodown(g);
-                                                    setGodownForm({ name: g.name, location: g.location ?? '', notes: g.notes ?? '' });
-                                                    setGodownModal(true);
-                                                }}>Edit</button>
+                                                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                                                    {!g.is_default && (
+                                                        <button
+                                                            className="btn sm"
+                                                            onClick={() => router.post(ROUTES.setDefaultGodown(g.id), {}, { preserveScroll: true })}
+                                                        >
+                                                            Set Default
+                                                        </button>
+                                                    )}
+                                                    <button className="btn sm" onClick={() => {
+                                                        setEditingGodown(g);
+                                                        setGodownForm({ name: g.name, location: g.location ?? '', notes: g.notes ?? '' });
+                                                        setGodownModal(true);
+                                                    }}>Edit</button>
+                                                </div>
                                             )}
                                         </div>
 

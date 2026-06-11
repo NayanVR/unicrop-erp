@@ -17,6 +17,7 @@ export type User = {
     is_active?: boolean;
     cost_access?: boolean;
     modules?: string[] | null;
+    hidden_nav_items?: string[] | null;
     permissions?: string[] | null;
     company_access?: string[] | null;
     roles?: Role[];

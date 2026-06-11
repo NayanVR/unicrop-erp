@@ -1,3 +1,4 @@
+import { ALL_NAV_ITEMS } from '@/layouts/erp-layout';
 import { destroy, store, update } from '@/routes/users';
 import type { Role, User } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
@@ -22,6 +23,7 @@ type UserFormData = {
     notes: string;
     permissions: string[];
     modules: string[];
+    hidden_nav_items: string[];
     company_access: string[];
     cost_access: boolean;
 };
@@ -70,6 +72,7 @@ export default function UsersIndex({ users, roles, companies, canManageUsers, ma
         notes: '',
         permissions: [],
         modules: [],
+        hidden_nav_items: [],
         company_access: [],
         cost_access: false,
     });
@@ -100,6 +103,7 @@ export default function UsersIndex({ users, roles, companies, canManageUsers, ma
             notes: (user.notes as string) ?? '',
             permissions: (user.permissions as string[]) ?? [],
             modules: (user.modules as string[]) ?? [],
+            hidden_nav_items: (user.hidden_nav_items as string[]) ?? [],
             company_access: (user.company_access as string[]) ?? [],
             cost_access: Boolean(user.cost_access),
         });
@@ -167,6 +171,7 @@ export default function UsersIndex({ users, roles, companies, canManageUsers, ma
                 notes: (user.notes as string) ?? '',
                 permissions: (user.permissions as string[]) ?? [],
                 modules: (user.modules as string[]) ?? [],
+                hidden_nav_items: (user.hidden_nav_items as string[]) ?? [],
                 company_access: (user.company_access as string[]) ?? [],
                 cost_access: Boolean(user.cost_access),
             },
@@ -702,6 +707,60 @@ export default function UsersIndex({ users, roles, companies, canManageUsers, ma
                                             }
                                         />
                                         {module.label}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div
+                            style={{
+                                marginTop: '14px',
+                                padding: '14px',
+                                background: 'var(--bg-paper)',
+                                border: '1px solid var(--border)',
+                                borderRadius: 'var(--radius-sm)',
+                            }}
+                        >
+                            <div
+                                style={{
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '.6px',
+                                    color: 'var(--tx-muted)',
+                                    marginBottom: '8px',
+                                }}
+                            >
+                                📑 Sidebar Visibility
+                            </div>
+                            <div style={{ fontSize: '12px', color: 'var(--tx-muted)', marginBottom: '8px' }}>
+                                Uncheck an item to hide it from this user's sidebar menu.
+                            </div>
+                            <div
+                                style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: '1fr 1fr',
+                                    gap: '7px',
+                                }}
+                            >
+                                {ALL_NAV_ITEMS.map((item) => (
+                                    <label
+                                        key={item.id}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            fontSize: '13px',
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            style={{ width: 'auto' }}
+                                            checked={!form.data.hidden_nav_items.includes(item.id)}
+                                            onChange={() => toggleArrayValue('hidden_nav_items', item.id)}
+                                        />
+                                        {item.label}
                                     </label>
                                 ))}
                             </div>

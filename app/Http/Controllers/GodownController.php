@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Godown;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class GodownController extends Controller
 {
@@ -40,5 +41,15 @@ class GodownController extends Controller
         $godown->update(['is_active' => false]);
 
         return redirect()->back()->with('success', 'Godown deactivated.');
+    }
+
+    public function setDefault(Godown $godown): RedirectResponse
+    {
+        DB::transaction(function () use ($godown) {
+            Godown::where('id', '!=', $godown->id)->update(['is_default' => false]);
+            $godown->update(['is_default' => true]);
+        });
+
+        return redirect()->back()->with('success', "{$godown->name} set as default godown.");
     }
 }

@@ -52,7 +52,7 @@ class UserController extends Controller
 
         return Inertia::render('erp/users/index', [
             'pageTitle' => 'User Management',
-            'users' => $usersQuery->get(['id', 'name', 'email', 'phone', 'notes', 'is_active', 'cost_access', 'modules', 'permissions', 'company_access', 'password_plain', 'created_at', 'updated_at']),
+            'users' => $usersQuery->get(['id', 'name', 'email', 'phone', 'notes', 'is_active', 'cost_access', 'modules', 'hidden_nav_items', 'permissions', 'company_access', 'password_plain', 'created_at', 'updated_at']),
             'roles' => Role::query()->orderBy('name')->get(['id', 'name', 'slug']),
             'companies' => [],
             'canManageUsers' => $this->canManageUsers(),
@@ -82,6 +82,7 @@ class UserController extends Controller
             'is_active'      => $data['status'] === 'active',
             'cost_access'    => $data['cost_access'] ?? false,
             'modules'        => $data['modules'] ?? [],
+            'hidden_nav_items' => $data['hidden_nav_items'] ?? [],
             'permissions'    => $data['permissions'] ?? [],
             'company_access' => $data['company_access'] ?? [],
         ]);
@@ -113,6 +114,7 @@ class UserController extends Controller
             'is_active'      => $data['status'] === 'active',
             'cost_access'    => $data['cost_access'] ?? false,
             'modules'        => $data['modules'] ?? [],
+            'hidden_nav_items' => $data['hidden_nav_items'] ?? [],
             'permissions'    => $data['permissions'] ?? [],
             'company_access' => $data['company_access'] ?? [],
         ]);

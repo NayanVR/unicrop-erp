@@ -36,6 +36,8 @@ class StoreUserRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:1000'],
             'modules' => ['nullable', 'array'],
             'modules.*' => ['string', 'max:50'],
+            'hidden_nav_items' => ['nullable', 'array'],
+            'hidden_nav_items.*' => ['string', 'max:50'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', 'max:50'],
             'company_access' => ['nullable', 'array'],

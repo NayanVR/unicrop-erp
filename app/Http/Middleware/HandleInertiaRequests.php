@@ -61,6 +61,7 @@ class HandleInertiaRequests extends Middleware
                     'is_active' => $user->is_active,
                     'cost_access' => $user->cost_access,
                     'modules' => $user->modules,
+                    'hidden_nav_items' => $user->hidden_nav_items,
                     'permissions' => $user->permissions,
                     'company_access' => $user->company_access,
                     'roles' => $user->roles->map(fn ($role) => [

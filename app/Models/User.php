@@ -21,6 +21,7 @@ use Illuminate\Notifications\Notifiable;
     'is_active',
     'cost_access',
     'modules',
+    'hidden_nav_items',
     'permissions',
     'company_access',
 ])]
@@ -43,6 +44,7 @@ class User extends Authenticatable
             'is_active' => 'boolean',
             'cost_access' => 'boolean',
             'modules' => 'array',
+            'hidden_nav_items' => 'array',
             'permissions' => 'array',
             'company_access' => 'array',
         ];

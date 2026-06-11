@@ -90,6 +90,17 @@ const NAV_DEFS: Record<string, NavItem[]> = {
     ],
 };
 
+// Union of every nav item across all roles, for the admin "sidebar visibility" checklist.
+export const ALL_NAV_ITEMS: { id: string; label: string }[] = (() => {
+    const seen = new Map<string, string>();
+    Object.values(NAV_DEFS).forEach((items) => {
+        items.forEach((item) => {
+            if (!seen.has(item.id)) seen.set(item.id, item.label);
+        });
+    });
+    return Array.from(seen, ([id, label]) => ({ id, label }));
+})();
+
 const roleLabel = (roles?: Role[], role?: string | null): string => {
     if (roles && roles.length > 0) {
         return roles.map((item) => item.name).join(', ');
@@ -138,6 +149,7 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
     const role        = auth.user?.role ?? auth.user?.roles?.[0]?.slug ?? null;
     const permissions = (auth.user?.permissions ?? []) as string[];
     const modules     = (auth.user?.modules ?? []) as string[];
+    const hiddenNavItems = (auth.user?.hidden_nav_items ?? []) as string[];
 
     // Maps a nav item id to the module slug required to see it.
     // Items not listed here have no module gate and always show.
@@ -168,8 +180,11 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
                 return !required || modules.includes(required);
             });
         }
+        if (hiddenNavItems.length > 0) {
+            items = items.filter((item) => !hiddenNavItems.includes(item.id));
+        }
         return items;
-    }, [role, permissions, modules]);
+    }, [role, permissions, modules, hiddenNavItems]);
 
     useDraggableModals();
 

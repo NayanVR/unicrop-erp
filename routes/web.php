@@ -104,6 +104,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('inventory/godowns', [GodownController::class, 'store'])->name('inventory.godowns.store');
         Route::patch('inventory/godowns/{godown}', [GodownController::class, 'update'])->name('inventory.godowns.update');
         Route::delete('inventory/godowns/{godown}', [GodownController::class, 'destroy'])->name('inventory.godowns.destroy');
+        Route::post('inventory/godowns/{godown}/set-default', [GodownController::class, 'setDefault'])->name('inventory.godowns.set-default');
         Route::delete('inventory/categories/{category}', [InventoryController::class, 'destroyCategory'])->name('inventory.categories.destroy');
 
         Route::get('bom', [BomController::class, 'index'])->name('bom.index');
