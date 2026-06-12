@@ -22,7 +22,6 @@ type UserFormData = {
     phone: string;
     notes: string;
     permissions: string[];
-    modules: string[];
     hidden_nav_items: string[];
     company_access: string[];
     cost_access: boolean;
@@ -43,16 +42,6 @@ const bomPermissions = [
     { id: 'manage_users', label: 'User Management (Add / Edit / Delete)' },
 ];
 
-const moduleAccess = [
-    { id: 'factory', label: 'Production Orders' },
-    { id: 'bom', label: 'Bill of Materials' },
-    { id: 'bottle-filling', label: 'Filling' },
-    { id: 'box-labels', label: 'Box Labels' },
-    { id: 'prod-history', label: 'Production History' },
-    { id: 'inventory', label: 'Inventory' },
-    { id: 'finished-goods', label: 'Finished Goods' },
-];
-
 const userStatusLabel = (isActive?: boolean) =>
     isActive ? 'Active' : 'Inactive';
 
@@ -71,7 +60,6 @@ export default function UsersIndex({ users, roles, companies, canManageUsers, ma
         phone: '',
         notes: '',
         permissions: [],
-        modules: [],
         hidden_nav_items: [],
         company_access: [],
         cost_access: false,
@@ -102,7 +90,6 @@ export default function UsersIndex({ users, roles, companies, canManageUsers, ma
             phone: (user.phone as string) ?? '',
             notes: (user.notes as string) ?? '',
             permissions: (user.permissions as string[]) ?? [],
-            modules: (user.modules as string[]) ?? [],
             hidden_nav_items: (user.hidden_nav_items as string[]) ?? [],
             company_access: (user.company_access as string[]) ?? [],
             cost_access: Boolean(user.cost_access),
@@ -170,7 +157,6 @@ export default function UsersIndex({ users, roles, companies, canManageUsers, ma
                 phone: (user.phone as string) ?? '',
                 notes: (user.notes as string) ?? '',
                 permissions: (user.permissions as string[]) ?? [],
-                modules: (user.modules as string[]) ?? [],
                 hidden_nav_items: (user.hidden_nav_items as string[]) ?? [],
                 company_access: (user.company_access as string[]) ?? [],
                 cost_access: Boolean(user.cost_access),
@@ -673,65 +659,7 @@ export default function UsersIndex({ users, roles, companies, canManageUsers, ma
                                     marginBottom: '8px',
                                 }}
                             >
-                                📦 Module Access
-                            </div>
-                            <div
-                                style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: '1fr 1fr',
-                                    gap: '7px',
-                                }}
-                            >
-                                {moduleAccess.map((module) => (
-                                    <label
-                                        key={module.id}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '8px',
-                                            fontSize: '13px',
-                                            cursor: 'pointer',
-                                        }}
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            style={{ width: 'auto' }}
-                                            checked={form.data.modules.includes(
-                                                module.id,
-                                            )}
-                                            onChange={() =>
-                                                toggleArrayValue(
-                                                    'modules',
-                                                    module.id,
-                                                )
-                                            }
-                                        />
-                                        {module.label}
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div
-                            style={{
-                                marginTop: '14px',
-                                padding: '14px',
-                                background: 'var(--bg-paper)',
-                                border: '1px solid var(--border)',
-                                borderRadius: 'var(--radius-sm)',
-                            }}
-                        >
-                            <div
-                                style={{
-                                    fontSize: '11px',
-                                    fontWeight: 700,
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '.6px',
-                                    color: 'var(--tx-muted)',
-                                    marginBottom: '8px',
-                                }}
-                            >
-                                📑 Sidebar Visibility
+                                📦 Module Access / Sidebar Visibility
                             </div>
                             <div style={{ fontSize: '12px', color: 'var(--tx-muted)', marginBottom: '8px' }}>
                                 Uncheck an item to hide it from this user's sidebar menu.

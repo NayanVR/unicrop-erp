@@ -148,18 +148,7 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
 
     const role        = auth.user?.role ?? auth.user?.roles?.[0]?.slug ?? null;
     const permissions = (auth.user?.permissions ?? []) as string[];
-    const modules     = (auth.user?.modules ?? []) as string[];
     const hiddenNavItems = (auth.user?.hidden_nav_items ?? []) as string[];
-
-    // Maps a nav item id to the module slug required to see it.
-    // Items not listed here have no module gate and always show.
-    const MODULE_GATE: Record<string, string> = {
-        factory:         'factory',
-        bom:             'bom',
-        filling:         'bottle-filling',
-        inventory:       'inventory',
-        'finished-goods':'finished-goods',
-    };
 
     const navItems = useMemo(() => {
         const base = NAV_DEFS[role ?? 'admin'] ?? [];
@@ -174,17 +163,11 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
         if (role !== 'admin' && !permissions.includes('manage_users')) {
             items = items.filter((i) => i.id !== 'users');
         }
-        if (role !== 'admin' && modules.length > 0) {
-            items = items.filter((item) => {
-                const required = MODULE_GATE[item.id];
-                return !required || modules.includes(required);
-            });
-        }
         if (hiddenNavItems.length > 0) {
             items = items.filter((item) => !hiddenNavItems.includes(item.id));
         }
         return items;
-    }, [role, permissions, modules, hiddenNavItems]);
+    }, [role, permissions, hiddenNavItems]);
 
     useDraggableModals();
 
