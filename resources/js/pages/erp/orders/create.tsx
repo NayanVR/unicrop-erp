@@ -88,7 +88,7 @@ type Props = {
     currentUser: { id: number; name: string };
     productPhotos: ProductPhoto[];
     finishGoodBrands: FinishGoodBrand[];
-    packingSizes: { name: string; multiplier: string | number; pieces_per_box: number | null }[];
+    packingSizes: { name: string; multiplier: string | number; pieces_per_box: number | null; pack_unit: string | null }[];
     editingOrder?: EditingOrder | null;
 };
 
@@ -120,6 +120,24 @@ function normalizeSize(s: string): string {
 function getBoxQty(packingSize: string, overrides: Record<string, number>): number | null {
     const key = normalizeSize(packingSize);
     return overrides[key] ?? BOX_SIZES[key] ?? null;
+}
+
+// Pack unit (box / bag / carba) by normalized packing size, when admin hasn't set one
+const DEFAULT_PACK_UNITS: Record<string, string> = {
+    '10kg': 'bag', '25kg': 'bag', '50kg': 'bag',
+    '10ltr': 'carba', '20ltr': 'carba', '50ltr': 'carba', '200ltr': 'carba',
+};
+
+function getPackUnit(packingSize: string, overrides: Record<string, string>): string {
+    const key = normalizeSize(packingSize);
+    return overrides[key] ?? DEFAULT_PACK_UNITS[key] ?? 'box';
+}
+
+function pluralizeUnit(unit: string, count: number): string {
+    if (count === 1) return unit;
+    if (unit === 'box') return 'boxes';
+    if (unit === 'bag') return 'bags';
+    return unit;
 }
 
 type ProductRow = {
@@ -275,6 +293,16 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         packingSizes.forEach((p) => {
             if (p.pieces_per_box) {
                 map[normalizeSize(p.name)] = p.pieces_per_box;
+            }
+        });
+        return map;
+    }, [packingSizes]);
+
+    const packUnitOverrides = useMemo(() => {
+        const map: Record<string, string> = {};
+        packingSizes.forEach((p) => {
+            if (p.pack_unit) {
+                map[normalizeSize(p.name)] = p.pack_unit;
             }
         });
         return map;
@@ -916,6 +944,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                         );
                                         const qty = toNumber(row.quantity);
                                         const pcsPerBox = getBoxQty(row.packing_size, pcsPerBoxOverrides);
+                                        const packUnit = getPackUnit(row.packing_size, packUnitOverrides);
                                         const boxes = pcsPerBox && qty > 0 ? qty / pcsPerBox : null;
                                         const boxesExact = boxes !== null && Number.isInteger(boxes);
 
@@ -1001,8 +1030,8 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                                     {boxes !== null && (
                                                         <div className={`box-count${boxesExact ? ' ok' : ' warn'}`}>
                                                             {boxesExact
-                                                                ? `✓ ${boxes} box${boxes !== 1 ? 'es' : ''}`
-                                                                : `${boxes.toFixed(2)} boxes (${pcsPerBox} pcs/box)`}
+                                                                ? `✓ ${boxes} ${pluralizeUnit(packUnit, boxes)}`
+                                                                : `${boxes.toFixed(2)} ${pluralizeUnit(packUnit, 2)} (${pcsPerBox} pcs/${packUnit})`}
                                                         </div>
                                                     )}
                                                 </td>

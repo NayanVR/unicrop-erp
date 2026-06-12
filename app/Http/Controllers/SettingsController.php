@@ -46,6 +46,7 @@ class SettingsController extends Controller
             'name'           => 'required|string|max:50|unique:packing_sizes,name',
             'multiplier'     => 'required|numeric|min:0.001|max:999999',
             'pieces_per_box' => 'nullable|integer|min:1|max:999999',
+            'pack_unit'      => 'nullable|string|in:box,bag,carba',
         ]);
 
         PackingSize::create($data);
@@ -59,6 +60,7 @@ class SettingsController extends Controller
             'name'           => 'required|string|max:50|unique:packing_sizes,name,' . $packingSize->id,
             'multiplier'     => 'required|numeric|min:0.001|max:999999',
             'pieces_per_box' => 'nullable|integer|min:1|max:999999',
+            'pack_unit'      => 'nullable|string|in:box,bag,carba',
         ]);
 
         $packingSize->update($data);
