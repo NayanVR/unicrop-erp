@@ -5,18 +5,27 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import type { Auth } from '@/types/auth';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+type ProductPhotoSize = {
+    packing_size?: string | null;
+    mrp?: string | number | null;
+};
+
 type ProductPhoto = {
     id: number;
     party_id: number | null;
     our_brand: string;
     party_brand: string | null;
     packing_size: string | null;
+    mrp: string | number | null;
+    sizes: ProductPhotoSize[] | null;
     photo_url: string;
 };
 
 function buildPhotoMap(photos: ProductPhoto[]) {
     const ob = new Map<string, string>();
     const pb = new Map<string, string>();
+    const obMrp = new Map<string, string>();
+    const pbMrp = new Map<string, string>();
     for (const p of photos) {
         const size = (p.packing_size ?? '').toLowerCase();
         if (p.party_id === null) {
@@ -25,8 +34,28 @@ function buildPhotoMap(photos: ProductPhoto[]) {
         } else if (p.party_brand) {
             pb.set(`${p.party_id}|${p.party_brand.toLowerCase()}|${size}`, p.photo_url);
         }
+
+        for (const s of p.sizes ?? []) {
+            if (s.mrp == null || s.mrp === '') continue;
+            const sSize = (s.packing_size ?? '').toLowerCase();
+            const mrp = String(s.mrp);
+            if (p.party_id === null) {
+                obMrp.set(`${p.our_brand.toLowerCase()}|${sSize}`, mrp);
+            } else if (p.party_brand) {
+                pbMrp.set(`${p.party_id}|${p.party_brand.toLowerCase()}|${sSize}`, mrp);
+            }
+        }
+        if (p.mrp != null && p.mrp !== '') {
+            const mrp = String(p.mrp);
+            if (p.party_id === null) {
+                if (!obMrp.has(`${p.our_brand.toLowerCase()}|${size}`)) obMrp.set(`${p.our_brand.toLowerCase()}|${size}`, mrp);
+                if (!p.packing_size && !obMrp.has(`${p.our_brand.toLowerCase()}|`)) obMrp.set(`${p.our_brand.toLowerCase()}|`, mrp);
+            } else if (p.party_brand) {
+                if (!pbMrp.has(`${p.party_id}|${p.party_brand.toLowerCase()}|${size}`)) pbMrp.set(`${p.party_id}|${p.party_brand.toLowerCase()}|${size}`, mrp);
+            }
+        }
     }
-    return { ob, pb };
+    return { ob, pb, obMrp, pbMrp };
 }
 
 function getItemPhoto(
@@ -44,6 +73,21 @@ function getItemPhoto(
     return map.ob.get(`${item.our_brand.toLowerCase()}|${size}`)
         ?? map.ob.get(`${item.our_brand.toLowerCase()}|`)
         ?? null;
+}
+
+function getItemMrp(
+    item: OrderItem,
+    partyId: number | null | undefined,
+    map: { obMrp: Map<string, string>; pbMrp: Map<string, string> },
+): string | null {
+    if (!item.our_brand) return null;
+    const size = (item.packing_size ?? '').toLowerCase();
+    if (partyId && item.party_brand) {
+        const key = `${partyId}|${item.party_brand.toLowerCase()}|${size}`;
+        const mrp = map.pbMrp.get(key);
+        if (mrp) return mrp;
+    }
+    return map.obMrp.get(`${item.our_brand.toLowerCase()}|${size}`) ?? null;
 }
 
 type StageLogEntry = {
@@ -1094,6 +1138,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                     const showLabels = received != null || item.status !== 'pending';
                                                     const log = [...(item.stage_log ?? [])].reverse();
                                                     const photo = getItemPhoto(item, order.party_id, photoMap);
+                                                    const mrp = getItemMrp(item, order.party_id, photoMap);
 
                                                     return (
                                                         <tr key={item.id}>
@@ -1115,6 +1160,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                     <div>
                                                                         <div className="prod-name">{item.our_brand ?? '—'}</div>
                                                                         {item.party_brand && <div className="prod-detail">{item.party_brand}</div>}
+                                                                        {mrp && <div className="prod-detail">MRP: ₹{mrp}</div>}
                                                                         <span
                                                                             className={`badge ${isNewItem(item.status) ? 's-pending' : (STAGE_CLASS[item.status!] ?? 'gray')}`}
                                                                             style={{ marginTop: '4px', display: 'inline-block' }}

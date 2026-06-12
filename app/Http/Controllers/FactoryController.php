@@ -110,6 +110,7 @@ class FactoryController extends Controller
                     'party_brand'  => $p->party_brand,
                     'packing_size' => $p->packing_size,
                     'mrp'          => $p->mrp,
+                    'sizes'        => $p->sizes,
                     'photo_url'    => $p->photo_url,
                 ]),
             'packingSizes' => PackingSize::query()->orderBy('name')->get(['name', 'multiplier', 'pieces_per_box', 'pack_unit']),
