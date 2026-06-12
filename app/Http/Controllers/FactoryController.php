@@ -259,6 +259,7 @@ class FactoryController extends Controller
     {
         $data = $request->validate([
             'box_size' => 'nullable|integer|min:1',
+            'boxes_override' => 'nullable|integer|min:1',
         ]);
 
         $item->update($data);

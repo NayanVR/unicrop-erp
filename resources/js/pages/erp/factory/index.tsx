@@ -62,6 +62,7 @@ type OrderItem = {
     party_brand?: string | null;
     packing_size?: string | null;
     box_size?: number | null;
+    boxes_override?: number | null;
     labels_received?: number | null;
     quantity: string | number;
     dispatched_qty?: string | number | null;
@@ -287,6 +288,7 @@ const pcsPerBox = (item: OrderItem, overrides: Record<string, number> = {}): num
     item.box_size ?? stdPcsPerBox(item.packing_size, overrides);
 
 const boxesFor = (item: OrderItem, overrides: Record<string, number> = {}): number | null => {
+    if (item.boxes_override != null && item.boxes_override > 0) return item.boxes_override;
     const ppb = pcsPerBox(item, overrides);
     if (!ppb || ppb <= 0) return null;
     return Math.ceil(Number(item.quantity) / ppb);
@@ -358,6 +360,8 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
     }, [labelEditor, labelFS.totalBoxes]);
     const [boxSizeDraft, setBoxSizeDraft] = useState<Record<number, string>>({});
     const [savingBoxSize, setSavingBoxSize] = useState<number | null>(null);
+    const [boxCountDraft, setBoxCountDraft] = useState<Record<number, string>>({});
+    const [savingBoxCount, setSavingBoxCount] = useState<number | null>(null);
 
     // Unit transfer modal (opened from a specific order item)
     const [transferModal, setTransferModal] = useState<{ order: Order; item: OrderItem } | null>(null);
@@ -523,6 +527,31 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
             `/factory/items/${itemId}`,
             { box_size: num },
             { preserveScroll: true, onFinish: () => setSavingBoxSize(null) },
+        );
+    };
+
+    const saveBoxCount = (itemId: number, computed: number | null) => {
+        const raw = boxCountDraft[itemId];
+        if (raw === undefined) return;
+        const trimmed = raw.trim();
+        // Empty or same-as-computed clears the override back to auto
+        const num = trimmed === '' ? null : parseInt(trimmed, 10);
+        if (num !== null && (isNaN(num) || num < 1)) return;
+        setSavingBoxCount(itemId);
+        router.patch(
+            `/factory/items/${itemId}`,
+            { boxes_override: num !== null && num === computed ? null : num },
+            {
+                preserveScroll: true,
+                onFinish: () => {
+                    setSavingBoxCount(null);
+                    setBoxCountDraft((prev) => {
+                        const next = { ...prev };
+                        delete next[itemId];
+                        return next;
+                    });
+                },
+            },
         );
     };
 
@@ -1128,11 +1157,48 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                                         }}
                                                                                     />
                                                                                 )}
-                                                                                {effective != null && boxes != null && (
-                                                                                    <span style={{ fontSize: '11px', color: 'var(--tx-muted)', fontWeight: 600 }}>
-                                                                                        · {boxes} {pluralizeUnit(unit, boxes)}
-                                                                                    </span>
-                                                                                )}
+                                                                                {effective != null && boxes != null && (() => {
+                                                                                    const autoBoxes = Math.ceil(Number(item.quantity) / effective);
+                                                                                    const isCountOverridden = item.boxes_override != null;
+                                                                                    return (
+                                                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--tx-muted)', fontWeight: 600 }}>
+                                                                                            ·
+                                                                                            <input
+                                                                                                type="number"
+                                                                                                min={1}
+                                                                                                value={boxCountDraft[item.id] ?? String(boxes)}
+                                                                                                onChange={(e) => setBoxCountDraft((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                                                                                                onBlur={() => saveBoxCount(item.id, autoBoxes)}
+                                                                                                onKeyDown={(e) => e.key === 'Enter' && saveBoxCount(item.id, autoBoxes)}
+                                                                                                disabled={savingBoxCount === item.id}
+                                                                                                style={{
+                                                                                                    width: '52px', padding: '2px 4px', fontSize: '12px', fontWeight: 700,
+                                                                                                    border: `1px solid ${isCountOverridden ? '#d97706' : 'var(--border)'}`,
+                                                                                                    borderRadius: '4px', background: 'var(--bg-input, #fff)',
+                                                                                                    color: isCountOverridden ? '#d97706' : 'inherit',
+                                                                                                }}
+                                                                                            />
+                                                                                            {pluralizeUnit(unit, boxes)}
+                                                                                            {isCountOverridden && (
+                                                                                                <>
+                                                                                                    <span style={{ color: '#d97706' }}>= {boxes * effective} pcs</span>
+                                                                                                    <button
+                                                                                                        type="button"
+                                                                                                        title={`Reset to auto (${autoBoxes})`}
+                                                                                                        onClick={() => {
+                                                                                                            setSavingBoxCount(item.id);
+                                                                                                            router.patch(`/factory/items/${item.id}`, { boxes_override: null }, { preserveScroll: true, onFinish: () => setSavingBoxCount(null) });
+                                                                                                        }}
+                                                                                                        disabled={savingBoxCount === item.id}
+                                                                                                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '12px', padding: 0, color: 'var(--tx-muted)' }}
+                                                                                                    >
+                                                                                                        ↺
+                                                                                                    </button>
+                                                                                                </>
+                                                                                            )}
+                                                                                        </span>
+                                                                                    );
+                                                                                })()}
                                                                             </div>
                                                                             {/* Show override input when auto value exists */}
                                                                             {auto != null && (
