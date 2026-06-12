@@ -1496,7 +1496,14 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                                                 return (
                                                                                     <td key={s} style={{ textAlign: 'center', verticalAlign: 'top', paddingTop: '6px' }}>
                                                                                         {isPast ? (
-                                                                                            <span title={actor ? `by ${actor}` : undefined} style={{ color: '#059669', fontSize: '14px', cursor: actor ? 'help' : 'default' }}>✓</span>
+                                                                                            <div>
+                                                                                                <span style={{ color: '#059669', fontSize: '14px' }}>✓</span>
+                                                                                                {actor && (
+                                                                                                    <div style={{ fontSize: '10px', color: 'var(--tx-muted)', marginTop: '3px', whiteSpace: 'nowrap' }}>
+                                                                                                        {actor}
+                                                                                                    </div>
+                                                                                                )}
+                                                                                            </div>
                                                                                         ) : isCurrent ? (
                                                                                             <div>
                                                                                                 <span className={`badge s-${s}`} style={{ fontSize: '10px' }}>●</span>
