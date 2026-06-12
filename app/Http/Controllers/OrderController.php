@@ -150,7 +150,7 @@ class OrderController extends Controller
             'currentUser' => ['id' => $user?->id, 'name' => $user?->name],
             'finishGoodBrands' => $this->finishGoodBrands(),
             'productPhotos' => $this->mapProductPhotos(),
-            'packingSizes' => PackingSize::query()->orderBy('name')->get(['name', 'multiplier']),
+            'packingSizes' => PackingSize::query()->orderBy('name')->get(['name', 'multiplier', 'pieces_per_box']),
         ]);
     }
 
@@ -434,7 +434,7 @@ class OrderController extends Controller
             'currentUser'  => ['id' => $user?->id, 'name' => $user?->name],
             'finishGoodBrands' => $this->finishGoodBrands(),
             'productPhotos' => $this->mapProductPhotos(),
-            'packingSizes' => PackingSize::query()->orderBy('name')->get(['name', 'multiplier']),
+            'packingSizes' => PackingSize::query()->orderBy('name')->get(['name', 'multiplier', 'pieces_per_box']),
             'editingOrder' => [
                 'id'               => $order->id,
                 'order_number'     => $order->order_number,

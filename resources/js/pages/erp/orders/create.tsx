@@ -88,7 +88,7 @@ type Props = {
     currentUser: { id: number; name: string };
     productPhotos: ProductPhoto[];
     finishGoodBrands: FinishGoodBrand[];
-    packingSizes: { name: string; multiplier: string | number }[];
+    packingSizes: { name: string; multiplier: string | number; pieces_per_box: number | null }[];
     editingOrder?: EditingOrder | null;
 };
 
@@ -117,8 +117,9 @@ function normalizeSize(s: string): string {
         .replace(/millilitre|milliliter|millilitres|milliliters|mls\b/g, 'ml');
 }
 
-function getBoxQty(packingSize: string): number | null {
-    return BOX_SIZES[normalizeSize(packingSize)] ?? null;
+function getBoxQty(packingSize: string, overrides: Record<string, number>): number | null {
+    const key = normalizeSize(packingSize);
+    return overrides[key] ?? BOX_SIZES[key] ?? null;
 }
 
 type ProductRow = {
@@ -268,6 +269,16 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         aadhaar_file: null,
         save_as_draft: false,
     });
+
+    const pcsPerBoxOverrides = useMemo(() => {
+        const map: Record<string, number> = {};
+        packingSizes.forEach((p) => {
+            if (p.pieces_per_box) {
+                map[normalizeSize(p.name)] = p.pieces_per_box;
+            }
+        });
+        return map;
+    }, [packingSizes]);
 
     const filteredParties = useMemo(
         () =>
@@ -904,7 +915,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                             (r) => r.our_brand.toLowerCase() === row.our_brand.toLowerCase(),
                                         );
                                         const qty = toNumber(row.quantity);
-                                        const pcsPerBox = getBoxQty(row.packing_size);
+                                        const pcsPerBox = getBoxQty(row.packing_size, pcsPerBoxOverrides);
                                         const boxes = pcsPerBox && qty > 0 ? qty / pcsPerBox : null;
                                         const boxesExact = boxes !== null && Number.isInteger(boxes);
 

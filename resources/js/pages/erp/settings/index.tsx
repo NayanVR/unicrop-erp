@@ -37,6 +37,7 @@ type PackingSizeEntry = {
     id: number;
     name: string;
     multiplier: string | number;
+    pieces_per_box: number | null;
 };
 
 type AlertSettings = {
@@ -77,6 +78,7 @@ type TransportForm = {
 type PackingSizeForm = {
     name: string;
     multiplier: string;
+    pieces_per_box: string;
 };
 
 const GST_OPTIONS = ['0', '5', '12', '18', '28'];
@@ -155,6 +157,7 @@ export default function SettingsIndex({ products, transports, alertSettings, pac
     const packingSizeForm = useForm<PackingSizeForm>({
         name: '',
         multiplier: '1',
+        pieces_per_box: '',
     });
 
     // ── Product handlers ──────────────────────────────────────────────────
@@ -236,14 +239,14 @@ export default function SettingsIndex({ products, transports, alertSettings, pac
 
     // ── Packing size handlers ─────────────────────────────────────────────
     const openNewPackingSize = () => {
-        packingSizeForm.setData({ name: '', multiplier: '1' });
+        packingSizeForm.setData({ name: '', multiplier: '1', pieces_per_box: '' });
         packingSizeForm.clearErrors();
         setEditingPackingSize(null);
         setPackingSizeModalOpen(true);
     };
 
     const openEditPackingSize = (p: PackingSizeEntry) => {
-        packingSizeForm.setData({ name: p.name, multiplier: String(p.multiplier) });
+        packingSizeForm.setData({ name: p.name, multiplier: String(p.multiplier), pieces_per_box: p.pieces_per_box != null ? String(p.pieces_per_box) : '' });
         packingSizeForm.clearErrors();
         setEditingPackingSize(p);
         setPackingSizeModalOpen(true);
@@ -425,6 +428,7 @@ export default function SettingsIndex({ products, transports, alertSettings, pac
                                     <tr>
                                         <th>Packing Size</th>
                                         <th>Stock Multiplier</th>
+                                        <th>Pcs / Box</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -433,6 +437,7 @@ export default function SettingsIndex({ products, transports, alertSettings, pac
                                         <tr key={p.id}>
                                             <td><div className="prod-name">{p.name}</div></td>
                                             <td>{p.multiplier}</td>
+                                            <td>{p.pieces_per_box ?? '—'}</td>
                                             <td>
                                                 <div style={{ display: 'flex', gap: '6px' }}>
                                                     <button className="btn sm" onClick={() => openEditPackingSize(p)}>Edit</button>
@@ -726,6 +731,20 @@ export default function SettingsIndex({ products, transports, alertSettings, pac
                                 Inventory units deducted per unit ordered (e.g. "25kg" → 25).
                             </small>
                             {packingSizeForm.errors.multiplier && <span className="field-error">{packingSizeForm.errors.multiplier}</span>}
+                        </div>
+                        <div className="form-group">
+                            <label>Pieces per Box</label>
+                            <input
+                                type="number"
+                                value={packingSizeForm.data.pieces_per_box}
+                                onChange={(e) => packingSizeForm.setData('pieces_per_box', e.target.value)}
+                                step="1" min="1"
+                                placeholder="e.g. 20"
+                            />
+                            <small style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                                Used to auto-calculate box count on the order form (e.g. "500ml" → 20 pcs/box). Leave blank to use the default.
+                            </small>
+                            {packingSizeForm.errors.pieces_per_box && <span className="field-error">{packingSizeForm.errors.pieces_per_box}</span>}
                         </div>
                     </div>
                     <div className="modal-footer">

@@ -43,8 +43,9 @@ class SettingsController extends Controller
     public function storePackingSize(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'name'       => 'required|string|max:50|unique:packing_sizes,name',
-            'multiplier' => 'required|numeric|min:0.001|max:999999',
+            'name'           => 'required|string|max:50|unique:packing_sizes,name',
+            'multiplier'     => 'required|numeric|min:0.001|max:999999',
+            'pieces_per_box' => 'nullable|integer|min:1|max:999999',
         ]);
 
         PackingSize::create($data);
@@ -55,8 +56,9 @@ class SettingsController extends Controller
     public function updatePackingSize(Request $request, PackingSize $packingSize): RedirectResponse
     {
         $data = $request->validate([
-            'name'       => 'required|string|max:50|unique:packing_sizes,name,' . $packingSize->id,
-            'multiplier' => 'required|numeric|min:0.001|max:999999',
+            'name'           => 'required|string|max:50|unique:packing_sizes,name,' . $packingSize->id,
+            'multiplier'     => 'required|numeric|min:0.001|max:999999',
+            'pieces_per_box' => 'nullable|integer|min:1|max:999999',
         ]);
 
         $packingSize->update($data);

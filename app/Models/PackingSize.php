@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['name', 'multiplier'])]
+#[Fillable(['name', 'multiplier', 'pieces_per_box'])]
 class PackingSize extends Model
 {
     /**
@@ -15,6 +15,7 @@ class PackingSize extends Model
     {
         return [
             'multiplier' => 'decimal:3',
+            'pieces_per_box' => 'integer',
         ];
     }
 }
