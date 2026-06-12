@@ -122,6 +122,7 @@ type Props = {
     canAdvance: boolean;
     productPhotos?: ProductPhoto[];
     packingSizes?: { name: string; multiplier: string | number; pieces_per_box: number | null; pack_unit: string | null }[];
+    godowns?: { id: number; name: string }[];
 };
 
 const STAGE_ORDER = ['accepted', 'filling', 'labeling', 'ready', 'dispatched'];
@@ -299,7 +300,7 @@ const boxesFor = (item: OrderItem, overrides: Record<string, number> = {}): numb
     return Math.ceil(Number(item.quantity) / ppb);
 };
 
-export default function FactoryIndex({ orders, urgentPending, canAdvance, productPhotos = [], packingSizes = [] }: Props) {
+export default function FactoryIndex({ orders, urgentPending, canAdvance, productPhotos = [], packingSizes = [], godowns = [] }: Props) {
     const pcsPerBoxOverrides = useMemo(() => {
         const map: Record<string, number> = {};
         packingSizes.forEach((p) => {
@@ -1867,22 +1868,22 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
 
                                 <div className="form-grid">
                                     <div className="form-group">
-                                        <label>From Unit *</label>
-                                        <input
-                                            type="text"
-                                            placeholder="e.g. Main Factory"
-                                            value={transferForm.from_unit}
-                                            onChange={(e) => setTransferForm((f) => ({ ...f, from_unit: e.target.value }))}
-                                        />
+                                        <label>From Godown *</label>
+                                        <select value={transferForm.from_unit} onChange={(e) => setTransferForm((f) => ({ ...f, from_unit: e.target.value }))}>
+                                            <option value="">— Select —</option>
+                                            {godowns.map((g) => (
+                                                <option key={g.id} value={g.name}>{g.name}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                     <div className="form-group">
-                                        <label>To Unit *</label>
-                                        <input
-                                            type="text"
-                                            placeholder="e.g. Warehouse B"
-                                            value={transferForm.to_unit}
-                                            onChange={(e) => setTransferForm((f) => ({ ...f, to_unit: e.target.value }))}
-                                        />
+                                        <label>To Godown *</label>
+                                        <select value={transferForm.to_unit} onChange={(e) => setTransferForm((f) => ({ ...f, to_unit: e.target.value }))}>
+                                            <option value="">— Select —</option>
+                                            {godowns.map((g) => (
+                                                <option key={g.id} value={g.name}>{g.name}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                     <div className="form-group">
                                         <label>Qty *</label>
