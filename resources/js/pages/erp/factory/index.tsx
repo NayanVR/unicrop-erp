@@ -338,7 +338,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
 
     const [photoLightbox, setPhotoLightbox] = useState<string | null>(null);
     const [labelEditor, setLabelEditor] = useState<{ order: Order; labels: EditableLabel[]; unitSummary: string } | null>(null);
-    const [labelFS, setLabelFS] = useState({ transport: 28, totalBoxes: 36, brand: 16, boxNum: 18, party: 10 });
+    const [labelFS, setLabelFS] = useState({ transport: 28, totalBoxes: 34, brand: 16, boxNum: 18, party: 10 });
     const adjFS = (key: keyof typeof labelFS, delta: number) =>
         setLabelFS((prev) => ({ ...prev, [key]: Math.max(6, prev[key] + delta) }));
     const [boxSizeDraft, setBoxSizeDraft] = useState<Record<number, string>>({});
@@ -546,8 +546,9 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
             unitTotals[unit] = (unitTotals[unit] ?? 0) + itemBoxes;
         });
         const totalParcels = Object.values(unitTotals).reduce((sum, n) => sum + n, 0);
+        const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
         const unitSummary = Object.entries(unitTotals)
-            .map(([unit, count]) => `${count} ${pluralizeUnit(unit, count)}`)
+            .map(([unit, count]) => `${count} ${cap(pluralizeUnit(unit, count))}`)
             .join(' + ') + ` = ${totalParcels} Parcel${totalParcels !== 1 ? 's' : ''}`;
 
         const labels: EditableLabel[] = [];
@@ -604,7 +605,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                     <div class="party">${esc(lbl.party || '—')}</div>
                     <div class="mid-row">
                         <span class="box-num">${lbl.boxNum}</span>
-                        <span class="total-boxes">${lbl.unit.toUpperCase()}</span>
+                        <span class="total-boxes">${esc(labelEditor.unitSummary)}</span>
                     </div>
                     <div class="auto-row2">
                         <span class="inboxpcs">${lbl.inBoxPcs ? `In-box: <b>${esc(lbl.inBoxPcs)} pcs</b>` : '—'}</span>
@@ -614,7 +615,6 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                         <div class="brand-name">${esc(lbl.brand || '—')}</div>
                     </div>
                     <div class="order-ref">${esc(lbl.orderRef)}</div>
-                    <div class="unit-summary">${esc(labelEditor.unitSummary)}</div>
                 </div>
             </div>`,
             )
@@ -632,14 +632,13 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 .party { font-size:${labelFS.party}pt; font-weight:700; margin-bottom:2mm; }
                 .mid-row { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2mm; }
                 .box-num { font-size:${labelFS.boxNum}pt; font-weight:900; }
-                .total-boxes { font-size:${labelFS.totalBoxes}pt; font-weight:900; }
+                .total-boxes { font-size:${labelFS.totalBoxes}pt; font-weight:900; text-align:right; line-height:1.05; word-break:break-word; }
                 .auto-row2 { display:flex; justify-content:space-between; align-items:center; font-size:9pt; margin-bottom:1.5mm; }
                 .inboxpcs { font-weight:700; color:#222; }
                 .item-box-count { color:#666; font-style:italic; font-size:8pt; }
                 .product-block { border-top:0.5px solid #ccc; padding-top:1.5mm; }
                 .brand-name { font-size:${labelFS.brand}pt; font-weight:900; word-break:break-word; white-space:normal; line-height:1.15; }
                 .order-ref { font-size:7.5pt; color:#888; margin-top:1mm; text-align:right; }
-                .unit-summary { font-size:7pt; color:#666; margin-top:0.5mm; text-align:right; font-style:italic; }
                 .printed-by { font-size:7pt; color:#555; margin-top:0.5mm; text-align:right; }
                 .toolbar { position:sticky; top:0; z-index:10; background:#1e293b; color:#fff; padding:10px 16px; display:flex; align-items:center; gap:12px; }
                 .toolbar button { background:#2563eb; color:#fff; border:0; border-radius:6px; padding:8px 18px; font-size:14px; font-weight:700; cursor:pointer; }
@@ -1457,7 +1456,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                             {([
                                 { key: 'transport', label: 'Transport' },
                                 { key: 'party',     label: 'Party' },
-                                { key: 'totalBoxes',label: 'Boxes' },
+                                { key: 'totalBoxes',label: 'Parcels' },
                                 { key: 'boxNum',    label: 'Box#' },
                                 { key: 'brand',     label: 'Product' },
                             ] as { key: keyof typeof labelFS; label: string }[]).map(({ key, label }) => (
@@ -1542,10 +1541,10 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                             overflow: 'hidden', lineHeight: 1.2,
                                         }}
                                     />
-                                    {/* Box number | Pack unit */}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '1mm 0 0.5mm' }}>
+                                    {/* Box number | Parcel summary */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '1mm 0 0.5mm', gap: '2mm' }}>
                                         <span style={{ fontSize: `${labelFS.boxNum}pt`, fontWeight: 900, color: '#111' }}>{lbl.boxNum}</span>
-                                        <span style={{ fontSize: `${labelFS.totalBoxes}pt`, fontWeight: 900, color: '#111' }}>{lbl.unit.toUpperCase()}</span>
+                                        <span style={{ fontSize: `${labelFS.totalBoxes}pt`, fontWeight: 900, color: '#111', textAlign: 'right', lineHeight: 1.05, wordBreak: 'break-word' }}>{labelEditor.unitSummary}</span>
                                     </div>
                                     {/* In-box pcs | product box/bag/carba */}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1mm' }}>
@@ -1599,10 +1598,6 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                             marginTop: 'auto',
                                         }}
                                     />
-                                    {/* Order parcel summary — bottom right */}
-                                    <div style={{ fontSize: '7pt', color: '#999', textAlign: 'right', fontStyle: 'italic' }}>
-                                        {labelEditor.unitSummary}
-                                    </div>
                                 </div>
                             ))}
                         </div>
