@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Events\ErpActivity;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\PackingSize;
 use App\Models\ProductPhoto;
 use App\Models\Role;
 use App\Models\User;
@@ -110,6 +111,7 @@ class FactoryController extends Controller
                     'mrp'          => $p->mrp,
                     'photo_url'    => $p->photo_url,
                 ]),
+            'packingSizes' => PackingSize::query()->orderBy('name')->get(['name', 'multiplier', 'pieces_per_box', 'pack_unit']),
         ]);
     }
 

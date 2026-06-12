@@ -120,6 +120,7 @@ type Props = {
     urgentPending: UrgentPendingOrder[];
     canAdvance: boolean;
     productPhotos?: ProductPhoto[];
+    packingSizes?: { name: string; multiplier: string | number; pieces_per_box: number | null; pack_unit: string | null }[];
 };
 
 const STAGE_ORDER = ['accepted', 'filling', 'labeling', 'ready', 'dispatched'];
@@ -147,6 +148,7 @@ type EditableLabel = {
     party: string;
     boxNum: number;
     totalBoxes: number;
+    unit: string;        // pack unit for this item's parcels (box / bag / carba)
     itemBoxNum: number;   // this box's position within its product (1-of-3)
     itemTotalBoxes: number; // total boxes for this product
     brand: string;
@@ -231,34 +233,86 @@ const formatDay = (iso?: string | null) => {
 
 const priorityClass = (priority?: string | null) => `badge priority-${priority ?? 'normal'}`;
 
-// Standard pcs-per-box lookup by packing size
-const PCS_PER_BOX_RULES: [RegExp, number][] = [
-    [/^1\s*kg$/i, 10],
-    [/^500\s*(g|gm|ml)$/i, 20],
-    [/^250\s*(g|gm|ml)$/i, 40],
-    [/^100\s*(g|gm|ml)$/i, 50],
-    [/^50\s*(g|gm|ml)$/i, 100],
-];
+// Standard pcs-per-box/bag/carba lookup by normalized packing size
+const STD_PCS_PER_BOX: Record<string, number> = {
+    '5ltr': 2,   '5kg': 2,
+    '1ltr': 10,  '1kg': 10,
+    '500ml': 20, '500gm': 20,
+    '250ml': 40, '250gm': 40,
+    '100ml': 50, '100gm': 50,
+    '50ml': 100, '50gm': 100,
+    '20ml': 300, '20gm': 300,
+    '10ml': 600, '10gm': 600,
+    '5ml': 600,  '5gm': 600,
+    // Carba large containers
+    '10ltr': 1, '20ltr': 1, '50ltr': 1, '200ltr': 1,
+    // Bags
+    '10kg': 1, '25kg': 1, '50kg': 1,
+};
 
-const stdPcsPerBox = (packing: string | null | undefined): number | null => {
+// Pack unit (box / bag / carba) by normalized packing size, when admin hasn't set one
+const STD_PACK_UNIT: Record<string, string> = {
+    '10kg': 'bag', '25kg': 'bag', '50kg': 'bag',
+    '10ltr': 'carba', '20ltr': 'carba', '50ltr': 'carba', '200ltr': 'carba',
+};
+
+const normalizeSize = (s: string): string =>
+    s.toLowerCase().replace(/\s+/g, '')
+        .replace(/litre|liter|litres|liters/g, 'ltr')
+        .replace(/kilogram|kilograms|kgs\b/g, 'kg')
+        .replace(/gram|grams\b/g, 'gm')
+        .replace(/millilitre|milliliter|millilitres|milliliters|mls\b/g, 'ml');
+
+const stdPcsPerBox = (packing: string | null | undefined, overrides: Record<string, number> = {}): number | null => {
     if (!packing) return null;
-    for (const [re, pcs] of PCS_PER_BOX_RULES) {
-        if (re.test(packing.trim())) return pcs;
-    }
-    return null;
+    const key = normalizeSize(packing);
+    return overrides[key] ?? STD_PCS_PER_BOX[key] ?? null;
+};
+
+const packUnitFor = (packing: string | null | undefined, overrides: Record<string, string> = {}): string => {
+    if (!packing) return 'box';
+    const key = normalizeSize(packing);
+    return overrides[key] ?? STD_PACK_UNIT[key] ?? 'box';
+};
+
+const pluralizeUnit = (unit: string, count: number): string => {
+    if (count === 1) return unit;
+    if (unit === 'box') return 'boxes';
+    if (unit === 'bag') return 'bags';
+    return unit;
 };
 
 // Effective pcs/box: stored box_size takes priority, else derive from packing_size
-const pcsPerBox = (item: OrderItem): number | null =>
-    item.box_size ?? stdPcsPerBox(item.packing_size);
+const pcsPerBox = (item: OrderItem, overrides: Record<string, number> = {}): number | null =>
+    item.box_size ?? stdPcsPerBox(item.packing_size, overrides);
 
-const boxesFor = (item: OrderItem): number | null => {
-    const ppb = pcsPerBox(item);
+const boxesFor = (item: OrderItem, overrides: Record<string, number> = {}): number | null => {
+    const ppb = pcsPerBox(item, overrides);
     if (!ppb || ppb <= 0) return null;
     return Math.ceil(Number(item.quantity) / ppb);
 };
 
-export default function FactoryIndex({ orders, urgentPending, canAdvance, productPhotos = [] }: Props) {
+export default function FactoryIndex({ orders, urgentPending, canAdvance, productPhotos = [], packingSizes = [] }: Props) {
+    const pcsPerBoxOverrides = useMemo(() => {
+        const map: Record<string, number> = {};
+        packingSizes.forEach((p) => {
+            if (p.pieces_per_box) {
+                map[normalizeSize(p.name)] = p.pieces_per_box;
+            }
+        });
+        return map;
+    }, [packingSizes]);
+
+    const packUnitOverrides = useMemo(() => {
+        const map: Record<string, string> = {};
+        packingSizes.forEach((p) => {
+            if (p.pack_unit) {
+                map[normalizeSize(p.name)] = p.pack_unit;
+            }
+        });
+        return map;
+    }, [packingSizes]);
+
     const initialFilter = (): FilterKey => {
         const param = new URLSearchParams(window.location.search).get('filter');
         const valid: FilterKey[] = ['all', 'new', 'in-process', 'filling', 'ready', 'dispatched'];
@@ -283,7 +337,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
     const [labelsSaving, setLabelsSaving] = useState(false);
 
     const [photoLightbox, setPhotoLightbox] = useState<string | null>(null);
-    const [labelEditor, setLabelEditor] = useState<{ order: Order; labels: EditableLabel[] } | null>(null);
+    const [labelEditor, setLabelEditor] = useState<{ order: Order; labels: EditableLabel[]; unitSummary: string } | null>(null);
     const [labelFS, setLabelFS] = useState({ transport: 28, totalBoxes: 36, brand: 16, boxNum: 18, party: 10 });
     const adjFS = (key: keyof typeof labelFS, delta: number) =>
         setLabelFS((prev) => ({ ...prev, [key]: Math.max(6, prev[key] + delta) }));
@@ -483,12 +537,26 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
 
     const openLabelEditor = (order: Order, e: React.MouseEvent) => {
         e.stopPropagation();
-        const totalBoxes = order.items.reduce((sum, item) => sum + (boxesFor(item) ?? 1), 0);
+
+        // Tally parcel counts per pack unit (box / bag / carba) across the order
+        const unitTotals: Record<string, number> = {};
+        order.items.forEach((item) => {
+            const itemBoxes = boxesFor(item, pcsPerBoxOverrides) ?? 1;
+            const unit = packUnitFor(item.packing_size, packUnitOverrides);
+            unitTotals[unit] = (unitTotals[unit] ?? 0) + itemBoxes;
+        });
+        const totalParcels = Object.values(unitTotals).reduce((sum, n) => sum + n, 0);
+        const unitSummary = Object.entries(unitTotals)
+            .map(([unit, count]) => `${count} ${pluralizeUnit(unit, count)}`)
+            .join(' + ') + ` = ${totalParcels} Parcel${totalParcels !== 1 ? 's' : ''}`;
+
         const labels: EditableLabel[] = [];
         let seq = 1;
         order.items.forEach((item) => {
-            const itemBoxes = boxesFor(item) ?? 1;
+            const itemBoxes = boxesFor(item, pcsPerBoxOverrides) ?? 1;
+            const unit = packUnitFor(item.packing_size, packUnitOverrides);
             const brand = item.party_brand || item.our_brand || '—';
+            const ppb = pcsPerBox(item, pcsPerBoxOverrides);
             for (let b = 1; b <= itemBoxes; b++) {
                 labels.push({
                     key: `${item.id}-${b}`,
@@ -496,16 +564,17 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                     destination: order.destination ?? '',
                     party: order.company_name,
                     boxNum: seq++,
-                    totalBoxes,
+                    totalBoxes: totalParcels,
+                    unit,
                     itemBoxNum: b,
                     itemTotalBoxes: itemBoxes,
                     brand: `${brand}${item.packing_size ? ' · ' + item.packing_size : ''}`,
-                    inBoxPcs: pcsPerBox(item) != null ? String(pcsPerBox(item)) : '',
+                    inBoxPcs: ppb != null ? String(ppb) : '',
                     orderRef: order.order_number,
                 });
             }
         });
-        setLabelEditor({ order, labels });
+        setLabelEditor({ order, labels, unitSummary });
     };
 
     const updateLabelField = (idx: number, field: keyof Omit<EditableLabel, 'key' | 'boxNum' | 'totalBoxes' | 'itemBoxNum' | 'itemTotalBoxes'>, value: string) => {
@@ -535,16 +604,17 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                     <div class="party">${esc(lbl.party || '—')}</div>
                     <div class="mid-row">
                         <span class="box-num">${lbl.boxNum}</span>
-                        <span class="total-boxes">${lbl.totalBoxes} box</span>
+                        <span class="total-boxes">${lbl.unit.toUpperCase()}</span>
                     </div>
                     <div class="auto-row2">
                         <span class="inboxpcs">${lbl.inBoxPcs ? `In-box: <b>${esc(lbl.inBoxPcs)} pcs</b>` : '—'}</span>
-                        <span class="item-box-count">product box ${lbl.itemBoxNum}/${lbl.itemTotalBoxes}</span>
+                        <span class="item-box-count">${esc(lbl.unit)} ${lbl.itemBoxNum}/${lbl.itemTotalBoxes}</span>
                     </div>
                     <div class="product-block">
                         <div class="brand-name">${esc(lbl.brand || '—')}</div>
                     </div>
                     <div class="order-ref">${esc(lbl.orderRef)}</div>
+                    <div class="unit-summary">${esc(labelEditor.unitSummary)}</div>
                 </div>
             </div>`,
             )
@@ -569,6 +639,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 .product-block { border-top:0.5px solid #ccc; padding-top:1.5mm; }
                 .brand-name { font-size:${labelFS.brand}pt; font-weight:900; word-break:break-word; white-space:normal; line-height:1.15; }
                 .order-ref { font-size:7.5pt; color:#888; margin-top:1mm; text-align:right; }
+                .unit-summary { font-size:7pt; color:#666; margin-top:0.5mm; text-align:right; font-style:italic; }
                 .printed-by { font-size:7pt; color:#555; margin-top:0.5mm; text-align:right; }
                 .toolbar { position:sticky; top:0; z-index:10; background:#1e293b; color:#fff; padding:10px 16px; display:flex; align-items:center; gap:12px; }
                 .toolbar button { background:#2563eb; color:#fff; border:0; border-radius:6px; padding:8px 18px; font-size:14px; font-weight:700; cursor:pointer; }
@@ -801,6 +872,23 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                             </button>
                                         )}
                                         <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px' }}>
+                                            {(() => {
+                                                const unitTotals: Record<string, number> = {};
+                                                order.items.forEach((item) => {
+                                                    const count = boxesFor(item, pcsPerBoxOverrides) ?? 1;
+                                                    const unit = packUnitFor(item.packing_size, packUnitOverrides);
+                                                    unitTotals[unit] = (unitTotals[unit] ?? 0) + count;
+                                                });
+                                                const totalParcels = Object.values(unitTotals).reduce((sum, n) => sum + n, 0);
+                                                const summary = Object.entries(unitTotals)
+                                                    .map(([unit, count]) => `${count} ${pluralizeUnit(unit, count)}`)
+                                                    .join(' + ');
+                                                return (
+                                                    <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--tx-muted)', textAlign: 'right' }}>
+                                                        📦 {summary} = {totalParcels} parcel{totalParcels !== 1 ? 's' : ''}
+                                                    </span>
+                                                );
+                                            })()}
                                             <button
                                                 type="button"
                                                 className="btn sm"
@@ -924,7 +1012,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                             <tbody>
                                                 {order.items.map((item) => {
                                                     const isDispatched = item.status === 'dispatched';
-                                                    const boxes = boxesFor(item);
+                                                    const boxes = boxesFor(item, pcsPerBoxOverrides);
                                                     const total = Number(item.quantity);
                                                     const received = item.labels_received ?? null;
                                                     const short = received != null ? total - received : null;
@@ -972,10 +1060,11 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                         Dispatched: {Number(item.dispatched_qty)}
                                                                     </div>
                                                                 )}
-                                                                {/* Per-box pcs — auto from packing size, overridable */}
+                                                                {/* Per-box/bag/carba pcs — auto from packing size, overridable */}
                                                                 {(() => {
-                                                                    const auto = stdPcsPerBox(item.packing_size);
-                                                                    const effective = pcsPerBox(item);
+                                                                    const auto = stdPcsPerBox(item.packing_size, pcsPerBoxOverrides);
+                                                                    const effective = pcsPerBox(item, pcsPerBoxOverrides);
+                                                                    const unit = packUnitFor(item.packing_size, packUnitOverrides);
                                                                     const isOverridden = item.box_size != null;
                                                                     const draftVal = boxSizeDraft[item.id];
                                                                     const inputVal = draftVal ?? (item.box_size != null ? String(item.box_size) : '');
@@ -986,7 +1075,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                                 {/* Auto-derived value */}
                                                                                 {auto != null && !isOverridden ? (
                                                                                     <span style={{ fontSize: '12px', fontWeight: 600 }}>
-                                                                                        {auto} pcs/box
+                                                                                        {auto} pcs/{unit}
                                                                                     </span>
                                                                                 ) : (
                                                                                     <input
@@ -996,7 +1085,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                                         onChange={(e) => setBoxSizeDraft((prev) => ({ ...prev, [item.id]: e.target.value }))}
                                                                                         onBlur={() => saveBoxSize(item.id)}
                                                                                         onKeyDown={(e) => e.key === 'Enter' && saveBoxSize(item.id)}
-                                                                                        placeholder="pcs/box"
+                                                                                        placeholder={`pcs/${unit}`}
                                                                                         disabled={savingBoxSize === item.id}
                                                                                         style={{
                                                                                             width: '60px', padding: '2px 4px', fontSize: '12px',
@@ -1006,8 +1095,8 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                                     />
                                                                                 )}
                                                                                 {effective != null && boxes != null && (
-                                                                                    <span style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>
-                                                                                        · {boxes} box{boxes !== 1 ? 'es' : ''}
+                                                                                    <span style={{ fontSize: '11px', color: 'var(--tx-muted)', fontWeight: 600 }}>
+                                                                                        · {boxes} {pluralizeUnit(unit, boxes)}
                                                                                     </span>
                                                                                 )}
                                                                             </div>
@@ -1358,6 +1447,10 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                             </button>
                             <button className="modal-close" onClick={() => setLabelEditor(null)}>✕</button>
                         </div>
+                        {/* Parcel breakdown summary */}
+                        <div style={{ padding: '8px 16px', fontSize: '12px', fontWeight: 700, color: '#1e293b', background: '#f8fafc', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                            📦 {labelEditor.unitSummary}
+                        </div>
                         {/* Font size controls */}
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '8px 16px', alignItems: 'center', flexShrink: 0, borderBottom: '1px solid var(--border)' }}>
                             <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, marginRight: 2 }}>Font:</span>
@@ -1449,15 +1542,15 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                             overflow: 'hidden', lineHeight: 1.2,
                                         }}
                                     />
-                                    {/* Box number | Total boxes */}
+                                    {/* Box number | Pack unit */}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '1mm 0 0.5mm' }}>
                                         <span style={{ fontSize: `${labelFS.boxNum}pt`, fontWeight: 900, color: '#111' }}>{lbl.boxNum}</span>
-                                        <span style={{ fontSize: `${labelFS.totalBoxes}pt`, fontWeight: 900, color: '#111' }}>{lbl.totalBoxes} box</span>
+                                        <span style={{ fontSize: `${labelFS.totalBoxes}pt`, fontWeight: 900, color: '#111' }}>{lbl.unit.toUpperCase()}</span>
                                     </div>
-                                    {/* In-box pcs | product box */}
+                                    {/* In-box pcs | product box/bag/carba */}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1mm' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '2mm' }}>
-                                            <span style={{ fontSize: '8pt', color: '#555' }}>In-box:</span>
+                                            <span style={{ fontSize: '8pt', color: '#555' }}>In-{lbl.unit}:</span>
                                             <input
                                                 type="number"
                                                 min={1}
@@ -1473,7 +1566,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                             <span style={{ fontSize: '8pt', color: '#555' }}>pcs</span>
                                         </div>
                                         <span style={{ fontSize: '7pt', color: '#777', fontStyle: 'italic' }}>
-                                            product box {lbl.itemBoxNum}/{lbl.itemTotalBoxes}
+                                            {lbl.unit} {lbl.itemBoxNum}/{lbl.itemTotalBoxes}
                                         </span>
                                     </div>
                                     {/* Divider */}
@@ -1506,6 +1599,10 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                             marginTop: 'auto',
                                         }}
                                     />
+                                    {/* Order parcel summary — bottom right */}
+                                    <div style={{ fontSize: '7pt', color: '#999', textAlign: 'right', fontStyle: 'italic' }}>
+                                        {labelEditor.unitSummary}
+                                    </div>
                                 </div>
                             ))}
                         </div>
