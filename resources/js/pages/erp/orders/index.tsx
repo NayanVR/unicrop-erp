@@ -911,6 +911,11 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                     <div style={{ flex: 1 }}>
                                         <div className="o-company">{order.company_name}</div>
                                         <div className="o-customer">{order.customer_name}</div>
+                                        {order.items.length > 0 && (
+                                            <div style={{ fontSize: '11px', color: 'var(--tx-muted)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {order.items.map((item) => `${item.our_brand ?? '—'}${item.packing_size ? ` (${item.packing_size})` : ''} × ${item.quantity}`).join(', ')}
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="o-meta">
                                         <div>{formatDate(order.order_date)}</div>
