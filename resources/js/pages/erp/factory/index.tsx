@@ -327,9 +327,11 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
     };
     const [activeFilter, setActiveFilter] = useState<FilterKey>(initialFilter);
     const { auth } = usePage<{ auth: Auth }>().props;
+    const canFill = auth.user?.role === 'admin' || (auth.user?.permissions ?? []).includes('filling');
     const [search, setSearch] = useState('');
     const [openOrders, setOpenOrders] = useState<number[]>([]);
     const [stagingItem, setStagingItem] = useState<number | null>(null);
+    const [fillingPrompt, setFillingPrompt] = useState<{ item: OrderItem; current: string | null } | null>(null);
     const [dispatchingOrder, setDispatchingOrder] = useState<number | null>(null);
     const [approvingId, setApprovingId] = useState<number | null>(null);
     const [rejectingId, setRejectingId] = useState<number | null>(null);
@@ -1283,7 +1285,13 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                                         key={stage}
                                                                                         type="button"
                                                                                         className={`badge ${isActive ? (STAGE_CLASS[stage] ?? 'gray') : (isCurrent && !item.status ? 's-pending' : 'gray')}`}
-                                                                                        onClick={() => setItemStage(item.id, stage, item.status ?? '')}
+                                                                                        onClick={() => {
+                                                                                            if (stage === 'filling' && !isActive) {
+                                                                                                setFillingPrompt({ item, current: item.status ?? '' });
+                                                                                                return;
+                                                                                            }
+                                                                                            setItemStage(item.id, stage, item.status ?? '');
+                                                                                        }}
                                                                                         disabled={stagingItem === item.id || isActive}
                                                                                         title={isActive ? 'Current stage' : `Set to ${STAGE_LABELS[stage]}`}
                                                                                         style={{
@@ -1745,6 +1753,59 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Filling choice prompt */}
+            {fillingPrompt && (
+                <div className="modal-overlay open" onClick={() => setFillingPrompt(null)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 380 }}>
+                        <div className="modal-header">
+                            <h2>🧪 Filling</h2>
+                            <button className="modal-close" onClick={() => setFillingPrompt(null)}>✕</button>
+                        </div>
+                        <div className="modal-body">
+                            <div style={{ marginBottom: 14, fontSize: 13, color: 'var(--tx-muted)' }}>
+                                <strong>{fillingPrompt.item.our_brand ?? '—'}</strong>
+                                {fillingPrompt.item.packing_size ? ` (${fillingPrompt.item.packing_size})` : ''}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                <button
+                                    type="button"
+                                    className="btn"
+                                    onClick={() => {
+                                        setItemStage(fillingPrompt.item.id, 'filling', fillingPrompt.current);
+                                        setFillingPrompt(null);
+                                    }}
+                                >
+                                    ✅ Already Filled
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn primary"
+                                    disabled={!canFill}
+                                    title={!canFill ? 'You do not have access to the Filling page' : undefined}
+                                    onClick={() => {
+                                        if (!canFill) return;
+                                        setItemStage(fillingPrompt.item.id, 'filling', fillingPrompt.current);
+                                        const params = new URLSearchParams({
+                                            brand: fillingPrompt.item.our_brand ?? '',
+                                            packing: fillingPrompt.item.packing_size ?? '',
+                                        });
+                                        setFillingPrompt(null);
+                                        router.visit(`/filling?${params.toString()}`);
+                                    }}
+                                >
+                                    🧪 Filling Now
+                                </button>
+                                {!canFill && (
+                                    <span style={{ fontSize: 12, color: 'var(--tx-faint)' }}>
+                                        "Filling Now" requires Filling access — ask admin to enable it for your account.
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>

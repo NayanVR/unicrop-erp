@@ -1,7 +1,7 @@
 import SearchableSelect from '@/components/searchable-select';
 import type { Auth } from '@/types/auth';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type RawMaterial = {
     id: number;
@@ -306,6 +306,24 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
         }, 60);
         setTimeout(() => setHighlightedId(null), 2500);
     };
+
+    // Jump straight to a recipe's filling card + open the Run modal when
+    // arriving from the factory page (e.g. /filling?brand=...&packing=...).
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const brand = params.get('brand');
+        if (!brand) return;
+        const packing = (params.get('packing') ?? '').trim().toLowerCase();
+        const recipe = recipes.find((r) =>
+            r.name.trim().toLowerCase() === brand.trim().toLowerCase()
+            && (r.packing_size ?? '').trim().toLowerCase() === packing,
+        );
+        if (recipe) {
+            scrollToCard(recipe.id);
+            if (canManage) openRun(recipe);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Recipes whose output material is low / out of stock
     const lowStockRecipes = recipes.filter((r) => {
