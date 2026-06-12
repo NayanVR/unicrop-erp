@@ -656,10 +656,10 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                     </div>
                     <div class="auto-row2">
                         <span class="inboxpcs">${lbl.inBoxPcs ? `In-${esc(lbl.unit)}: <b>${esc(lbl.inBoxPcs)} pcs</b>` : '—'}</span>
-                        <span class="item-box-count">${esc(lbl.unit)} ${lbl.itemBoxNum}/${lbl.itemTotalBoxes}</span>
                     </div>
                     <div class="product-block">
-                        <div class="brand-name">${esc(lbl.brand || '—')}</div>
+                        <span class="brand-name">${esc(lbl.brand || '—')}</span>
+                        <span class="item-box-count">${lbl.itemTotalBoxes} ${esc(pluralizeUnit(lbl.unit, lbl.itemTotalBoxes))}</span>
                     </div>
                     <div class="footer-row">
                         <span class="unit-tag">${esc(lbl.unit.toUpperCase())}</span>
@@ -687,9 +687,9 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 .total-boxes { font-size:${labelFS.totalBoxes}pt; font-weight:900; line-height:1.05; white-space:nowrap; }
                 .auto-row2 { display:flex; justify-content:space-between; align-items:center; font-size:9pt; margin-bottom:1.5mm; }
                 .inboxpcs { font-weight:700; color:#222; }
-                .item-box-count { color:#666; font-style:italic; font-size:8pt; }
-                .product-block { padding-top:0.5mm; }
-                .brand-name { font-size:${labelFS.brand}pt; font-weight:900; word-break:break-word; white-space:normal; line-height:1.15; }
+                .product-block { padding-top:0.5mm; display:flex; justify-content:space-between; align-items:baseline; gap:2mm; }
+                .brand-name { font-size:${labelFS.brand}pt; font-weight:900; word-break:break-word; white-space:normal; line-height:1.15; flex:1; min-width:0; }
+                .item-box-count { font-size:${labelFS.brand}pt; font-weight:900; white-space:nowrap; flex-shrink:0; }
                 .footer-row { display:flex; justify-content:space-between; align-items:center; margin-top:1mm; }
                 .unit-tag { font-size:8pt; font-weight:900; border:1.5px solid #000; padding:0.5mm 2.5mm; letter-spacing:1.5px; border-radius:1mm; }
                 .order-ref { font-size:7.5pt; color:#888; text-align:right; }
@@ -1687,25 +1687,32 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                             />
                                             <span style={{ fontSize: '8pt', color: '#555' }}>pcs</span>
                                         </div>
-                                        <span style={{ fontSize: '7pt', color: '#777', fontStyle: 'italic' }}>
-                                            {lbl.unit} {lbl.itemBoxNum}/{lbl.itemTotalBoxes}
+                                    </div>
+                                    {/* Brand / product + this item's box/bag/carba count */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '2mm' }}>
+                                        <textarea
+                                            value={lbl.brand}
+                                            onChange={(e) => updateLabelField(idx, 'brand', e.target.value)}
+                                            placeholder="Brand · packing"
+                                            rows={2}
+                                            style={{
+                                                border: 'none', outline: 'none',
+                                                fontSize: `${labelFS.brand}pt`, fontWeight: 900, lineHeight: 1.15,
+                                                padding: '0', width: '100%', background: 'transparent',
+                                                resize: 'none', overflow: 'hidden',
+                                                wordBreak: 'break-word', whiteSpace: 'pre-wrap',
+                                                fontFamily: 'Arial, sans-serif', flex: 1, minWidth: 0,
+                                            }}
+                                        />
+                                        <span
+                                            style={{
+                                                fontSize: `${labelFS.brand}pt`, fontWeight: 900,
+                                                whiteSpace: 'nowrap', flexShrink: 0,
+                                            }}
+                                        >
+                                            {lbl.itemTotalBoxes} {pluralizeUnit(lbl.unit, lbl.itemTotalBoxes)}
                                         </span>
                                     </div>
-                                    {/* Brand / product */}
-                                    <textarea
-                                        value={lbl.brand}
-                                        onChange={(e) => updateLabelField(idx, 'brand', e.target.value)}
-                                        placeholder="Brand · packing"
-                                        rows={2}
-                                        style={{
-                                            border: 'none', outline: 'none',
-                                            fontSize: `${labelFS.brand}pt`, fontWeight: 900, lineHeight: 1.15,
-                                            padding: '0', width: '100%', background: 'transparent',
-                                            resize: 'none', overflow: 'hidden',
-                                            wordBreak: 'break-word', whiteSpace: 'pre-wrap',
-                                            fontFamily: 'Arial, sans-serif', flex: 1,
-                                        }}
-                                    />
                                     {/* Footer: unit tag | order ref */}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', gap: '2mm' }}>
                                         <span
