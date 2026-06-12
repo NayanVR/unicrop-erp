@@ -50,6 +50,7 @@ type OrderItem = {
     gst_amount: string | number;
     status?: string | null;
     stage_log?: Array<{ from?: string; to?: string; name?: string | null; at?: string; revert?: boolean }> | null;
+    edit_log?: Array<{ field?: string; label?: string; old?: number | string | null; new?: number | string | null; by?: string | null; at?: string }> | null;
 };
 
 const lastStageActor = (item: OrderItem): string | null => {
@@ -1328,6 +1329,20 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                                 </tbody>
                                                             </table>
                                                         </div>
+                                                        {order.items.some((item) => (item.edit_log ?? []).length > 0) && (
+                                                            <div style={{ marginTop: '8px', padding: '8px 12px', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '8px' }}>
+                                                                <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: '#b45309', marginBottom: '4px' }}>🏭 Factory Changes</div>
+                                                                {order.items.flatMap((item) =>
+                                                                    (item.edit_log ?? []).map((entry, i) => (
+                                                                        <div key={`${item.id}-${i}`} style={{ fontSize: '12px', color: '#78350f', padding: '1px 0' }}>
+                                                                            <strong>{item.our_brand ?? '—'}{item.packing_size ? ` (${item.packing_size})` : ''}</strong>
+                                                                            {' — '}{entry.label ?? entry.field}: {entry.old ?? 'auto'} → <strong>{entry.new ?? 'auto'}</strong>
+                                                                            {entry.by ? ` · ${entry.by}` : ''}{entry.at ? `, ${formatDate(entry.at)}` : ''}
+                                                                        </div>
+                                                                    )),
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
 
                                                     {/* Charges */}

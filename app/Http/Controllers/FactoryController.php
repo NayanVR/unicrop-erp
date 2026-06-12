@@ -262,7 +262,26 @@ class FactoryController extends Controller
             'boxes_override' => 'nullable|integer|min:1',
         ]);
 
-        $item->update($data);
+        // Log factory edits so sales users can see what changed.
+        $user = $request->user();
+        $labels = ['box_size' => 'Pcs per pack', 'boxes_override' => 'Pack count'];
+        $log = (array) ($item->edit_log ?? []);
+        foreach ($data as $field => $new) {
+            $old = $item->{$field};
+            if ($old == $new) {
+                continue;
+            }
+            $log[] = [
+                'field' => $field,
+                'label' => $labels[$field] ?? $field,
+                'old'   => $old,
+                'new'   => $new,
+                'by'    => $user?->name,
+                'at'    => now()->toISOString(),
+            ];
+        }
+
+        $item->update([...$data, 'edit_log' => $log]);
 
         return redirect()->back()->with('success', 'Item updated.');
     }

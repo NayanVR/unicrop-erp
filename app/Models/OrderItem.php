@@ -27,6 +27,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'cap_color',
     'status',
     'stage_log',
+    'edit_log',
 ])]
 class OrderItem extends Model
 {
@@ -49,6 +50,7 @@ class OrderItem extends Model
             'boxes_override' => 'integer',
             'labels_received' => 'integer',
             'stage_log' => 'array',
+            'edit_log' => 'array',
         ];
     }
 
