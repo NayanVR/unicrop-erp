@@ -26,6 +26,7 @@ class Party extends Model
         'is_active',
         'default_transport_type',
         'default_transport_id',
+        'destination',
     ];
 
     protected $casts = [

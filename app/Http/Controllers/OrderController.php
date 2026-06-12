@@ -146,7 +146,7 @@ class OrderController extends Controller
                 ->whereNotIn('type', ['supplier', 'vendor'])
                 ->orderBy('name')
                 ->with(['productRates' => fn ($q) => $q->where('is_active', true)->orderBy('our_brand')->orderBy('packing_size')])
-                ->get(['id', 'name', 'customer_name', 'gst_no', 'pan_no', 'pan_card_path', 'phone', 'address', 'city', 'state', 'default_transport_type', 'default_transport_id']),
+                ->get(['id', 'name', 'customer_name', 'gst_no', 'pan_no', 'pan_card_path', 'phone', 'address', 'city', 'state', 'default_transport_type', 'default_transport_id', 'destination']),
             'currentUser' => ['id' => $user?->id, 'name' => $user?->name],
             'finishGoodBrands' => $this->finishGoodBrands(),
             'productPhotos' => $this->mapProductPhotos(),
@@ -430,7 +430,7 @@ class OrderController extends Controller
             'couriers'     => Transport::couriers()->orderBy('name')->get(['id', 'name']),
             'parties'      => Party::where('is_active', true)->orderBy('name')
                 ->with(['productRates' => fn ($q) => $q->where('is_active', true)->orderBy('our_brand')->orderBy('packing_size')])
-                ->get(['id', 'name', 'customer_name', 'gst_no', 'pan_no', 'pan_card_path', 'phone', 'address', 'city', 'state', 'default_transport_type', 'default_transport_id']),
+                ->get(['id', 'name', 'customer_name', 'gst_no', 'pan_no', 'pan_card_path', 'phone', 'address', 'city', 'state', 'default_transport_type', 'default_transport_id', 'destination']),
             'currentUser'  => ['id' => $user?->id, 'name' => $user?->name],
             'finishGoodBrands' => $this->finishGoodBrands(),
             'productPhotos' => $this->mapProductPhotos(),

@@ -100,6 +100,7 @@ class PartyController extends Controller
             'notes'                  => 'nullable|string',
             'default_transport_type' => 'nullable|in:transport,courier',
             'default_transport_id'   => 'nullable|integer|exists:transports,id',
+            'destination'            => 'nullable|string|max:255',
         ]);
 
         $panCardFile = $request->file('pan_card_file');
@@ -136,6 +137,7 @@ class PartyController extends Controller
             'is_active'              => 'boolean',
             'default_transport_type' => 'nullable|in:transport,courier',
             'default_transport_id'   => 'nullable|integer|exists:transports,id',
+            'destination'            => 'nullable|string|max:255',
         ]);
 
         $panCardFile = $request->file('pan_card_file');

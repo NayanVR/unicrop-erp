@@ -26,6 +26,7 @@ type Party = {
     state?: string | null;
     default_transport_type?: 'transport' | 'courier' | null;
     default_transport_id?: number | null;
+    destination?: string | null;
     product_rates: ProductRate[];
 };
 
@@ -548,7 +549,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
             pan_no: party.pan_no ?? '',
             phone: party.phone ?? form.data.phone,
             delivery_address: party.address ?? form.data.delivery_address,
-            destination: party.city ? (party.state ? `${party.city}, ${party.state}` : party.city) : form.data.destination,
+            destination: party.destination || (party.city ? (party.state ? `${party.city}, ${party.state}` : party.city) : form.data.destination),
             transport_type: transportType,
             transport_name: transportName,
         });

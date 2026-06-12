@@ -67,6 +67,7 @@ type Party = {
     is_active: boolean;
     default_transport_type: 'transport' | 'courier' | null;
     default_transport_id: number | null;
+    destination: string | null;
     documents_count: number;
     product_rates: PartyProduct[];
     created_at: string;
@@ -109,6 +110,7 @@ const defaultPartyForm = {
     notes: '',
     default_transport_type: '' as '' | 'transport' | 'courier',
     default_transport_id: '' as '' | number,
+    destination: '',
 };
 
 export default function PartiesIndex() {
@@ -217,7 +219,7 @@ export default function PartiesIndex() {
 
     const openEdit = (p: Party) => {
         setEditing(p);
-        setData({ name: p.name, customer_name: p.customer_name ?? '', type: p.type, gst_no: p.gst_no ?? '', pan_no: p.pan_no ?? '', phone: p.phone ?? '', email: p.email ?? '', address: p.address ?? '', city: p.city ?? '', state: p.state ?? '', pincode: p.pincode ?? '', notes: p.notes ?? '', default_transport_type: p.default_transport_type ?? '', default_transport_id: p.default_transport_id ?? '' });
+        setData({ name: p.name, customer_name: p.customer_name ?? '', type: p.type, gst_no: p.gst_no ?? '', pan_no: p.pan_no ?? '', phone: p.phone ?? '', email: p.email ?? '', address: p.address ?? '', city: p.city ?? '', state: p.state ?? '', pincode: p.pincode ?? '', notes: p.notes ?? '', default_transport_type: p.default_transport_type ?? '', default_transport_id: p.default_transport_id ?? '', destination: p.destination ?? '' });
         setShowModal(true);
     };
 
@@ -533,6 +535,11 @@ export default function PartiesIndex() {
                                         ))}
                                     </select>
                                 </div>
+                            </div>
+                            <div className="form-group">
+                                <label>Destination</label>
+                                <input value={data.destination} onChange={(e) => setData('destination', e.target.value)} placeholder="e.g. Hyderabad" />
+                                <span style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>Auto-fills on new orders for this party</span>
                             </div>
                             </div>
                             <div className="modal-actions" style={{ padding: '16px 24px 20px', marginTop: 0 }}>
