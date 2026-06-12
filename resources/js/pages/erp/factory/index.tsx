@@ -122,7 +122,7 @@ type Props = {
     canAdvance: boolean;
     productPhotos?: ProductPhoto[];
     packingSizes?: { name: string; multiplier: string | number; pieces_per_box: number | null; pack_unit: string | null }[];
-    godowns?: { id: number; name: string }[];
+    godowns?: { id: number; name: string; is_default?: boolean }[];
 };
 
 const STAGE_ORDER = ['accepted', 'filling', 'labeling', 'ready', 'dispatched'];
@@ -386,8 +386,9 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
     const [urgentReason, setUrgentReason] = useState('');
 
     const openTransfer = (order: Order, item: OrderItem) => {
+        const defaultGodown = godowns.find((g) => g.is_default)?.name ?? '';
         setTransferForm({
-            from_unit: '',
+            from_unit: defaultGodown,
             to_unit: '',
             unit: 'pcs',
             notes: '',

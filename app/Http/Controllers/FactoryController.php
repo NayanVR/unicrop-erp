@@ -113,7 +113,7 @@ class FactoryController extends Controller
                     'photo_url'    => $p->photo_url,
                 ]),
             'packingSizes' => PackingSize::query()->orderBy('name')->get(['name', 'multiplier', 'pieces_per_box', 'pack_unit']),
-            'godowns' => Godown::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'godowns' => Godown::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'is_default']),
         ]);
     }
 
