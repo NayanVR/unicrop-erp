@@ -3,7 +3,7 @@ import { dispatch as orderDispatch, notes as orderNotes } from '@/routes/factory
 import { approveUrgent as ordersApproveUrgent, rejectUrgent as ordersRejectUrgent } from '@/routes/orders';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import type { Auth } from '@/types/auth';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type ProductPhoto = {
     id: number;
@@ -338,9 +338,24 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
 
     const [photoLightbox, setPhotoLightbox] = useState<string | null>(null);
     const [labelEditor, setLabelEditor] = useState<{ order: Order; labels: EditableLabel[]; unitSummary: string } | null>(null);
-    const [labelFS, setLabelFS] = useState({ transport: 28, totalBoxes: 34, brand: 16, boxNum: 18, party: 10 });
+    const [labelFS, setLabelFS] = useState({ transport: 28, totalBoxes: 22, brand: 16, boxNum: 18, party: 10 });
     const adjFS = (key: keyof typeof labelFS, delta: number) =>
         setLabelFS((prev) => ({ ...prev, [key]: Math.max(6, prev[key] + delta) }));
+    const totalBoxesRefs = useRef<(HTMLSpanElement | null)[]>([]);
+
+    // Shrink the parcel-summary line so it always fits on one line within the label
+    useEffect(() => {
+        if (!labelEditor) return;
+        totalBoxesRefs.current.forEach((el) => {
+            if (!el || !el.parentElement) return;
+            let size = labelFS.totalBoxes;
+            el.style.fontSize = `${size}pt`;
+            while (size > 8 && el.scrollWidth > el.parentElement.clientWidth) {
+                size -= 1;
+                el.style.fontSize = `${size}pt`;
+            }
+        });
+    }, [labelEditor, labelFS.totalBoxes]);
     const [boxSizeDraft, setBoxSizeDraft] = useState<Record<number, string>>({});
     const [savingBoxSize, setSavingBoxSize] = useState<number | null>(null);
 
@@ -1577,10 +1592,11 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                         }}
                                     />
                                     {/* Parcel summary — single line band, shrunk to fit the label width */}
-                                    <div style={{ margin: '1mm 0 1.5mm', padding: '1mm 0', textAlign: 'center', borderTop: '1.5px solid #000', borderBottom: '1.5px solid #000' }}>
+                                    <div style={{ margin: '1mm 0 1.5mm', padding: '1mm 0', textAlign: 'center', borderTop: '1.5px solid #000', borderBottom: '1.5px solid #000', overflow: 'hidden' }}>
                                         <span
+                                            ref={(el) => { totalBoxesRefs.current[idx] = el; }}
                                             style={{
-                                                fontSize: `${Math.min(labelFS.totalBoxes, Math.floor(490 / Math.max(labelEditor.unitSummary.length, 1)))}pt`,
+                                                fontSize: `${labelFS.totalBoxes}pt`,
                                                 fontWeight: 900, color: '#111', lineHeight: 1.05, whiteSpace: 'nowrap',
                                             }}
                                         >
