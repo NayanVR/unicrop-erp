@@ -23,16 +23,22 @@ type ProductPhoto = {
 
 function buildPhotoMap(photos: ProductPhoto[]) {
     const ob = new Map<string, string>();
+    const obAny = new Map<string, string>();
     const pb = new Map<string, string>();
+    const pbAny = new Map<string, string>();
     const obMrp = new Map<string, string>();
     const pbMrp = new Map<string, string>();
     for (const p of photos) {
         const size = (p.packing_size ?? '').toLowerCase();
         if (p.party_id === null) {
-            ob.set(`${p.our_brand.toLowerCase()}|${size}`, p.photo_url);
-            if (!p.packing_size) ob.set(`${p.our_brand.toLowerCase()}|`, p.photo_url);
+            const b = p.our_brand.toLowerCase();
+            ob.set(`${b}|${size}`, p.photo_url);
+            if (!p.packing_size) ob.set(`${b}|`, p.photo_url);
+            if (!obAny.has(b)) obAny.set(b, p.photo_url);
         } else if (p.party_brand) {
-            pb.set(`${p.party_id}|${p.party_brand.toLowerCase()}|${size}`, p.photo_url);
+            const anyKey = `${p.party_id}|${p.party_brand.toLowerCase()}`;
+            pb.set(`${anyKey}|${size}`, p.photo_url);
+            if (!pbAny.has(anyKey)) pbAny.set(anyKey, p.photo_url);
         }
 
         for (const s of p.sizes ?? []) {
@@ -55,23 +61,25 @@ function buildPhotoMap(photos: ProductPhoto[]) {
             }
         }
     }
-    return { ob, pb, obMrp, pbMrp };
+    return { ob, obAny, pb, pbAny, obMrp, pbMrp };
 }
 
 function getItemPhoto(
     item: OrderItem,
     partyId: number | null | undefined,
-    map: { ob: Map<string, string>; pb: Map<string, string> },
+    map: { ob: Map<string, string>; obAny: Map<string, string>; pb: Map<string, string>; pbAny: Map<string, string> },
 ): string | null {
     if (!item.our_brand) return null;
     const size = (item.packing_size ?? '').toLowerCase();
     if (partyId && item.party_brand) {
-        const key = `${partyId}|${item.party_brand.toLowerCase()}|${size}`;
-        const url = map.pb.get(key) ?? map.pb.get(`${partyId}|${item.party_brand.toLowerCase()}|`);
+        const anyKey = `${partyId}|${item.party_brand.toLowerCase()}`;
+        const url = map.pb.get(`${anyKey}|${size}`) ?? map.pb.get(`${anyKey}|`) ?? map.pbAny.get(anyKey);
         if (url) return url;
     }
-    return map.ob.get(`${item.our_brand.toLowerCase()}|${size}`)
-        ?? map.ob.get(`${item.our_brand.toLowerCase()}|`)
+    const b = item.our_brand.toLowerCase();
+    return map.ob.get(`${b}|${size}`)
+        ?? map.ob.get(`${b}|`)
+        ?? map.obAny.get(b)
         ?? null;
 }
 
