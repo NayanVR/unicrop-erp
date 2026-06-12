@@ -602,21 +602,25 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 <div class="label-inner">
                     <div class="transport-row">
                         <span class="transport">${esc(lbl.transport || '—')}</span>
-                        <span class="box-num">${lbl.boxNum}</span>
+                        <span class="box-badge">${lbl.boxNum}</span>
                     </div>
                     <div class="destination">${esc(lbl.destination || '—')}</div>
+                    <div class="party-tag">DELIVER TO</div>
                     <div class="party">${esc(lbl.party || '—')}</div>
                     <div class="mid-row">
                         <span class="total-boxes">${esc(labelEditor.unitSummary)}</span>
                     </div>
                     <div class="auto-row2">
-                        <span class="inboxpcs">${lbl.inBoxPcs ? `In-box: <b>${esc(lbl.inBoxPcs)} pcs</b>` : '—'}</span>
+                        <span class="inboxpcs">${lbl.inBoxPcs ? `In-${esc(lbl.unit)}: <b>${esc(lbl.inBoxPcs)} pcs</b>` : '—'}</span>
                         <span class="item-box-count">${esc(lbl.unit)} ${lbl.itemBoxNum}/${lbl.itemTotalBoxes}</span>
                     </div>
                     <div class="product-block">
                         <div class="brand-name">${esc(lbl.brand || '—')}</div>
                     </div>
-                    <div class="order-ref">${esc(lbl.orderRef)}</div>
+                    <div class="footer-row">
+                        <span class="unit-tag">${esc(lbl.unit.toUpperCase())}</span>
+                        <span class="order-ref">${esc(lbl.orderRef)}</span>
+                    </div>
                 </div>
             </div>`,
             )
@@ -626,22 +630,25 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 @page { size: 100mm 75mm; margin: 0; }
                 * { box-sizing: border-box; }
                 body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
-                .label { width:100mm; height:75mm; border:0.5px solid #000; page-break-after:always; overflow:hidden; position:relative; }
+                .label { width:100mm; height:75mm; border:1px solid #000; page-break-after:always; overflow:hidden; position:relative; }
                 .label:last-child { page-break-after:avoid; }
                 .label-inner { padding:3mm 4mm; transform-origin:top left; }
-                .transport-row { display:flex; justify-content:space-between; align-items:baseline; gap:2mm; margin-bottom:1mm; }
+                .transport-row { display:flex; justify-content:space-between; align-items:center; gap:2mm; border-bottom:2px solid #000; padding-bottom:1mm; margin-bottom:1mm; }
                 .transport { font-size:${labelFS.transport}pt; font-weight:900; line-height:1.1; }
-                .destination { font-size:9pt; color:#444; margin-bottom:1mm; }
-                .party { font-size:${labelFS.party}pt; font-weight:700; margin-bottom:2mm; }
-                .mid-row { margin-bottom:2mm; text-align:center; }
-                .box-num { font-size:${labelFS.boxNum}pt; font-weight:900; }
+                .box-badge { min-width:11mm; height:11mm; padding:0 2mm; background:#000; color:#fff; display:flex; align-items:center; justify-content:center; font-size:${labelFS.boxNum}pt; font-weight:900; border-radius:1.5mm; flex-shrink:0; }
+                .destination { font-size:9pt; color:#333; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:1mm; }
+                .party-tag { font-size:6.5pt; font-weight:700; color:#777; letter-spacing:1.5px; }
+                .party { font-size:${labelFS.party}pt; font-weight:700; margin-bottom:1.5mm; }
+                .mid-row { border-top:1.5px solid #000; border-bottom:1.5px solid #000; padding:1mm 0; margin-bottom:1.5mm; text-align:center; }
                 .total-boxes { font-size:${labelFS.totalBoxes}pt; font-weight:900; line-height:1.05; white-space:nowrap; }
                 .auto-row2 { display:flex; justify-content:space-between; align-items:center; font-size:9pt; margin-bottom:1.5mm; }
                 .inboxpcs { font-weight:700; color:#222; }
                 .item-box-count { color:#666; font-style:italic; font-size:8pt; }
-                .product-block { border-top:0.5px solid #ccc; padding-top:1.5mm; }
+                .product-block { padding-top:0.5mm; }
                 .brand-name { font-size:${labelFS.brand}pt; font-weight:900; word-break:break-word; white-space:normal; line-height:1.15; }
-                .order-ref { font-size:7.5pt; color:#888; margin-top:1mm; text-align:right; }
+                .footer-row { display:flex; justify-content:space-between; align-items:center; margin-top:1mm; }
+                .unit-tag { font-size:8pt; font-weight:900; border:1.5px solid #000; padding:0.5mm 2.5mm; letter-spacing:1.5px; border-radius:1mm; }
+                .order-ref { font-size:7.5pt; color:#888; text-align:right; }
                 .printed-by { font-size:7pt; color:#555; margin-top:0.5mm; text-align:right; }
                 .toolbar { position:sticky; top:0; z-index:10; background:#1e293b; color:#fff; padding:10px 16px; display:flex; align-items:center; gap:12px; }
                 .toolbar button { background:#2563eb; color:#fff; border:0; border-radius:6px; padding:8px 18px; font-size:14px; font-weight:700; cursor:pointer; }
@@ -1514,8 +1521,8 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                         position: 'relative',
                                     }}
                                 >
-                                    {/* Transport | Box number */}
-                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '2mm', borderBottom: '1px dashed #bbb' }}>
+                                    {/* Transport | Box number badge */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '2mm', borderBottom: '2px solid #000', paddingBottom: '1mm' }}>
                                         <textarea
                                             value={lbl.transport}
                                             onChange={(e) => updateLabelField(idx, 'transport', e.target.value)}
@@ -1529,7 +1536,17 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                 overflow: 'hidden',
                                             }}
                                         />
-                                        <span style={{ fontSize: `${labelFS.boxNum}pt`, fontWeight: 900, color: '#111', flexShrink: 0 }}>{lbl.boxNum}</span>
+                                        <span
+                                            style={{
+                                                minWidth: '11mm', height: '11mm', padding: '0 2mm',
+                                                background: '#000', color: '#fff',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                fontSize: `${labelFS.boxNum}pt`, fontWeight: 900,
+                                                borderRadius: '1.5mm', flexShrink: 0,
+                                            }}
+                                        >
+                                            {lbl.boxNum}
+                                        </span>
                                     </div>
                                     {/* Destination */}
                                     <input
@@ -1537,28 +1554,30 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                         onChange={(e) => updateLabelField(idx, 'destination', e.target.value)}
                                         placeholder="Destination"
                                         style={{
-                                            border: 'none', borderBottom: '1px dashed #bbb', outline: 'none',
-                                            fontSize: '8pt', color: '#444', marginTop: '1mm',
+                                            border: 'none', outline: 'none',
+                                            fontSize: '8pt', color: '#333', marginTop: '1mm',
+                                            textTransform: 'uppercase', letterSpacing: '0.5px',
                                             padding: '0', width: '100%', background: 'transparent',
                                             fontFamily: 'Arial, sans-serif',
                                         }}
                                     />
                                     {/* Party */}
+                                    <div style={{ fontSize: '6.5pt', fontWeight: 700, color: '#777', letterSpacing: '1.5px', marginTop: '1mm' }}>DELIVER TO</div>
                                     <textarea
                                         value={lbl.party}
                                         onChange={(e) => updateLabelField(idx, 'party', e.target.value)}
                                         placeholder="Party name"
                                         rows={2}
                                         style={{
-                                            border: 'none', borderBottom: '1px dashed #bbb', outline: 'none',
-                                            fontSize: `${labelFS.party}pt`, fontWeight: 700, marginTop: '1mm',
+                                            border: 'none', outline: 'none',
+                                            fontSize: `${labelFS.party}pt`, fontWeight: 700,
                                             padding: '0', width: '100%', background: 'transparent',
                                             fontFamily: 'Arial, sans-serif', resize: 'none',
                                             overflow: 'hidden', lineHeight: 1.2,
                                         }}
                                     />
-                                    {/* Parcel summary — single line, shrunk to fit the label width */}
-                                    <div style={{ margin: '1mm 0 0.5mm', textAlign: 'center' }}>
+                                    {/* Parcel summary — single line band, shrunk to fit the label width */}
+                                    <div style={{ margin: '1mm 0 1.5mm', padding: '1mm 0', textAlign: 'center', borderTop: '1.5px solid #000', borderBottom: '1.5px solid #000' }}>
                                         <span
                                             style={{
                                                 fontSize: `${Math.min(labelFS.totalBoxes, Math.floor(490 / Math.max(labelEditor.unitSummary.length, 1)))}pt`,
@@ -1590,8 +1609,6 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                             {lbl.unit} {lbl.itemBoxNum}/{lbl.itemTotalBoxes}
                                         </span>
                                     </div>
-                                    {/* Divider */}
-                                    <div style={{ borderTop: '0.5px solid #555', marginBottom: '1.5mm' }} />
                                     {/* Brand / product */}
                                     <textarea
                                         value={lbl.brand}
@@ -1607,19 +1624,29 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                             fontFamily: 'Arial, sans-serif', flex: 1,
                                         }}
                                     />
-                                    {/* Order ref — bottom right */}
-                                    <input
-                                        value={lbl.orderRef}
-                                        onChange={(e) => updateLabelField(idx, 'orderRef', e.target.value)}
-                                        placeholder="Order ref"
-                                        style={{
-                                            border: 'none', outline: 'none',
-                                            fontSize: '7pt', color: '#999',
-                                            padding: '0', width: '100%', background: 'transparent',
-                                            textAlign: 'right', fontFamily: 'Arial, sans-serif',
-                                            marginTop: 'auto',
-                                        }}
-                                    />
+                                    {/* Footer: unit tag | order ref */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', gap: '2mm' }}>
+                                        <span
+                                            style={{
+                                                fontSize: '8pt', fontWeight: 900, border: '1.5px solid #000',
+                                                padding: '0.5mm 2.5mm', letterSpacing: '1.5px', borderRadius: '1mm',
+                                                flexShrink: 0,
+                                            }}
+                                        >
+                                            {lbl.unit.toUpperCase()}
+                                        </span>
+                                        <input
+                                            value={lbl.orderRef}
+                                            onChange={(e) => updateLabelField(idx, 'orderRef', e.target.value)}
+                                            placeholder="Order ref"
+                                            style={{
+                                                border: 'none', outline: 'none',
+                                                fontSize: '7pt', color: '#999',
+                                                padding: '0', flex: 1, background: 'transparent',
+                                                textAlign: 'right', fontFamily: 'Arial, sans-serif',
+                                            }}
+                                        />
+                                    </div>
                                 </div>
                             ))}
                         </div>
