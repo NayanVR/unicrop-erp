@@ -59,8 +59,10 @@ class Order extends Model
         return [
             'order_date' => 'date',
             'confirmed_at' => 'datetime',
+            'urgent_approved' => 'boolean',
             'urgent_approved_at' => 'datetime',
             'urgent_days' => 'integer',
+            'eway_bill_not_required' => 'boolean',
             'labels_last_printed_at' => 'datetime',
             'freight_amount' => 'decimal:2',
             'courier_amount' => 'decimal:2',
