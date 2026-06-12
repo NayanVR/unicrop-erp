@@ -600,11 +600,13 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 (lbl) => `
             <div class="label">
                 <div class="label-inner">
-                    <div class="transport">${esc(lbl.transport || '—')}</div>
+                    <div class="transport-row">
+                        <span class="transport">${esc(lbl.transport || '—')}</span>
+                        <span class="box-num">${lbl.boxNum}</span>
+                    </div>
                     <div class="destination">${esc(lbl.destination || '—')}</div>
                     <div class="party">${esc(lbl.party || '—')}</div>
                     <div class="mid-row">
-                        <span class="box-num">${lbl.boxNum}</span>
                         <span class="total-boxes">${esc(labelEditor.unitSummary)}</span>
                     </div>
                     <div class="auto-row2">
@@ -627,12 +629,13 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 .label { width:100mm; height:75mm; border:0.5px solid #000; page-break-after:always; overflow:hidden; position:relative; }
                 .label:last-child { page-break-after:avoid; }
                 .label-inner { padding:3mm 4mm; transform-origin:top left; }
-                .transport { font-size:${labelFS.transport}pt; font-weight:900; line-height:1.1; margin-bottom:1mm; }
+                .transport-row { display:flex; justify-content:space-between; align-items:baseline; gap:2mm; margin-bottom:1mm; }
+                .transport { font-size:${labelFS.transport}pt; font-weight:900; line-height:1.1; }
                 .destination { font-size:9pt; color:#444; margin-bottom:1mm; }
                 .party { font-size:${labelFS.party}pt; font-weight:700; margin-bottom:2mm; }
-                .mid-row { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2mm; }
+                .mid-row { margin-bottom:2mm; text-align:center; }
                 .box-num { font-size:${labelFS.boxNum}pt; font-weight:900; }
-                .total-boxes { font-size:${labelFS.totalBoxes}pt; font-weight:900; text-align:right; line-height:1.05; word-break:break-word; }
+                .total-boxes { font-size:${labelFS.totalBoxes}pt; font-weight:900; line-height:1.05; white-space:nowrap; }
                 .auto-row2 { display:flex; justify-content:space-between; align-items:center; font-size:9pt; margin-bottom:1.5mm; }
                 .inboxpcs { font-weight:700; color:#222; }
                 .item-box-count { color:#666; font-style:italic; font-size:8pt; }
@@ -648,6 +651,16 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
             </style>
             <script>
             function fitLabels() {
+                // Shrink the parcel-summary line so it always stays on one line
+                document.querySelectorAll('.total-boxes').forEach(function(el) {
+                    var size = ${labelFS.totalBoxes};
+                    el.style.fontSize = size + 'pt';
+                    var parent = el.parentElement;
+                    while (size > 8 && el.scrollWidth > parent.clientWidth) {
+                        size -= 1;
+                        el.style.fontSize = size + 'pt';
+                    }
+                });
                 document.querySelectorAll('.label').forEach(function(label) {
                     var inner = label.querySelector('.label-inner');
                     if (!inner) return;
@@ -1501,20 +1514,23 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                         position: 'relative',
                                     }}
                                 >
-                                    {/* Transport */}
-                                    <textarea
-                                        value={lbl.transport}
-                                        onChange={(e) => updateLabelField(idx, 'transport', e.target.value)}
-                                        placeholder="Transport name"
-                                        rows={1}
-                                        style={{
-                                            border: 'none', borderBottom: '1px dashed #bbb', outline: 'none',
-                                            fontSize: `${labelFS.transport}pt`, fontWeight: 900, lineHeight: 1.1,
-                                            padding: '0', width: '100%', background: 'transparent',
-                                            fontFamily: 'Arial, sans-serif', resize: 'none',
-                                            overflow: 'hidden',
-                                        }}
-                                    />
+                                    {/* Transport | Box number */}
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '2mm', borderBottom: '1px dashed #bbb' }}>
+                                        <textarea
+                                            value={lbl.transport}
+                                            onChange={(e) => updateLabelField(idx, 'transport', e.target.value)}
+                                            placeholder="Transport name"
+                                            rows={1}
+                                            style={{
+                                                border: 'none', outline: 'none',
+                                                fontSize: `${labelFS.transport}pt`, fontWeight: 900, lineHeight: 1.1,
+                                                padding: '0', flex: 1, background: 'transparent',
+                                                fontFamily: 'Arial, sans-serif', resize: 'none',
+                                                overflow: 'hidden',
+                                            }}
+                                        />
+                                        <span style={{ fontSize: `${labelFS.boxNum}pt`, fontWeight: 900, color: '#111', flexShrink: 0 }}>{lbl.boxNum}</span>
+                                    </div>
                                     {/* Destination */}
                                     <input
                                         value={lbl.destination}
@@ -1541,10 +1557,16 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                             overflow: 'hidden', lineHeight: 1.2,
                                         }}
                                     />
-                                    {/* Box number | Parcel summary */}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '1mm 0 0.5mm', gap: '2mm' }}>
-                                        <span style={{ fontSize: `${labelFS.boxNum}pt`, fontWeight: 900, color: '#111' }}>{lbl.boxNum}</span>
-                                        <span style={{ fontSize: `${labelFS.totalBoxes}pt`, fontWeight: 900, color: '#111', textAlign: 'right', lineHeight: 1.05, wordBreak: 'break-word' }}>{labelEditor.unitSummary}</span>
+                                    {/* Parcel summary — single line, shrunk to fit the label width */}
+                                    <div style={{ margin: '1mm 0 0.5mm', textAlign: 'center' }}>
+                                        <span
+                                            style={{
+                                                fontSize: `${Math.min(labelFS.totalBoxes, Math.floor(490 / Math.max(labelEditor.unitSummary.length, 1)))}pt`,
+                                                fontWeight: 900, color: '#111', lineHeight: 1.05, whiteSpace: 'nowrap',
+                                            }}
+                                        >
+                                            {labelEditor.unitSummary}
+                                        </span>
                                     </div>
                                     {/* In-box pcs | product box/bag/carba */}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1mm' }}>
