@@ -441,8 +441,11 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
     const toggleOrder = (orderId: number) =>
         setOpenOrders((curr) => (curr.includes(orderId) ? curr.filter((id) => id !== orderId) : [...curr, orderId]));
 
-    const setItemStage = (itemId: number, stage: string, current: string | null) => {
-        if (stage === current) return;
+    const setItemStage = (itemId: number, stage: string, current: string | null, onDone?: () => void) => {
+        if (stage === current) {
+            onDone?.();
+            return;
+        }
         const targetIdx = STAGE_ORDER.indexOf(stage);
         const currentIdx = current ? STAGE_ORDER.indexOf(current) : -1;
         if (targetIdx < currentIdx && !confirm(`Move this item back to "${STAGE_LABELS[stage] ?? stage}"?`)) return;
@@ -450,7 +453,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
         router.post(
             itemSetStage(itemId).url,
             { stage },
-            { preserveScroll: true, onFinish: () => setStagingItem(null) },
+            { preserveScroll: true, onFinish: () => { setStagingItem(null); onDone?.(); } },
         );
     };
 
@@ -1789,13 +1792,14 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                     title={!canFill ? 'You do not have access to the Filling page' : undefined}
                                     onClick={() => {
                                         if (!canFill) return;
-                                        setItemStage(fillingPrompt.item.id, 'filling', fillingPrompt.current);
                                         const params = new URLSearchParams({
                                             brand: fillingPrompt.item.our_brand ?? '',
                                             packing: fillingPrompt.item.packing_size ?? '',
                                         });
                                         setFillingPrompt(null);
-                                        router.visit(`/filling?${params.toString()}`);
+                                        setItemStage(fillingPrompt.item.id, 'filling', fillingPrompt.current, () => {
+                                            window.location.href = `/filling?${params.toString()}`;
+                                        });
                                     }}
                                 >
                                     🧪 Filling Now
