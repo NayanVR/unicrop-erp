@@ -64,6 +64,11 @@ const STAGES = [
 
 const stageFor = (key: string) => STAGES.find((s) => s.key === key) ?? STAGES[0];
 
+const formatQty = (value: string | number) => {
+    const n = Number(value);
+    return isNaN(n) ? String(value) : String(n);
+};
+
 const priorityBadge = (p: string) => {
     if (p === 'urgent') return <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: '#fef2f2', color: '#dc2626', textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>URGENT</span>;
     if (p === 'high')   return <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: '#fffbeb', color: '#d97706', textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>HIGH</span>;
@@ -264,7 +269,7 @@ export default function FactoryDashboard({
                                                         {item.party_brand && <span style={{ color: 'var(--tx-muted)', marginLeft: '6px', fontSize: '12px' }}>({item.party_brand})</span>}
                                                         {item.packing_size && <span style={{ color: 'var(--tx-muted)', marginLeft: '6px', fontSize: '12px' }}>{item.packing_size}</span>}
                                                     </div>
-                                                    <span style={{ fontSize: '12px', color: 'var(--tx-muted)', whiteSpace: 'nowrap' }}>{item.quantity} units</span>
+                                                    <span style={{ fontSize: '12px', color: 'var(--tx-muted)', whiteSpace: 'nowrap' }}>{formatQty(item.quantity)} units</span>
                                                     <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '5px', background: stage.bg, color: stage.color, border: `1px solid ${stage.border}`, whiteSpace: 'nowrap' }}>
                                                         {stage.label}
                                                     </span>
@@ -292,7 +297,7 @@ export default function FactoryDashboard({
                                             {item.packing_size && <span style={{ fontWeight: 400, color: 'var(--tx-muted)', marginLeft: '6px', fontSize: '12px' }}>{item.packing_size}</span>}
                                         </div>
                                         <div style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>
-                                            {item.order_number} · {item.company_name} · {item.quantity} units
+                                            {item.order_number} · {item.company_name} · {formatQty(item.quantity)} units
                                         </div>
                                     </div>
                                     <span style={{ fontSize: '11px', color: 'var(--tx-muted)', whiteSpace: 'nowrap' }}>{item.dispatched_at}</span>

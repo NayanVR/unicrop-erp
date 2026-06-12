@@ -283,6 +283,11 @@ const pluralizeUnit = (unit: string, count: number): string => {
     return unit;
 };
 
+const formatQty = (value: string | number) => {
+    const n = Number(value);
+    return isNaN(n) ? String(value) : String(n);
+};
+
 // Effective pcs/box: stored box_size takes priority, else derive from packing_size
 const pcsPerBox = (item: OrderItem, overrides: Record<string, number> = {}): number | null =>
     item.box_size ?? stdPcsPerBox(item.packing_size, overrides);
@@ -809,7 +814,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                         {order.items.length} item{order.items.length !== 1 ? 's' : ''}
                                         {order.items.slice(0, 2).map((item, idx) => (
                                             <div key={idx} style={{ color: 'var(--tx-faint)' }}>
-                                                {item.our_brand ?? '—'} {item.packing_size ? `(${item.packing_size})` : ''} ×{item.quantity}
+                                                {item.our_brand ?? '—'} {item.packing_size ? `(${item.packing_size})` : ''} ×{formatQty(item.quantity)}
                                             </div>
                                         ))}
                                         {order.items.length > 2 && <div style={{ color: 'var(--tx-faint)' }}>+{order.items.length - 2} more</div>}
@@ -1116,7 +1121,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                             {/* Details */}
                                                             <td>
                                                                 <div style={{ fontSize: '13px' }}>
-                                                                    {item.packing_size ? `${item.packing_size} · ` : ''}Qty: {item.quantity}
+                                                                    {item.packing_size ? `${item.packing_size} · ` : ''}Qty: {formatQty(item.quantity)}
                                                                 </div>
                                                                 {isDispatched && item.dispatched_qty != null && Number(item.dispatched_qty) !== Number(item.quantity) && (
                                                                     <div style={{ fontSize: '12px', fontWeight: 600, color: Number(item.dispatched_qty) < Number(item.quantity) ? '#dc2626' : '#d97706' }}>

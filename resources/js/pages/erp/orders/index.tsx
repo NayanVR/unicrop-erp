@@ -185,6 +185,11 @@ const formatDate = (value?: string | null) => {
 const formatAmount = (value?: string | number | null) =>
     Number(value ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+const formatQty = (value: string | number) => {
+    const n = Number(value);
+    return isNaN(n) ? String(value) : String(n);
+};
+
 const statusClassName = (status?: string | null) => {
     switch (status) {
         case 'submitted':  return 'badge sky';
@@ -596,7 +601,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                             <td style={{ fontWeight: 600 }}>{item.our_brand ?? '—'}</td>
                                                             <td>{item.party_brand ?? '—'}</td>
                                                             <td>{item.packing_size ?? '—'}</td>
-                                                            <td>{item.quantity}</td>
+                                                            <td>{formatQty(item.quantity)}</td>
                                                         </tr>
                                                     ))}
                                                 </tbody>
@@ -913,7 +918,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                         <div className="o-customer">{order.customer_name}</div>
                                         {order.items.length > 0 && (
                                             <div style={{ fontSize: '11px', color: 'var(--tx-muted)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                {order.items.map((item) => `${item.our_brand ?? '—'}${item.packing_size ? ` (${item.packing_size})` : ''} × ${item.quantity}`).join(', ')}
+                                                {order.items.map((item) => `${item.our_brand ?? '—'}${item.packing_size ? ` (${item.packing_size})` : ''} × ${formatQty(item.quantity)}`).join(', ')}
                                             </div>
                                         )}
                                     </div>
@@ -1314,7 +1319,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                                             <td><div className="prod-name" style={{ fontSize: '12px' }}>{item.our_brand ?? '—'}</div></td>
                                                                             <td><div style={{ fontSize: '12px', color: 'var(--tx-muted)' }}>{item.party_brand ?? '—'}</div></td>
                                                                             <td>{item.packing_size ?? '—'}</td>
-                                                                            <td>{item.quantity}</td>
+                                                                            <td>{formatQty(item.quantity)}</td>
                                                                             <td>₹{formatAmount(item.rate)}</td>
                                                                             <td>{item.gst_percent}%</td>
                                                                             <td>₹{formatAmount(item.amount)}</td>
@@ -1411,7 +1416,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                                             <div className="prod-detail">{item.party_brand ?? '—'}</div>
                                                                         </td>
                                                                         <td>{item.packing_size ?? '—'}</td>
-                                                                        <td>{item.quantity}</td>
+                                                                        <td>{formatQty(item.quantity)}</td>
                                                                         <td>{formatAmount(item.rate)}</td>
                                                                         <td>{item.gst_percent}</td>
                                                                         <td>{formatAmount(item.amount)}</td>
