@@ -683,8 +683,8 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 .destination { font-size:9pt; color:#333; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:1mm; }
                 .party-tag { font-size:6.5pt; font-weight:700; color:#777; letter-spacing:1.5px; }
                 .party { font-size:${labelFS.party}pt; font-weight:700; margin-bottom:1.5mm; }
-                .mid-row { border-top:1.5px solid #000; border-bottom:1.5px solid #000; padding:1mm 0; margin-bottom:1.5mm; text-align:center; }
-                .total-boxes { font-size:${labelFS.totalBoxes}pt; font-weight:900; line-height:1.05; white-space:nowrap; }
+                .mid-row { background:#000; border-radius:1.5mm; padding:1mm 0; margin-bottom:1.5mm; text-align:center; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+                .total-boxes { font-size:${labelFS.totalBoxes}pt; font-weight:900; line-height:1.05; white-space:nowrap; color:#fff; }
                 .auto-row2 { display:flex; justify-content:space-between; align-items:center; font-size:9pt; margin-bottom:1.5mm; }
                 .inboxpcs { font-weight:700; color:#222; }
                 .product-block { padding-top:0.5mm; display:flex; justify-content:space-between; align-items:center; gap:2mm; }
@@ -1658,12 +1658,12 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                         }}
                                     />
                                     {/* Parcel summary — single line band, shrunk to fit the label width */}
-                                    <div style={{ margin: '1mm 0 1.5mm', padding: '1mm 0', textAlign: 'center', borderTop: '1.5px solid #000', borderBottom: '1.5px solid #000', overflow: 'hidden' }}>
+                                    <div style={{ margin: '1mm 0 1.5mm', padding: '1mm 0', textAlign: 'center', background: '#000', borderRadius: '1.5mm', overflow: 'hidden' }}>
                                         <span
                                             ref={(el) => { totalBoxesRefs.current[idx] = el; }}
                                             style={{
                                                 fontSize: `${labelFS.totalBoxes}pt`,
-                                                fontWeight: 900, color: '#111', lineHeight: 1.05, whiteSpace: 'nowrap',
+                                                fontWeight: 900, color: '#fff', lineHeight: 1.05, whiteSpace: 'nowrap',
                                             }}
                                         >
                                             {labelEditor.unitSummary}
