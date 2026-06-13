@@ -1003,23 +1003,35 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     return { border: '#bae6fd', bg: '#f0f9ff', text: '#0284c7', icon: '🔵' };
                 };
 
-                const renderChip = (m: RawMaterial, recipes: string[] | null) => {
+                const renderChip = (m: RawMaterial, recipes: string[] | null, productionTarget?: 'bom' | 'filling') => {
                     const c = statusColors(stockStatus(m));
+                    const goToProduction = () => {
+                        if (productionTarget === 'bom') router.visit(`/bom?output=${m.id}`);
+                        else if (productionTarget === 'filling') router.visit(`/filling?output=${m.id}`);
+                    };
                     return (
-                        <div key={m.id} style={{ borderRadius: 8, border: `1px solid ${c.border}`, background: c.bg, padding: '8px 12px', fontSize: 13, minWidth: 200 }}>
+                        <div
+                            key={m.id}
+                            onClick={productionTarget ? goToProduction : undefined}
+                            title={productionTarget ? 'Open production card to run' : undefined}
+                            style={{ borderRadius: 8, border: `1px solid ${c.border}`, background: c.bg, padding: '8px 12px', fontSize: 13, minWidth: 200, cursor: productionTarget ? 'pointer' : 'default' }}
+                        >
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ cursor: 'pointer', fontWeight: 700, color: c.text }} onClick={() => { setSearch(m.name); setTab('materials'); }}>
+                                <span
+                                    style={{ cursor: 'pointer', fontWeight: 700, color: c.text }}
+                                    onClick={(e) => { e.stopPropagation(); if (productionTarget) goToProduction(); else { setSearch(m.name); setTab('materials'); } }}
+                                >
                                     {c.icon} {m.name}: {fmt(m.stock_qty)} {m.unit}
                                 </span>
                                 {!recipes && (
-                                    <button type="button" className="btn sm primary" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => openOrderPlaced(m)}>
+                                    <button type="button" className="btn sm primary" style={{ fontSize: 11, padding: '2px 8px' }} onClick={(e) => { e.stopPropagation(); openOrderPlaced(m); }}>
                                         + Order Placed
                                     </button>
                                 )}
                             </div>
                             {recipes && recipes.length > 0 && (
                                 <div style={{ fontSize: 11, color: '#1e40af', fontWeight: 600, marginTop: 2 }}>
-                                    🏭 Run: {recipes.join(', ')}
+                                    🏭 Run: {recipes.join(', ')} →
                                 </div>
                             )}
                         </div>
@@ -1032,6 +1044,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     accent: string,
                     items: RawMaterial[],
                     recipesFor: ((m: RawMaterial) => string[]) | null,
+                    productionTarget?: 'bom' | 'filling',
                 ) => items.length > 0 && (
                     <div className="card" style={{ borderLeft: `4px solid ${accent}` }}>
                         <div className="card-title" style={{ marginBottom: 8, color: accent }}>
@@ -1039,7 +1052,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                             <span className="ct-badge" style={{ background: accent, color: '#fff' }}>{items.length}</span>
                         </div>
                         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                            {items.map((m) => renderChip(m, recipesFor ? recipesFor(m) : null))}
+                            {items.map((m) => renderChip(m, recipesFor ? recipesFor(m) : null, productionTarget))}
                         </div>
                     </div>
                 );
@@ -1048,8 +1061,8 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
                         {banner('Out of Stock', '🔴', '#dc2626', outAlerts, null)}
                         {banner('Low Stock Alert', '🟡', '#d97706', lowAlerts, null)}
-                        {banner('BOM Production Required', '⚗️', '#7c3aed', bomAlerts, (m) => bomOutputMap[String(m.id)] ?? [])}
-                        {banner('Filling Production Required', '🧪', '#0891b2', fillingAlerts, (m) => fillingOutputMap[String(m.id)] ?? [])}
+                        {banner('BOM Production Required', '⚗️', '#7c3aed', bomAlerts, (m) => bomOutputMap[String(m.id)] ?? [], 'bom')}
+                        {banner('Filling Production Required', '🧪', '#0891b2', fillingAlerts, (m) => fillingOutputMap[String(m.id)] ?? [], 'filling')}
                         {banner('Reorder Level', '🔵', '#0284c7', reorderAlerts, null)}
                     </div>
                 );

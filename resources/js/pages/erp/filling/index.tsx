@@ -315,6 +315,18 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
     // arriving from the factory page (e.g. /filling?brand=...&packing=...).
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
+
+        // Arriving from inventory production banner (e.g. /filling?output=<materialId>)
+        const output = params.get('output');
+        if (output) {
+            const recipe = recipes.find((r) => String(r.output_raw_material_id) === output);
+            if (recipe) {
+                scrollToCard(recipe.id);
+                if (canManage) openRun(recipe);
+            }
+            return;
+        }
+
         const brand = params.get('brand');
         if (!brand) return;
         const packing = (params.get('packing') ?? '').trim().toLowerCase();

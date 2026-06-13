@@ -470,6 +470,19 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
         setTimeout(() => setHighlightedId(null), 2500);
     };
 
+    // Jump to a BOM card when arriving from inventory (e.g. /bom?output=<materialId>)
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const output = params.get('output');
+        if (!output) return;
+        const bom = boms.find((b) => String(b.output_raw_material_id) === output);
+        if (bom) {
+            scrollToCard(bom.id);
+            if (canRun(bom)) openRun(bom);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const lowStockBoms = boms.filter((b) => {
         const m = b.output_material;
         if (!m) return false;
