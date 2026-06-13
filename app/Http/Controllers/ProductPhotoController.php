@@ -58,6 +58,7 @@ class ProductPhotoController extends Controller
             ]);
 
         $parties = Party::where('is_active', true)
+            ->whereIn('type', ['customer', 'both'])
             ->orderBy('name')
             ->get(['id', 'name']);
 
