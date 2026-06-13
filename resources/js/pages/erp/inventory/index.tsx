@@ -379,7 +379,8 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         sku: '',
         unit: 'pcs',
         supplier: '',
-        stock: '0',
+        min_stock: '0',
+        reorder_level: '0',
         cost_per_unit: '',
         selling_rate: '',
         notes: '',
@@ -887,7 +888,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const openPackModal = () => {
         setPackStep(1);
         setPackCat(null);
-        setPackForm({ size: '', shape: '', dim_l: '', dim_w: '', dim_h: '', hsn: '', gst: '18', sku: '', unit: 'pcs', supplier: '', stock: '0', cost_per_unit: '', selling_rate: '', notes: '' });
+        setPackForm({ size: '', shape: '', dim_l: '', dim_w: '', dim_h: '', hsn: '', gst: '18', sku: '', unit: 'pcs', supplier: '', min_stock: '0', reorder_level: '0', cost_per_unit: '', selling_rate: '', notes: '' });
         setPkgSellMode('manual');
         setPkgProfitPct('');
         setPackModal(true);
@@ -918,8 +919,8 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             unit: packForm.unit,
             category: packCat.label,
             shape: packForm.shape,
-            min_stock: '0',
-            reorder_level: '0',
+            min_stock: packForm.min_stock || '0',
+            reorder_level: packForm.reorder_level || '0',
             cost_per_unit: packForm.cost_per_unit || '0',
             selling_rate: packForm.selling_rate || '0',
             dim_l: packForm.dim_l || '',
@@ -927,7 +928,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             dim_h: packForm.dim_h || '',
             supplier: packForm.supplier,
             notes: packForm.notes,
-            stock_qty: packForm.stock || '0',
+            stock_qty: '0',
             is_active: true,
         });
         packSubmitForm.post(matStore().url, {
@@ -3039,13 +3040,23 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                         {packStep === 4 && (
                             <div className="form-grid">
                                 <div className="form-group">
-                                    <label>Initial Stock (qty)</label>
+                                    <label>Min Stock</label>
                                     <input
                                         type="number"
                                         min="0"
                                         step="any"
-                                        value={packForm.stock}
-                                        onChange={(e) => setPackForm((p) => ({ ...p, stock: e.target.value }))}
+                                        value={packForm.min_stock}
+                                        onChange={(e) => setPackForm((p) => ({ ...p, min_stock: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Reorder Level</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="any"
+                                        value={packForm.reorder_level}
+                                        onChange={(e) => setPackForm((p) => ({ ...p, reorder_level: e.target.value }))}
                                     />
                                 </div>
                                 <div className="form-group">
