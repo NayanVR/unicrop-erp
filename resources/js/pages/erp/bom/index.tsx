@@ -180,6 +180,16 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
     const [runTarget, setRunTarget]   = useState<Bom | null>(null);
     const [runSummary, setRunSummary]     = useState<NormalizedRun | null>(null);
     const [highlightedId, setHighlightedId] = useState<number | null>(null);
+    const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+    const toggleGroup = (key: string) => {
+        setCollapsedGroups((prev) => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+    };
 
     // Quick-add material from output product field
     const [quickAddOpen, setQuickAddOpen]         = useState(false);
@@ -440,6 +450,14 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
     const scrollToCard = (bomId: number) => {
         setPageView('boms');
         setHighlightedId(bomId);
+        const bom = boms.find((b) => b.id === bomId);
+        const groupKey = (bom?.category ?? '').trim() || UNCATEGORIZED;
+        setCollapsedGroups((prev) => {
+            if (!prev.has(groupKey)) return prev;
+            const next = new Set(prev);
+            next.delete(groupKey);
+            return next;
+        });
         setTimeout(() => {
             document.getElementById(`bom-card-${bomId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 50);
@@ -601,18 +619,37 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                         <p>{boms.length === 0 ? 'No BOMs yet. Create one to define a product formulation.' : 'No BOMs match the current filter.'}</p>
                     </div>
                 ) : (
-                    groupedBoms.map(([cat, list]) => (
+                    groupedBoms.map(([cat, list]) => {
+                    const isCollapsed = collapsedGroups.has(cat);
+                    return (
                     <div key={cat} style={{ marginBottom: 24 }}>
                         {showGroupHeaders && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 12px', paddingBottom: 6, borderBottom: '2px solid var(--border)' }}>
-                                <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--tx-body)' }}>
+                            <div
+                                onClick={() => toggleGroup(cat)}
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+                                    padding: '10px 16px', borderRadius: 10, marginBottom: isCollapsed ? 0 : 14,
+                                    background: cat === UNCATEGORIZED ? 'var(--bg-paper)' : '#f5f3ff',
+                                    border: `1.5px solid ${cat === UNCATEGORIZED ? 'var(--border)' : '#c4b5fd'}`,
+                                    userSelect: 'none',
+                                    transition: 'background 0.15s',
+                                }}
+                            >
+                                <span style={{
+                                    fontSize: 13, display: 'inline-block',
+                                    transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+                                    transition: 'transform 0.2s',
+                                    color: 'var(--tx-muted)',
+                                }}>▼</span>
+                                <span style={{ fontWeight: 700, fontSize: 15, flex: 1, color: cat === UNCATEGORIZED ? 'var(--tx-head)' : '#6d28d9' }}>
                                     {cat === UNCATEGORIZED ? '📦 Uncategorized' : `🏷️ ${cat}`}
                                 </span>
-                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--tx-muted)', background: 'var(--bg-paper)', border: '1px solid var(--border)', borderRadius: 20, padding: '1px 9px' }}>
+                                <span style={{ fontSize: 12, fontWeight: 700, background: cat === UNCATEGORIZED ? 'var(--bg-secondary)' : '#ede9fe', color: cat === UNCATEGORIZED ? 'var(--tx-muted)' : '#6d28d9', border: '1px solid ' + (cat === UNCATEGORIZED ? 'var(--border)' : '#c4b5fd'), padding: '2px 10px', borderRadius: 10 }}>
                                     {list.length}
                                 </span>
                             </div>
                         )}
+                        {!isCollapsed && (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16 }}>
                         {list.map((bom) => {
                             const type        = bomType(bom.batch_unit);
@@ -742,8 +779,10 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                             );
                         })}
                         </div>
+                        )}
                     </div>
-                    ))
+                    );
+                    })
                 )}
             </>}
 
