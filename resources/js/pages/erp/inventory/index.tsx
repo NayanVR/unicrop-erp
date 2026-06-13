@@ -617,27 +617,34 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     };
 
     const openEditMat = (m: RawMaterial) => {
+        // Model casts these to decimal, so the server sends them as strings like
+        // "18.00" / "0.000". Strip the trailing zeros so number inputs show clean
+        // values and the GST <select> can match its integer option values.
+        const num = (v: number | string | null | undefined) =>
+            v == null || v === '' ? '' : String(Number(v));
         matForm.setData({
             name: m.name,
             sku: m.sku ?? '',
             hsn: m.hsn ?? '',
-            gst: String(m.gst),
+            gst: num(m.gst),
             unit: m.unit,
             category: m.category ?? '',
             group_name: m.group_name ?? '',
             shape: m.shape ?? '',
-            min_stock: String(m.min_stock),
-            reorder_level: String(m.reorder_level),
-            cost_per_unit: String(m.cost_per_unit),
-            selling_rate: String(m.selling_rate),
-            dim_l: m.dim_l != null ? String(m.dim_l) : '',
-            dim_w: m.dim_w != null ? String(m.dim_w) : '',
-            dim_h: m.dim_h != null ? String(m.dim_h) : '',
+            min_stock: num(m.min_stock),
+            reorder_level: num(m.reorder_level),
+            cost_per_unit: num(m.cost_per_unit),
+            selling_rate: num(m.selling_rate),
+            dim_l: m.dim_l != null ? num(m.dim_l) : '',
+            dim_w: m.dim_w != null ? num(m.dim_w) : '',
+            dim_h: m.dim_h != null ? num(m.dim_h) : '',
             supplier: m.supplier ?? '',
             notes: m.notes ?? '',
             is_active: m.is_active,
         });
         matForm.clearErrors();
+        setMatSellMode('manual');
+        setMatProfitPct('');
         setEditingMat(m);
         setMatModal(true);
     };
