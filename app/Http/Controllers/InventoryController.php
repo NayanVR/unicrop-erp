@@ -472,6 +472,7 @@ class InventoryController extends Controller
         ]);
 
         InventoryReorder::create($data);
+        $this->ensureSupplierParty($data['supplier'] ?? null);
 
         return redirect()->back()->with('success', 'Reorder created.');
     }

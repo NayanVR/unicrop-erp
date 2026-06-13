@@ -267,6 +267,7 @@ function SupplierField({
     setOpen,
     onAddNew,
     error,
+    label = 'Supplier',
 }: {
     value: string;
     onChange: (v: string) => void;
@@ -275,12 +276,13 @@ function SupplierField({
     setOpen: (v: boolean) => void;
     onAddNew: (name: string) => void;
     error?: string;
+    label?: string;
 }) {
     const q = value.trim().toLowerCase();
     const matches = vendors.filter((v) => v.name.toLowerCase().includes(q));
     return (
         <div className="form-group" style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-            <label>Supplier</label>
+            <label>{label}</label>
             <div style={{ display: 'flex', gap: 6 }}>
                 <input
                     type="text"
@@ -525,9 +527,10 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     });
     const [addSupplierProcessing, setAddSupplierProcessing] = useState(false);
     const pendingSupplierName = useRef<string | null>(null);
-    const pendingSupplierTarget = useRef<'bill' | 'mat' | 'pack' | null>(null);
+    const pendingSupplierTarget = useRef<'bill' | 'mat' | 'pack' | 'reorder' | null>(null);
     const [matSupplierOpen, setMatSupplierOpen] = useState(false);
     const [packSupplierOpen, setPackSupplierOpen] = useState(false);
+    const [reorderSupplierOpen, setReorderSupplierOpen] = useState(false);
 
     // Auto-select newly created supplier once vendors list refreshes
     useEffect(() => {
@@ -538,6 +541,8 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                 matForm.setData('supplier', match.name);
             } else if (pendingSupplierTarget.current === 'pack') {
                 setPackForm((p) => ({ ...p, supplier: match.name }));
+            } else if (pendingSupplierTarget.current === 'reorder') {
+                reorderForm.setData('supplier', match.name);
             } else {
                 setBillForm((p) => ({ ...p, party_id: String(match.id), vendor_name: match.name }));
                 setBillVendorSearch(match.name);
@@ -892,7 +897,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         });
     };
 
-    const openAddSupplier = (target: 'bill' | 'mat' | 'pack', name: string) => {
+    const openAddSupplier = (target: 'bill' | 'mat' | 'pack' | 'reorder', name: string) => {
         pendingSupplierTarget.current = target;
         setAddSupplierForm((p) => ({ ...p, name }));
         setAddSupplierModal(true);
@@ -2821,7 +2826,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                         <button className="modal-close" onClick={() => setReorderModal(false)}>×</button>
                     </div>
                     <form onSubmit={submitReorder} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                        <div className="modal-body">
+                        <div className="modal-body" onClick={() => setReorderSupplierOpen(false)}>
                             <div className="form-grid">
                                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                                     <label>Material *</label>
@@ -2870,16 +2875,16 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                     </select>
                                     {reorderForm.errors.unit && <div className="form-error">{reorderForm.errors.unit}</div>}
                                 </div>
-                                <div className="form-group">
-                                    <label>Vendor / Supplier *</label>
-                                    <input
-                                        type="text"
-                                        value={reorderForm.data.supplier}
-                                        onChange={(e) => reorderForm.setData('supplier', e.target.value)}
-                                        placeholder="Vendor name"
-                                    />
-                                    {reorderForm.errors.supplier && <div className="form-error">{reorderForm.errors.supplier}</div>}
-                                </div>
+                                <SupplierField
+                                    value={reorderForm.data.supplier}
+                                    onChange={(v) => reorderForm.setData('supplier', v)}
+                                    vendors={vendors}
+                                    isOpen={reorderSupplierOpen}
+                                    setOpen={setReorderSupplierOpen}
+                                    onAddNew={(name) => openAddSupplier('reorder', name)}
+                                    error={reorderForm.errors.supplier}
+                                    label="Vendor / Supplier *"
+                                />
                                 <div className="form-group">
                                     <label>Order Date *</label>
                                     <input
