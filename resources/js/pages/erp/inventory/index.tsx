@@ -509,7 +509,20 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
 
     // Add Supplier mini-modal
     const [addSupplierModal, setAddSupplierModal] = useState(false);
-    const [addSupplierForm, setAddSupplierForm] = useState({ name: '', phone: '', gst_no: '', type: 'supplier' });
+    const [addSupplierForm, setAddSupplierForm] = useState({
+        name: '',
+        customer_name: '',
+        type: 'supplier',
+        gst_no: '',
+        pan_no: '',
+        phone: '',
+        email: '',
+        address: '',
+        city: '',
+        state: '',
+        pincode: '',
+        notes: '',
+    });
     const [addSupplierProcessing, setAddSupplierProcessing] = useState(false);
     const pendingSupplierName = useRef<string | null>(null);
     const pendingSupplierTarget = useRef<'bill' | 'mat' | 'pack' | null>(null);
@@ -868,7 +881,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             preserveScroll: true,
             onSuccess: () => {
                 setAddSupplierModal(false);
-                setAddSupplierForm({ name: '', phone: '', gst_no: '', type: 'supplier' });
+                setAddSupplierForm({ name: '', customer_name: '', type: 'supplier', gst_no: '', pan_no: '', phone: '', email: '', address: '', city: '', state: '', pincode: '', notes: '' });
                 setAddSupplierProcessing(false);
             },
             onError: () => {
@@ -3395,9 +3408,9 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                 </div>
             </div>
 
-            {/* ── Add Supplier Mini Modal ──────────────────────────────────── */}
+            {/* ── Add Supplier Modal (same fields as Supplier/Vendor page) ───── */}
             <div className={`modal-overlay${addSupplierModal ? ' open' : ''}`} onClick={() => setAddSupplierModal(false)} style={{ zIndex: 1100 }}>
-                <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420, width: '95%' }}>
+                <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 620, width: '95%' }}>
                     <div className="modal-header">
                         <h3>➕ Add New Supplier</h3>
                         <button className="modal-close" onClick={() => setAddSupplierModal(false)}>×</button>
@@ -3405,13 +3418,29 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     <div className="modal-body">
                         <div className="form-grid">
                             <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                                <label>Name *</label>
+                                <label>Company Name *</label>
                                 <input
                                     type="text"
                                     value={addSupplierForm.name}
                                     onChange={(e) => setAddSupplierForm((p) => ({ ...p, name: e.target.value }))}
                                     placeholder="Supplier / company name"
                                     autoFocus
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Type</label>
+                                <select value={addSupplierForm.type} onChange={(e) => setAddSupplierForm((p) => ({ ...p, type: e.target.value }))}>
+                                    <option value="supplier">Supplier only</option>
+                                    <option value="both">Supplier + Customer</option>
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label>Contact Person</label>
+                                <input
+                                    type="text"
+                                    value={addSupplierForm.customer_name}
+                                    onChange={(e) => setAddSupplierForm((p) => ({ ...p, customer_name: e.target.value }))}
+                                    placeholder="Contact person name"
                                 />
                             </div>
                             <div className="form-group">
@@ -3424,7 +3453,15 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                 />
                             </div>
                             <div className="form-group">
-                                <label>GST Number</label>
+                                <label>Email</label>
+                                <input
+                                    type="email"
+                                    value={addSupplierForm.email}
+                                    onChange={(e) => setAddSupplierForm((p) => ({ ...p, email: e.target.value }))}
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>GST No.</label>
                                 <input
                                     type="text"
                                     value={addSupplierForm.gst_no}
@@ -3432,12 +3469,54 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                     placeholder="22AAAAA0000A1Z5"
                                 />
                             </div>
+                            <div className="form-group">
+                                <label>PAN No.</label>
+                                <input
+                                    type="text"
+                                    value={addSupplierForm.pan_no}
+                                    onChange={(e) => setAddSupplierForm((p) => ({ ...p, pan_no: e.target.value.toUpperCase() }))}
+                                    placeholder="AAAAA0000A"
+                                />
+                            </div>
                             <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                                <label>Type</label>
-                                <select value={addSupplierForm.type} onChange={(e) => setAddSupplierForm((p) => ({ ...p, type: e.target.value }))}>
-                                    <option value="supplier">Supplier only</option>
-                                    <option value="both">Supplier + Customer</option>
-                                </select>
+                                <label>Address</label>
+                                <input
+                                    type="text"
+                                    value={addSupplierForm.address}
+                                    onChange={(e) => setAddSupplierForm((p) => ({ ...p, address: e.target.value }))}
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>City</label>
+                                <input
+                                    type="text"
+                                    value={addSupplierForm.city}
+                                    onChange={(e) => setAddSupplierForm((p) => ({ ...p, city: e.target.value }))}
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>State</label>
+                                <input
+                                    type="text"
+                                    value={addSupplierForm.state}
+                                    onChange={(e) => setAddSupplierForm((p) => ({ ...p, state: e.target.value }))}
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Pincode</label>
+                                <input
+                                    type="text"
+                                    value={addSupplierForm.pincode}
+                                    onChange={(e) => setAddSupplierForm((p) => ({ ...p, pincode: e.target.value }))}
+                                />
+                            </div>
+                            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                <label>Notes</label>
+                                <textarea
+                                    rows={2}
+                                    value={addSupplierForm.notes}
+                                    onChange={(e) => setAddSupplierForm((p) => ({ ...p, notes: e.target.value }))}
+                                />
                             </div>
                         </div>
                     </div>
