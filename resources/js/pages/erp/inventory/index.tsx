@@ -257,6 +257,72 @@ function buildSku(catCode: string, size: string, shape: string): string {
     return parts.join('-');
 }
 
+// ── Searchable supplier picker (used in Add/Edit Material & Packaging Wizard) ──
+
+function SupplierField({
+    value,
+    onChange,
+    vendors,
+    isOpen,
+    setOpen,
+    onAddNew,
+    error,
+}: {
+    value: string;
+    onChange: (v: string) => void;
+    vendors: Vendor[];
+    isOpen: boolean;
+    setOpen: (v: boolean) => void;
+    onAddNew: (name: string) => void;
+    error?: string;
+}) {
+    const q = value.trim().toLowerCase();
+    const matches = vendors.filter((v) => v.name.toLowerCase().includes(q));
+    return (
+        <div className="form-group" style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+            <label>Supplier</label>
+            <div style={{ display: 'flex', gap: 6 }}>
+                <input
+                    type="text"
+                    value={value}
+                    onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+                    onFocus={() => setOpen(true)}
+                    placeholder="Search supplier..."
+                    autoComplete="off"
+                    style={{ flex: 1 }}
+                />
+                <button
+                    type="button"
+                    title="Add new supplier"
+                    onClick={() => { onAddNew(value.trim()); setOpen(false); }}
+                    style={{ flexShrink: 0, width: 34, height: 34, border: '1px solid #d1d5db', borderRadius: 6, background: '#f0fdf4', color: '#059669', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}
+                >+</button>
+            </div>
+            {error && <div className="form-error">{error}</div>}
+            {isOpen && q.length > 0 && matches.length > 0 && (
+                <div style={{
+                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200,
+                    background: '#fff', border: '1px solid #d1d5db', borderRadius: 6,
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto',
+                }}>
+                    {matches.map((v) => (
+                        <div
+                            key={v.id}
+                            onMouseDown={(e) => { e.preventDefault(); onChange(v.name); setOpen(false); }}
+                            style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #f3f4f6' }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = '#eff6ff')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
+                        >
+                            <div style={{ fontWeight: 600, fontSize: 13 }}>{v.name}</div>
+                            {v.gst_no && <div style={{ fontSize: 11, color: '#6b7280' }}>GST: {v.gst_no}</div>}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function InventoryIndex({ materials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomOutputMap, fillingOutputMap, godowns, finishGoodGroups }: Props) {
@@ -446,15 +512,25 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const [addSupplierForm, setAddSupplierForm] = useState({ name: '', phone: '', gst_no: '', type: 'supplier' });
     const [addSupplierProcessing, setAddSupplierProcessing] = useState(false);
     const pendingSupplierName = useRef<string | null>(null);
+    const pendingSupplierTarget = useRef<'bill' | 'mat' | 'pack' | null>(null);
+    const [matSupplierOpen, setMatSupplierOpen] = useState(false);
+    const [packSupplierOpen, setPackSupplierOpen] = useState(false);
 
     // Auto-select newly created supplier once vendors list refreshes
     useEffect(() => {
         if (!pendingSupplierName.current) return;
         const match = vendors.find((v) => v.name === pendingSupplierName.current);
         if (match) {
-            setBillForm((p) => ({ ...p, party_id: String(match.id), vendor_name: match.name }));
-            setBillVendorSearch(match.name);
+            if (pendingSupplierTarget.current === 'mat') {
+                matForm.setData('supplier', match.name);
+            } else if (pendingSupplierTarget.current === 'pack') {
+                setPackForm((p) => ({ ...p, supplier: match.name }));
+            } else {
+                setBillForm((p) => ({ ...p, party_id: String(match.id), vendor_name: match.name }));
+                setBillVendorSearch(match.name);
+            }
             pendingSupplierName.current = null;
+            pendingSupplierTarget.current = null;
         }
     }, [vendors]);
 
@@ -797,9 +873,16 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             },
             onError: () => {
                 pendingSupplierName.current = null;
+                pendingSupplierTarget.current = null;
                 setAddSupplierProcessing(false);
             },
         });
+    };
+
+    const openAddSupplier = (target: 'bill' | 'mat' | 'pack', name: string) => {
+        pendingSupplierTarget.current = target;
+        setAddSupplierForm((p) => ({ ...p, name }));
+        setAddSupplierModal(true);
     };
 
     const submitBill = () => {
@@ -1909,7 +1992,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                         <button className="modal-close" onClick={() => setMatModal(false)}>×</button>
                     </div>
                     <form onSubmit={submitMat} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                        <div className="modal-body">
+                        <div className="modal-body" onClick={() => setMatSupplierOpen(false)}>
                             <div className="form-grid">
                                 <div className="form-group">
                                     <label>Name *</label>
@@ -2174,15 +2257,15 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                         <div className="form-error">Invalid dimensions</div>
                                     )}
                                 </div>
-                                <div className="form-group">
-                                    <label>Supplier</label>
-                                    <input
-                                        type="text"
-                                        value={matForm.data.supplier}
-                                        onChange={(e) => matForm.setData('supplier', e.target.value)}
-                                    />
-                                    {matForm.errors.supplier && <div className="form-error">{matForm.errors.supplier}</div>}
-                                </div>
+                                <SupplierField
+                                    value={matForm.data.supplier}
+                                    onChange={(v) => matForm.setData('supplier', v)}
+                                    vendors={vendors}
+                                    isOpen={matSupplierOpen}
+                                    setOpen={setMatSupplierOpen}
+                                    onAddNew={(name) => openAddSupplier('mat', name)}
+                                    error={matForm.errors.supplier}
+                                />
                                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                                     <label>Notes</label>
                                     <textarea
@@ -2360,8 +2443,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                         type="button"
                                         title="Add new supplier"
                                         onClick={() => {
-                                            setAddSupplierForm((p) => ({ ...p, name: billVendorSearch.trim() }));
-                                            setAddSupplierModal(true);
+                                            openAddSupplier('bill', billVendorSearch.trim());
                                             setBillVendorOpen(false);
                                         }}
                                         style={{ flexShrink: 0, width: 34, height: 34, border: '1px solid #d1d5db', borderRadius: 6, background: '#f0fdf4', color: '#059669', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}
@@ -2852,7 +2934,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                         <h3>📦 Packaging Wizard — Step {packStep} of 4</h3>
                         <button className="modal-close" onClick={() => setPackModal(false)}>×</button>
                     </div>
-                    <div className="modal-body">
+                    <div className="modal-body" onClick={() => setPackSupplierOpen(false)}>
                         {/* Step indicator */}
                         <div style={{ display: 'flex', gap: 0, marginBottom: 20, borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
                             {['Category', 'Size & Details', 'SKU Preview', 'Cost'].map((label, idx) => (
@@ -3025,14 +3107,14 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                         {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
                                     </select>
                                 </div>
-                                <div className="form-group">
-                                    <label>Supplier</label>
-                                    <input
-                                        type="text"
-                                        value={packForm.supplier}
-                                        onChange={(e) => setPackForm((p) => ({ ...p, supplier: e.target.value }))}
-                                    />
-                                </div>
+                                <SupplierField
+                                    value={packForm.supplier}
+                                    onChange={(v) => setPackForm((p) => ({ ...p, supplier: v }))}
+                                    vendors={vendors}
+                                    isOpen={packSupplierOpen}
+                                    setOpen={setPackSupplierOpen}
+                                    onAddNew={(name) => openAddSupplier('pack', name)}
+                                />
                             </div>
                         )}
 
