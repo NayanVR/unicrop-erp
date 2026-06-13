@@ -133,6 +133,8 @@ const TYPE_CONFIG = {
     other:  { label: 'OTHER',  color: '#6b7280', bg: '#f9fafb', border: '#9ca3af' },
 };
 
+const UNCATEGORIZED = 'Uncategorized';
+
 // Normalize unit strings to their canonical display form
 function normalizeUnitDisplay(unit: string): string {
     const u = unit.trim().toLowerCase();
@@ -180,7 +182,11 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
     const [runTarget, setRunTarget]   = useState<Bom | null>(null);
     const [runSummary, setRunSummary]     = useState<NormalizedRun | null>(null);
     const [highlightedId, setHighlightedId] = useState<number | null>(null);
-    const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+    const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+        const keys = new Set<string>();
+        for (const b of boms) keys.add((b.category ?? '').trim() || UNCATEGORIZED);
+        return keys;
+    });
 
     const toggleGroup = (key: string) => {
         setCollapsedGroups((prev) => {
@@ -471,8 +477,6 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
         const min   = Number(m.min_stock ?? 0);
         return stock <= min || stock <= 0;
     });
-
-    const UNCATEGORIZED = 'Uncategorized';
 
     // Distinct BOM groups (PGR, Pesticide, Fungicide, …) for the category picker
     const bomCategories = useMemo(() => {
