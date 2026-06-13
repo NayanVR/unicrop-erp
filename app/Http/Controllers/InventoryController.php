@@ -151,6 +151,7 @@ class InventoryController extends Controller
             'reorder_level' => 'nullable|numeric|min:0',
             'cost_per_unit' => 'nullable|numeric|min:0',
             'selling_rate'  => 'nullable|numeric|min:0',
+            'stock_qty'     => 'nullable|numeric|min:0',
             'dim_l'         => 'nullable|numeric|min:0',
             'dim_w'         => 'nullable|numeric|min:0',
             'dim_h'         => 'nullable|numeric|min:0',
