@@ -806,6 +806,39 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
         ]);
     };
 
+    // Add a "Bill Pending" reorder material straight into the bill as a line item,
+    // pre-filled from the material master (sku/hsn/category/rate/gst) and reorder qty.
+    const addPendingReorderRow = (r: Reorder) => {
+        const mat = materials.find((m) => m.id === r.raw_material_id);
+        const qty = Number(r.qty_ordered) || 0;
+        const rate = mat?.cost_per_unit ? Number(mat.cost_per_unit) : 0;
+        const gst = mat?.gst ? Number(mat.gst) : 18;
+        const base = qty * rate;
+        const amount = base > 0 ? (base + (base * gst) / 100).toFixed(2) : '';
+        setBillRows((prev) => {
+            // Avoid adding the same material twice
+            if (r.raw_material_id && prev.some((row) => row.raw_material_id === String(r.raw_material_id))) {
+                return prev;
+            }
+            return [
+                ...prev,
+                {
+                    raw_material_id: r.raw_material_id ? String(r.raw_material_id) : '',
+                    material_name: r.raw_material?.name ?? mat?.name ?? '',
+                    matSearch: r.raw_material?.name ?? mat?.name ?? '',
+                    sku: mat?.sku ?? '',
+                    category: mat?.category ?? '',
+                    hsn: mat?.hsn ?? '',
+                    qty: qty ? String(qty) : '',
+                    unit: r.unit || mat?.unit || 'pcs',
+                    rate: rate ? String(rate) : '',
+                    gst: String(gst),
+                    amount,
+                },
+            ];
+        });
+    };
+
     const selectBillRowMaterial = (i: number, mat: MatSearchResult) => {
         setBillRows((prev) => {
             const rows = [...prev];
@@ -856,6 +889,12 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const removeBillRow = (i: number) => {
         setBillRows((prev) => prev.filter((_, idx) => idx !== i));
     };
+
+    // Bill-pending reorders for the supplier currently selected in the bill modal
+    const selectedBillVendor = (billForm.vendor_name || billVendorSearch).trim().toLowerCase();
+    const matchingPendingReorders = selectedBillVendor
+        ? billPendingReorders.filter((r) => (r.supplier ?? '').trim().toLowerCase() === selectedBillVendor)
+        : [];
 
     const billSubtotal = billRows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
     const billFreight = Number(billForm.freight_charges) || 0;
@@ -2547,6 +2586,46 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                 {billFile && <div style={{ fontSize: 11, color: '#059669', marginTop: 4 }}>✓ {billFile.name}</div>}
                             </div>
                         </div>
+
+                        {/* Bill-pending materials for the selected supplier */}
+                        {matchingPendingReorders.length > 0 && (
+                            <div style={{ marginTop: 4, marginBottom: 12, padding: '10px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8 }} onClick={(e) => e.stopPropagation()}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                    <strong style={{ fontSize: 13, color: '#92400e' }}>🧾 Bill Pending for this supplier</strong>
+                                    <button
+                                        type="button"
+                                        className="btn sm"
+                                        onClick={() => matchingPendingReorders.forEach((r) => addPendingReorderRow(r))}
+                                    >+ Add all</button>
+                                </div>
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                    {matchingPendingReorders.map((r) => {
+                                        const already = r.raw_material_id && billRows.some((row) => row.raw_material_id === String(r.raw_material_id));
+                                        return (
+                                            <button
+                                                key={r.id}
+                                                type="button"
+                                                onClick={() => addPendingReorderRow(r)}
+                                                disabled={!!already}
+                                                style={{
+                                                    background: already ? '#f3f4f6' : '#fff',
+                                                    border: '1px solid #fcd34d',
+                                                    borderRadius: 8,
+                                                    padding: '6px 12px',
+                                                    fontSize: 12,
+                                                    cursor: already ? 'default' : 'pointer',
+                                                    color: already ? '#9ca3af' : '#92400e',
+                                                    fontWeight: 600,
+                                                }}
+                                            >
+                                                {already ? '✓ ' : '+ '}{r.raw_material?.name ?? '—'}
+                                                <span style={{ fontWeight: 400, color: already ? '#9ca3af' : '#6b7280' }}> · {fmt(r.qty_ordered)} {r.unit}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Line Items */}
                         <div style={{ marginTop: 8 }}>
