@@ -141,7 +141,11 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
     const [runTarget, setRunTarget] = useState<Recipe | null>(null);
     const [dupWarning, setDupWarning] = useState<{ exact: boolean; names: string[] } | null>(null);
     const [highlightedId, setHighlightedId] = useState<number | null>(null);
-    const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+    const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+        const keys = new Set<string>();
+        for (const r of recipes) keys.add(r.group_name || '');
+        return keys;
+    });
 
     const toggleGroup = (key: string) => {
         setCollapsedGroups((prev) => {
