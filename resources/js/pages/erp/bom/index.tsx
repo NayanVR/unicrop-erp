@@ -35,15 +35,11 @@ type Bom = {
     output_material?: { id: number; name: string; unit: string; stock_qty?: string | number | null; min_stock?: string | number | null; category?: string | null } | null;
     notes?: string | null;
     is_active: boolean;
-    product?: { id: number; name: string } | null;
     items: BomItem[];
 };
 
-type Product = { id: number; name: string };
-
 type Props = {
     boms: Bom[];
-    products: Product[];
     materials: RawMaterial[];
     categories: string[];
     productionRuns: ProductionRunRecord[];
@@ -51,7 +47,6 @@ type Props = {
 
 type BomFormData = {
     name: string;
-    product_id: string;
     packing_size: string;
     batch_size: string;
     batch_unit: string;
@@ -166,7 +161,7 @@ function fmtSmart(qty: number, unit: string): string {
     return `${s.qty.toLocaleString('en-IN', { maximumFractionDigits: 4 })} ${s.unit}`;
 }
 
-export default function BomIndex({ boms, products, materials, categories, productionRuns }: Props) {
+export default function BomIndex({ boms, materials, categories, productionRuns }: Props) {
     const { auth } = usePage<{ auth: Auth }>().props;
     const canSeeCost  = auth.user?.role === 'admin' || auth.user?.cost_access === true;
     const isAdmin     = auth.user?.role === 'admin';
@@ -212,7 +207,7 @@ export default function BomIndex({ boms, products, materials, categories, produc
     };
 
     const form = useForm<BomFormData>({
-        name: '', product_id: '', packing_size: '', batch_size: '1',
+        name: '', packing_size: '', batch_size: '1',
         batch_unit: 'kg', output_raw_material_id: '', output_category: '', notes: '', is_active: true, items: [],
     });
     const runForm = useForm<RunFormData>({ batch_number: '', batch_count: '1', notes: '' });
@@ -224,7 +219,6 @@ export default function BomIndex({ boms, products, materials, categories, produc
     const openEdit = (bom: Bom) => {
         form.setData({
             name: bom.name,
-            product_id: bom.product?.id ? String(bom.product.id) : '',
             packing_size: bom.packing_size ?? '',
             batch_size: String(bom.batch_size),
             batch_unit: bom.batch_unit,
@@ -461,7 +455,6 @@ export default function BomIndex({ boms, products, materials, categories, produc
         if (search.trim()) {
             const q = search.toLowerCase();
             return b.name.toLowerCase().includes(q)
-                || (b.product?.name ?? '').toLowerCase().includes(q)
                 || b.items.some((i) => (i.raw_material?.name ?? '').toLowerCase().includes(q));
         }
         return true;
@@ -588,8 +581,8 @@ export default function BomIndex({ boms, products, materials, categories, produc
                                         <span style={{ background: cfg.bg, color: cfg.color, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, letterSpacing: '.5px' }}>
                                             {type === 'liquid' ? '💧' : type === 'powder' ? '🌿' : '📦'} {cfg.label}
                                         </span>
-                                        {bom.product && (
-                                            <span style={{ fontSize: 12, color: 'var(--tx-sub)' }}>{bom.product.name}{bom.packing_size ? ` · ${bom.packing_size}` : ''}</span>
+                                        {bom.packing_size && (
+                                            <span style={{ fontSize: 12, color: 'var(--tx-sub)' }}>{bom.packing_size}</span>
                                         )}
                                         {!bom.is_active && (
                                             <span className="badge gray" style={{ fontSize: 11 }}>Inactive</span>

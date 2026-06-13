@@ -8,12 +8,10 @@ import {
 import { router, useForm, usePage } from '@inertiajs/react';
 import { Fragment, useMemo, useState } from 'react';
 
-type Product = { id: number; name: string };
 type Bom = { id: number; name: string; packing_size: string | null; batch_size: number; batch_unit: string };
 
 type FinishedGood = {
     id: number;
-    product_id: number | null;
     bom_id: number | null;
     created_by: number | null;
     name: string;
@@ -26,7 +24,6 @@ type FinishedGood = {
     cost_per_unit: string | number | null;
     total_cost: string | number | null;
     created_at: string;
-    product: Product | null;
     bom: Bom | null;
     creator: { id: number; name: string } | null;
 };
@@ -40,7 +37,6 @@ type Stats = {
 
 type PageProps = {
     goods: FinishedGood[];
-    products: Product[];
     boms: Bom[];
     stats: Stats;
     flash?: { success?: string; error?: string };
@@ -48,7 +44,6 @@ type PageProps = {
 };
 
 const defaultForm = {
-    product_id: '',
     bom_id: '',
     name: '',
     packing_size: '',
@@ -71,7 +66,7 @@ function packingToLiters(size: string | null | undefined): number {
 }
 
 export default function FinishedGoodsIndex() {
-    const { goods, products, boms, stats, flash, auth } = usePage<PageProps>().props;
+    const { goods, boms, stats, flash, auth } = usePage<PageProps>().props;
     const canSeeCost = auth.user?.role === 'admin' || auth.user?.cost_access === true;
     const colCount   = canSeeCost ? 8 : 7;
     const [showModal, setShowModal] = useState(false);
@@ -105,7 +100,6 @@ export default function FinishedGoodsIndex() {
     const openEdit = (g: FinishedGood) => {
         setEditing(g);
         setData({
-            product_id: g.product_id?.toString() ?? '',
             bom_id: g.bom_id?.toString() ?? '',
             name: g.name,
             packing_size: g.packing_size ?? '',
@@ -138,8 +132,7 @@ export default function FinishedGoodsIndex() {
             const q = search.toLowerCase();
             const hit = g.name.toLowerCase().includes(q)
                 || (g.batch_ref ?? '').toLowerCase().includes(q)
-                || (g.packing_size ?? '').toLowerCase().includes(q)
-                || (g.product?.name ?? '').toLowerCase().includes(q);
+                || (g.packing_size ?? '').toLowerCase().includes(q);
             if (!hit) return false;
         }
         return true;
@@ -152,7 +145,7 @@ export default function FinishedGoodsIndex() {
     const productGroups = useMemo<ProductGroup[]>(() => {
         const byProduct = new Map<string, FinishedGood[]>();
         for (const g of filtered) {
-            const key = g.product?.name ?? g.name;
+            const key = g.name;
             if (!byProduct.has(key)) byProduct.set(key, []);
             byProduct.get(key)!.push(g);
         }
@@ -351,13 +344,6 @@ export default function FinishedGoodsIndex() {
                                 </div>
                             </div>
                             <div className="form-row">
-                                <div className="form-group">
-                                    <label>Product</label>
-                                    <select value={data.product_id} onChange={(e) => setData('product_id', e.target.value)}>
-                                        <option value="">— Select product —</option>
-                                        {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                    </select>
-                                </div>
                                 <div className="form-group">
                                     <label>BOM</label>
                                     <select value={data.bom_id} onChange={(e) => setData('bom_id', e.target.value)}>

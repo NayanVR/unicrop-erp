@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Bom;
 use App\Models\FinishedGood;
-use App\Models\Product;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -14,11 +13,10 @@ class FinishedGoodsController extends Controller
 {
     public function index(): Response
     {
-        $goods = FinishedGood::with(['product:id,name', 'bom:id,name', 'creator:id,name'])
+        $goods = FinishedGood::with(['bom:id,name', 'creator:id,name'])
             ->latest()
             ->get();
 
-        $products = Product::where('is_active', true)->get(['id', 'name']);
         $boms = Bom::where('is_active', true)->get(['id', 'name', 'packing_size', 'batch_size', 'batch_unit']);
 
         $stats = [
@@ -29,13 +27,12 @@ class FinishedGoodsController extends Controller
             'manual_entries' => $goods->where('source', 'manual')->count(),
         ];
 
-        return Inertia::render('erp/finished-goods/index', compact('goods', 'products', 'boms', 'stats'));
+        return Inertia::render('erp/finished-goods/index', compact('goods', 'boms', 'stats'));
     }
 
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'product_id' => 'nullable|exists:products,id',
             'bom_id' => 'nullable|exists:boms,id',
             'name' => 'required|string|max:255',
             'packing_size' => 'nullable|string|max:100',
@@ -56,7 +53,6 @@ class FinishedGoodsController extends Controller
     public function update(Request $request, FinishedGood $finishedGood): RedirectResponse
     {
         $data = $request->validate([
-            'product_id' => 'nullable|exists:products,id',
             'bom_id' => 'nullable|exists:boms,id',
             'name' => 'required|string|max:255',
             'packing_size' => 'nullable|string|max:100',

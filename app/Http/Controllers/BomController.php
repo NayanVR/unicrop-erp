@@ -6,7 +6,6 @@ use App\Models\Bom;
 use App\Models\FinishedGood;
 use App\Models\InventoryCategory;
 use App\Models\InventoryTransaction;
-use App\Models\Product;
 use App\Models\ProductionRun;
 use App\Models\RawMaterial;
 use App\Services\LowStockAlertService;
@@ -21,11 +20,10 @@ class BomController extends Controller
     public function index(): Response
     {
         $boms = Bom::query()
-            ->with(['product:id,name', 'items.rawMaterial:id,name,unit,stock_qty,cost_per_unit', 'outputMaterial:id,name,unit,stock_qty,min_stock,category'])
+            ->with(['items.rawMaterial:id,name,unit,stock_qty,cost_per_unit', 'outputMaterial:id,name,unit,stock_qty,min_stock,category'])
             ->orderBy('name')
             ->get();
 
-        $products   = Product::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
         $materials  = RawMaterial::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'unit', 'stock_qty', 'cost_per_unit', 'category']);
         $categories = InventoryCategory::orderBy('name')->pluck('name');
 
@@ -38,7 +36,6 @@ class BomController extends Controller
         return Inertia::render('erp/bom/index', [
             'pageTitle'      => 'Bill of Materials',
             'boms'           => $boms,
-            'products'       => $products,
             'materials'      => $materials,
             'categories'     => $categories,
             'productionRuns' => $productionRuns,
@@ -49,7 +46,6 @@ class BomController extends Controller
     {
         $data = $request->validate([
             'name'                   => 'required|string|max:255',
-            'product_id'             => 'nullable|exists:products,id',
             'packing_size'           => 'nullable|string|max:50',
             'batch_size'             => 'required|numeric|min:0.001',
             'batch_unit'             => 'required|string|max:20',
@@ -65,7 +61,6 @@ class BomController extends Controller
         return DB::transaction(function () use ($data) {
             $bom = Bom::create([
                 'name'                   => $data['name'],
-                'product_id'             => $data['product_id'] ?? null,
                 'packing_size'           => $data['packing_size'] ?? null,
                 'batch_size'             => $data['batch_size'],
                 'batch_unit'             => $data['batch_unit'],
@@ -95,7 +90,6 @@ class BomController extends Controller
     {
         $data = $request->validate([
             'name'                   => 'required|string|max:255',
-            'product_id'             => 'nullable|exists:products,id',
             'packing_size'           => 'nullable|string|max:50',
             'batch_size'             => 'required|numeric|min:0.001',
             'batch_unit'             => 'required|string|max:20',
@@ -112,7 +106,6 @@ class BomController extends Controller
         return DB::transaction(function () use ($data, $bom) {
             $bom->update([
                 'name'                   => $data['name'],
-                'product_id'             => $data['product_id'] ?? null,
                 'packing_size'           => $data['packing_size'] ?? null,
                 'batch_size'             => $data['batch_size'],
                 'batch_unit'             => $data['batch_unit'],
@@ -244,7 +237,6 @@ class BomController extends Controller
             $yieldTotal = (float) $bom->batch_size * $batchCount;
 
             FinishedGood::create([
-                'product_id'   => $bom->product_id,
                 'bom_id'       => $bom->id,
                 'created_by'   => $request->user()?->id,
                 'name'         => $bom->name,

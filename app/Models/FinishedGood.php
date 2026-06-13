@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class FinishedGood extends Model
 {
     protected $fillable = [
-        'product_id',
         'bom_id',
         'created_by',
         'name',
@@ -28,11 +27,6 @@ class FinishedGood extends Model
             'cost_per_unit' => 'decimal:4',
             'total_cost'    => 'decimal:4',
         ];
-    }
-
-    public function product(): BelongsTo
-    {
-        return $this->belongsTo(Product::class);
     }
 
     public function bom(): BelongsTo
