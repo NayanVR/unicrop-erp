@@ -160,8 +160,39 @@ class InventoryController extends Controller
         ]);
 
         RawMaterial::create($data);
+        $this->ensureSupplierParty($data['supplier'] ?? null);
 
         return redirect()->back()->with('success', 'Material added.');
+    }
+
+    /**
+     * Make sure a supplier typed into any inventory form (material, packaging
+     * wizard, purchase bill) also exists as a Party in the Supplier/Vendor list,
+     * so suppliers stay in sync no matter where they were entered.
+     */
+    private function ensureSupplierParty(?string $name): void
+    {
+        $name = trim((string) $name);
+        if ($name === '') {
+            return;
+        }
+
+        $existing = Party::whereRaw('LOWER(name) = ?', [mb_strtolower($name)])->first();
+
+        if ($existing) {
+            // A customer that also supplies us becomes "both".
+            if ($existing->type === 'customer') {
+                $existing->update(['type' => 'both']);
+            }
+            return;
+        }
+
+        Party::create([
+            'name'      => $name,
+            'type'      => 'supplier',
+            'is_active' => true,
+            'created_by' => auth()->id(),
+        ]);
     }
 
     public function updateMaterial(Request $request, RawMaterial $material): RedirectResponse
@@ -188,6 +219,7 @@ class InventoryController extends Controller
         ]);
 
         $material->update($data);
+        $this->ensureSupplierParty($data['supplier'] ?? null);
 
         return redirect()->back()->with('success', 'Material updated.');
     }
@@ -320,6 +352,12 @@ class InventoryController extends Controller
         if ($request->hasFile('bill_file')) {
             $billFilePath = $request->file('bill_file')->store('inventory/bills', 'public');
             $billFileName = $request->file('bill_file')->getClientOriginalName();
+        }
+
+        // A manually-typed vendor (no party selected) should also land in the
+        // Supplier/Vendor list so it can be picked next time.
+        if (empty($data['party_id'])) {
+            $this->ensureSupplierParty($vendorName);
         }
 
         DB::transaction(function () use ($data, $billNumber, $billFilePath, $billFileName, $request, $vendorName) {
