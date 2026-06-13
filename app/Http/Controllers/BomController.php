@@ -46,6 +46,7 @@ class BomController extends Controller
     {
         $data = $request->validate([
             'name'                   => 'required|string|max:255',
+            'category'               => 'nullable|string|max:100',
             'packing_size'           => 'nullable|string|max:50',
             'batch_size'             => 'required|numeric|min:0.001',
             'batch_unit'             => 'required|string|max:20',
@@ -61,6 +62,7 @@ class BomController extends Controller
         return DB::transaction(function () use ($data) {
             $bom = Bom::create([
                 'name'                   => $data['name'],
+                'category'               => $data['category'] ?? null,
                 'packing_size'           => $data['packing_size'] ?? null,
                 'batch_size'             => $data['batch_size'],
                 'batch_unit'             => $data['batch_unit'],
@@ -90,6 +92,7 @@ class BomController extends Controller
     {
         $data = $request->validate([
             'name'                   => 'required|string|max:255',
+            'category'               => 'nullable|string|max:100',
             'packing_size'           => 'nullable|string|max:50',
             'batch_size'             => 'required|numeric|min:0.001',
             'batch_unit'             => 'required|string|max:20',
@@ -106,6 +109,7 @@ class BomController extends Controller
         return DB::transaction(function () use ($data, $bom) {
             $bom->update([
                 'name'                   => $data['name'],
+                'category'               => $data['category'] ?? null,
                 'packing_size'           => $data['packing_size'] ?? null,
                 'batch_size'             => $data['batch_size'],
                 'batch_unit'             => $data['batch_unit'],

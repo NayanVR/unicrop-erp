@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\RawMaterial;
 
-#[Fillable(['name', 'packing_size', 'batch_size', 'batch_unit', 'output_raw_material_id', 'notes', 'is_active'])]
+#[Fillable(['name', 'category', 'packing_size', 'batch_size', 'batch_unit', 'output_raw_material_id', 'notes', 'is_active'])]
 class Bom extends Model
 {
     /**

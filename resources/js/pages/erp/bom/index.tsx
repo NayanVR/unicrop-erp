@@ -6,7 +6,7 @@ import {
 } from '@/routes/bom';
 import type { Auth } from '@/types/auth';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type RawMaterial = {
     id: number;
@@ -28,6 +28,7 @@ type BomItem = {
 type Bom = {
     id: number;
     name: string;
+    category?: string | null;
     packing_size?: string | null;
     batch_size: string | number;
     batch_unit: string;
@@ -47,6 +48,7 @@ type Props = {
 
 type BomFormData = {
     name: string;
+    category: string;
     packing_size: string;
     batch_size: string;
     batch_unit: string;
@@ -170,6 +172,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
     const [pageView, setPageView]     = useState<'boms' | 'history'>('boms');
     const [search, setSearch]         = useState('');
     const [typeFilter, setTypeFilter] = useState<'all' | 'liquid' | 'powder' | 'other'>('all');
+    const [categoryFilter, setCategoryFilter] = useState<string>('all');
     const [histSearch, setHistSearch] = useState('');
     const [editModal, setEditModal]   = useState(false);
     const [runModal, setRunModal]     = useState(false);
@@ -207,7 +210,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
     };
 
     const form = useForm<BomFormData>({
-        name: '', packing_size: '', batch_size: '1',
+        name: '', category: '', packing_size: '', batch_size: '1',
         batch_unit: 'kg', output_raw_material_id: '', output_category: '', notes: '', is_active: true, items: [],
     });
     const runForm = useForm<RunFormData>({ batch_number: '', batch_count: '1', notes: '' });
@@ -219,6 +222,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
     const openEdit = (bom: Bom) => {
         form.setData({
             name: bom.name,
+            category: bom.category ?? '',
             packing_size: bom.packing_size ?? '',
             batch_size: String(bom.batch_size),
             batch_unit: bom.batch_unit,
@@ -450,15 +454,46 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
         return stock <= min || stock <= 0;
     });
 
+    const UNCATEGORIZED = 'Uncategorized';
+
+    // Distinct BOM groups (PGR, Pesticide, Fungicide, …) for the category picker
+    const bomCategories = useMemo(() => {
+        const set = new Set<string>();
+        for (const b of boms) {
+            const c = (b.category ?? '').trim();
+            if (c) set.add(c);
+        }
+        return [...set].sort((a, b) => a.localeCompare(b));
+    }, [boms]);
+
     const filtered = boms.filter((b) => {
         if (typeFilter !== 'all' && bomType(b.batch_unit) !== typeFilter) return false;
+        if (categoryFilter !== 'all' && ((b.category ?? '').trim() || UNCATEGORIZED) !== categoryFilter) return false;
         if (search.trim()) {
             const q = search.toLowerCase();
             return b.name.toLowerCase().includes(q)
+                || (b.category ?? '').toLowerCase().includes(q)
                 || b.items.some((i) => (i.raw_material?.name ?? '').toLowerCase().includes(q));
         }
         return true;
     });
+
+    // Group filtered BOMs by category, named groups first (alphabetical), Uncategorized last
+    const groupedBoms = useMemo(() => {
+        const groups = new Map<string, Bom[]>();
+        for (const b of filtered) {
+            const key = (b.category ?? '').trim() || UNCATEGORIZED;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key)!.push(b);
+        }
+        return [...groups.entries()].sort((a, b) => {
+            if (a[0] === UNCATEGORIZED) return 1;
+            if (b[0] === UNCATEGORIZED) return -1;
+            return a[0].localeCompare(b[0]);
+        });
+    }, [filtered]);
+
+    const showGroupHeaders = groupedBoms.length > 1 || (groupedBoms.length === 1 && groupedBoms[0][0] !== UNCATEGORIZED);
 
     return (
         <>
@@ -536,6 +571,27 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                             </button>
                         ))}
                     </div>
+                    {bomCategories.length > 0 && (
+                        <div className="filter-bar" style={{ margin: 0 }}>
+                            <button
+                                className={`pill${categoryFilter === 'all' ? ' active' : ''}`}
+                                onClick={() => setCategoryFilter('all')}
+                                style={{ fontWeight: categoryFilter === 'all' ? 600 : 400 }}
+                            >
+                                🏷️ All Groups
+                            </button>
+                            {bomCategories.map((c) => (
+                                <button
+                                    key={c}
+                                    className={`pill${categoryFilter === c ? ' active' : ''}`}
+                                    onClick={() => setCategoryFilter(c)}
+                                    style={{ fontWeight: categoryFilter === c ? 600 : 400 }}
+                                >
+                                    {c}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* Cards grid */}
@@ -545,8 +601,20 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                         <p>{boms.length === 0 ? 'No BOMs yet. Create one to define a product formulation.' : 'No BOMs match the current filter.'}</p>
                     </div>
                 ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16 }}>
-                        {filtered.map((bom) => {
+                    groupedBoms.map(([cat, list]) => (
+                    <div key={cat} style={{ marginBottom: 24 }}>
+                        {showGroupHeaders && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 12px', paddingBottom: 6, borderBottom: '2px solid var(--border)' }}>
+                                <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--tx-body)' }}>
+                                    {cat === UNCATEGORIZED ? '📦 Uncategorized' : `🏷️ ${cat}`}
+                                </span>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--tx-muted)', background: 'var(--bg-paper)', border: '1px solid var(--border)', borderRadius: 20, padding: '1px 9px' }}>
+                                    {list.length}
+                                </span>
+                            </div>
+                        )}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16 }}>
+                        {list.map((bom) => {
                             const type        = bomType(bom.batch_unit);
                             const cfg         = TYPE_CONFIG[type];
                             const runnable    = canRun(bom);
@@ -581,6 +649,11 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                         <span style={{ background: cfg.bg, color: cfg.color, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, letterSpacing: '.5px' }}>
                                             {type === 'liquid' ? '💧' : type === 'powder' ? '🌿' : '📦'} {cfg.label}
                                         </span>
+                                        {bom.category && (
+                                            <span style={{ background: '#ede9fe', color: '#6d28d9', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
+                                                🏷️ {bom.category}
+                                            </span>
+                                        )}
                                         {bom.packing_size && (
                                             <span style={{ fontSize: 12, color: 'var(--tx-sub)' }}>{bom.packing_size}</span>
                                         )}
@@ -668,7 +741,9 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                 </div>
                             );
                         })}
+                        </div>
                     </div>
+                    ))
                 )}
             </>}
 
@@ -767,6 +842,25 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                 <label>BOM Name *</label>
                                 <input type="text" value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} placeholder="e.g. Imidacloprid 17.8% SL - 1L" />
                                 {form.errors.name && <div className="form-error">{form.errors.name}</div>}
+                            </div>
+                            <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                                <label>
+                                    🏷️ Group / Category
+                                    <span style={{ fontWeight: 400, color: 'var(--tx-muted)', marginLeft: 6, fontSize: 11 }}>
+                                        (e.g. PGR, Pesticide, Fungicide)
+                                    </span>
+                                </label>
+                                <input
+                                    type="text"
+                                    list="bom-category-list"
+                                    value={form.data.category}
+                                    onChange={(e) => form.setData('category', e.target.value)}
+                                    placeholder="Type or pick a group…"
+                                />
+                                <datalist id="bom-category-list">
+                                    {bomCategories.map((c) => <option key={c} value={c} />)}
+                                </datalist>
+                                {form.errors.category && <div className="form-error">{form.errors.category}</div>}
                             </div>
                             <div className="form-group">
                                 <label>Batch Size *</label>
