@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
 use App\Models\PackingSize;
-use App\Models\Product;
 use App\Models\Transport;
 use App\Services\LowStockAlertService;
 use Illuminate\Http\JsonResponse;
@@ -33,7 +32,6 @@ class SettingsController extends Controller
 
         return Inertia::render('erp/settings/index', [
             'pageTitle'     => 'Settings',
-            'products'      => Product::query()->orderBy('name')->get(),
             'transports'    => Transport::query()->orderBy('type')->orderBy('name')->get(),
             'alertSettings' => $alertSettings,
             'packingSizes'  => PackingSize::query()->orderBy('name')->get(),
@@ -104,44 +102,6 @@ class SettingsController extends Controller
         $result  = $service->sendTest("🧪 Test alert from UniCrop ERP — your low stock alerts are working!");
 
         return response()->json($result);
-    }
-
-    public function storeProduct(Request $request): RedirectResponse
-    {
-        $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'hsn_code' => 'nullable|string|max:20',
-            'gst_percent' => 'required|numeric|min:0|max:100',
-            'category' => 'nullable|string|max:100',
-            'description' => 'nullable|string|max:500',
-        ]);
-
-        Product::create($data);
-
-        return redirect()->back()->with('success', 'Product added.');
-    }
-
-    public function updateProduct(Request $request, Product $product): RedirectResponse
-    {
-        $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'hsn_code' => 'nullable|string|max:20',
-            'gst_percent' => 'required|numeric|min:0|max:100',
-            'category' => 'nullable|string|max:100',
-            'description' => 'nullable|string|max:500',
-            'is_active' => 'boolean',
-        ]);
-
-        $product->update($data);
-
-        return redirect()->back()->with('success', 'Product updated.');
-    }
-
-    public function destroyProduct(Product $product): RedirectResponse
-    {
-        $product->delete();
-
-        return redirect()->back()->with('success', 'Product deleted.');
     }
 
     public function storeTransport(Request $request): RedirectResponse

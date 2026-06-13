@@ -133,9 +133,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('reports/profit-loss', [\App\Http\Controllers\ReportController::class, 'profitLoss'])->name('reports.profit-loss');
 
         Route::get('erp/settings', [SettingsController::class, 'index'])->name('settings.index');
-        Route::post('erp/settings/products', [SettingsController::class, 'storeProduct'])->name('settings.products.store');
-        Route::patch('erp/settings/products/{product}', [SettingsController::class, 'updateProduct'])->name('settings.products.update');
-        Route::delete('erp/settings/products/{product}', [SettingsController::class, 'destroyProduct'])->name('settings.products.destroy');
 
         Route::patch('erp/settings/transports/{transport}', [SettingsController::class, 'updateTransport'])->name('settings.transports.update');
         Route::post('erp/settings/alert', [SettingsController::class, 'updateAlertSettings'])->name('settings.alert.update');
