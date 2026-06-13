@@ -183,16 +183,31 @@ const ROUTES = {
 const UNITS = ['kg', 'g', 'L', 'ml', 'pcs', 'bags', 'drums', 'bottles'];
 const GST_OPTIONS = ['0', '5', '12', '18', '28'];
 
-const PACKAGING_CATEGORIES = [
-    { label: 'Bottle', icon: '🫙', code: 'BOT', unit: 'pcs' },
-    { label: 'Box/Carton', icon: '📦', code: 'BOX', unit: 'pcs' },
-    { label: 'Printed Box', icon: '🖨️', code: 'PBOX', unit: 'pcs' },
-    { label: 'Label', icon: '🏷️', code: 'LBL', unit: 'pcs' },
-    { label: 'Drum', icon: '🥁', code: 'DRM', unit: 'pcs' },
-    { label: 'Pouch', icon: '👝', code: 'PCH', unit: 'pcs' },
-    { label: 'Jar', icon: '🫙', code: 'JAR', unit: 'pcs' },
-    { label: 'Cap/Closure', icon: '🔩', code: 'CAP', unit: 'pcs' },
-];
+// Known icons/SKU codes for common packaging category names. These are only
+// used as defaults when an Inventory Category matches one of these names —
+// the actual list of options always comes live from Inventory Categories, so
+// renaming/adding/removing a category there is reflected in the wizard.
+const PACKAGING_ICON_MAP: Record<string, string> = {
+    'bottle': '🫙',
+    'box/carton': '📦',
+    'printed box': '🖨️',
+    'label': '🏷️',
+    'drum': '🥁',
+    'pouch': '👝',
+    'jar': '🫙',
+    'cap/closure': '🔩',
+};
+
+const PACKAGING_CODE_MAP: Record<string, string> = {
+    'bottle': 'BOT',
+    'box/carton': 'BOX',
+    'printed box': 'PBOX',
+    'label': 'LBL',
+    'drum': 'DRM',
+    'pouch': 'PCH',
+    'jar': 'JAR',
+    'cap/closure': 'CAP',
+};
 
 type WizardCategory = { label: string; icon: string; code: string; unit: string; color?: string };
 
@@ -512,19 +527,16 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
 
     const categories = inventoryCategories.map((c) => c.name);
 
-    const packingHardcodedLabels = new Set(PACKAGING_CATEGORIES.map((c) => c.label.toLowerCase()));
-    const wizardCategories: WizardCategory[] = [
-        ...PACKAGING_CATEGORIES,
-        ...inventoryCategories
-            .filter((c) => !packingHardcodedLabels.has(c.name.toLowerCase()))
-            .map((c) => ({
-                label: c.name,
-                icon: '📁',
-                code: c.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase(),
-                unit: 'pcs',
-                color: c.color ?? undefined,
-            })),
-    ];
+    const wizardCategories: WizardCategory[] = inventoryCategories.map((c) => {
+        const key = c.name.toLowerCase();
+        return {
+            label: c.name,
+            icon: PACKAGING_ICON_MAP[key] ?? '📁',
+            code: PACKAGING_CODE_MAP[key] ?? c.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase(),
+            unit: 'pcs',
+            color: c.color ?? undefined,
+        };
+    });
 
     const isFinishGoodCat = catFilter !== 'all' &&
         catFilter.toLowerCase().includes('finish') &&
