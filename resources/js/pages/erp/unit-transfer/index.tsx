@@ -27,12 +27,24 @@ type Transfer = {
     receiver: { id: number; name: string } | null;
 };
 
+type Godown = { id: number; name: string; is_default: boolean };
+type InventoryItem = { id: number; name: string; unit: string; category: string };
+
 type Stats = { total: number; in_transit: number; received: number; cancelled: number };
 
 type PageProps = {
     transfers: Transfer[];
     stats: Stats;
+    godowns: Godown[];
+    inventoryItems: InventoryItem[];
     flash?: { success?: string; error?: string };
+};
+
+const guessItemType = (category: string): 'raw_material' | 'finished_good' | 'other' => {
+    const c = category.toLowerCase();
+    if (/finish|product|fg|goods/i.test(c)) return 'finished_good';
+    if (/raw|material|ingredient|feed/i.test(c)) return 'raw_material';
+    return 'other';
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -51,27 +63,52 @@ const fmtTime = (s: string) =>
     new Date(s).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 const defaultForm = {
-    from_unit:  '',
-    to_unit:    '',
-    item_type:  'raw_material' as 'raw_material' | 'finished_good' | 'other',
-    item_name:  '',
-    quantity:   '',
-    unit:       'kg',
-    notes:      '',
+    from_unit:    '',
+    to_unit:      '',
+    item_type:    'raw_material' as 'raw_material' | 'finished_good' | 'other',
+    item_name:    '',
+    quantity:     '',
+    unit:         'kg',
+    notes:        '',
     order_number: '',
 };
 
 export default function UnitTransferIndex() {
-    const { transfers, stats, flash } = usePage<PageProps>().props;
+    const { transfers, stats, flash, godowns, inventoryItems } = usePage<PageProps>().props;
+    const defaultGodown = godowns.find((g) => g.is_default)?.name ?? '';
     const [showModal, setShowModal] = useState(false);
     const [search, setSearch]       = useState('');
     const [filter, setFilter]       = useState<'all' | 'in-transit' | 'unloaded' | 'cancelled'>('all');
+    const [selectedItemId, setSelectedItemId] = useState<number | ''>('');
 
-    const { data, setData, post, processing, reset, errors } = useForm(defaultForm);
+    const { data, setData, post, processing, reset, errors } = useForm({
+        ...defaultForm,
+        from_unit: defaultGodown,
+    });
+
+    const openModal = () => {
+        reset();
+        setData('from_unit', defaultGodown);
+        setSelectedItemId('');
+        setShowModal(true);
+    };
+
+    const selectInventoryItem = (id: number | '') => {
+        setSelectedItemId(id);
+        if (id === '') return;
+        const item = inventoryItems.find((i) => i.id === id);
+        if (!item) return;
+        setData((prev) => ({
+            ...prev,
+            item_name: item.name,
+            unit:      item.unit ?? prev.unit,
+            item_type: guessItemType(item.category ?? ''),
+        }));
+    };
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        post(transferStore().url, { onSuccess: () => { setShowModal(false); reset(); } });
+        post(transferStore().url, { onSuccess: () => { setShowModal(false); reset(); setSelectedItemId(''); } });
     };
 
     const receive = (t: Transfer) => {
@@ -105,7 +142,7 @@ export default function UnitTransferIndex() {
         <>
             <div className="page-header">
                 <h1 className="page-title">Unit Transfers</h1>
-                <button className="btn-primary" onClick={() => { reset(); setShowModal(true); }}>+ New Transfer</button>
+                <button className="btn-primary" onClick={openModal}>+ New Transfer</button>
             </div>
 
             {flash?.success && <div className="alert-success">{flash.success}</div>}
@@ -221,18 +258,53 @@ export default function UnitTransferIndex() {
                             <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
                         </div>
                         <form onSubmit={submit} className="modal-form">
+                            {/* From / To godown dropdowns */}
                             <div className="form-row">
                                 <div className="form-group">
                                     <label>From Unit *</label>
-                                    <input value={data.from_unit} onChange={(e) => setData('from_unit', e.target.value)} placeholder="e.g. Main Factory" required />
+                                    {godowns.length > 0 ? (
+                                        <select value={data.from_unit} onChange={(e) => setData('from_unit', e.target.value)} required>
+                                            <option value="">— Select Godown —</option>
+                                            {godowns.map((g) => (
+                                                <option key={g.id} value={g.name}>{g.name}{g.is_default ? ' (Default)' : ''}</option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <input value={data.from_unit} onChange={(e) => setData('from_unit', e.target.value)} placeholder="e.g. Main Factory" required />
+                                    )}
                                     {errors.from_unit && <span className="field-error">{errors.from_unit}</span>}
                                 </div>
                                 <div className="form-group">
                                     <label>To Unit *</label>
-                                    <input value={data.to_unit} onChange={(e) => setData('to_unit', e.target.value)} placeholder="e.g. Warehouse B" required />
+                                    {godowns.length > 0 ? (
+                                        <select value={data.to_unit} onChange={(e) => setData('to_unit', e.target.value)} required>
+                                            <option value="">— Select Godown —</option>
+                                            {godowns.map((g) => (
+                                                <option key={g.id} value={g.name}>{g.name}{g.is_default ? ' (Default)' : ''}</option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <input value={data.to_unit} onChange={(e) => setData('to_unit', e.target.value)} placeholder="e.g. Warehouse B" required />
+                                    )}
                                     {errors.to_unit && <span className="field-error">{errors.to_unit}</span>}
                                 </div>
                             </div>
+
+                            {/* Item Select from inventory */}
+                            <div className="form-group">
+                                <label>Select Item (Inventory)</label>
+                                <select
+                                    value={selectedItemId}
+                                    onChange={(e) => selectInventoryItem(e.target.value === '' ? '' : Number(e.target.value))}
+                                >
+                                    <option value="">— Select from Inventory —</option>
+                                    {inventoryItems.map((item) => (
+                                        <option key={item.id} value={item.id}>{item.name} ({item.category})</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Item Type (auto-filled, editable) */}
                             <div className="form-row">
                                 <div className="form-group">
                                     <label>Item Type *</label>
@@ -244,10 +316,11 @@ export default function UnitTransferIndex() {
                                 </div>
                                 <div className="form-group">
                                     <label>Item Name *</label>
-                                    <input value={data.item_name} onChange={(e) => setData('item_name', e.target.value)} required />
+                                    <input value={data.item_name} onChange={(e) => setData('item_name', e.target.value)} placeholder="Item name" required />
                                     {errors.item_name && <span className="field-error">{errors.item_name}</span>}
                                 </div>
                             </div>
+
                             <div className="form-row">
                                 <div className="form-group">
                                     <label>Quantity *</label>

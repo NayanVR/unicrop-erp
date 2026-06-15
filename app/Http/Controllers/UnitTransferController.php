@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Godown;
+use App\Models\RawMaterial;
 use App\Models\UnitTransfer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,7 +25,10 @@ class UnitTransferController extends Controller
             'cancelled'   => $transfers->where('status', 'cancelled')->count(),
         ];
 
-        return Inertia::render('erp/unit-transfer/index', compact('transfers', 'stats'));
+        $godowns       = Godown::where('is_active', true)->orderBy('name')->get(['id', 'name', 'is_default']);
+        $inventoryItems = RawMaterial::where('is_active', true)->orderBy('name')->get(['id', 'name', 'unit', 'category']);
+
+        return Inertia::render('erp/unit-transfer/index', compact('transfers', 'stats', 'godowns', 'inventoryItems'));
     }
 
     public function store(Request $request): RedirectResponse
