@@ -96,14 +96,11 @@ export default function UnitTransferIndex() {
     const handleItemSearch = (val: string) => {
         setItemSearch(val);
         const found = inventoryItems.find((i) => i.name === val);
-        if (found) {
-            setData((prev) => ({
-                ...prev,
-                item_name: found.name,
-                unit:      found.unit ?? prev.unit,
-                item_type: guessItemType(found.category ?? ''),
-            }));
-        }
+        setData((prev) => ({
+            ...prev,
+            item_name: val,
+            ...(found ? { unit: found.unit ?? prev.unit, item_type: guessItemType(found.category ?? '') } : {}),
+        }));
     };
 
     const submit = (e: React.FormEvent) => {
@@ -311,20 +308,13 @@ export default function UnitTransferIndex() {
                             </div>
 
                             {/* Item Type (auto-filled, editable) */}
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Item Type *</label>
-                                    <select value={data.item_type} onChange={(e) => setData('item_type', e.target.value as typeof data.item_type)}>
-                                        <option value="raw_material">Raw Material</option>
-                                        <option value="finished_good">Finished Good</option>
-                                        <option value="other">Other</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label>Item Name *</label>
-                                    <input value={data.item_name} onChange={(e) => setData('item_name', e.target.value)} placeholder="Item name" required />
-                                    {errors.item_name && <span className="field-error">{errors.item_name}</span>}
-                                </div>
+                            <div className="form-group">
+                                <label>Item Type *</label>
+                                <select value={data.item_type} onChange={(e) => setData('item_type', e.target.value as typeof data.item_type)}>
+                                    <option value="raw_material">Raw Material</option>
+                                    <option value="finished_good">Finished Good</option>
+                                    <option value="other">Other</option>
+                                </select>
                             </div>
 
                             <div className="form-row">
