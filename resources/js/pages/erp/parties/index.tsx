@@ -11,6 +11,7 @@ import {
     store as rateStore,
     update as rateUpdate,
 } from '@/routes/parties/product-rates';
+import type { Auth } from '@/types/auth';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useRef, useState } from 'react';
 
@@ -115,6 +116,9 @@ const defaultPartyForm = {
 
 export default function PartiesIndex() {
     const { parties, partyPhotos, stats, transports, couriers, defaultFilter, pageTitle, flash } = usePage<PageProps>().props;
+    const { auth } = usePage<{ auth: Auth }>().props;
+    const role = auth.user?.role ?? auth.user?.roles?.[0]?.slug ?? '';
+    const isSales = role === 'sales';
 
     // pageTitle is only set on the Supplier / Vendor page; the plain Parties page has none
     const isSupplierPage = !!pageTitle;
@@ -212,6 +216,7 @@ export default function PartiesIndex() {
     const openAdd = () => {
         reset();
         if (isSupplierPage) setData('type', 'supplier');
+        else if (isSales) setData('type', 'customer');
         setEditing(null);
         setShowModal(true);
         if (panFileRef.current) panFileRef.current.value = '';
@@ -464,11 +469,18 @@ export default function PartiesIndex() {
                                 </div>
                                 <div className="form-group">
                                     <label>Type *</label>
-                                    <select value={data.type} onChange={(e) => setData('type', e.target.value as typeof data.type)}>
+                                    <select value={data.type} onChange={(e) => setData('type', e.target.value as typeof data.type)} disabled={isSales && !isSupplierPage}>
                                         {isSupplierPage ? (
                                             <>
                                                 <option value="supplier">Supplier</option>
                                                 {editing && data.type !== 'supplier' && (
+                                                    <option value={data.type}>{data.type.charAt(0).toUpperCase() + data.type.slice(1)}</option>
+                                                )}
+                                            </>
+                                        ) : isSales ? (
+                                            <>
+                                                <option value="customer">Customer</option>
+                                                {editing && data.type !== 'customer' && (
                                                     <option value={data.type}>{data.type.charAt(0).toUpperCase() + data.type.slice(1)}</option>
                                                 )}
                                             </>
