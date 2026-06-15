@@ -5,7 +5,7 @@ import {
     store as transferStore,
 } from '@/routes/unit-transfer';
 import { router, useForm, usePage } from '@inertiajs/react';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
 type Transfer = {
     id: number;
@@ -79,19 +79,7 @@ export default function UnitTransferIndex() {
     const [showModal, setShowModal] = useState(false);
     const [search, setSearch]       = useState('');
     const [filter, setFilter]       = useState<'all' | 'in-transit' | 'unloaded' | 'cancelled'>('all');
-    const [selectedItemId, setSelectedItemId] = useState<number | ''>('');
     const [itemSearch, setItemSearch] = useState('');
-    const [itemDropOpen, setItemDropOpen] = useState(false);
-    const itemDropRef = useRef<HTMLDivElement>(null);
-    useEffect(() => {
-        const handler = (e: MouseEvent) => {
-            if (itemDropRef.current && !itemDropRef.current.contains(e.target as Node)) {
-                setItemDropOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, []);
 
     const { data, setData, post, processing, reset, errors } = useForm({
         ...defaultForm,
@@ -101,26 +89,26 @@ export default function UnitTransferIndex() {
     const openModal = () => {
         reset();
         setData('from_unit', defaultGodown);
-        setSelectedItemId('');
         setItemSearch('');
         setShowModal(true);
     };
 
-    const selectInventoryItem = (item: InventoryItem) => {
-        setSelectedItemId(item.id);
-        setItemSearch(item.name);
-        setItemDropOpen(false);
-        setData((prev) => ({
-            ...prev,
-            item_name: item.name,
-            unit:      item.unit ?? prev.unit,
-            item_type: guessItemType(item.category ?? ''),
-        }));
+    const handleItemSearch = (val: string) => {
+        setItemSearch(val);
+        const found = inventoryItems.find((i) => i.name === val);
+        if (found) {
+            setData((prev) => ({
+                ...prev,
+                item_name: found.name,
+                unit:      found.unit ?? prev.unit,
+                item_type: guessItemType(found.category ?? ''),
+            }));
+        }
     };
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        post(transferStore().url, { onSuccess: () => { setShowModal(false); reset(); setSelectedItemId(''); setItemSearch(''); } });
+        post(transferStore().url, { onSuccess: () => { setShowModal(false); reset(); setItemSearch(''); } });
     };
 
     const receive = (t: Transfer) => {
@@ -302,43 +290,24 @@ export default function UnitTransferIndex() {
                                 </div>
                             </div>
 
-                            {/* Item Select from inventory — searchable */}
-                            <div className="form-group" style={{ position: 'relative' }} ref={itemDropRef}>
+                            {/* Item Select from inventory — native datalist (escapes modal overflow) */}
+                            <div className="form-group">
                                 <label>Select Item (Inventory)</label>
                                 <input
                                     type="text"
+                                    list="unit-transfer-items"
                                     value={itemSearch}
-                                    onChange={(e) => { setItemSearch(e.target.value); setItemDropOpen(true); if (!e.target.value) { setSelectedItemId(''); } }}
-                                    onFocus={() => setItemDropOpen(true)}
-                                    placeholder="Search inventory item..."
+                                    onChange={(e) => handleItemSearch(e.target.value)}
+                                    placeholder="Type to search inventory..."
                                     autoComplete="off"
                                 />
-                                {itemDropOpen && (() => {
-                                    const q = itemSearch.trim().toLowerCase();
-                                    const matches = inventoryItems.filter((i) =>
-                                        i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q)
-                                    );
-                                    return matches.length > 0 ? (
-                                        <div style={{
-                                            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300,
-                                            background: '#fff', border: '1px solid #d1d5db', borderRadius: 6,
-                                            boxShadow: '0 4px 16px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto',
-                                        }}>
-                                            {matches.map((item) => (
-                                                <div
-                                                    key={item.id}
-                                                    onMouseDown={(e) => { e.preventDefault(); selectInventoryItem(item); }}
-                                                    style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #f3f4f6', background: selectedItemId === item.id ? '#eff6ff' : '#fff' }}
-                                                    onMouseEnter={(e) => (e.currentTarget.style.background = '#eff6ff')}
-                                                    onMouseLeave={(e) => (e.currentTarget.style.background = selectedItemId === item.id ? '#eff6ff' : '#fff')}
-                                                >
-                                                    <div style={{ fontWeight: 600, fontSize: 13 }}>{item.name}</div>
-                                                    <div style={{ fontSize: 11, color: '#6b7280' }}>{item.category} · {item.unit}</div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : null;
-                                })()}
+                                <datalist id="unit-transfer-items">
+                                    {inventoryItems.map((item) => (
+                                        <option key={item.id} value={item.name}>
+                                            {item.category} · {item.unit}
+                                        </option>
+                                    ))}
+                                </datalist>
                             </div>
 
                             {/* Item Type (auto-filled, editable) */}
