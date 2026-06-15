@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateUserRequest;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -43,19 +44,40 @@ class UserController extends Controller
 
     public function index(): Response
     {
-        $manageableRoleSlug = $this->canManageUsers() ? $this->manageableRoleSlug() : null;
+        $canManage = $this->canManageUsers();
+        $manageableRoleSlug = $canManage ? $this->manageableRoleSlug() : null;
 
         $usersQuery = User::query()->with('roles')->orderBy('name');
         if ($manageableRoleSlug !== null) {
             $usersQuery->whereHas('roles', fn ($q) => $q->where('slug', $manageableRoleSlug));
         }
 
+        $users = $usersQuery->get(['id', 'name', 'email', 'phone', 'notes', 'is_active', 'cost_access', 'modules', 'hidden_nav_items', 'permissions', 'company_access', 'password_plain', 'created_at', 'updated_at']);
+
+        if ($canManage) {
+            $sessions = DB::table('sessions')
+                ->whereIn('user_id', $users->pluck('id'))
+                ->orderByDesc('last_activity')
+                ->get(['user_id', 'ip_address', 'user_agent', 'last_activity'])
+                ->groupBy('user_id');
+
+            $users->each(function (User $user) use ($sessions) {
+                $user->sessions = ($sessions->get($user->id) ?? collect())
+                    ->map(fn ($s) => [
+                        'ip_address'    => $s->ip_address,
+                        'user_agent'    => $s->user_agent,
+                        'last_activity' => $s->last_activity,
+                    ])
+                    ->values();
+            });
+        }
+
         return Inertia::render('erp/users/index', [
             'pageTitle' => 'User Management',
-            'users' => $usersQuery->get(['id', 'name', 'email', 'phone', 'notes', 'is_active', 'cost_access', 'modules', 'hidden_nav_items', 'permissions', 'company_access', 'password_plain', 'created_at', 'updated_at']),
+            'users' => $users,
             'roles' => Role::query()->orderBy('name')->get(['id', 'name', 'slug']),
             'companies' => [],
-            'canManageUsers' => $this->canManageUsers(),
+            'canManageUsers' => $canManage,
             'manageableRoleSlug' => $manageableRoleSlug,
         ]);
     }

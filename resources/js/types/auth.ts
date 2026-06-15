@@ -23,6 +23,7 @@ export type User = {
     roles?: Role[];
     role?: string | null;
     password_plain?: string | null;
+    sessions?: { ip_address: string | null; user_agent: string | null; last_activity: number }[];
     [key: string]: unknown;
 };
 

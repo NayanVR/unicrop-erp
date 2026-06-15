@@ -45,6 +45,34 @@ const bomPermissions = [
 const userStatusLabel = (isActive?: boolean) =>
     isActive ? 'Active' : 'Inactive';
 
+const parseDevice = (ua: string | null): string => {
+    if (!ua) return 'Unknown device';
+
+    let os = 'Unknown OS';
+    if (/windows/i.test(ua)) os = 'Windows';
+    else if (/iphone|ipad|ipod/i.test(ua)) os = 'iOS';
+    else if (/android/i.test(ua)) os = 'Android';
+    else if (/macintosh|mac os x/i.test(ua)) os = 'macOS';
+    else if (/linux/i.test(ua)) os = 'Linux';
+
+    let browser = 'Unknown browser';
+    if (/edg\//i.test(ua)) browser = 'Edge';
+    else if (/chrome\//i.test(ua)) browser = 'Chrome';
+    else if (/firefox\//i.test(ua)) browser = 'Firefox';
+    else if (/safari\//i.test(ua)) browser = 'Safari';
+
+    return `${browser} · ${os}`;
+};
+
+const formatLastActive = (timestamp: number): string => {
+    const diffSec = Math.floor(Date.now() / 1000) - timestamp;
+    if (diffSec < 60) return 'Just now';
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)} min ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} hr ago`;
+    if (diffSec < 604800) return `${Math.floor(diffSec / 86400)} day(s) ago`;
+    return new Date(timestamp * 1000).toLocaleString();
+};
+
 export default function UsersIndex({ users, roles, companies, canManageUsers, manageableRoleSlug }: Props) {
     const [modalOpen, setModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -245,6 +273,39 @@ export default function UsersIndex({ users, roles, companies, canManageUsers, ma
                                         )}
                                     </div>
                                 </div>
+                                {canManageUsers && user.sessions && user.sessions.length > 0 && (
+                                    <div
+                                        style={{
+                                            marginTop: 8,
+                                            padding: '8px 10px',
+                                            background: 'var(--bg-paper)',
+                                            border: '1px solid var(--border)',
+                                            borderRadius: 'var(--radius-sm)',
+                                            fontSize: 12,
+                                        }}
+                                    >
+                                        <div style={{ fontWeight: 700, color: 'var(--tx-muted)', marginBottom: 4 }}>
+                                            🖥️ Login Sessions
+                                        </div>
+                                        {user.sessions.map((session, idx) => (
+                                            <div
+                                                key={idx}
+                                                style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    gap: 8,
+                                                    padding: '3px 0',
+                                                    borderTop: idx > 0 ? '1px solid var(--border)' : 'none',
+                                                }}
+                                            >
+                                                <span>{parseDevice(session.user_agent)}</span>
+                                                <span style={{ color: 'var(--tx-muted)' }}>
+                                                    {session.ip_address ?? 'Unknown IP'} · {formatLastActive(session.last_activity)}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                                 {canManageUsers && (
                                     <div className="user-card-actions">
                                         <button
