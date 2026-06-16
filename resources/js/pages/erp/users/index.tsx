@@ -3,6 +3,7 @@ import { destroy, store, update } from '@/routes/users';
 import type { Role, User } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
 import { useState } from 'react';
+import { ModalPortal } from '@/components/modal-portal';
 
 type Props = {
     pageTitle: string;
@@ -336,6 +337,7 @@ export default function UsersIndex({ users, roles, companies, canManageUsers, ma
                 </div>
             </div>
 
+            <ModalPortal>
             <div className={`modal-overlay${modalOpen ? ' open' : ''}`}>
                 <div
                     className="modal"
@@ -769,6 +771,7 @@ export default function UsersIndex({ users, roles, companies, canManageUsers, ma
                     </div>
                 </div>
             </div>
+            </ModalPortal>
         </>
     );
 }

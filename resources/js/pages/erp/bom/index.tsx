@@ -7,6 +7,7 @@ import {
 import type { Auth } from '@/types/auth';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
+import { ModalPortal } from '@/components/modal-portal';
 
 type RawMaterial = {
     id: number;
@@ -956,6 +957,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
             </div>
 
             {/* ── Create / Edit BOM modal ─────────────────────────────────── */}
+            <ModalPortal>
             <div className={`modal-overlay${editModal ? ' open' : ''}`} onClick={() => setEditModal(false)}>
                 <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
                     <div className="modal-header">
@@ -1092,9 +1094,11 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                     </div>
                 </div>
             </div>
+            </ModalPortal>
 
             {/* ── Quick Add Material modal (full inventory form) ───────────── */}
             {quickAddOpen && (
+                <ModalPortal>
                 <div className="modal-overlay open" style={{ zIndex: 1100 }} onClick={() => setQuickAddOpen(false)}>
                     <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 600, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
                         <div className="modal-header">
@@ -1192,9 +1196,11 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                         </div>
                     </div>
                 </div>
+                </ModalPortal>
             )}
 
             {/* ── Run production modal ─────────────────────────────────────── */}
+            <ModalPortal>
             <div className={`modal-overlay${runModal ? ' open' : ''}`} onClick={() => setRunModal(false)}>
                 <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
                     <div className="modal-header">
@@ -1290,9 +1296,11 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                     </div>
                 </div>
             </div>
+            </ModalPortal>
 
             {/* ── Run summary modal ────────────────────────────────────────── */}
             {runSummary && (
+                <ModalPortal>
                 <div className="modal-overlay open" onClick={() => setRunSummary(null)}>
                     <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
                         <div className="modal-header">
@@ -1361,9 +1369,11 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                         </div>
                     </div>
                 </div>
+                </ModalPortal>
             )}
             {/* Category rename modal */}
             {catRenameOpen && (
+                <ModalPortal>
                 <div className="modal-overlay open" onClick={() => setCatRenameOpen(false)}>
                     <div className="modal" style={{ maxWidth: 360 }} onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
@@ -1388,6 +1398,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                         </div>
                     </div>
                 </div>
+                </ModalPortal>
             )}
         </>
     );

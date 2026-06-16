@@ -5,6 +5,7 @@ import {
 } from '@/routes/purchase-bills';
 import { Head, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
+import { ModalPortal } from '@/components/modal-portal';
 
 type Bill = {
     id: number;
@@ -243,6 +244,7 @@ export default function PurchaseBillsIndex({ bills, summary }: Props) {
                 </div>
             </div>
 
+            <ModalPortal>
             <div className={`modal-overlay${modal ? ' open' : ''}`}>
                 <div className="modal" style={{ maxWidth: '520px' }}>
                     <div className="modal-header">
@@ -336,6 +338,7 @@ export default function PurchaseBillsIndex({ bills, summary }: Props) {
                     </div>
                 </div>
             </div>
+            </ModalPortal>
         </>
     );
 }

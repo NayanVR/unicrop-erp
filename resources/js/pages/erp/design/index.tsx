@@ -6,6 +6,7 @@ import {
 } from '@/routes/design';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
+import { ModalPortal } from '@/components/modal-portal';
 
 type Designer = { id: number; name: string };
 type StageLogEntry = { stage: string; at: string; by?: string | null };
@@ -242,6 +243,7 @@ export default function DesignIndex() {
 
             {/* ── Create / Edit Modal ── */}
             {showModal && (
+                <ModalPortal>
                 <div className="modal-overlay open" onClick={() => setShowModal(false)}>
                     <div className="modal" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
@@ -301,6 +303,7 @@ export default function DesignIndex() {
                         </form>
                     </div>
                 </div>
+                </ModalPortal>
             )}
         </>
     );

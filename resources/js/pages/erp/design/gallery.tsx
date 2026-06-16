@@ -3,6 +3,7 @@ import { store as foldersStore } from '@/routes/design/gallery/folders';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { ModalPortal } from '@/components/modal-portal';
 
 function SearchableSelect({
     value, onChange, options, placeholder, hasError,
@@ -521,6 +522,7 @@ export default function DesignGallery() {
 
                 {/* Create Folder modal */}
                 {showCreate && (
+                    <ModalPortal>
                     <div className="modal-overlay open" onClick={() => setShowCreate(false)}>
                         <div className="modal" style={{ width: '400px' }} onClick={(e) => e.stopPropagation()}>
                             <div className="modal-header">
@@ -578,6 +580,7 @@ export default function DesignGallery() {
                             )}
                         </div>
                     </div>
+                    </ModalPortal>
                 )}
 
                 {/* Upload modal (no pre-selected party) */}
@@ -697,6 +700,7 @@ export default function DesignGallery() {
 
             {/* Lightbox */}
             {lightbox && (
+                <ModalPortal>
                 <div
                     className="modal-overlay open"
                     onClick={() => setLightbox(null)}
@@ -749,6 +753,7 @@ export default function DesignGallery() {
                         />
                     </div>
                 </div>
+                </ModalPortal>
             )}
 
             {/* Upload modal */}
@@ -775,6 +780,7 @@ export default function DesignGallery() {
 
             {/* Edit modal */}
             {editingPhoto && (
+                <ModalPortal>
                 <div className="modal-overlay open" onClick={() => setEditingPhoto(null)}>
                     <div className="modal" style={{ width: '460px' }} onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
@@ -911,6 +917,7 @@ export default function DesignGallery() {
                         </div>
                     </div>
                 </div>
+                </ModalPortal>
             )}
         </div>
     );
@@ -1080,6 +1087,7 @@ function UploadModal({ form, fileRef, folders, ourBrands, allCategories, brandSu
     onSubmit: (e: React.FormEvent) => void;
 }) {
     return (
+        <ModalPortal>
         <div className="modal-overlay open" onClick={onClose}>
             <div className="modal" style={{ width: '460px' }} onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
@@ -1239,5 +1247,6 @@ function UploadModal({ form, fileRef, folders, ourBrands, allCategories, brandSu
                 </div>
             </div>
         </div>
+        </ModalPortal>
     );
 }

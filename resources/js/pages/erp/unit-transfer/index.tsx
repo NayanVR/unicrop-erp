@@ -6,6 +6,7 @@ import {
 } from '@/routes/unit-transfer';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
+import { ModalPortal } from '@/components/modal-portal';
 
 type Transfer = {
     id: number;
@@ -248,6 +249,7 @@ export default function UnitTransferIndex() {
             </div>
 
             {showModal && (
+                <ModalPortal>
                 <div className="modal-overlay open" onClick={() => setShowModal(false)}>
                     <div className="modal" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
@@ -345,6 +347,7 @@ export default function UnitTransferIndex() {
                         </form>
                     </div>
                 </div>
+                </ModalPortal>
             )}
         </>
     );

@@ -6,6 +6,7 @@ import {
 import type { Auth } from '@/types/auth';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
+import { ModalPortal } from '@/components/modal-portal';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -2010,6 +2011,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             ════════════════════════════════════════════════════════════════ */}
 
             {/* ── Godown Modal ──────────────────────────────────────────────── */}
+            <ModalPortal>
             <div className={`modal-overlay${godownModal ? ' open' : ''}`} onClick={() => setGodownModal(false)}>
                 <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440, width: '95%' }}>
                     <div className="modal-header">
@@ -2049,8 +2051,10 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     </div>
                 </div>
             </div>
+            </ModalPortal>
 
             {/* ── Material Modal ────────────────────────────────────────────── */}
+            <ModalPortal>
             <div className={`modal-overlay${matModal ? ' open' : ''}`} onClick={() => setMatModal(false)}>
                 <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 600, width: '95%' }}>
                     <div className="modal-header">
@@ -2373,8 +2377,10 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     </form>
                 </div>
             </div>
+            </ModalPortal>
 
             {/* ── Transaction Modal ─────────────────────────────────────────── */}
+            <ModalPortal>
             <div className={`modal-overlay${txnModal ? ' open' : ''}`} onClick={() => setTxnModal(false)}>
                 <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480, width: '95%' }}>
                     <div className="modal-header">
@@ -2475,8 +2481,10 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     </form>
                 </div>
             </div>
+            </ModalPortal>
 
             {/* ── Purchase Bill Modal ───────────────────────────────────────── */}
+            <ModalPortal>
             <div className={`modal-overlay${billModal ? ' open' : ''}`} onClick={() => { setBillModal(false); resetBillForm(); }}>
                 <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 1050, width: '98%' }}>
                     <div className="modal-header">
@@ -2863,6 +2871,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     </div>
                 </div>
             </div>
+            </ModalPortal>
 
             {/* ── Material search dropdown (fixed, outside table overflow) ─── */}
             {billMatDropdown !== null && matDropdownRect && (() => {
@@ -2918,6 +2927,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             })()}
 
             {/* ── Reorder Modal ─────────────────────────────────────────────── */}
+            <ModalPortal>
             <div className={`modal-overlay${reorderModal ? ' open' : ''}`} onClick={() => setReorderModal(false)}>
                 <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560, width: '95%' }}>
                     <div className="modal-header">
@@ -3043,8 +3053,10 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     </form>
                 </div>
             </div>
+            </ModalPortal>
 
             {/* ── Packaging Wizard Modal ────────────────────────────────────── */}
+            <ModalPortal>
             <div className={`modal-overlay${packModal ? ' open' : ''}`} onClick={() => setPackModal(false)}>
                 <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 620, width: '95%' }}>
                     <div className="modal-header">
@@ -3340,8 +3352,10 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     </div>
                 </div>
             </div>
+            </ModalPortal>
 
             {/* ── Transport Detail Modal (On The Way) ───────────────────────── */}
+            <ModalPortal>
             <div className={`modal-overlay${viewReorder ? ' open' : ''}`} onClick={() => setViewReorder(null)}>
                 <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480, width: '95%' }}>
                     <div className="modal-header">
@@ -3429,8 +3443,10 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     </div>
                 </div>
             </div>
+            </ModalPortal>
 
             {/* ── Enter Bill (for received reorder) Modal ───────────────────── */}
+            <ModalPortal>
             <div className={`modal-overlay${billReorder ? ' open' : ''}`} onClick={() => setBillReorder(null)}>
                 <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460, width: '95%' }}>
                     <div className="modal-header">
@@ -3511,8 +3527,10 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     </form>
                 </div>
             </div>
+            </ModalPortal>
 
             {/* ── Add Supplier Modal (same fields as Supplier/Vendor page) ───── */}
+            <ModalPortal>
             <div className={`modal-overlay${addSupplierModal ? ' open' : ''}`} onClick={() => setAddSupplierModal(false)} style={{ zIndex: 1100 }}>
                 <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 620, width: '95%' }}>
                     <div className="modal-header">
@@ -3637,8 +3655,10 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     </div>
                 </div>
             </div>
+            </ModalPortal>
 
             {/* ── Scan Bill Modal ───────────────────────────────────────────── */}
+            <ModalPortal>
             <div className={`modal-overlay${scanModal ? ' open' : ''}`} onClick={() => setScanModal(false)}>
                 <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480, width: '95%' }}>
                     <div className="modal-header">
@@ -3684,7 +3704,9 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     </div>
                 </div>
             </div>
+            </ModalPortal>
             {/* ── Category Add/Edit Modal ───────────────────────────────────── */}
+            <ModalPortal>
             <div className={`modal-overlay${catMgmtModal ? ' open' : ''}`} onClick={() => setCatMgmtModal(false)}>
                 <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400, width: '95%' }}>
                     <div className="modal-header">
@@ -3748,6 +3770,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     </div>
                 </div>
             </div>
+            </ModalPortal>
         </div>
     );
 }

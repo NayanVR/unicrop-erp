@@ -10,6 +10,7 @@ import {
 } from '@/routes/settings/packing-sizes';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
+import { ModalPortal } from '@/components/modal-portal';
 
 type TransportEntry = {
     id: number;
@@ -478,6 +479,7 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes 
             </div>
 
             {/* Transport / Courier Modal */}
+            <ModalPortal>
             <div className={`modal-overlay${transportModalOpen ? ' open' : ''}`}>
                 <div className="modal" style={{ maxWidth: '420px' }}>
                     <div className="modal-header">
@@ -512,8 +514,10 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes 
                     </div>
                 </div>
             </div>
+            </ModalPortal>
 
             {/* Packing Size Modal */}
+            <ModalPortal>
             <div className={`modal-overlay${packingSizeModalOpen ? ' open' : ''}`}>
                 <div className="modal" style={{ maxWidth: '420px' }}>
                     <div className="modal-header">
@@ -584,6 +588,7 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes 
                     </div>
                 </div>
             </div>
+            </ModalPortal>
         </>
     );
 }

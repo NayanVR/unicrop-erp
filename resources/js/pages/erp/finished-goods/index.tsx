@@ -7,6 +7,7 @@ import {
 } from '@/routes/finished-goods';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { Fragment, useMemo, useState } from 'react';
+import { ModalPortal } from '@/components/modal-portal';
 
 type Bom = { id: number; name: string; packing_size: string | null; batch_size: number; batch_unit: string };
 
@@ -321,6 +322,7 @@ export default function FinishedGoodsIndex() {
             </div>
 
             {showModal && (
+                <ModalPortal>
                 <div className="modal-overlay open" onClick={() => setShowModal(false)}>
                     <div className="modal" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
@@ -390,6 +392,7 @@ export default function FinishedGoodsIndex() {
                         </form>
                     </div>
                 </div>
+                </ModalPortal>
             )}
         </>
     );

@@ -14,6 +14,7 @@ import {
 import type { Auth } from '@/types/auth';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useRef, useState } from 'react';
+import { ModalPortal } from '@/components/modal-portal';
 
 type Document = {
     id: number;
@@ -453,6 +454,7 @@ export default function PartiesIndex() {
 
             {/* ── Add/Edit Party Modal ─────────────────────────────────────── */}
             {showModal && (
+                <ModalPortal>
                 <div className="modal-overlay open" onClick={() => setShowModal(false)}>
                     <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
@@ -561,10 +563,12 @@ export default function PartiesIndex() {
                         </form>
                     </div>
                 </div>
+                </ModalPortal>
             )}
 
             {/* ── Products Modal ────────────────────────────────────────────── */}
             {showProductModal && selectedParty && (
+                <ModalPortal>
                 <div className="modal-overlay open" onClick={closeProducts}>
                     <div className="modal modal-xl" style={{ maxHeight: '88vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
@@ -834,10 +838,12 @@ export default function PartiesIndex() {
                         </div>
                     </div>
                 </div>
+                </ModalPortal>
             )}
 
             {/* ── Lightbox ─────────────────────────────────────────────────── */}
             {lightboxUrl && (
+                <ModalPortal>
                 <div className="modal-overlay" style={{ zIndex: 9999 }} onClick={() => setLightboxUrl(null)}>
                     <div style={{ maxWidth: '600px', width: '90vw', background: 'var(--bg-card)', borderRadius: '12px', overflow: 'hidden' }} onClick={(e) => e.stopPropagation()}>
                         <div style={{ padding: '12px 16px', display: 'flex', justifyContent: 'flex-end', borderBottom: '1px solid var(--border)' }}>
@@ -846,10 +852,12 @@ export default function PartiesIndex() {
                         <img src={lightboxUrl} alt="" style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain', background: '#fff', padding: '20px' }} />
                     </div>
                 </div>
+                </ModalPortal>
             )}
 
             {/* ── Documents Modal ───────────────────────────────────────────── */}
             {showDocModal && selectedParty && (
+                <ModalPortal>
                 <div className="modal-overlay open" onClick={() => setShowDocModal(false)}>
                     <div className="modal" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
@@ -893,6 +901,7 @@ export default function PartiesIndex() {
                         </div>
                     </div>
                 </div>
+                </ModalPortal>
             )}
         </>
     );
