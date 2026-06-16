@@ -215,7 +215,14 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
     // Quick-add material from output product field
     const [quickAddOpen, setQuickAddOpen]         = useState(false);
     const [pendingSelectName, setPendingSelectName] = useState<string | null>(null);
-    const quickForm = useForm({ name: '', unit: 'kg', category: '' });
+    const quickForm = useForm({
+        name: '', sku: '', hsn: '', gst: '', unit: 'kg', category: '',
+        group_name: '', shape: '', min_stock: '', reorder_level: '',
+        cost_per_unit: '', selling_rate: '', stock_qty: '',
+        dim_l: '', dim_w: '', dim_h: '', supplier: '', notes: '',
+    });
+    const [qSellMode, setQSellMode] = useState<'manual' | 'profit'>('manual');
+    const [qProfitPct, setQProfitPct] = useState('');
 
     // After materials prop refreshes, auto-select the just-created material
     useEffect(() => {
@@ -997,7 +1004,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                     <button
                                         type="button"
                                         title="Add new material to inventory"
-                                        onClick={() => { quickForm.reset(); setQuickAddOpen(true); }}
+                                        onClick={() => { quickForm.reset(); setQSellMode('manual'); setQProfitPct(''); setQuickAddOpen(true); }}
                                         style={{
                                             height: 36, width: 32, border: '1px dashed #2563eb',
                                             borderRadius: 6, background: '#eff6ff', color: '#2563eb',
@@ -1086,37 +1093,25 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                 </div>
             </div>
 
-            {/* ── Quick Add Material modal ─────────────────────────────────── */}
+            {/* ── Quick Add Material modal (full inventory form) ───────────── */}
             {quickAddOpen && (
                 <div className="modal-overlay open" style={{ zIndex: 1100 }} onClick={() => setQuickAddOpen(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400 }}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 600, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
                         <div className="modal-header">
-                            <h2>➕ Add New Material</h2>
+                            <h2>➕ Add Material to Inventory</h2>
                             <button className="modal-close" onClick={() => setQuickAddOpen(false)}>✕</button>
                         </div>
-                        <div className="modal-body">
-                            <p style={{ fontSize: 13, color: 'var(--tx-muted)', marginTop: 0, marginBottom: 16 }}>
-                                New material will be added to Inventory and auto-selected as the Output Product.
-                            </p>
+                        <div className="modal-body" style={{ overflowY: 'auto', flex: 1 }}>
                             <div className="form-grid">
                                 <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                     <label>Name *</label>
-                                    <input
-                                        autoFocus
-                                        type="text"
-                                        value={quickForm.data.name}
-                                        onChange={(e) => quickForm.setData('name', e.target.value)}
-                                        placeholder="e.g. Amino Liquid"
-                                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitQuickAdd(); } }}
-                                    />
+                                    <input autoFocus type="text" value={quickForm.data.name} onChange={(e) => quickForm.setData('name', e.target.value)} placeholder="e.g. Amino Liquid" />
                                     {quickForm.errors.name && <div className="form-error">{quickForm.errors.name}</div>}
                                 </div>
                                 <div className="form-group">
                                     <label>Unit *</label>
                                     <select value={quickForm.data.unit} onChange={(e) => quickForm.setData('unit', e.target.value)}>
-                                        {['kg', 'g', 'gm', 'mg', 'L', 'ml', 'pcs', 'nos', 'litre', 'ltr'].map((u) => (
-                                            <option key={u} value={u}>{u}</option>
-                                        ))}
+                                        {['kg', 'g', 'gm', 'mg', 'L', 'ml', 'pcs', 'nos', 'bags', 'drums', 'litre', 'ltr'].map((u) => <option key={u}>{u}</option>)}
                                     </select>
                                     {quickForm.errors.unit && <div className="form-error">{quickForm.errors.unit}</div>}
                                 </div>
@@ -1127,16 +1122,71 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                         {categories.map((c) => <option key={c} value={c}>{c}</option>)}
                                     </select>
                                 </div>
+                                <div className="form-group">
+                                    <label>SKU / Item Code</label>
+                                    <input type="text" value={quickForm.data.sku} onChange={(e) => quickForm.setData('sku', e.target.value)} placeholder="SKU" />
+                                    {quickForm.errors.sku && <div className="form-error">{quickForm.errors.sku}</div>}
+                                </div>
+                                <div className="form-group">
+                                    <label>HSN Code</label>
+                                    <input type="text" value={quickForm.data.hsn} onChange={(e) => quickForm.setData('hsn', e.target.value)} placeholder="HSN" />
+                                </div>
+                                <div className="form-group">
+                                    <label>GST %</label>
+                                    <select value={quickForm.data.gst} onChange={(e) => quickForm.setData('gst', e.target.value)}>
+                                        <option value="">— None —</option>
+                                        {['0','5','12','18','28'].map((g) => <option key={g} value={g}>{g}%</option>)}
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>Min Stock</label>
+                                    <input type="number" min="0" step="any" value={quickForm.data.min_stock} onChange={(e) => quickForm.setData('min_stock', e.target.value)} placeholder="0" />
+                                </div>
+                                <div className="form-group">
+                                    <label>Reorder Level</label>
+                                    <input type="number" min="0" step="any" value={quickForm.data.reorder_level} onChange={(e) => quickForm.setData('reorder_level', e.target.value)} placeholder="0" />
+                                </div>
+                                <div className="form-group">
+                                    <label>Initial Stock</label>
+                                    <input type="number" min="0" step="any" value={quickForm.data.stock_qty} onChange={(e) => quickForm.setData('stock_qty', e.target.value)} placeholder="0" />
+                                </div>
+                                <div className="form-group">
+                                    <label>Cost / Unit (₹)</label>
+                                    <input type="number" min="0" step="any" value={quickForm.data.cost_per_unit} onChange={(e) => quickForm.setData('cost_per_unit', e.target.value)} placeholder="0.00" />
+                                </div>
+                                <div className="form-group">
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span>Selling Rate (₹)</span>
+                                        <span style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden', fontSize: 11, height: 20 }}>
+                                            <button type="button" onClick={() => setQSellMode('manual')} style={{ padding: '0 8px', border: 'none', cursor: 'pointer', background: qSellMode === 'manual' ? 'var(--accent)' : 'var(--bg-paper)', color: qSellMode === 'manual' ? '#fff' : 'var(--tx-muted)', fontWeight: 600 }}>Manual</button>
+                                            <button type="button" onClick={() => setQSellMode('profit')} style={{ padding: '0 8px', border: 'none', borderLeft: '1px solid var(--border)', cursor: 'pointer', background: qSellMode === 'profit' ? '#059669' : 'var(--bg-paper)', color: qSellMode === 'profit' ? '#fff' : 'var(--tx-muted)', fontWeight: 600 }}>% Profit</button>
+                                        </span>
+                                    </label>
+                                    {qSellMode === 'manual' ? (
+                                        <input type="number" min="0" step="any" value={quickForm.data.selling_rate} onChange={(e) => quickForm.setData('selling_rate', e.target.value)} placeholder="0.00" />
+                                    ) : (
+                                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                            <div style={{ position: 'relative', flex: 1 }}>
+                                                <input type="number" min="0" step="0.1" placeholder="Profit %" value={qProfitPct} onChange={(e) => { setQProfitPct(e.target.value); const cost = Number(quickForm.data.cost_per_unit) || 0; quickForm.setData('selling_rate', String(cost * (1 + Number(e.target.value) / 100))); }} style={{ paddingRight: 28 }} />
+                                                <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--tx-muted)', fontSize: 13, pointerEvents: 'none' }}>%</span>
+                                            </div>
+                                            <span style={{ fontSize: 13, color: '#059669', fontWeight: 700, whiteSpace: 'nowrap' }}>= ₹{(Number(quickForm.data.cost_per_unit) * (1 + Number(qProfitPct || 0) / 100)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="form-group">
+                                    <label>Supplier</label>
+                                    <input type="text" value={quickForm.data.supplier} onChange={(e) => quickForm.setData('supplier', e.target.value)} placeholder="Supplier name" />
+                                </div>
+                                <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                                    <label>Notes</label>
+                                    <textarea rows={2} value={quickForm.data.notes} onChange={(e) => quickForm.setData('notes', e.target.value)} placeholder="Any notes" />
+                                </div>
                             </div>
                         </div>
                         <div className="modal-footer">
                             <button className="btn" type="button" onClick={() => setQuickAddOpen(false)}>Cancel</button>
-                            <button
-                                className="btn primary"
-                                type="button"
-                                onClick={submitQuickAdd}
-                                disabled={quickForm.processing || !quickForm.data.name.trim()}
-                            >
+                            <button className="btn primary" type="button" onClick={submitQuickAdd} disabled={quickForm.processing || !quickForm.data.name.trim()}>
                                 {quickForm.processing ? 'Adding…' : '+ Add & Select'}
                             </button>
                         </div>
