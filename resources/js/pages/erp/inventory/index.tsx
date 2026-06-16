@@ -738,8 +738,17 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             is_active: m.is_active,
         });
         matForm.clearErrors();
-        setMatSellMode('manual');
-        setMatProfitPct('');
+        // Restore profit-mode if selling_rate > cost (back-calculate %)
+        const cost = Number(m.cost_per_unit) || 0;
+        const rate = Number(m.selling_rate) || 0;
+        if (cost > 0 && rate > cost) {
+            const pct = ((rate - cost) / cost) * 100;
+            setMatSellMode('profit');
+            setMatProfitPct(String(Math.round(pct * 100) / 100));
+        } else {
+            setMatSellMode('manual');
+            setMatProfitPct('');
+        }
         setEditingMat(m);
         setMatModal(true);
     };
