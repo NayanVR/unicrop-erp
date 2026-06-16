@@ -8,6 +8,7 @@ use App\Models\InventoryCategory;
 use App\Models\InventoryTransaction;
 use App\Models\ProductionRun;
 use App\Models\RawMaterial;
+use App\Models\Role;
 use App\Services\LowStockAlertService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -141,7 +142,7 @@ class BomController extends Controller
     {
         $user  = $request->user();
         $perms = $user?->permissions ?? [];
-        if ($user?->role !== 'admin' && ! in_array('bom_delete', $perms)) {
+        if (! $user?->hasRole(Role::ADMIN) && ! in_array('bom_delete', $perms)) {
             abort(403);
         }
 
@@ -289,7 +290,7 @@ class BomController extends Controller
     {
         $user  = $request->user();
         $perms = $user?->permissions ?? [];
-        if ($user?->role !== 'admin' && ! in_array('bom_delete', $perms)) {
+        if (! $user?->hasRole(Role::ADMIN) && ! in_array('bom_delete', $perms)) {
             abort(403);
         }
 
