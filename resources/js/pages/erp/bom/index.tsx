@@ -171,6 +171,20 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
     const isAdmin     = auth.user?.role === 'admin';
     const canDeleteBom = isAdmin || (auth.user?.permissions ?? []).includes('bom_delete');
 
+    const [catRenameOpen, setCatRenameOpen] = useState(false);
+    const [catRenameOld,  setCatRenameOld]  = useState('');
+    const [catRenameNew,  setCatRenameNew]  = useState('');
+
+    const openCatRename = (cat: string) => { setCatRenameOld(cat); setCatRenameNew(cat); setCatRenameOpen(true); };
+    const submitCatRename = () => {
+        if (!catRenameNew.trim() || catRenameNew.trim() === catRenameOld) { setCatRenameOpen(false); return; }
+        router.patch('/bom-category/rename', { old_name: catRenameOld, new_name: catRenameNew.trim() }, { preserveScroll: true, onSuccess: () => setCatRenameOpen(false) });
+    };
+    const deleteCat = (cat: string) => {
+        if (!confirm(`"${cat}" category remove karsho? Badha BOMs uncategorized thai jashe.`)) return;
+        router.delete('/bom-category/delete', { data: { name: cat }, preserveScroll: true });
+    };
+
     const [pageView, setPageView]     = useState<'boms' | 'history'>('boms');
     const [search, setSearch]         = useState('');
     const [typeFilter, setTypeFilter] = useState<'all' | 'liquid' | 'powder' | 'other'>('all');
@@ -687,6 +701,22 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                 <span style={{ fontSize: 12, fontWeight: 700, background: cat === UNCATEGORIZED ? 'var(--bg-secondary)' : '#ede9fe', color: cat === UNCATEGORIZED ? 'var(--tx-muted)' : '#6d28d9', border: '1px solid ' + (cat === UNCATEGORIZED ? 'var(--border)' : '#c4b5fd'), padding: '2px 10px', borderRadius: 10 }}>
                                     {list.length}
                                 </span>
+                                {isAdmin && cat !== UNCATEGORIZED && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); openCatRename(cat); }}
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: '2px 4px', color: '#6d28d9' }}
+                                            title="Rename category"
+                                        >✏️</button>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); deleteCat(cat); }}
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: '2px 4px', color: '#dc2626' }}
+                                            title="Delete category"
+                                        >🗑️</button>
+                                    </>
+                                )}
                             </div>
                         )}
                         {!isCollapsed && (
@@ -1282,6 +1312,33 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                         <div className="modal-footer">
                             <button className="btn" onClick={() => setRunSummary(null)}>Close</button>
                             <button className="btn primary" onClick={() => printRunSummary(runSummary)}>🖨 Print Report</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Category rename modal */}
+            {catRenameOpen && (
+                <div className="modal-overlay open" onClick={() => setCatRenameOpen(false)}>
+                    <div className="modal" style={{ maxWidth: 360 }} onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>✏️ Rename Category</h2>
+                            <button className="modal-close" onClick={() => setCatRenameOpen(false)}>✕</button>
+                        </div>
+                        <div className="modal-body">
+                            <div className="form-group">
+                                <label>New Category Name *</label>
+                                <input
+                                    type="text"
+                                    value={catRenameNew}
+                                    onChange={(e) => setCatRenameNew(e.target.value)}
+                                    autoFocus
+                                    onKeyDown={(e) => { if (e.key === 'Enter') submitCatRename(); }}
+                                />
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn" onClick={() => setCatRenameOpen(false)}>Cancel</button>
+                            <button className="btn primary" onClick={submitCatRename} disabled={!catRenameNew.trim()}>Rename</button>
                         </div>
                     </div>
                 </div>

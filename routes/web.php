@@ -114,6 +114,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('bom/{bom}/run', [BomController::class, 'runProduction'])->name('bom.run');
         Route::delete('bom/{bom}', [BomController::class, 'destroy'])->name('bom.destroy');
         Route::delete('bom/runs/{run}', [BomController::class, 'destroyRun'])->name('bom.runs.destroy');
+        Route::patch('bom-category/rename', [BomController::class, 'renameCategory'])->name('bom.category.rename');
+        Route::delete('bom-category/delete', [BomController::class, 'deleteCategory'])->name('bom.category.delete');
     });
 
     // Inventory — view: admin, factory, accountant, sales

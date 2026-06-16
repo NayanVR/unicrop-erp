@@ -151,6 +151,25 @@ class BomController extends Controller
         return redirect()->back()->with('success', 'BOM deleted.');
     }
 
+    public function renameCategory(Request $request): RedirectResponse
+    {
+        abort_unless($request->user()?->hasRole(Role::ADMIN), 403);
+        $data = $request->validate([
+            'old_name' => 'required|string|max:100',
+            'new_name' => 'required|string|max:100',
+        ]);
+        Bom::where('category', $data['old_name'])->update(['category' => $data['new_name']]);
+        return redirect()->back()->with('success', 'Category renamed.');
+    }
+
+    public function deleteCategory(Request $request): RedirectResponse
+    {
+        abort_unless($request->user()?->hasRole(Role::ADMIN), 403);
+        $data = $request->validate(['name' => 'required|string|max:100']);
+        Bom::where('category', $data['name'])->update(['category' => null]);
+        return redirect()->back()->with('success', 'Category removed from all BOMs.');
+    }
+
     public function runProduction(Request $request, Bom $bom): RedirectResponse
     {
         $data = $request->validate([
