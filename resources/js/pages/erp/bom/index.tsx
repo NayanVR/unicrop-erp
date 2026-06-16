@@ -197,7 +197,11 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
     const [runTarget, setRunTarget]   = useState<Bom | null>(null);
     const [runSummary, setRunSummary]     = useState<NormalizedRun | null>(null);
     const [highlightedId, setHighlightedId] = useState<number | null>(null);
-    const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+    const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+        const keys = new Set<string>();
+        for (const b of boms) keys.add((b.category ?? '').trim() || UNCATEGORIZED);
+        return keys;
+    });
 
     const toggleGroup = (key: string) => {
         setCollapsedGroups((prev) => {
@@ -313,9 +317,15 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                 onSuccess: () => { setEditModal(false); form.reset(); setEditingBom(null); },
             });
         } else {
+            const newCat = (form.data.category ?? '').trim() || UNCATEGORIZED;
             form.post(bomStore().url, {
                 preserveScroll: true,
-                onSuccess: () => { setEditModal(false); form.reset(); },
+                onSuccess: () => {
+                    setEditModal(false);
+                    form.reset();
+                    // Expand the group the new BOM landed in
+                    setCollapsedGroups((prev) => { const n = new Set(prev); n.delete(newCat); return n; });
+                },
             });
         }
     };
