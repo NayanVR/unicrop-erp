@@ -159,6 +159,10 @@ class InventoryController extends Controller
             'notes'         => 'nullable|string|max:500',
         ]);
 
+        foreach (['cost_per_unit', 'selling_rate', 'min_stock', 'reorder_level', 'stock_qty', 'gst', 'dim_l', 'dim_w', 'dim_h'] as $field) {
+            $data[$field] = $data[$field] ?? 0;
+        }
+
         RawMaterial::create($data);
         $this->ensureSupplierParty($data['supplier'] ?? null);
 
@@ -217,6 +221,10 @@ class InventoryController extends Controller
             'notes'         => 'nullable|string|max:500',
             'is_active'     => 'boolean',
         ]);
+
+        foreach (['cost_per_unit', 'selling_rate', 'min_stock', 'reorder_level', 'gst', 'dim_l', 'dim_w', 'dim_h'] as $field) {
+            $data[$field] = $data[$field] ?? 0;
+        }
 
         $material->update($data);
         $this->ensureSupplierParty($data['supplier'] ?? null);
