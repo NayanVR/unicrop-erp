@@ -948,20 +948,6 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                     <div className="modal-body" style={{ overflowY: 'auto', flex: 1 }}>
                         <div className="form-grid">
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
-                                <label>BOM Name *</label>
-                                <input type="text" value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} placeholder="e.g. Imidacloprid 17.8% SL - 1L" />
-                                {form.errors.name && <div className="form-error">{form.errors.name}</div>}
-                                {!form.errors.name && form.data.name.trim() && (() => {
-                                    const q = form.data.name.trim().toLowerCase();
-                                    const dup = boms.find((b) => b.name.toLowerCase() === q && b.id !== editingBom?.id);
-                                    return dup ? (
-                                        <div style={{ marginTop: 4, padding: '5px 10px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 5, fontSize: 12, color: '#9a3412' }}>
-                                            ⚠️ "{dup.name}" નામ already exist છે
-                                        </div>
-                                    ) : null;
-                                })()}
-                            </div>
-                            <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                 <label>
                                     🏷️ Group / Category
                                     <span style={{ fontWeight: 400, color: 'var(--tx-muted)', marginLeft: 6, fontSize: 11 }}>
@@ -1002,13 +988,13 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                         value={form.data.output_raw_material_id}
                                         onChange={(e) => {
                                             const id = e.target.value;
-                                            form.setData('output_raw_material_id', id);
-                                            if (id) {
-                                                const mat = materials.find((m) => m.id === Number(id));
-                                                form.setData('output_category', mat?.category ?? '');
-                                            } else {
-                                                form.setData('output_category', '');
-                                            }
+                                            const mat = id ? materials.find((m) => m.id === Number(id)) : null;
+                                            form.setData({
+                                                ...form.data,
+                                                output_raw_material_id: id,
+                                                output_category: mat?.category ?? '',
+                                                name: mat?.name ?? form.data.name,
+                                            });
                                         }}
                                     >
                                         <option value="">— Not linked (won't update inventory stock) —</option>
