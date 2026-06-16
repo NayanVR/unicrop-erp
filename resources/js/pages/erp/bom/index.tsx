@@ -921,6 +921,15 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                 <label>BOM Name *</label>
                                 <input type="text" value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} placeholder="e.g. Imidacloprid 17.8% SL - 1L" />
                                 {form.errors.name && <div className="form-error">{form.errors.name}</div>}
+                                {!form.errors.name && form.data.name.trim() && (() => {
+                                    const q = form.data.name.trim().toLowerCase();
+                                    const dup = boms.find((b) => b.name.toLowerCase() === q && b.id !== editingBom?.id);
+                                    return dup ? (
+                                        <div style={{ marginTop: 4, padding: '5px 10px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 5, fontSize: 12, color: '#9a3412' }}>
+                                            ⚠️ "{dup.name}" નામ already exist છે
+                                        </div>
+                                    ) : null;
+                                })()}
                             </div>
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                 <label>
