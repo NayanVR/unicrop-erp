@@ -949,35 +949,6 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                         <div className="form-grid">
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                 <label>
-                                    🏷️ Group / Category
-                                    <span style={{ fontWeight: 400, color: 'var(--tx-muted)', marginLeft: 6, fontSize: 11 }}>
-                                        (e.g. PGR, Pesticide, Fungicide)
-                                    </span>
-                                </label>
-                                <input
-                                    type="text"
-                                    list="bom-category-list"
-                                    value={form.data.category}
-                                    onChange={(e) => form.setData('category', e.target.value)}
-                                    placeholder="Type or pick a group…"
-                                />
-                                <datalist id="bom-category-list">
-                                    {bomCategories.map((c) => <option key={c} value={c} />)}
-                                </datalist>
-                                {form.errors.category && <div className="form-error">{form.errors.category}</div>}
-                            </div>
-                            <div className="form-group">
-                                <label>Batch Size *</label>
-                                <input type="number" value={form.data.batch_size} onChange={(e) => form.setData('batch_size', e.target.value)} step="0.001" min="0.001" />
-                            </div>
-                            <div className="form-group">
-                                <label>Batch Unit *</label>
-                                <select value={form.data.batch_unit} onChange={(e) => form.setData('batch_unit', e.target.value)}>
-                                    {BATCH_UNITS.map((u) => <option key={u}>{u}</option>)}
-                                </select>
-                            </div>
-                            <div className="form-group" style={{ gridColumn: '1/-1' }}>
-                                <label>
                                     📦 Output Product in Inventory
                                     <span style={{ fontWeight: 400, color: 'var(--tx-muted)', marginLeft: 6, fontSize: 11 }}>
                                         (stock will be added here when BOM is run)
@@ -1026,6 +997,35 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                         }}
                                     >+</button>
                                 </div>
+                            </div>
+                            <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                                <label>
+                                    🏷️ Group / Category
+                                    <span style={{ fontWeight: 400, color: 'var(--tx-muted)', marginLeft: 6, fontSize: 11 }}>
+                                        (e.g. PGR, Pesticide, Fungicide)
+                                    </span>
+                                </label>
+                                <input
+                                    type="text"
+                                    list="bom-category-list"
+                                    value={form.data.category}
+                                    onChange={(e) => form.setData('category', e.target.value)}
+                                    placeholder="Type or pick a group…"
+                                />
+                                <datalist id="bom-category-list">
+                                    {bomCategories.map((c) => <option key={c} value={c} />)}
+                                </datalist>
+                                {form.errors.category && <div className="form-error">{form.errors.category}</div>}
+                            </div>
+                            <div className="form-group">
+                                <label>Batch Size *</label>
+                                <input type="number" value={form.data.batch_size} onChange={(e) => form.setData('batch_size', e.target.value)} step="0.001" min="0.001" />
+                            </div>
+                            <div className="form-group">
+                                <label>Batch Unit *</label>
+                                <select value={form.data.batch_unit} onChange={(e) => form.setData('batch_unit', e.target.value)}>
+                                    {BATCH_UNITS.map((u) => <option key={u}>{u}</option>)}
+                                </select>
                             </div>
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                 <label>Description / Notes</label>
