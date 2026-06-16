@@ -139,7 +139,7 @@ class InventoryController extends Controller
     public function storeMaterial(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'name'          => 'required|string|max:255',
+            'name'          => 'required|string|max:255|unique:raw_materials,name',
             'sku'           => 'nullable|string|max:100|unique:raw_materials,sku',
             'hsn'           => 'nullable|string|max:50',
             'gst'           => 'nullable|numeric|min:0|max:100',
@@ -198,7 +198,7 @@ class InventoryController extends Controller
     public function updateMaterial(Request $request, RawMaterial $material): RedirectResponse
     {
         $data = $request->validate([
-            'name'          => 'required|string|max:255',
+            'name'          => 'required|string|max:255|unique:raw_materials,name,' . $material->id,
             'sku'           => 'nullable|string|max:100|unique:raw_materials,sku,' . $material->id,
             'hsn'           => 'nullable|string|max:50',
             'gst'           => 'nullable|numeric|min:0|max:100',
