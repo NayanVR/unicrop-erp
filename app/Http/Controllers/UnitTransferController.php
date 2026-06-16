@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Godown;
+use App\Models\GodownStock;
 use App\Models\RawMaterial;
 use App\Models\UnitTransfer;
 use Illuminate\Http\RedirectResponse;
@@ -31,6 +32,25 @@ class UnitTransferController extends Controller
         return Inertia::render('erp/unit-transfer/index', compact('transfers', 'stats', 'godowns', 'inventoryItems'));
     }
 
+    /** Adjust godown-level stock for a named godown + item. Direction: 'add' or 'deduct'. */
+    private function adjustGodownStock(string $godownName, string $itemName, float $qty, string $direction): void
+    {
+        $godown   = Godown::where('name', $godownName)->first();
+        $material = RawMaterial::where('name', $itemName)->first();
+        if (! $godown || ! $material) return;
+
+        $stock = GodownStock::firstOrCreate(
+            ['godown_id' => $godown->id, 'raw_material_id' => $material->id],
+            ['stock_qty' => 0]
+        );
+
+        $stock->stock_qty = $direction === 'add'
+            ? (float) $stock->stock_qty + $qty
+            : max(0, (float) $stock->stock_qty - $qty);
+
+        $stock->save();
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -45,9 +65,12 @@ class UnitTransferController extends Controller
         ]);
 
         $data['created_by'] = $request->user()?->id;
-        $data['status']     = 'in-transit';   // immediately "On the Way"
+        $data['status']     = 'in-transit';
 
-        UnitTransfer::create($data);
+        $transfer = UnitTransfer::create($data);
+
+        // Deduct stock from the sending godown immediately on dispatch
+        $this->adjustGodownStock($transfer->from_unit, $transfer->item_name, (float) $transfer->quantity, 'deduct');
 
         return redirect()->back()->with('success', 'Transfer created — On the Way.');
     }
@@ -67,6 +90,13 @@ class UnitTransferController extends Controller
             $extra['received_by_user_id'] = $request->user()?->id;
             $extra['received_at']         = now();
             $extra['transferred_at']      = now();
+            // Credit stock to the receiving godown
+            $this->adjustGodownStock($unitTransfer->to_unit, $unitTransfer->item_name, (float) $unitTransfer->quantity, 'add');
+        }
+
+        if ($data['status'] === 'cancelled') {
+            // Return stock to the sending godown
+            $this->adjustGodownStock($unitTransfer->from_unit, $unitTransfer->item_name, (float) $unitTransfer->quantity, 'add');
         }
 
         $unitTransfer->update(array_merge($data, $extra));
@@ -77,6 +107,11 @@ class UnitTransferController extends Controller
 
     public function destroy(UnitTransfer $unitTransfer): RedirectResponse
     {
+        // If still in-transit, return stock to sender before deleting
+        if ($unitTransfer->status === 'in-transit') {
+            $this->adjustGodownStock($unitTransfer->from_unit, $unitTransfer->item_name, (float) $unitTransfer->quantity, 'add');
+        }
+
         $unitTransfer->delete();
 
         return redirect()->back()->with('success', 'Transfer deleted.');
