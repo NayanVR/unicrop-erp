@@ -709,7 +709,6 @@ body {
 }
 .view.active {
     display: block;
-    animation: viewIn 0.22s ease both;
 }
 @keyframes viewIn {
     from {
