@@ -179,6 +179,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
     const [editModal, setEditModal]   = useState(false);
     const [runModal, setRunModal]     = useState(false);
     const [editingBom, setEditingBom] = useState<Bom | null>(null);
+    const [itemSearches, setItemSearches] = useState<string[]>([]);
     const [runTarget, setRunTarget]   = useState<Bom | null>(null);
     const [runSummary, setRunSummary]     = useState<NormalizedRun | null>(null);
     const [highlightedId, setHighlightedId] = useState<number | null>(null);
@@ -232,7 +233,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
     const runForm = useForm<RunFormData>({ batch_number: '', batch_count: '1', notes: '' });
 
     const openNew = () => {
-        form.reset(); form.clearErrors(); setEditingBom(null); setEditModal(true);
+        form.reset(); form.clearErrors(); setEditingBom(null); setItemSearches([]); setEditModal(true);
     };
 
     const openEdit = (bom: Bom) => {
@@ -252,12 +253,34 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                 unit: i.unit ?? '',
             })),
         });
-        form.clearErrors(); setEditingBom(bom); setEditModal(true);
+        const searches = bom.items.map((i) => {
+            const mat = i.raw_material ?? materials.find((m) => m.id === i.raw_material_id);
+            return mat?.name ?? '';
+        });
+        form.clearErrors(); setEditingBom(bom); setItemSearches(searches); setEditModal(true);
     };
 
-    const addItem = () => form.setData('items', [...form.data.items, { raw_material_id: '', qty_per_batch: '', unit: '' }]);
+    const addItem = () => {
+        form.setData('items', [...form.data.items, { raw_material_id: '', qty_per_batch: '', unit: '' }]);
+        setItemSearches((prev) => [...prev, '']);
+    };
 
-    const removeItem = (idx: number) => form.setData('items', form.data.items.filter((_, i) => i !== idx));
+    const removeItem = (idx: number) => {
+        form.setData('items', form.data.items.filter((_, i) => i !== idx));
+        setItemSearches((prev) => prev.filter((_, i) => i !== idx));
+    };
+
+    const updateItemSearch = (idx: number, val: string) => {
+        setItemSearches((prev) => { const n = [...prev]; n[idx] = val; return n; });
+        const mat = materials.find((m) => m.name.toLowerCase() === val.trim().toLowerCase());
+        const items = [...form.data.items];
+        if (mat) {
+            items[idx] = { ...items[idx], raw_material_id: String(mat.id), unit: mat.unit };
+        } else {
+            items[idx] = { ...items[idx], raw_material_id: '' };
+        }
+        form.setData('items', items);
+    };
 
     const updateItem = (idx: number, field: string, value: string) => {
         const items = [...form.data.items];
@@ -990,16 +1013,25 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                 <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)' }}>⚗️ Ingredients</div>
                                 <button type="button" className="btn sm" onClick={addItem}>+ Add Ingredient</button>
                             </div>
+                            <datalist id="bom-materials-list">
+                                {materials.map((m) => (
+                                    <option key={m.id} value={m.name}>{formatQty(m.stock_qty)} {m.unit}</option>
+                                ))}
+                            </datalist>
                             {form.data.items.length === 0 ? (
                                 <div style={{ textAlign: 'center', padding: 16, color: 'var(--tx-faint)', fontSize: 13, border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)' }}>
                                     No ingredients added yet.
                                 </div>
                             ) : form.data.items.map((item, idx) => (
                                 <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 32px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                                    <select value={item.raw_material_id} onChange={(e) => updateItem(idx, 'raw_material_id', e.target.value)}>
-                                        <option value="">— Select material —</option>
-                                        {materials.map((m) => <option key={m.id} value={m.id}>{m.name} ({formatQty(m.stock_qty)} {m.unit})</option>)}
-                                    </select>
+                                    <input
+                                        type="text"
+                                        list="bom-materials-list"
+                                        placeholder="Search material…"
+                                        value={itemSearches[idx] ?? ''}
+                                        onChange={(e) => updateItemSearch(idx, e.target.value)}
+                                        style={{ borderColor: item.raw_material_id ? undefined : itemSearches[idx] ? '#f87171' : undefined }}
+                                    />
                                     <input type="number" placeholder="Qty" value={item.qty_per_batch} onChange={(e) => updateItem(idx, 'qty_per_batch', e.target.value)} step="0.001" min="0" />
                                     <select value={item.unit} onChange={(e) => updateItem(idx, 'unit', e.target.value)}>
                                         <option value="">— unit —</option>
