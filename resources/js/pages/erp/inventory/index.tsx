@@ -2069,6 +2069,17 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                         required
                                     />
                                     {matForm.errors.name && <div className="form-error">{matForm.errors.name}</div>}
+                                    {!matForm.errors.name && matForm.data.name.trim() && (() => {
+                                        const q = matForm.data.name.trim().toLowerCase();
+                                        const dup = materials.find((m) =>
+                                            m.name.toLowerCase() === q && m.id !== editingMat?.id
+                                        );
+                                        return dup ? (
+                                            <div style={{ marginTop: 4, padding: '5px 10px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 5, fontSize: 12, color: '#9a3412' }}>
+                                                ⚠️ "{dup.name}" નામ already exist છે
+                                            </div>
+                                        ) : null;
+                                    })()}
                                 </div>
                                 <div className="form-group">
                                     <label>Unit *</label>
