@@ -197,11 +197,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
     const [runTarget, setRunTarget]   = useState<Bom | null>(null);
     const [runSummary, setRunSummary]     = useState<NormalizedRun | null>(null);
     const [highlightedId, setHighlightedId] = useState<number | null>(null);
-    const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
-        const keys = new Set<string>();
-        for (const b of boms) keys.add((b.category ?? '').trim() || UNCATEGORIZED);
-        return keys;
-    });
+    const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
     const toggleGroup = (key: string) => {
         setCollapsedGroups((prev) => {
@@ -222,8 +218,12 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
         if (!pendingSelectName) return;
         const mat = materials.find((m) => m.name.toLowerCase() === pendingSelectName.toLowerCase());
         if (mat) {
-            form.setData('output_raw_material_id', String(mat.id));
-            form.setData('output_category', mat.category ?? '');
+            form.setData({
+                ...form.data,
+                output_raw_material_id: String(mat.id),
+                output_category: mat.category ?? '',
+                name: mat.name,
+            });
             setPendingSelectName(null);
             setQuickAddOpen(false);
             quickForm.reset();
