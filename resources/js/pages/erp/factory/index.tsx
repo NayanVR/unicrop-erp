@@ -152,6 +152,7 @@ type Order = {
     design_status?: DesignStatus | null;
     tax_docs_pending?: boolean;
     docs?: Array<{ id: number; document_type: string; original_name: string }>;
+    pan_doc?: { id: number; original_name: string } | null;
     labels_last_printed_by?: string | null;
     labels_last_printed_at?: string | null;
     items: OrderItem[];
@@ -1081,6 +1082,21 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                     ))}
                                                 </div>
                                             )}
+                                        </div>
+                                    )}
+
+                                    {/* ── PAN card (from order upload or party record) ── */}
+                                    {order.pan_doc && (
+                                        <div style={{ marginBottom: '10px' }}>
+                                            <a
+                                                href={`/orders/${order.id}/documents/${order.pan_doc.id}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '5px 10px', background: '#fef3f2', border: '1px solid #fecdca', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: '#b42318' }}
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                🪪 PAN Card
+                                            </a>
                                         </div>
                                     )}
 

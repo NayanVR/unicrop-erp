@@ -725,7 +725,8 @@ class OrderController extends Controller
     {
         abort_if($attachment->order_id !== $order->id, 404);
 
-        $fullPath = Storage::disk('local')->path($attachment->path);
+        $disk = in_array($attachment->document_type, ['pan', 'aadhaar'], true) ? 'public' : 'local';
+        $fullPath = Storage::disk($disk)->path($attachment->path);
         abort_if(! file_exists($fullPath), 404, 'File not found.');
 
         return response()->file($fullPath, [

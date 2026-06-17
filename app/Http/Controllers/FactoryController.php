@@ -49,7 +49,7 @@ class FactoryController extends Controller
                 'items',
                 'salesUser:id,name',
                 'createdBy:id,name',
-                'attachments:id,order_id,document_type',
+                'attachments:id,order_id,document_type,original_name',
                 'designOrders:id,order_id,assigned_to,status,updated_at',
                 'designOrders.assignee:id,name',
             ])
@@ -80,6 +80,13 @@ class FactoryController extends Controller
                 ])->values()->all();
             $order->docs = $taxDocs;
             $order->tax_docs_pending = collect($taxDocs)->where('document_type', 'tax_invoice')->isEmpty();
+
+            // PAN card — uploaded either on the order itself or copied from the party's saved PAN
+            $panDoc = $order->attachments->where('document_type', 'pan')->sortByDesc('id')->first();
+            $order->pan_doc = $panDoc ? [
+                'id'            => $panDoc->id,
+                'original_name' => $panDoc->original_name,
+            ] : null;
 
             $order->unsetRelation('salesUser');
             $order->unsetRelation('createdBy');
