@@ -1,7 +1,7 @@
 import { advance as designAdvance, tracking as designTracking } from '@/routes/design';
-import { confirm as ordersConfirm, create as ordersCreate, destroy as ordersDestroy, edit as ordersEdit, sendToDesign as ordersSendToDesign } from '@/routes/orders';
+import { confirm as ordersConfirm, create as ordersCreate, destroy as ordersDestroy, edit as ordersEdit, labelPrint as ordersLabelPrint, sendToDesign as ordersSendToDesign } from '@/routes/orders';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type PhotoInfo = { url: string; mrp: string | null };
 
@@ -43,6 +43,8 @@ type OrderItem = {
     our_brand?: string | null;
     party_brand?: string | null;
     packing_size?: string | null;
+    box_size?: number | null;
+    boxes_override?: number | null;
     quantity: string | number;
     rate: string | number;
     amount: string | number;
@@ -158,7 +160,83 @@ type Props = {
     currentUserId?: number | null;
     userRole?: string | null;
     productPhotos?: ProductPhoto[];
+    packingSizes?: { name: string; multiplier: string | number; pieces_per_box: number | null; pack_unit: string | null }[];
     flash?: { success?: string; error?: string };
+};
+
+type EditableLabel = {
+    key: string;
+    transport: string;
+    destination: string;
+    party: string;
+    boxNum: number;
+    totalBoxes: number;
+    unit: string;
+    itemBoxNum: number;
+    itemTotalBoxes: number;
+    brand: string;
+    inBoxPcs: string;
+    orderRef: string;
+};
+
+// Standard pcs-per-box/bag/carba lookup by normalized packing size
+const STD_PCS_PER_BOX: Record<string, number> = {
+    '5ltr': 2,   '5kg': 2,
+    '1ltr': 10,  '1kg': 10,
+    '500ml': 20, '500gm': 20,
+    '250ml': 40, '250gm': 40,
+    '100ml': 50, '100gm': 50,
+    '50ml': 100, '50gm': 100,
+    '20ml': 300, '20gm': 300,
+    '10ml': 600, '10gm': 600,
+    '5ml': 600,  '5gm': 600,
+    // Carba large containers
+    '10ltr': 1, '20ltr': 1, '50ltr': 1, '200ltr': 1,
+    // Bags
+    '10kg': 1, '25kg': 1, '50kg': 1,
+};
+
+// Pack unit (box / bag / carba) by normalized packing size, when admin hasn't set one
+const STD_PACK_UNIT: Record<string, string> = {
+    '10kg': 'bag', '25kg': 'bag', '50kg': 'bag',
+    '10ltr': 'carba', '20ltr': 'carba', '50ltr': 'carba', '200ltr': 'carba',
+};
+
+const normalizeBoxSize = (s: string): string =>
+    s.toLowerCase().replace(/\s+/g, '')
+        .replace(/litre|liter|litres|liters/g, 'ltr')
+        .replace(/kilogram|kilograms|kgs\b/g, 'kg')
+        .replace(/gram|grams\b/g, 'gm')
+        .replace(/millilitre|milliliter|millilitres|milliliters|mls\b/g, 'ml');
+
+const stdPcsPerBox = (packing: string | null | undefined, overrides: Record<string, number> = {}): number | null => {
+    if (!packing) return null;
+    const key = normalizeBoxSize(packing);
+    return overrides[key] ?? STD_PCS_PER_BOX[key] ?? null;
+};
+
+const packUnitFor = (packing: string | null | undefined, overrides: Record<string, string> = {}): string => {
+    if (!packing) return 'box';
+    const key = normalizeBoxSize(packing);
+    return overrides[key] ?? STD_PACK_UNIT[key] ?? 'box';
+};
+
+const pluralizeUnit = (unit: string, count: number): string => {
+    if (count === 1) return unit;
+    if (unit === 'box') return 'boxes';
+    if (unit === 'bag') return 'bags';
+    return unit;
+};
+
+// Effective pcs/box: stored box_size takes priority, else derive from packing_size
+const pcsPerBox = (item: OrderItem, overrides: Record<string, number> = {}): number | null =>
+    item.box_size ?? stdPcsPerBox(item.packing_size, overrides);
+
+const boxesFor = (item: OrderItem, overrides: Record<string, number> = {}): number | null => {
+    if (item.boxes_override != null && item.boxes_override > 0) return item.boxes_override;
+    const ppb = pcsPerBox(item, overrides);
+    if (!ppb || ppb <= 0) return null;
+    return Math.ceil(Number(item.quantity) / ppb);
 };
 
 const PROD_STAGES = ['accepted', 'filling', 'labeling', 'ready', 'dispatched'];
@@ -212,12 +290,207 @@ const statusLabel = (status?: string | null) => {
 const priorityClassName = (priority?: string | null) =>
     `badge priority-${priority ?? 'normal'}`;
 
-export default function OrdersIndex({ orders, currentUserId, userRole, productPhotos = [] }: Props) {
+export default function OrdersIndex({ orders, currentUserId, userRole, productPhotos = [], packingSizes = [] }: Props) {
     const { flash } = usePage<Props>().props;
 
     useEffect(() => {
         if (flash?.error) window.alert(flash.error);
     }, [flash?.error]);
+
+    const pcsPerBoxOverrides = useMemo(() => {
+        const map: Record<string, number> = {};
+        packingSizes.forEach((p) => {
+            if (p.pieces_per_box) {
+                map[normalizeBoxSize(p.name)] = p.pieces_per_box;
+            }
+        });
+        return map;
+    }, [packingSizes]);
+
+    const packUnitOverrides = useMemo(() => {
+        const map: Record<string, string> = {};
+        packingSizes.forEach((p) => {
+            if (p.pack_unit) {
+                map[normalizeBoxSize(p.name)] = p.pack_unit;
+            }
+        });
+        return map;
+    }, [packingSizes]);
+
+    const [labelEditor, setLabelEditor] = useState<{ order: Order; labels: EditableLabel[]; unitSummary: string } | null>(null);
+    const [labelFS, setLabelFS] = useState({ transport: 28, totalBoxes: 22, brand: 16, boxNum: 18, party: 10 });
+    const adjFS = (key: keyof typeof labelFS, delta: number) =>
+        setLabelFS((prev) => ({ ...prev, [key]: Math.max(6, prev[key] + delta) }));
+    const totalBoxesRefs = useRef<(HTMLSpanElement | null)[]>([]);
+
+    useEffect(() => {
+        if (!labelEditor) return;
+        totalBoxesRefs.current.forEach((el) => {
+            if (!el || !el.parentElement) return;
+            let size = labelFS.totalBoxes;
+            el.style.fontSize = `${size}pt`;
+            while (size > 8 && el.scrollWidth > el.parentElement.clientWidth) {
+                size -= 1;
+                el.style.fontSize = `${size}pt`;
+            }
+        });
+    }, [labelEditor, labelFS.totalBoxes]);
+
+    const openLabelEditor = (order: Order, e: React.MouseEvent) => {
+        e.stopPropagation();
+
+        const unitTotals: Record<string, number> = {};
+        order.items.forEach((item) => {
+            const itemBoxes = boxesFor(item, pcsPerBoxOverrides) ?? 1;
+            const unit = packUnitFor(item.packing_size, packUnitOverrides);
+            unitTotals[unit] = (unitTotals[unit] ?? 0) + itemBoxes;
+        });
+        const totalParcels = Object.values(unitTotals).reduce((sum, n) => sum + n, 0);
+        const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+        const unitSummary = Object.entries(unitTotals)
+            .map(([unit, count]) => `${count} ${cap(pluralizeUnit(unit, count))}`)
+            .join(' + ') + ` = ${totalParcels} Parcel${totalParcels !== 1 ? 's' : ''}`;
+
+        const labels: EditableLabel[] = [];
+        let seq = 1;
+        order.items.forEach((item) => {
+            const itemBoxes = boxesFor(item, pcsPerBoxOverrides) ?? 1;
+            const unit = packUnitFor(item.packing_size, packUnitOverrides);
+            const brand = item.party_brand || item.our_brand || '—';
+            const ppb = pcsPerBox(item, pcsPerBoxOverrides);
+            for (let b = 1; b <= itemBoxes; b++) {
+                labels.push({
+                    key: `${item.id}-${b}`,
+                    transport: order.transport_name ?? '',
+                    destination: order.destination ?? '',
+                    party: order.company_name,
+                    boxNum: seq++,
+                    totalBoxes: totalParcels,
+                    unit,
+                    itemBoxNum: b,
+                    itemTotalBoxes: itemBoxes,
+                    brand: `${brand}${item.packing_size ? ' · ' + item.packing_size : ''}`,
+                    inBoxPcs: ppb != null ? String(ppb) : '',
+                    orderRef: order.order_number,
+                });
+            }
+        });
+        setLabelEditor({ order, labels, unitSummary });
+    };
+
+    const updateLabelField = (idx: number, field: keyof Omit<EditableLabel, 'key' | 'boxNum' | 'totalBoxes' | 'itemBoxNum' | 'itemTotalBoxes'>, value: string) => {
+        setLabelEditor((prev) => {
+            if (!prev) return prev;
+            const labels = [...prev.labels];
+            labels[idx] = { ...labels[idx], [field]: value };
+            return { ...prev, labels };
+        });
+    };
+
+    const downloadLabelsPDF = () => {
+        if (!labelEditor) return;
+        const esc = (s: string) =>
+            s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const win = window.open('', '_blank', 'width=900,height=700');
+        if (!win) return;
+        const labelHtml = labelEditor.labels
+            .map(
+                (lbl) => `
+            <div class="label">
+                <div class="label-inner">
+                    <div class="transport-row">
+                        <span class="transport">${esc(lbl.transport || '—')}</span>
+                        <span class="box-badge">${lbl.boxNum}</span>
+                    </div>
+                    <div class="destination">${esc(lbl.destination || '—')}</div>
+                    <div class="party-tag">DELIVER TO</div>
+                    <div class="party">${esc(lbl.party || '—')}</div>
+                    <div class="mid-row">
+                        <span class="total-boxes">${esc(labelEditor.unitSummary)}</span>
+                    </div>
+                    <div class="auto-row2">
+                        <span class="inboxpcs">${lbl.inBoxPcs ? `In-${esc(lbl.unit)}: <b>${esc(lbl.inBoxPcs)} pcs</b>` : '—'}</span>
+                    </div>
+                    <div class="product-block">
+                        <span class="brand-name">${esc(lbl.brand || '—')}</span>
+                        <span class="item-box-count">${lbl.itemTotalBoxes} ${esc(pluralizeUnit(lbl.unit, lbl.itemTotalBoxes))}</span>
+                    </div>
+                    <div class="footer-row">
+                        <span class="unit-tag">${esc(lbl.unit.toUpperCase())}</span>
+                        <span class="order-ref">${esc(lbl.orderRef)}</span>
+                    </div>
+                </div>
+            </div>`,
+            )
+            .join('');
+        win.document.write(`<html><head><title>Box Labels — ${labelEditor.order.order_number}</title>
+            <style>
+                @page { size: 100mm 75mm; margin: 0; }
+                * { box-sizing: border-box; }
+                body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+                .label { width:100mm; height:75mm; border:1px solid #000; page-break-after:always; overflow:hidden; position:relative; }
+                .label:last-child { page-break-after:avoid; }
+                .label-inner { padding:3mm 4mm; transform-origin:top left; }
+                .transport-row { display:flex; justify-content:space-between; align-items:center; gap:2mm; border-bottom:2px solid #000; padding-bottom:1mm; margin-bottom:1mm; }
+                .transport { font-size:${labelFS.transport}pt; font-weight:900; line-height:1.1; }
+                .box-badge { min-width:11mm; height:11mm; padding:0 2mm; background:#000; color:#fff; display:flex; align-items:center; justify-content:center; font-size:${labelFS.boxNum}pt; font-weight:900; border-radius:1.5mm; flex-shrink:0; }
+                .destination { font-size:9pt; color:#333; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:1mm; }
+                .party-tag { font-size:6.5pt; font-weight:700; color:#777; letter-spacing:1.5px; }
+                .party { font-size:${labelFS.party}pt; font-weight:700; margin-bottom:1.5mm; }
+                .mid-row { background:#000; border-radius:1.5mm; padding:1mm 0; margin-bottom:1.5mm; text-align:center; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+                .total-boxes { font-size:${labelFS.totalBoxes}pt; font-weight:900; line-height:1.05; white-space:nowrap; color:#fff; }
+                .auto-row2 { display:flex; justify-content:space-between; align-items:center; font-size:9pt; margin-bottom:1.5mm; }
+                .inboxpcs { font-weight:700; color:#222; }
+                .product-block { padding-top:0.5mm; display:flex; justify-content:space-between; align-items:center; gap:2mm; }
+                .brand-name { font-size:${labelFS.brand}pt; font-weight:900; word-break:break-word; white-space:normal; line-height:1.15; flex:1; min-width:0; }
+                .item-box-count { font-size:${labelFS.brand}pt; font-weight:900; white-space:nowrap; flex-shrink:0; background:#000; color:#fff; padding:0.5mm 2.5mm; border-radius:1.5mm; }
+                .footer-row { display:flex; justify-content:space-between; align-items:center; margin-top:1mm; }
+                .unit-tag { font-size:8pt; font-weight:900; border:1.5px solid #000; padding:0.5mm 2.5mm; letter-spacing:1.5px; border-radius:1mm; }
+                .order-ref { font-size:7.5pt; color:#888; text-align:right; }
+                .toolbar { position:sticky; top:0; z-index:10; background:#1e293b; color:#fff; padding:10px 16px; display:flex; align-items:center; gap:12px; }
+                .toolbar button { background:#2563eb; color:#fff; border:0; border-radius:6px; padding:8px 18px; font-size:14px; font-weight:700; cursor:pointer; }
+                .toolbar span { color:#cbd5e1; font-size:12px; }
+                @media screen { body { background:#f0f0f0; } .label { margin:10px auto; border:1px dashed #888; border-radius:4px; background:#fff; } }
+                @media print { .toolbar { display:none; } }
+            </style>
+            <script>
+            function fitLabels() {
+                document.querySelectorAll('.total-boxes').forEach(function(el) {
+                    var size = ${labelFS.totalBoxes};
+                    el.style.fontSize = size + 'pt';
+                    var parent = el.parentElement;
+                    while (size > 8 && el.scrollWidth > parent.clientWidth) {
+                        size -= 1;
+                        el.style.fontSize = size + 'pt';
+                    }
+                });
+                document.querySelectorAll('.label').forEach(function(label) {
+                    var inner = label.querySelector('.label-inner');
+                    if (!inner) return;
+                    inner.style.transform = '';
+                    inner.style.width = '';
+                    var labelH = label.offsetHeight;
+                    var labelW = label.offsetWidth;
+                    var innerH = inner.scrollHeight;
+                    var innerW = inner.scrollWidth;
+                    var scaleH = innerH > labelH ? labelH / innerH : 1;
+                    var scaleW = innerW > labelW ? labelW / innerW : 1;
+                    var scale = Math.min(scaleH, scaleW);
+                    if (scale < 0.999) {
+                        inner.style.transform = 'scale(' + scale.toFixed(4) + ')';
+                        inner.style.width = Math.ceil(100 / scale) + '%';
+                    }
+                });
+            }
+            window.addEventListener('load', fitLabels);
+            window.addEventListener('beforeprint', fitLabels);
+            <\/script>
+            </head>
+            <body><div class="toolbar"><button onclick="fitLabels();window.print()">🖨 Save as PDF / Print</button><span>${labelEditor.labels.length} label(s) — ${labelEditor.order.order_number}</span></div>
+            ${labelHtml}</body></html>`);
+        win.document.close();
+        router.post(ordersLabelPrint(labelEditor.order.id).url, {}, { preserveScroll: true });
+    };
 
     const isDesign      = userRole === 'design';
     const isAdmin       = userRole === 'admin';
@@ -1036,6 +1309,31 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                         >
                                             🖨️ Print / PDF
                                         </a>
+                                        <button
+                                            type="button"
+                                            className="btn sm"
+                                            style={{ borderColor: '#d97706', color: '#d97706' }}
+                                            onClick={(e) => openLabelEditor(order, e)}
+                                        >
+                                            🏷 Box Labels
+                                        </button>
+                                        {(() => {
+                                            const unitTotals: Record<string, number> = {};
+                                            order.items.forEach((item) => {
+                                                const count = boxesFor(item, pcsPerBoxOverrides) ?? 1;
+                                                const unit = packUnitFor(item.packing_size, packUnitOverrides);
+                                                unitTotals[unit] = (unitTotals[unit] ?? 0) + count;
+                                            });
+                                            const totalParcels = Object.values(unitTotals).reduce((sum, n) => sum + n, 0);
+                                            const summary = Object.entries(unitTotals)
+                                                .map(([unit, count]) => `${count} ${pluralizeUnit(unit, count)}`)
+                                                .join(' + ');
+                                            return (
+                                                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--tx-muted)' }}>
+                                                    📦 {summary} = {totalParcels} parcel{totalParcels !== 1 ? 's' : ''}
+                                                </span>
+                                            );
+                                        })()}
                                     </div>
 
                                     {/* Edit / Delete — shown based on role and order status */}
@@ -1679,6 +1977,228 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                     ));
                 })()}
             </div>
+
+            {/* ── Box Label Editor Modal ── */}
+            {labelEditor && (
+                <div
+                    className="modal-overlay open"
+                    onClick={() => setLabelEditor(null)}
+                    style={{ zIndex: 9000 }}
+                >
+                    <div
+                        className="modal"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ maxWidth: '480px', width: '100%', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 40px)' }}
+                    >
+                        <div className="modal-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                            <h2 style={{ flex: 1, fontSize: '15px' }}>🏷 Box Labels — {labelEditor.order.order_number}</h2>
+                            <button
+                                type="button"
+                                className="btn-primary"
+                                style={{ padding: '7px 14px', fontSize: '13px' }}
+                                onClick={downloadLabelsPDF}
+                            >
+                                ⬇ Download PDF
+                            </button>
+                            <button className="modal-close" onClick={() => setLabelEditor(null)}>✕</button>
+                        </div>
+                        {/* Parcel breakdown summary */}
+                        <div style={{ padding: '8px 16px', fontSize: '12px', fontWeight: 700, color: '#1e293b', background: '#f8fafc', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                            📦 {labelEditor.unitSummary}
+                        </div>
+                        {/* Font size controls */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '8px 16px', alignItems: 'center', flexShrink: 0, borderBottom: '1px solid var(--border)' }}>
+                            <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, marginRight: 2 }}>Font:</span>
+                            {([
+                                { key: 'transport', label: 'Transport' },
+                                { key: 'party',     label: 'Party' },
+                                { key: 'totalBoxes',label: 'Parcels' },
+                                { key: 'boxNum',    label: 'Box#' },
+                                { key: 'brand',     label: 'Product' },
+                            ] as { key: keyof typeof labelFS; label: string }[]).map(({ key, label }) => (
+                                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '2px', background: '#f1f5f9', borderRadius: '5px', padding: '2px 5px' }}>
+                                    <span style={{ fontSize: '10px', color: '#475569', minWidth: 48 }}>{label}</span>
+                                    <button type="button" onClick={() => adjFS(key, -2)} style={{ width: 20, height: 20, border: '1px solid #cbd5e1', borderRadius: 3, background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 13, lineHeight: 1 }}>−</button>
+                                    <span style={{ fontSize: '11px', fontWeight: 700, minWidth: 26, textAlign: 'center' }}>{labelFS[key]}pt</span>
+                                    <button type="button" onClick={() => adjFS(key, 2)} style={{ width: 20, height: 20, border: '1px solid #cbd5e1', borderRadius: 3, background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 13, lineHeight: 1 }}>+</button>
+                                </div>
+                            ))}
+                        </div>
+                        {/* Scrollable labels — each card is exactly 100mm × 75mm */}
+                        <div
+                            style={{
+                                flex: 1,
+                                overflowY: 'auto',
+                                minHeight: 0,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '16px',
+                                padding: '16px',
+                                background: '#e5e7eb',
+                            }}
+                        >
+                            {labelEditor.labels.map((lbl, idx) => (
+                                <div
+                                    key={lbl.key}
+                                    style={{
+                                        width: '100mm',
+                                        height: '75mm',
+                                        border: '0.5px solid #000',
+                                        background: '#fff',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        padding: '2mm 3mm',
+                                        fontFamily: 'Arial, sans-serif',
+                                        boxSizing: 'border-box',
+                                        flexShrink: 0,
+                                        overflow: 'hidden',
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+                                        position: 'relative',
+                                    }}
+                                >
+                                    {/* Transport | Box number badge */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '2mm', borderBottom: '2px solid #000', paddingBottom: '1mm' }}>
+                                        <textarea
+                                            value={lbl.transport}
+                                            onChange={(e) => updateLabelField(idx, 'transport', e.target.value)}
+                                            placeholder="Transport name"
+                                            rows={1}
+                                            style={{
+                                                border: 'none', outline: 'none',
+                                                fontSize: `${labelFS.transport}pt`, fontWeight: 900, lineHeight: 1.1,
+                                                padding: '0', flex: 1, background: 'transparent',
+                                                fontFamily: 'Arial, sans-serif', resize: 'none',
+                                                overflow: 'hidden',
+                                            }}
+                                        />
+                                        <span
+                                            style={{
+                                                minWidth: '11mm', height: '11mm', padding: '0 2mm',
+                                                background: '#000', color: '#fff',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                fontSize: `${labelFS.boxNum}pt`, fontWeight: 900,
+                                                borderRadius: '1.5mm', flexShrink: 0,
+                                            }}
+                                        >
+                                            {lbl.boxNum}
+                                        </span>
+                                    </div>
+                                    {/* Destination */}
+                                    <input
+                                        value={lbl.destination}
+                                        onChange={(e) => updateLabelField(idx, 'destination', e.target.value)}
+                                        placeholder="Destination"
+                                        style={{
+                                            border: 'none', outline: 'none',
+                                            fontSize: '8pt', color: '#333', marginTop: '1mm',
+                                            textTransform: 'uppercase', letterSpacing: '0.5px',
+                                            padding: '0', width: '100%', background: 'transparent',
+                                            fontFamily: 'Arial, sans-serif',
+                                        }}
+                                    />
+                                    {/* Party */}
+                                    <div style={{ fontSize: '6.5pt', fontWeight: 700, color: '#777', letterSpacing: '1.5px', marginTop: '1mm' }}>DELIVER TO</div>
+                                    <textarea
+                                        value={lbl.party}
+                                        onChange={(e) => updateLabelField(idx, 'party', e.target.value)}
+                                        placeholder="Party name"
+                                        rows={2}
+                                        style={{
+                                            border: 'none', outline: 'none',
+                                            fontSize: `${labelFS.party}pt`, fontWeight: 700,
+                                            padding: '0', width: '100%', background: 'transparent',
+                                            fontFamily: 'Arial, sans-serif', resize: 'none',
+                                            overflow: 'hidden', lineHeight: 1.2,
+                                        }}
+                                    />
+                                    {/* Parcel summary — single line band, shrunk to fit the label width */}
+                                    <div style={{ margin: '1mm 0 1.5mm', padding: '1mm 0', textAlign: 'center', background: '#000', borderRadius: '1.5mm', overflow: 'hidden' }}>
+                                        <span
+                                            ref={(el) => { totalBoxesRefs.current[idx] = el; }}
+                                            style={{
+                                                fontSize: `${labelFS.totalBoxes}pt`,
+                                                fontWeight: 900, color: '#fff', lineHeight: 1.05, whiteSpace: 'nowrap',
+                                            }}
+                                        >
+                                            {labelEditor.unitSummary}
+                                        </span>
+                                    </div>
+                                    {/* In-box pcs | product box/bag/carba */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1mm' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2mm' }}>
+                                            <span style={{ fontSize: '8pt', color: '#555' }}>In-{lbl.unit}:</span>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                value={lbl.inBoxPcs}
+                                                onChange={(e) => updateLabelField(idx, 'inBoxPcs', e.target.value)}
+                                                style={{
+                                                    border: 'none', borderBottom: '1px dashed #bbb', outline: 'none',
+                                                    fontSize: '9pt', fontWeight: 700, color: '#111',
+                                                    width: '14mm', background: 'transparent', padding: '0',
+                                                    fontFamily: 'Arial, sans-serif',
+                                                }}
+                                            />
+                                            <span style={{ fontSize: '8pt', color: '#555' }}>pcs</span>
+                                        </div>
+                                    </div>
+                                    {/* Brand / product + this item's box/bag/carba count */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '2mm' }}>
+                                        <textarea
+                                            value={lbl.brand}
+                                            onChange={(e) => updateLabelField(idx, 'brand', e.target.value)}
+                                            placeholder="Brand · packing"
+                                            rows={2}
+                                            style={{
+                                                border: 'none', outline: 'none',
+                                                fontSize: `${labelFS.brand}pt`, fontWeight: 900, lineHeight: 1.15,
+                                                padding: '0', width: '100%', background: 'transparent',
+                                                resize: 'none', overflow: 'hidden',
+                                                wordBreak: 'break-word', whiteSpace: 'pre-wrap',
+                                                fontFamily: 'Arial, sans-serif', flex: 1, minWidth: 0,
+                                            }}
+                                        />
+                                        <span
+                                            style={{
+                                                fontSize: `${labelFS.brand}pt`, fontWeight: 900,
+                                                whiteSpace: 'nowrap', flexShrink: 0,
+                                                background: '#000', color: '#fff',
+                                                padding: '0.5mm 2.5mm', borderRadius: '1.5mm',
+                                            }}
+                                        >
+                                            {lbl.itemTotalBoxes} {pluralizeUnit(lbl.unit, lbl.itemTotalBoxes)}
+                                        </span>
+                                    </div>
+                                    {/* Footer: unit tag | order ref */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', gap: '2mm' }}>
+                                        <span
+                                            style={{
+                                                fontSize: '8pt', fontWeight: 900, border: '1.5px solid #000',
+                                                padding: '0.5mm 2.5mm', letterSpacing: '1.5px', borderRadius: '1mm',
+                                                flexShrink: 0,
+                                            }}
+                                        >
+                                            {lbl.unit.toUpperCase()}
+                                        </span>
+                                        <input
+                                            value={lbl.orderRef}
+                                            onChange={(e) => updateLabelField(idx, 'orderRef', e.target.value)}
+                                            placeholder="Order ref"
+                                            style={{
+                                                border: 'none', outline: 'none',
+                                                fontSize: '7pt', color: '#999',
+                                                padding: '0', flex: 1, background: 'transparent',
+                                                textAlign: 'right', fontFamily: 'Arial, sans-serif',
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Photo lightbox */}
             {photoLightbox && (

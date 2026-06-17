@@ -68,6 +68,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('orders/{order}', [OrderController::class, 'destroy'])->name('orders.destroy');
         Route::post('orders/{order}/confirm', [OrderController::class, 'confirm'])->name('orders.confirm');
         Route::post('orders/{order}/send-to-design', [OrderController::class, 'sendToDesign'])->name('orders.send-to-design');
+        Route::post('orders/{order}/label-print', [FactoryController::class, 'recordLabelPrint'])->name('orders.label-print');
         Route::post('erp/settings/transports', [SettingsController::class, 'storeTransport'])->name('settings.transports.store');
         Route::delete('erp/settings/transports/{transport}', [SettingsController::class, 'destroyTransport'])->name('settings.transports.destroy');
     });

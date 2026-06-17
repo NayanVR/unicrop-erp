@@ -124,6 +124,7 @@ class OrderController extends Controller
             'currentUserId' => $user?->id,
             'userRole'      => $role,
             'productPhotos' => $this->mapProductPhotos(),
+            'packingSizes'  => PackingSize::query()->orderBy('name')->get(['name', 'multiplier', 'pieces_per_box', 'pack_unit']),
         ]);
     }
 
