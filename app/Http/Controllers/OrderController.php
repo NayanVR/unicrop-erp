@@ -51,16 +51,10 @@ class OrderController extends Controller
             $ordersQuery->whereIn('status', ['confirmed', 'design']);
         }
 
-        // Accountants see only orders that are ready for billing:
-        // dispatched orders, OR confirmed orders that have at least one item marked ready.
+        // Accountants see all confirmed and dispatched orders (visible as soon as
+        // sales confirms the order, not only once items reach "ready").
         if ($role === Role::ACCOUNTANT) {
-            $ordersQuery->where(function ($q) {
-                $q->where('status', 'dispatched')
-                  ->orWhere(function ($q2) {
-                      $q2->where('status', 'confirmed')
-                         ->whereHas('items', fn ($i) => $i->where('status', 'ready'));
-                  });
-            });
+            $ordersQuery->whereIn('status', ['confirmed', 'dispatched']);
         }
 
         // Sales users see confirmed/dispatched + their own submitted/draft orders
