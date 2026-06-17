@@ -245,6 +245,31 @@ function normalizeSize(s: string): string {
     return s.toUpperCase().replace(/\s+/g, '');
 }
 
+function levenshtein(a: string, b: string): number {
+    const m = a.length, n = b.length;
+    if (m === 0) return n;
+    if (n === 0) return m;
+    const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+            dp[i][j] = a[i - 1] === b[j - 1]
+                ? dp[i - 1][j - 1]
+                : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+        }
+    }
+    return dp[m][n];
+}
+
+function isSimilarName(a: string, b: string): boolean {
+    const na = a.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const nb = b.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!na || !nb || na === nb) return na === nb;
+    const dist = levenshtein(na, nb);
+    const threshold = Math.max(2, Math.round(Math.max(na.length, nb.length) * 0.2));
+    return dist <= threshold;
+}
+
 function abbrevShape(s: string): string {
     const key = s.toLowerCase().trim();
     if (SHAPE_ABBR[key]) return SHAPE_ABBR[key];
@@ -2073,14 +2098,25 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                                         required
                                     />
                                     {matForm.errors.name && <div className="form-error">{matForm.errors.name}</div>}
-                                    {!matForm.errors.name && matForm.data.name.trim() && (() => {
-                                        const q = matForm.data.name.trim().toLowerCase();
+                                    {!matForm.errors.name && matForm.data.name.trim().length >= 3 && (() => {
+                                        const nameVal = matForm.data.name.trim();
+                                        const q = nameVal.toLowerCase();
                                         const dup = materials.find((m) =>
                                             m.name.toLowerCase() === q && m.id !== editingMat?.id
                                         );
-                                        return dup ? (
-                                            <div style={{ marginTop: 4, padding: '5px 10px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 5, fontSize: 12, color: '#9a3412' }}>
-                                                ⚠️ "{dup.name}" નામ already exist છે
+                                        if (dup) {
+                                            return (
+                                                <div style={{ marginTop: 4, padding: '5px 10px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 5, fontSize: 12, color: '#9a3412' }}>
+                                                    ⚠️ "{dup.name}" નામ already exist છે
+                                                </div>
+                                            );
+                                        }
+                                        const similar = materials.filter((m) =>
+                                            m.id !== editingMat?.id && isSimilarName(m.name, nameVal)
+                                        );
+                                        return similar.length > 0 ? (
+                                            <div style={{ marginTop: 4, padding: '5px 10px', background: '#fefce8', border: '1px solid #fde68a', borderRadius: 5, fontSize: 12, color: '#92400e' }}>
+                                                ⚠️ Spelling check — maltu name: {similar.map((m) => `"${m.name}"`).join(', ')} (typo હોય તો ચેક કરો)
                                             </div>
                                         ) : null;
                                     })()}
