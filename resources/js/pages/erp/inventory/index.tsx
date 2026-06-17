@@ -1336,7 +1336,7 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
             {/* Tabs */}
             <div className="filter-bar" style={{ marginBottom: 0, borderBottom: '1px solid #e5e7eb' }}>
                 {(['materials', 'log', 'bills', 'reorders', 'categories', 'godowns'] as const).filter((t) => {
-                    if (role === 'accountant') return t === 'materials' || t === 'categories';
+                    if (role === 'accountant') return t === 'materials';
                     return !isSales || t === 'materials';
                 }).map((t) => (
                     <button
