@@ -743,7 +743,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
 
                             {/* Transport / Courier */}
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
-                                <label>Transport / Courier</label>
+                                <label>Transport / Courier <span style={{ color: '#94a3b8', fontWeight: 400 }}>(required before confirming)</span></label>
                                 <div style={{ display: 'flex', gap: '8px', margin: '4px 0 8px' }}>
                                     <button
                                         type="button"
@@ -794,7 +794,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                             )}
 
                             <div className="form-group">
-                                <label>Destination *</label>
+                                <label>Destination <span style={{ color: '#94a3b8', fontWeight: 400 }}>(required before confirming)</span></label>
                                 <input
                                     type="text"
                                     className={form.errors.destination ? 'error' : ''}
@@ -805,7 +805,7 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                 {form.errors.destination && <span className="field-error">{form.errors.destination}</span>}
                             </div>
                             <div className="form-group">
-                                <label>Delivery Address *</label>
+                                <label>Delivery Address <span style={{ color: '#94a3b8', fontWeight: 400 }}>(required before confirming)</span></label>
                                 <input
                                     type="text"
                                     className={form.errors.delivery_address ? 'error' : ''}

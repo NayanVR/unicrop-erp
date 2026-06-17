@@ -250,6 +250,10 @@ class OrderController extends Controller
             return redirect()->back()->with('error', 'Urgent orders must be approved by factory before confirming.');
         }
 
+        if (trim((string) $order->transport_name) === '' || trim((string) $order->destination) === '' || trim((string) $order->delivery_address) === '') {
+            return redirect()->back()->with('error', 'Transport details (transport, destination, delivery address) are required before confirming the order. Please edit the order and fill them in.');
+        }
+
         $user = $request->user();
 
         DB::transaction(function () use ($order, $user) {

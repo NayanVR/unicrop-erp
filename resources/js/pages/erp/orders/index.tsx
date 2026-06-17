@@ -1,7 +1,7 @@
 import { advance as designAdvance, tracking as designTracking } from '@/routes/design';
 import { confirm as ordersConfirm, create as ordersCreate, destroy as ordersDestroy, edit as ordersEdit, sendToDesign as ordersSendToDesign } from '@/routes/orders';
-import { Head, Link, router } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import { useEffect, useMemo, useState } from 'react';
 
 type PhotoInfo = { url: string; mrp: string | null };
 
@@ -158,6 +158,7 @@ type Props = {
     currentUserId?: number | null;
     userRole?: string | null;
     productPhotos?: ProductPhoto[];
+    flash?: { success?: string; error?: string };
 };
 
 const PROD_STAGES = ['accepted', 'filling', 'labeling', 'ready', 'dispatched'];
@@ -212,6 +213,12 @@ const priorityClassName = (priority?: string | null) =>
     `badge priority-${priority ?? 'normal'}`;
 
 export default function OrdersIndex({ orders, currentUserId, userRole, productPhotos = [] }: Props) {
+    const { flash } = usePage<Props>().props;
+
+    useEffect(() => {
+        if (flash?.error) window.alert(flash.error);
+    }, [flash?.error]);
+
     const isDesign      = userRole === 'design';
     const isAdmin       = userRole === 'admin';
     const isAccountant  = userRole === 'accountant';
@@ -307,11 +314,20 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
 
     const doConfirmFactory = () => {
         if (!confirmTarget) return;
+        const targetId = confirmTarget.id;
         setSubmitting(true);
-        router.post(ordersConfirm(confirmTarget.id).url, {}, {
+        router.post(ordersConfirm(targetId).url, {}, {
             preserveScroll: true,
             preserveState: true,
-            onSuccess: advanceToDesign,
+            onSuccess: (page) => {
+                const freshOrders = (page.props.orders as Order[]) ?? orders;
+                const fresh = freshOrders.find((o) => o.id === targetId);
+                if (fresh?.status === 'confirmed') {
+                    advanceToDesign();
+                } else {
+                    setSubmitting(false);
+                }
+            },
             onError: () => setSubmitting(false),
         });
     };
