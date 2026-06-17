@@ -28,13 +28,21 @@ class InventoryController extends Controller
     {
         $user = $request->user();
         $user->loadMissing('roles');
+        $role = $user->roles->first()?->slug;
         $fullAccessRoles = ['admin', 'factory', 'accountant'];
-        $isSales = ! in_array($user->roles->first()?->slug, $fullAccessRoles);
+        $isSales = ! in_array($role, $fullAccessRoles);
 
         $materials = RawMaterial::query()
             ->withCount('transactions')
+            ->where('approval_status', 'approved')
             ->orderBy('name')
             ->get();
+
+        $pendingMaterials = $role === 'admin' ? RawMaterial::query()
+            ->where('approval_status', 'pending')
+            ->with('requestedByUser:id,name')
+            ->orderByDesc('id')
+            ->get() : collect();
 
         if ($isSales) {
             // Admin controls which categories the sales team can see
@@ -131,7 +139,7 @@ class InventoryController extends Controller
             ->map(fn ($r) => ['name' => $r->group_name, 'count' => (int) $r->cnt]);
 
         return Inertia::render('erp/inventory/index', array_merge(
-            compact('materials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats', 'vendors', 'inventoryCategories', 'bomOutputMap', 'fillingOutputMap', 'godowns', 'finishGoodGroups'),
+            compact('materials', 'pendingMaterials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats', 'vendors', 'inventoryCategories', 'bomOutputMap', 'fillingOutputMap', 'godowns', 'finishGoodGroups'),
             ['pageTitle' => 'Inventory']
         ));
     }
@@ -163,10 +171,37 @@ class InventoryController extends Controller
             $data[$field] = $data[$field] ?? 0;
         }
 
+        $user = $request->user();
+        $user->loadMissing('roles');
+        $needsApproval = $user->roles->first()?->slug === 'accountant';
+
+        if ($needsApproval) {
+            $data['approval_status'] = 'pending';
+            $data['requested_by'] = $user->id;
+            $data['is_active'] = false;
+        }
+
         RawMaterial::create($data);
         $this->ensureSupplierParty($data['supplier'] ?? null);
 
-        return redirect()->back()->with('success', 'Material added.');
+        return redirect()->back()->with('success', $needsApproval
+            ? 'Material submitted for admin approval. It will appear in inventory once approved.'
+            : 'Material added.');
+    }
+
+    public function approveMaterial(RawMaterial $material): RedirectResponse
+    {
+        $material->update(['approval_status' => 'approved', 'is_active' => true]);
+
+        return redirect()->back()->with('success', "\"{$material->name}\" approved and added to inventory.");
+    }
+
+    public function rejectMaterial(RawMaterial $material): RedirectResponse
+    {
+        $name = $material->name;
+        $material->delete();
+
+        return redirect()->back()->with('success', "\"{$name}\" request rejected and removed.");
     }
 
     /**

@@ -94,7 +94,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('factory/orders/{order}/label-print', [FactoryController::class, 'recordLabelPrint'])->name('factory.orders.label-print');
 
         // Inventory — factory + admin only
-        Route::post('inventory/materials', [InventoryController::class, 'storeMaterial'])->name('inventory.materials.store');
         Route::post('inventory/materials/{material}/transactions', [InventoryController::class, 'addTransaction'])->name('inventory.materials.transactions');
         Route::delete('inventory/materials/{material}', [InventoryController::class, 'destroyMaterial'])->name('inventory.materials.destroy');
         Route::post('inventory/reorders', [InventoryController::class, 'storeReorder'])->name('inventory.reorders.store');
@@ -126,6 +125,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Inventory — edit material + bill entry: factory, accountant, and admin
     Route::middleware(['role:admin,factory,accountant'])->group(function () {
+        Route::post('inventory/materials', [InventoryController::class, 'storeMaterial'])->name('inventory.materials.store');
         Route::patch('inventory/materials/{material}', [InventoryController::class, 'updateMaterial'])->name('inventory.materials.update');
         Route::post('inventory/purchase-bills', [InventoryController::class, 'storePurchaseBill'])->name('inventory.purchase-bills.store');
         Route::delete('inventory/purchase-bills/{bill}', [InventoryController::class, 'destroyPurchaseBill'])->name('inventory.purchase-bills.destroy');
@@ -133,6 +133,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::middleware(['role:admin'])->group(function () {
+        Route::post('inventory/materials/{material}/approve', [InventoryController::class, 'approveMaterial'])->name('inventory.materials.approve');
+        Route::post('inventory/materials/{material}/reject', [InventoryController::class, 'rejectMaterial'])->name('inventory.materials.reject');
+
         Route::get('reports/profit-loss', [\App\Http\Controllers\ReportController::class, 'profitLoss'])->name('reports.profit-loss');
 
         Route::get('erp/settings', [SettingsController::class, 'index'])->name('settings.index');

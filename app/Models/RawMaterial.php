@@ -4,9 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'sku', 'hsn', 'gst', 'unit', 'category', 'group_name', 'shape', 'stock_qty', 'min_stock', 'reorder_level', 'cost_per_unit', 'selling_rate', 'dim_l', 'dim_w', 'dim_h', 'supplier', 'notes', 'is_active'])]
+#[Fillable(['name', 'sku', 'hsn', 'gst', 'unit', 'category', 'group_name', 'shape', 'stock_qty', 'min_stock', 'reorder_level', 'cost_per_unit', 'selling_rate', 'dim_l', 'dim_w', 'dim_h', 'supplier', 'notes', 'is_active', 'approval_status', 'requested_by'])]
 class RawMaterial extends Model
 {
     /**
@@ -26,6 +27,14 @@ class RawMaterial extends Model
             'dim_w' => 'decimal:2',
             'dim_h' => 'decimal:2',
         ];
+    }
+
+    /**
+     * @return BelongsTo<User, RawMaterial>
+     */
+    public function requestedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'requested_by');
     }
 
     /**

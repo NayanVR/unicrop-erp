@@ -31,7 +31,13 @@ type RawMaterial = {
     supplier: string | null;
     notes: string | null;
     is_active: boolean;
+    approval_status?: 'approved' | 'pending';
+    requested_by?: number | null;
     transactions_count?: number;
+};
+
+type PendingMaterial = RawMaterial & {
+    requested_by_user: { id: number; name: string } | null;
 };
 
 type Transaction = {
@@ -149,6 +155,7 @@ type FinishGoodGroup = { name: string; count: number };
 
 type Props = {
     materials: RawMaterial[];
+    pendingMaterials: PendingMaterial[];
     recentTransactions: Transaction[];
     purchaseBills: PurchaseBill[];
     reorders: Reorder[];
@@ -170,6 +177,8 @@ const ROUTES = {
     storeReorder: '/inventory/reorders',
     receiveReorder: (id: number) => `/inventory/reorders/${id}/receive`,
     destroyReorder: (id: number) => `/inventory/reorders/${id}`,
+    approveMaterial: (id: number) => `/inventory/materials/${id}/approve`,
+    rejectMaterial: (id: number) => `/inventory/materials/${id}/reject`,
     storeCategory: '/inventory/categories',
     storeGodown: '/inventory/godowns',
     updateGodown: (id: number) => `/inventory/godowns/${id}`,
@@ -353,8 +362,8 @@ function SupplierField({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function InventoryIndex({ materials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomOutputMap, fillingOutputMap, godowns, finishGoodGroups }: Props) {
-    const { auth } = usePage<{ auth: Auth }>().props;
+export default function InventoryIndex({ materials, pendingMaterials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomOutputMap, fillingOutputMap, godowns, finishGoodGroups }: Props) {
+    const { auth, flash } = usePage<{ auth: Auth; flash?: { success?: string; error?: string } }>().props;
     const role = auth.user?.role ?? auth.user?.roles?.[0]?.slug ?? '';
     const canSeeCost      = role === 'admin' || auth.user?.cost_access === true;
     const canSeeTotalValue = role === 'accountant' || canSeeCost;
@@ -362,8 +371,24 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
     const canManageStock   = role === 'admin' || role === 'factory';
     const canEditMaterial  = role === 'admin' || role === 'factory' || role === 'accountant';
     const canEnterBill    = role === 'admin' || role === 'factory' || role === 'accountant';
+    const canAddMaterial  = role === 'admin' || role === 'factory' || role === 'accountant';
     const isSales         = !['admin', 'factory', 'accountant'].includes(role);
     const defaultGodownId = godowns.find((g) => g.is_default)?.id;
+
+    useEffect(() => {
+        if (flash?.success) window.alert(flash.success);
+        if (flash?.error) window.alert(flash.error);
+    }, [flash]);
+
+    const approvePendingMaterial = (m: PendingMaterial) => {
+        if (!window.confirm(`Approve "${m.name}" and add it to inventory?`)) return;
+        router.post(ROUTES.approveMaterial(m.id), {}, { preserveScroll: true });
+    };
+
+    const rejectPendingMaterial = (m: PendingMaterial) => {
+        if (!window.confirm(`Reject and remove "${m.name}"?`)) return;
+        router.post(ROUTES.rejectMaterial(m.id), {}, { preserveScroll: true });
+    };
 
     // Tab
     const [tab, setTab] = useState<'materials' | 'log' | 'bills' | 'reorders' | 'categories' | 'godowns'>('materials');
@@ -1139,10 +1164,10 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     <p>Raw material stock levels &amp; transaction history</p>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {canEnterBill && role !== 'accountant' && <button className="btn sm" onClick={() => setScanModal(true)}>📸 Scan Bill</button>}
-                    {canEnterBill && role !== 'accountant' && <button className="btn sm" onClick={() => setBillModal(true)}>📄 Purchase Bill</button>}
-                    {canMarkReceived && <button className="btn sm" onClick={openPackModal}>📦 Packaging</button>}
-                    {canMarkReceived && <button className="btn sm primary" onClick={openNewMat}>+ Add Material</button>}
+                    {canEnterBill && <button className="btn sm" onClick={() => setScanModal(true)}>📸 Scan Bill</button>}
+                    {canEnterBill && <button className="btn sm" onClick={() => setBillModal(true)}>📄 Purchase Bill</button>}
+                    {canAddMaterial && <button className="btn sm" onClick={openPackModal}>📦 Packaging</button>}
+                    {canAddMaterial && <button className="btn sm primary" onClick={openNewMat}>+ Add Material</button>}
                 </div>
             </div>
 
@@ -1179,6 +1204,33 @@ export default function InventoryIndex({ materials, recentTransactions, purchase
                     </div>
                 )}
             </div>
+
+            {/* Pending Material/Packaging Approvals — submitted by accountant, awaiting admin sign-off */}
+            {role === 'admin' && pendingMaterials.length > 0 && (
+                <div className="card" style={{ borderLeft: '4px solid #d97706', marginBottom: 16 }}>
+                    <div className="card-title" style={{ marginBottom: 8, color: '#d97706' }}>
+                        ⏳ Pending Approval
+                        <span className="ct-badge" style={{ background: '#d97706', color: '#fff' }}>{pendingMaterials.length}</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {pendingMaterials.map((m) => (
+                            <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderRadius: 8, border: '1px solid #fde68a', background: '#fffbeb', padding: '8px 12px', fontSize: 13 }}>
+                                <div>
+                                    <div style={{ fontWeight: 700 }}>{m.name}</div>
+                                    <div style={{ color: '#92400e', fontSize: 12 }}>
+                                        {m.category ?? 'Uncategorized'} · {m.unit}
+                                        {m.requested_by_user ? ` · requested by ${m.requested_by_user.name}` : ''}
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                    <button type="button" className="btn sm primary" onClick={() => approvePendingMaterial(m)}>✓ Approve</button>
+                                    <button type="button" className="btn sm" style={{ borderColor: '#dc2626', color: '#dc2626' }} onClick={() => rejectPendingMaterial(m)}>✕ Reject</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Stock Alerts — Out of Stock / Low Stock / BOM Production / Filling Production / Reorder Level */}
             {!isSales && role !== 'accountant' && alertMaterials.length > 0 && (() => {
