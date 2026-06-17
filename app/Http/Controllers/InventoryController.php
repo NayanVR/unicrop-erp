@@ -38,11 +38,20 @@ class InventoryController extends Controller
             ->orderBy('name')
             ->get();
 
-        $pendingMaterials = $role === 'admin' ? RawMaterial::query()
-            ->where('approval_status', 'pending')
-            ->with('requestedByUser:id,name')
-            ->orderByDesc('id')
-            ->get() : collect();
+        $pendingMaterials = collect();
+        if ($role === 'admin') {
+            $pendingMaterials = RawMaterial::query()
+                ->where('approval_status', 'pending')
+                ->with('requestedByUser:id,name')
+                ->orderByDesc('id')
+                ->get();
+        } elseif ($role === 'accountant') {
+            $pendingMaterials = RawMaterial::query()
+                ->where('approval_status', 'pending')
+                ->where('requested_by', $user->id)
+                ->orderByDesc('id')
+                ->get();
+        }
 
         if ($isSales) {
             // Admin controls which categories the sales team can see

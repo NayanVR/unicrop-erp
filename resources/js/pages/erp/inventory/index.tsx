@@ -1206,12 +1206,17 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
             </div>
 
             {/* Pending Material/Packaging Approvals — submitted by accountant, awaiting admin sign-off */}
-            {role === 'admin' && pendingMaterials.length > 0 && (
+            {(role === 'admin' || role === 'accountant') && pendingMaterials.length > 0 && (
                 <div className="card" style={{ borderLeft: '4px solid #d97706', marginBottom: 16 }}>
                     <div className="card-title" style={{ marginBottom: 8, color: '#d97706' }}>
-                        ⏳ Pending Approval
+                        ⏳ {role === 'admin' ? 'Pending Approval' : 'Your Pending Requests'}
                         <span className="ct-badge" style={{ background: '#d97706', color: '#fff' }}>{pendingMaterials.length}</span>
                     </div>
+                    {role === 'accountant' && (
+                        <div style={{ fontSize: 12, color: '#92400e', marginBottom: 8 }}>
+                            Waiting for admin approval before these appear in inventory.
+                        </div>
+                    )}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         {pendingMaterials.map((m) => (
                             <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderRadius: 8, border: '1px solid #fde68a', background: '#fffbeb', padding: '8px 12px', fontSize: 13 }}>
@@ -1222,10 +1227,14 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                         {m.requested_by_user ? ` · requested by ${m.requested_by_user.name}` : ''}
                                     </div>
                                 </div>
-                                <div style={{ display: 'flex', gap: 6 }}>
-                                    <button type="button" className="btn sm primary" onClick={() => approvePendingMaterial(m)}>✓ Approve</button>
-                                    <button type="button" className="btn sm" style={{ borderColor: '#dc2626', color: '#dc2626' }} onClick={() => rejectPendingMaterial(m)}>✕ Reject</button>
-                                </div>
+                                {role === 'admin' ? (
+                                    <div style={{ display: 'flex', gap: 6 }}>
+                                        <button type="button" className="btn sm primary" onClick={() => approvePendingMaterial(m)}>✓ Approve</button>
+                                        <button type="button" className="btn sm" style={{ borderColor: '#dc2626', color: '#dc2626' }} onClick={() => rejectPendingMaterial(m)}>✕ Reject</button>
+                                    </div>
+                                ) : (
+                                    <span className="badge amber">⏳ Pending</span>
+                                )}
                             </div>
                         ))}
                     </div>
