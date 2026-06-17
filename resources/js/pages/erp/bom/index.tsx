@@ -167,7 +167,7 @@ function fmtSmart(qty: number, unit: string): string {
 }
 
 export default function BomIndex({ boms, materials, categories, productionRuns }: Props) {
-    const { auth } = usePage<{ auth: Auth }>().props;
+    const { auth, flash } = usePage<{ auth: Auth; flash?: { success?: string; error?: string } }>().props;
     const canSeeCost  = auth.user?.role === 'admin' || auth.user?.cost_access === true;
     const isAdmin     = auth.user?.role === 'admin';
     const canDeleteBom = isAdmin || (auth.user?.permissions ?? []).includes('bom_delete');
@@ -401,7 +401,10 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
         const batchNumber = runForm.data.batch_number.trim();
         const notes       = runForm.data.notes;
         const totalYield  = (Number(bom.batch_size) * batchCount).toLocaleString('en-IN', { maximumFractionDigits: 3 });
-        const msg = `Confirm Production Run\n\nBatch No.: ${batchNumber || '(auto)'}\nBOM: ${bom.name}\nBatches: ${batchCount}\nTotal yield: ${totalYield} ${bom.batch_unit}\n\nThis will deduct raw materials from stock and add to finished goods. Proceed?`;
+        const outputWarning = bom.output_raw_material_id
+            ? ''
+            : '\n\n⚠️ WARNING: This BOM has no "Output Product in Inventory" linked. The produced quantity will NOT be added to Inventory stock — only raw materials will be deducted. Edit the BOM and select an Output Product first if you want inventory stock to update.';
+        const msg = `Confirm Production Run\n\nBatch No.: ${batchNumber || '(auto)'}\nBOM: ${bom.name}\nBatches: ${batchCount}\nTotal yield: ${totalYield} ${bom.batch_unit}\n\nThis will deduct raw materials from stock and add to finished goods.${outputWarning}\n\nProceed?`;
         if (!window.confirm(msg)) return;
         runForm.post(bomRun(bom.id).url, {
             preserveScroll: true,
@@ -598,6 +601,9 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                     </div>
                     {pageView === 'boms' && <button className="btn primary" onClick={openNew}>+ Add New BOM</button>}
                 </div>
+
+                {flash?.success && <div className="alert-success" style={{ marginBottom: 16 }}>{flash.success}</div>}
+                {flash?.error   && <div className="alert-error"   style={{ marginBottom: 16 }}>{flash.error}</div>}
 
                 {/* Production Required Alerts */}
                 {lowStockBoms.length > 0 && (
