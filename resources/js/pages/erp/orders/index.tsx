@@ -508,7 +508,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
         return ['draft', 'submitted'].includes(order.status ?? '') && order.created_by === currentUserId;
     };
 
-    const [activeFilter, setActiveFilter] = useState<'mine' | 'mine-confirmed' | 'mine-dispatched' | 'all' | 'all-dispatched'>('mine');
+    const [activeFilter, setActiveFilter] = useState<'mine' | 'mine-confirmed' | 'mine-dispatched' | 'all' | 'all-dispatched'>(isAccountant ? 'all' : 'mine');
     const [openOrders, setOpenOrders] = useState<number[]>([]);
     const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
     const [confirmStep, setConfirmStep] = useState<'factory' | 'design'>('factory');
@@ -1136,7 +1136,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                             ['mine-dispatched', 'My Dispatched Orders'],
                             ['all', 'All Orders'],
                             ['all-dispatched', 'All Dispatched Orders'],
-                        ] as const).map(([key, label]) => (
+                        ] as const).filter(([key]) => !isAccountant || (key === 'all' || key === 'all-dispatched')).map(([key, label]) => (
                             <button
                                 key={key}
                                 type="button"
