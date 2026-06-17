@@ -434,7 +434,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
         const win = window.open('', '_blank', 'width=700,height=800');
         if (!win) return;
         win.document.write(`<html><head><title>Production Run — ${s.batchNumber ?? s.bomName}</title>
-        <style>body{font-family:Arial,sans-serif;padding:28px 32px;color:#111;font-size:14px}h1{font-size:20px;margin:0 0 4px}table{width:100%;border-collapse:collapse;margin-top:16px}th{text-align:left;font-size:12px;color:#555}@media print{@page{size:A4;margin:15mm}button{display:none}}</style>
+        <style>body{font-family:Arial,sans-serif;padding:14px 16px;color:#111;font-size:11px}h1{font-size:15px;margin:0 0 3px}table{width:100%;border-collapse:collapse;margin-top:10px}th{text-align:left;font-size:10px;color:#555}@media print{@page{size:A6;margin:6mm}button{display:none}}</style>
         </head><body>
         <h1>Production Run Report</h1>
         <div style="font-size:12px;color:#555;margin-bottom:20px">${s.date}${s.user ? ' · ' + s.user.name : ''}</div>
