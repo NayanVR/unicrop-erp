@@ -38,6 +38,7 @@ type Bom = {
     notes?: string | null;
     is_active: boolean;
     items: BomItem[];
+    created_at?: string;
 };
 
 type Props = {
@@ -791,6 +792,11 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                         {!bom.is_active && (
                                             <span className="badge gray" style={{ fontSize: 11 }}>Inactive</span>
                                         )}
+                                        {bom.created_at && (
+                                            <span style={{ fontSize: 11, color: 'var(--tx-faint)', marginLeft: 'auto' }}>
+                                                Created: {new Date(bom.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                            </span>
+                                        )}
                                     </div>
 
                                     {/* Output inventory link */}
@@ -823,6 +829,11 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                                         {formatQty(item.qty_per_batch)}{' '}
                                                         <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 12 }}>{normalizeUnitDisplay(itemUnit)}</span>
                                                     </span>
+                                                    {canSeeCost && mat && (
+                                                        <span style={{ fontSize: 12, color: 'var(--tx-muted)', whiteSpace: 'nowrap' }}>
+                                                            ₹{(neededInMatUnit * Number(mat.cost_per_unit)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        </span>
+                                                    )}
                                                     <span style={{
                                                         fontSize: 11, whiteSpace: 'nowrap',
                                                         color: sufficient ? '#059669' : '#dc2626',
