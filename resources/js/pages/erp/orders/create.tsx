@@ -27,6 +27,7 @@ type Party = {
     default_transport_type?: 'transport' | 'courier' | null;
     default_transport_id?: number | null;
     destination?: string | null;
+    outstanding_due?: number | null;
     product_rates: ProductRate[];
 };
 
@@ -673,6 +674,15 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                     </div>
                                 )}
                             </div>
+                            {(() => {
+                                const selectedParty = parties.find((p) => String(p.id) === form.data.party_id);
+                                if (!selectedParty?.outstanding_due || selectedParty.outstanding_due <= 0) return null;
+                                return (
+                                    <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 8, background: '#fef3c7', border: '1px solid #fcd34d', fontSize: 13 }}>
+                                        ⚠️ <strong>{selectedParty.name}</strong> has ₹{selectedParty.outstanding_due.toLocaleString('en-IN')} due from earlier orders.
+                                    </div>
+                                );
+                            })()}
                         </div>
 
                         <div className="form-grid">

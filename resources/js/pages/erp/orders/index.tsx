@@ -131,6 +131,7 @@ type Order = {
     items: OrderItem[];
     docs?: OrderDoc[];
     payments?: OrderPayment[];
+    party_previous_due?: number | null;
     eway_bill_not_required?: boolean;
 };
 
@@ -535,6 +536,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
     const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentRef, setPaymentRef] = useState('');
     const [savingPayment, setSavingPayment] = useState(false);
+    const [paymentOnlyMode, setPaymentOnlyMode] = useState(false);
     const [designNote, setDesignNote] = useState('');
     const [skipPartyApproval, setSkipPartyApproval] = useState(false);
     const [selectedItemIds, setSelectedItemIds] = useState<number[]>([]);
@@ -589,6 +591,20 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
     const openConfirm = (order: Order, e: React.MouseEvent) => {
         e.stopPropagation();
         setConfirmStep('payment');
+        setPaymentOnlyMode(false);
+        setPaymentBankId('');
+        setPaymentAmount('');
+        setPaymentRef('');
+        setConfirmTarget({ id: order.id, number: order.order_number, companyName: order.company_name });
+    };
+
+    // Lets sales/admin log a late payment after the order has already been
+    // confirmed/sent to factory — same Step-1 form, but without the rest of
+    // the confirm wizard (Factory/Design steps).
+    const openRecordPayment = (order: Order, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setConfirmStep('payment');
+        setPaymentOnlyMode(true);
         setPaymentBankId('');
         setPaymentAmount('');
         setPaymentRef('');
@@ -599,6 +615,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
         if (submitting || savingPayment) return;
         setConfirmTarget(null);
         setConfirmStep('payment');
+        setPaymentOnlyMode(false);
     };
 
     const addPayment = (onSuccess?: () => void) => {
@@ -630,6 +647,21 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
         }
         if (hasPayments) {
             setConfirmStep('factory');
+        }
+    };
+
+    // Standalone "Record Payment" flow (post-confirmation) — save a pending
+    // entry if one was filled in, then close without advancing any step.
+    const finishRecordPayment = () => {
+        const done = () => {
+            setConfirmTarget(null);
+            setConfirmStep('payment');
+            setPaymentOnlyMode(false);
+        };
+        if (paymentBankId && paymentAmount) {
+            addPayment(done);
+        } else {
+            done();
         }
     };
 
@@ -877,10 +909,20 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                         <button className="modal-close" onClick={closeConfirm} disabled={submitting || savingPayment}>✕</button>
                                     </div>
                                     <div className="modal-form">
-                                        <p style={{ color: 'var(--tx-muted)', fontSize: '12px', marginBottom: '6px' }}>Step 1 of 3</p>
+                                        {!paymentOnlyMode && (
+                                            <p style={{ color: 'var(--tx-muted)', fontSize: '12px', marginBottom: '6px' }}>Step 1 of 3</p>
+                                        )}
                                         <p style={{ color: 'var(--tx-muted)', marginBottom: '16px', fontSize: '14px' }}>
-                                            Record payment received for order <strong>{confirmTarget.number}</strong> before sending it to the factory.
+                                            {paymentOnlyMode
+                                                ? <>Record a payment received for order <strong>{confirmTarget.number}</strong>.</>
+                                                : <>Record payment received for order <strong>{confirmTarget.number}</strong> before sending it to the factory.</>}
                                         </p>
+
+                                        {!!targetOrder?.party_previous_due && targetOrder.party_previous_due > 0 && (
+                                            <div style={{ marginBottom: 14, padding: '8px 12px', borderRadius: 8, background: '#fef3c7', border: '1px solid #fcd34d', fontSize: 13 }}>
+                                                ⚠️ <strong>{targetOrder.company_name}</strong> also has ₹{targetOrder.party_previous_due.toLocaleString('en-IN')} due from earlier orders.
+                                            </div>
+                                        )}
 
                                         {payments.length > 0 && (
                                             <div style={{ marginBottom: 14, border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
@@ -910,7 +952,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                             </select>
                                         </div>
                                         <div className="form-group" style={{ marginBottom: 10 }}>
-                                            <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--tx-muted)', textTransform: 'uppercase' }}>Amount (₹)</label>
+                                            <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--tx-muted)', textTransform: 'uppercase' }}>Received Amount (₹)</label>
                                             <input type="number" min="0" step="any" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} style={{ width: '100%', marginTop: 6 }} disabled={savingPayment} />
                                         </div>
                                         <div className="form-group" style={{ marginBottom: 16 }}>
@@ -923,16 +965,22 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                             </button>
                                             <div style={{ display: 'flex', gap: 8 }}>
                                                 <button type="button" className="btn-secondary" onClick={closeConfirm} disabled={submitting || savingPayment}>
-                                                    Cancel
+                                                    {paymentOnlyMode ? 'Close' : 'Cancel'}
                                                 </button>
-                                                <button
-                                                    type="button"
-                                                    className="btn-primary"
-                                                    onClick={() => continueFromPayment(payments.length > 0)}
-                                                    disabled={savingPayment || (payments.length === 0 && !(paymentBankId && paymentAmount))}
-                                                >
-                                                    Continue →
-                                                </button>
+                                                {paymentOnlyMode ? (
+                                                    <button type="button" className="btn-primary" onClick={finishRecordPayment} disabled={savingPayment}>
+                                                        {savingPayment ? 'Saving…' : 'Done'}
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        className="btn-primary"
+                                                        onClick={() => continueFromPayment(payments.length > 0)}
+                                                        disabled={savingPayment || (payments.length === 0 && !(paymentBankId && paymentAmount))}
+                                                    >
+                                                        Continue →
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -1426,6 +1474,19 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                 <span className="badge teal" style={{ fontSize: '11px' }}>
                                                     ✓ Sent to Factory
                                                 </span>
+                                            </div>
+                                        )}
+                                        {/* Late/remaining payment — sales/admin can log it even after the order is confirmed/dispatched */}
+                                        {canConfirm && (order.status === 'confirmed' || order.status === 'dispatched') && (
+                                            <div className="confirm-btn">
+                                                <button
+                                                    type="button"
+                                                    className="btn sm"
+                                                    style={{ borderColor: '#059669', color: '#059669' }}
+                                                    onClick={(e) => openRecordPayment(order, e)}
+                                                >
+                                                    💰 Record Payment
+                                                </button>
                                             </div>
                                         )}
                                         {order.status === 'design' && (

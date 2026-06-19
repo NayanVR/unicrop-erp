@@ -77,9 +77,20 @@ class OrderController extends Controller
 
         $orders = $ordersQuery->get();
 
+        $partyDues = $this->partyOutstandingTotals();
+
         // Surface activity attribution as plain fields, then drop the relation
         // objects whose serialized keys would clobber the created_by / confirmed_by columns.
-        $orders->each(function (Order $order) {
+        $orders->each(function (Order $order) use ($partyDues) {
+            $order->party_previous_due = null;
+            if ($order->party_id && isset($partyDues[$order->party_id])) {
+                $due = $partyDues[$order->party_id];
+                if (in_array($order->status, ['confirmed', 'dispatched'], true)) {
+                    $due -= (float) $order->total_amount - (float) $order->payments->sum('amount');
+                }
+                $order->party_previous_due = round($due, 2);
+            }
+
             $order->confirmed_by_name = $order->confirmedBy?->name;
             $order->created_by_name = $order->createdBy?->name;
             $order->design_handlers = $order->designOrders
@@ -154,21 +165,59 @@ class OrderController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        $partyDues = $this->partyOutstandingTotals();
+
+        $parties = Party::where('is_active', true)
+            ->whereNotIn('type', ['supplier', 'vendor'])
+            ->orderBy('name')
+            ->with(['productRates' => fn ($q) => $q->where('is_active', true)->orderBy('our_brand')->orderBy('packing_size')])
+            ->get(['id', 'name', 'customer_name', 'gst_no', 'pan_no', 'pan_card_path', 'phone', 'address', 'city', 'state', 'default_transport_type', 'default_transport_id', 'destination']);
+
+        $parties->each(function (Party $party) use ($partyDues) {
+            $party->outstanding_due = round($partyDues[$party->id] ?? 0, 2);
+        });
+
         return Inertia::render('erp/orders/create', [
             'pageTitle' => 'New Order',
             'salesUsers' => $salesUsers,
             'transports' => Transport::transports()->orderBy('name')->get(['id', 'name']),
             'couriers' => Transport::couriers()->orderBy('name')->get(['id', 'name']),
-            'parties' => Party::where('is_active', true)
-                ->whereNotIn('type', ['supplier', 'vendor'])
-                ->orderBy('name')
-                ->with(['productRates' => fn ($q) => $q->where('is_active', true)->orderBy('our_brand')->orderBy('packing_size')])
-                ->get(['id', 'name', 'customer_name', 'gst_no', 'pan_no', 'pan_card_path', 'phone', 'address', 'city', 'state', 'default_transport_type', 'default_transport_id', 'destination']),
+            'parties' => $parties,
             'currentUser' => ['id' => $user?->id, 'name' => $user?->name],
             'finishGoodBrands' => $this->finishGoodBrands(),
             'productPhotos' => $this->mapProductPhotos(),
             'packingSizes' => PackingSize::query()->orderBy('name')->get(['name', 'multiplier', 'pieces_per_box', 'pack_unit']),
         ]);
+    }
+
+    /**
+     * Outstanding balance per party: total amount of their confirmed/dispatched
+     * orders minus payments received against those orders.
+     *
+     * @return array<int, float>
+     */
+    private function partyOutstandingTotals(): array
+    {
+        $totals = Order::query()
+            ->whereIn('status', ['confirmed', 'dispatched'])
+            ->whereNotNull('party_id')
+            ->selectRaw('party_id, SUM(total_amount) as total')
+            ->groupBy('party_id')
+            ->pluck('total', 'party_id');
+
+        $paid = OrderPayment::query()
+            ->join('orders', 'orders.id', '=', 'order_payments.order_id')
+            ->whereNotNull('orders.party_id')
+            ->selectRaw('orders.party_id as party_id, SUM(order_payments.amount) as paid')
+            ->groupBy('orders.party_id')
+            ->pluck('paid', 'party_id');
+
+        $dues = [];
+        foreach ($totals as $partyId => $total) {
+            $dues[$partyId] = (float) $total - (float) ($paid[$partyId] ?? 0);
+        }
+
+        return $dues;
     }
 
     public function store(StoreOrderRequest $request): RedirectResponse
@@ -259,8 +308,8 @@ class OrderController extends Controller
 
     public function storePayment(Request $request, Order $order): RedirectResponse
     {
-        if ($order->status !== 'submitted') {
-            return redirect()->back()->with('error', 'Payments can only be recorded for submitted orders, before they are confirmed.');
+        if (! in_array($order->status, ['submitted', 'confirmed', 'dispatched'], true)) {
+            return redirect()->back()->with('error', 'Payments can only be recorded once the order has been submitted.');
         }
 
         $data = $request->validate([
@@ -283,8 +332,8 @@ class OrderController extends Controller
             abort(404);
         }
 
-        if ($order->status !== 'submitted') {
-            return redirect()->back()->with('error', 'Payments can only be removed before the order is confirmed.');
+        if ($payment->tally_entry_done) {
+            return redirect()->back()->with('error', 'This payment has already been entered in Tally and cannot be removed.');
         }
 
         $payment->delete();
