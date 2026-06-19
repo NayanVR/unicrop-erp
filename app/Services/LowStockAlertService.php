@@ -234,59 +234,67 @@ class LowStockAlertService
 
     private function notifySupplier(RawMaterial $material): void
     {
-        $party = $this->resolveSupplierParty($material);
+        $parties = $this->resolveSupplierParties($material);
 
-        if (! $party || empty($party->phone)) {
-            return;
-        }
-
-        $message = $this->formatSupplierMessage($material, $party);
-        $phone   = $this->normalizePhone($party->phone);
-
-        try {
-            if (AppSetting::get('alert_provider', 'twilio') === 'twilio') {
-                $sid   = AppSetting::get('alert_twilio_sid');
-                $token = AppSetting::get('alert_twilio_token');
-                $from  = AppSetting::get('alert_twilio_from');
-
-                if (!$sid || !$token || !$from) {
-                    return;
-                }
-
-                $this->twilioSend($sid, $token, "whatsapp:{$from}", "whatsapp:{$phone}", $message);
-            } else {
-                $this->sendViaMSG91($message, [$phone]);
+        foreach ($parties as $party) {
+            if (empty($party->phone)) {
+                continue;
             }
-        } catch (\Throwable $e) {
-            Log::error("LowStockAlertService supplier notify error for material #{$material->id}: " . $e->getMessage());
+
+            $message = $this->formatSupplierMessage($material, $party);
+            $phone   = $this->normalizePhone($party->phone);
+
+            try {
+                if (AppSetting::get('alert_provider', 'twilio') === 'twilio') {
+                    $sid   = AppSetting::get('alert_twilio_sid');
+                    $token = AppSetting::get('alert_twilio_token');
+                    $from  = AppSetting::get('alert_twilio_from');
+
+                    if (!$sid || !$token || !$from) {
+                        continue;
+                    }
+
+                    $this->twilioSend($sid, $token, "whatsapp:{$from}", "whatsapp:{$phone}", $message);
+                } else {
+                    $this->sendViaMSG91($message, [$phone]);
+                }
+            } catch (\Throwable $e) {
+                Log::error("LowStockAlertService supplier notify error for material #{$material->id} / party #{$party->id}: " . $e->getMessage());
+            }
         }
     }
 
-    private function resolveSupplierParty(RawMaterial $material): ?Party
+    /**
+     * A material can be bought from more than one supplier (e.g. "Humic" from ~10
+     * vendors), so notify everyone who is on record as supplying it — matched both
+     * by the material's `supplier` name field and by purchase-bill history.
+     *
+     * @return \Illuminate\Support\Collection<int, Party>
+     */
+    private function resolveSupplierParties(RawMaterial $material): \Illuminate\Support\Collection
     {
+        $byName = collect();
+
         if (! empty($material->supplier)) {
-            $party = Party::where('is_active', true)
+            $byName = Party::where('is_active', true)
                 ->whereIn('type', ['supplier', 'both'])
                 ->whereNotNull('phone')
                 ->whereRaw('LOWER(name) = ?', [mb_strtolower(trim($material->supplier))])
-                ->first();
-
-            if ($party) {
-                return $party;
-            }
+                ->get();
         }
 
-        $item = InventoryPurchaseBillItem::where('raw_material_id', $material->id)
+        $byHistory = InventoryPurchaseBillItem::where('raw_material_id', $material->id)
             ->whereHas('inventoryPurchaseBill.party', function ($q) {
                 $q->where('is_active', true)
                     ->whereNotNull('phone')
                     ->whereIn('type', ['supplier', 'both']);
             })
             ->with('inventoryPurchaseBill.party')
-            ->latest('id')
-            ->first();
+            ->get()
+            ->pluck('inventoryPurchaseBill.party')
+            ->filter();
 
-        return $item?->inventoryPurchaseBill?->party;
+        return $byName->concat($byHistory)->unique('id')->values();
     }
 
     private function formatSupplierMessage(RawMaterial $material, Party $party): string
