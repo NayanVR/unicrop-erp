@@ -1,4 +1,5 @@
 import { ledger as partyLedger } from '@/routes/parties';
+import { print as partyLedgerPrint } from '@/routes/parties/ledger';
 import { Head, router, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
@@ -96,11 +97,23 @@ export default function PartyLedger() {
                             <div style={{ color: '#6b7280' }}>Select a party to view their ledger.</div>
                         ) : (
                             <>
-                                <h2 style={{ marginBottom: 4 }}>{party.name}</h2>
-                                {party.customer_name && <div style={{ color: '#6b7280', marginBottom: 4 }}>{party.customer_name}</div>}
-                                <div style={{ color: '#6b7280', fontSize: 13, marginBottom: 16 }}>
-                                    {party.gst_no && <span>GST: {party.gst_no} &nbsp;·&nbsp; </span>}
-                                    {party.phone && <span>{party.phone}</span>}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                    <div>
+                                        <h2 style={{ marginBottom: 4 }}>{party.name}</h2>
+                                        {party.customer_name && <div style={{ color: '#6b7280', marginBottom: 4 }}>{party.customer_name}</div>}
+                                        <div style={{ color: '#6b7280', fontSize: 13, marginBottom: 16 }}>
+                                            {party.gst_no && <span>GST: {party.gst_no} &nbsp;·&nbsp; </span>}
+                                            {party.phone && <span>{party.phone}</span>}
+                                        </div>
+                                    </div>
+                                    <a
+                                        href={partyLedgerPrint(party.id).url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="btn sm"
+                                    >
+                                        📄 Download PDF
+                                    </a>
                                 </div>
 
                                 {summary && (

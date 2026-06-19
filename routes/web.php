@@ -258,6 +258,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['role:admin,sales,accountant'])->group(function () {
         Route::get('party-ledger', [PartyController::class, 'ledgerIndex'])->name('parties.ledger.index');
         Route::get('party-ledger/{party}', [PartyController::class, 'ledger'])->name('parties.ledger');
+        Route::get('party-ledger/{party}/print', [PartyController::class, 'ledgerPrint'])->name('parties.ledger.print');
     });
 });
 

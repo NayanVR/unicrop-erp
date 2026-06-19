@@ -358,10 +358,46 @@ class PartyController extends Controller
 
     public function ledger(Request $request, Party $party): Response
     {
+        $this->guardLedgerAccess($request, $party);
+
+        ['entries' => $entries, 'summary' => $summary] = $this->buildLedger($party);
+
+        return Inertia::render('erp/parties/ledger', [
+            'pageTitle' => 'Party Ledger',
+            'parties'   => $this->ledgerPartyOptions($request),
+            'party'     => [
+                'id'            => $party->id,
+                'name'          => $party->name,
+                'customer_name' => $party->customer_name,
+                'gst_no'        => $party->gst_no,
+                'phone'         => $party->phone,
+            ],
+            'entries' => $entries,
+            'summary' => $summary,
+        ]);
+    }
+
+    public function ledgerPrint(Request $request, Party $party): \Illuminate\View\View
+    {
+        $this->guardLedgerAccess($request, $party);
+
+        ['entries' => $entries, 'summary' => $summary] = $this->buildLedger($party);
+
+        return view('parties.ledger-print', ['party' => $party, 'entries' => $entries, 'summary' => $summary]);
+    }
+
+    private function guardLedgerAccess(Request $request, Party $party): void
+    {
         if ($this->cannotViewSuppliers($request) && in_array($party->type, ['supplier', 'vendor'], true)) {
             abort(403);
         }
+    }
 
+    /**
+     * @return array{entries: array<int, array<string, mixed>>, summary: array<string, float>}
+     */
+    private function buildLedger(Party $party): array
+    {
         $party->load([
             'orders' => fn ($q) => $q->orderBy('order_date')->orderBy('id'),
             'orders.payments' => fn ($q) => $q->orderBy('created_at'),
@@ -406,23 +442,14 @@ class PartyController extends Controller
             return $entry;
         });
 
-        return Inertia::render('erp/parties/ledger', [
-            'pageTitle' => 'Party Ledger',
-            'parties'   => $this->ledgerPartyOptions($request),
-            'party'     => [
-                'id'            => $party->id,
-                'name'          => $party->name,
-                'customer_name' => $party->customer_name,
-                'gst_no'        => $party->gst_no,
-                'phone'         => $party->phone,
-            ],
+        return [
             'entries' => $entries->values()->all(),
             'summary' => [
                 'total_invoiced' => round($entries->sum('debit'), 2),
                 'total_received' => round($entries->sum('credit'), 2),
                 'balance_due'    => round($balance, 2),
             ],
-        ]);
+        ];
     }
 
     /**
