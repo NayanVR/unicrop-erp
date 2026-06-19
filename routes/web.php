@@ -55,6 +55,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('orders/{order}/documents', [OrderController::class, 'uploadDocument'])->name('orders.documents.store');
         Route::delete('orders/{order}/documents/{attachment}', [OrderController::class, 'deleteDocument'])->name('orders.documents.destroy');
         Route::post('orders/{order}/eway-not-required', [OrderController::class, 'setEwayNotRequired'])->name('orders.eway-not-required');
+        Route::post('orders/{order}/payments/{payment}/tally-entry', [OrderController::class, 'markPaymentTallyEntry'])->name('orders.payments.tally-entry');
     });
 
     Route::middleware(['role:admin,sales'])->group(function () {

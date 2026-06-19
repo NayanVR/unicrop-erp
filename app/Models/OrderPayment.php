@@ -7,12 +7,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class OrderPayment extends Model
 {
-    protected $fillable = ['order_id', 'bank_account_id', 'amount', 'reference_number', 'created_by'];
+    protected $fillable = [
+        'order_id', 'bank_account_id', 'amount', 'reference_number', 'created_by',
+        'tally_entry_done', 'tally_entry_done_at', 'tally_entry_done_by',
+    ];
 
     protected function casts(): array
     {
         return [
             'amount' => 'decimal:2',
+            'tally_entry_done' => 'boolean',
+            'tally_entry_done_at' => 'datetime',
         ];
     }
 
@@ -29,5 +34,10 @@ class OrderPayment extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function tallyEntryDoneBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'tally_entry_done_by');
     }
 }

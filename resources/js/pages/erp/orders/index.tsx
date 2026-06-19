@@ -1,6 +1,6 @@
 import { advance as designAdvance, tracking as designTracking } from '@/routes/design';
 import { confirm as ordersConfirm, create as ordersCreate, destroy as ordersDestroy, edit as ordersEdit, labelPrint as ordersLabelPrint, sendToDesign as ordersSendToDesign } from '@/routes/orders';
-import { store as orderPaymentsStore, destroy as orderPaymentsDestroy } from '@/routes/orders/payments';
+import { store as orderPaymentsStore, destroy as orderPaymentsDestroy, tallyEntry as orderPaymentsTallyEntry } from '@/routes/orders/payments';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -86,6 +86,10 @@ type OrderPayment = {
     bank_account?: { id: number; name: string } | null;
     amount: string | number;
     reference_number?: string | null;
+    recorded_by?: string | null;
+    tally_entry_done?: boolean;
+    tally_entry_done_at?: string | null;
+    tally_entry_done_by?: string | null;
     created_at?: string | null;
 };
 
@@ -1666,6 +1670,69 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                         )}
                                                         {tallyStatus === 'error' && (
                                                             <span style={{ color: '#dc2626', fontSize: '12px' }}>{tallyMessage}</span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Payments received */}
+                                                    <div style={{ marginBottom: '12px', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
+                                                        <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)', marginBottom: '8px' }}>
+                                                            💰 Payments Received
+                                                        </div>
+                                                        {(order.payments ?? []).length === 0 ? (
+                                                            <div style={{ fontSize: '12px', color: 'var(--tx-muted)' }}>No payments recorded yet.</div>
+                                                        ) : (
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                                {(order.payments ?? []).map((p) => (
+                                                                    <div
+                                                                        key={p.id}
+                                                                        style={{
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '10px',
+                                                                            flexWrap: 'wrap',
+                                                                            background: p.tally_entry_done ? '#f0fdf4' : 'var(--bg-paper)',
+                                                                            border: `1px solid ${p.tally_entry_done ? '#86efac' : 'var(--border)'}`,
+                                                                            borderRadius: '8px',
+                                                                            padding: '8px 12px',
+                                                                        }}
+                                                                    >
+                                                                        <div style={{ flex: 1, minWidth: '220px' }}>
+                                                                            <div style={{ fontSize: '13px', fontWeight: 700 }}>
+                                                                                ₹{Number(p.amount).toLocaleString('en-IN')}
+                                                                                <span style={{ fontWeight: 500, color: 'var(--tx-muted)' }}> · {p.bank_account?.name ?? '—'}</span>
+                                                                            </div>
+                                                                            <div style={{ fontSize: '11px', color: 'var(--tx-muted)' }}>
+                                                                                {p.reference_number ? `UTR/Ref: ${p.reference_number} · ` : ''}
+                                                                                Recorded by {p.recorded_by ?? '—'}{p.created_at ? ` on ${p.created_at}` : ''}
+                                                                            </div>
+                                                                            {p.tally_entry_done && (
+                                                                                <div style={{ fontSize: '11px', color: '#16a34a' }}>
+                                                                                    ✓ Tally entry done by {p.tally_entry_done_by ?? '—'}{p.tally_entry_done_at ? ` on ${p.tally_entry_done_at}` : ''}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="btn sm"
+                                                                            style={
+                                                                                p.tally_entry_done
+                                                                                    ? { padding: '4px 10px', fontSize: '11px', color: 'var(--tx-muted)' }
+                                                                                    : { padding: '4px 10px', fontSize: '11px', background: '#1e40af', borderColor: '#1e40af', color: '#fff' }
+                                                                            }
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                router.post(
+                                                                                    orderPaymentsTallyEntry([order.id, p.id]).url,
+                                                                                    { tally_entry_done: !p.tally_entry_done },
+                                                                                    { preserveScroll: true },
+                                                                                );
+                                                                            }}
+                                                                        >
+                                                                            {p.tally_entry_done ? '↩ Undo' : '✓ Mark Tally Entry Done'}
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
                                                         )}
                                                     </div>
 

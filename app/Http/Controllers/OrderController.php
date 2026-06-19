@@ -44,8 +44,10 @@ class OrderController extends Controller
                 'designOrders:id,order_id,order_item_id,assigned_to,status,order_qty,pcs_to_print,labels_received,skip_party_approval,stage_log',
                 'designOrders.assignee:id,name',
                 'attachments:id,order_id,document_type,original_name,created_at',
-                'payments:id,order_id,bank_account_id,amount,reference_number,created_at',
+                'payments:id,order_id,bank_account_id,amount,reference_number,created_by,tally_entry_done,tally_entry_done_at,tally_entry_done_by,created_at',
                 'payments.bankAccount:id,name',
+                'payments.createdBy:id,name',
+                'payments.tallyEntryDoneBy:id,name',
             ])
             ->orderByDesc('order_date')
             ->orderByDesc('id');
@@ -110,10 +112,25 @@ class OrderController extends Controller
                     'uploaded_at'   => $a->created_at?->format('d M Y'),
                 ])->values()->all();
 
+            // Payments received against this order, with attribution as plain fields
+            $order->payments = $order->payments->map(fn ($p) => [
+                'id'                    => $p->id,
+                'bank_account_id'       => $p->bank_account_id,
+                'bank_account'          => $p->bankAccount ? ['id' => $p->bankAccount->id, 'name' => $p->bankAccount->name] : null,
+                'amount'                => $p->amount,
+                'reference_number'      => $p->reference_number,
+                'recorded_by'           => $p->createdBy?->name,
+                'tally_entry_done'      => (bool) $p->tally_entry_done,
+                'tally_entry_done_at'   => $p->tally_entry_done_at?->format('d M Y, h:i A'),
+                'tally_entry_done_by'   => $p->tallyEntryDoneBy?->name,
+                'created_at'            => $p->created_at?->format('d M Y, h:i A'),
+            ])->values()->all();
+
             $order->unsetRelation('confirmedBy');
             $order->unsetRelation('createdBy');
             $order->unsetRelation('designOrders');
             $order->unsetRelation('attachments');
+            $order->unsetRelation('payments');
         });
 
         return Inertia::render('erp/orders/index', [
@@ -273,6 +290,25 @@ class OrderController extends Controller
         $payment->delete();
 
         return redirect()->back()->with('success', 'Payment removed.');
+    }
+
+    public function markPaymentTallyEntry(Request $request, Order $order, OrderPayment $payment): RedirectResponse
+    {
+        if ($payment->order_id !== $order->id) {
+            abort(404);
+        }
+
+        $data = $request->validate([
+            'tally_entry_done' => 'required|boolean',
+        ]);
+
+        $payment->update([
+            'tally_entry_done' => $data['tally_entry_done'],
+            'tally_entry_done_at' => $data['tally_entry_done'] ? now() : null,
+            'tally_entry_done_by' => $data['tally_entry_done'] ? $request->user()?->id : null,
+        ]);
+
+        return redirect()->back()->with('success', $data['tally_entry_done'] ? 'Marked as entered in Tally.' : 'Tally entry unmarked.');
     }
 
     public function confirm(Request $request, Order $order): RedirectResponse
