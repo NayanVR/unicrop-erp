@@ -9,6 +9,7 @@ use App\Models\ProductPhoto;
 use App\Models\ProductPhotoFolder;
 use App\Models\ProductRate;
 use App\Models\RawMaterial;
+use App\Models\Role;
 use App\Models\Transport;
 use App\Services\LowStockAlertService;
 use Illuminate\Http\RedirectResponse;
@@ -344,19 +345,23 @@ class PartyController extends Controller
         return redirect()->back()->with('success', 'Product rate deleted.');
     }
 
-    public function ledgerIndex(): Response
+    public function ledgerIndex(Request $request): Response
     {
         return Inertia::render('erp/parties/ledger', [
             'pageTitle' => 'Party Ledger',
-            'parties'   => $this->ledgerPartyOptions(),
+            'parties'   => $this->ledgerPartyOptions($request),
             'party'     => null,
             'entries'   => [],
             'summary'   => null,
         ]);
     }
 
-    public function ledger(Party $party): Response
+    public function ledger(Request $request, Party $party): Response
     {
+        if ($this->cannotViewSuppliers($request) && in_array($party->type, ['supplier', 'vendor'], true)) {
+            abort(403);
+        }
+
         $party->load([
             'orders' => fn ($q) => $q->orderBy('order_date')->orderBy('id'),
             'orders.payments' => fn ($q) => $q->orderBy('created_at'),
@@ -403,7 +408,7 @@ class PartyController extends Controller
 
         return Inertia::render('erp/parties/ledger', [
             'pageTitle' => 'Party Ledger',
-            'parties'   => $this->ledgerPartyOptions(),
+            'parties'   => $this->ledgerPartyOptions($request),
             'party'     => [
                 'id'            => $party->id,
                 'name'          => $party->name,
@@ -423,10 +428,19 @@ class PartyController extends Controller
     /**
      * @return \Illuminate\Support\Collection<int, Party>
      */
-    private function ledgerPartyOptions()
+    private function ledgerPartyOptions(Request $request)
     {
-        return Party::where('is_active', true)
-            ->orderBy('name')
-            ->get(['id', 'name', 'customer_name']);
+        $query = Party::where('is_active', true);
+
+        if ($this->cannotViewSuppliers($request)) {
+            $query->whereNotIn('type', ['supplier', 'vendor']);
+        }
+
+        return $query->orderBy('name')->get(['id', 'name', 'customer_name']);
+    }
+
+    private function cannotViewSuppliers(Request $request): bool
+    {
+        return $request->user()?->roles->pluck('slug')->intersect([Role::ADMIN, Role::ACCOUNTANT])->isEmpty() ?? false;
     }
 }
