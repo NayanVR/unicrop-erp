@@ -316,6 +316,10 @@ class OrderController extends Controller
 
         $bankAccounts = $order->payments->pluck('bankAccount')->filter()->unique('id')->values();
 
+        if ($bankAccounts->isEmpty()) {
+            $bankAccounts = BankAccount::where('is_default', true)->where('is_active', true)->get();
+        }
+
         return view('orders.print', [
             'order' => $order,
             'previousDue' => $previousDue,

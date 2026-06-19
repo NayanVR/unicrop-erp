@@ -93,7 +93,7 @@ type OrderPayment = {
     created_at?: string | null;
 };
 
-type BankAccount = { id: number; name: string; bank_name?: string | null; account_number?: string | null; upi_id?: string | null };
+type BankAccount = { id: number; name: string; bank_name?: string | null; account_number?: string | null; upi_id?: string | null; is_default?: boolean };
 
 type Order = {
     id: number;
@@ -592,7 +592,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
         e.stopPropagation();
         setConfirmStep('payment');
         setPaymentOnlyMode(false);
-        setPaymentBankId('');
+        setPaymentBankId(String(bankAccounts.find((b) => b.is_default)?.id ?? ''));
         setPaymentAmount('');
         setPaymentRef('');
         setConfirmTarget({ id: order.id, number: order.order_number, companyName: order.company_name });
@@ -605,7 +605,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
         e.stopPropagation();
         setConfirmStep('payment');
         setPaymentOnlyMode(true);
-        setPaymentBankId('');
+        setPaymentBankId(String(bankAccounts.find((b) => b.is_default)?.id ?? ''));
         setPaymentAmount('');
         setPaymentRef('');
         setConfirmTarget({ id: order.id, number: order.order_number, companyName: order.company_name });
@@ -629,7 +629,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => {
-                setPaymentBankId('');
+                setPaymentBankId(String(bankAccounts.find((b) => b.is_default)?.id ?? ''));
                 setPaymentAmount('');
                 setPaymentRef('');
                 onSuccess?.();

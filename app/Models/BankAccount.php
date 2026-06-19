@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class BankAccount extends Model
 {
-    protected $fillable = ['name', 'bank_name', 'account_number', 'ifsc', 'upi_id', 'is_active'];
+    protected $fillable = ['name', 'bank_name', 'account_number', 'ifsc', 'upi_id', 'is_active', 'is_default'];
 
     public function payments(): HasMany
     {

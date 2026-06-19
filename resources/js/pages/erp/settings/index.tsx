@@ -10,6 +10,7 @@ import {
 } from '@/routes/settings/packing-sizes';
 import {
     destroy as bankAccountDestroy,
+    setDefault as bankAccountSetDefault,
     store as bankAccountStore,
     update as bankAccountUpdate,
 } from '@/routes/settings/bank-accounts';
@@ -54,6 +55,7 @@ type BankAccountEntry = {
     ifsc: string | null;
     upi_id: string | null;
     is_active: boolean;
+    is_default: boolean;
 };
 
 type Props = {
@@ -264,6 +266,10 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes,
         bankAccountForm.delete(bankAccountDestroy(b.id).url, { preserveScroll: true });
     };
 
+    const makeDefaultBankAccount = (b: BankAccountEntry) => {
+        router.patch(bankAccountSetDefault(b.id).url, {}, { preserveScroll: true });
+    };
+
     return (
         <>
             <Head title="Settings" />
@@ -365,6 +371,7 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes,
                                         <th>Account No.</th>
                                         <th>IFSC</th>
                                         <th>UPI Address</th>
+                                        <th>Default</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -376,6 +383,15 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes,
                                             <td>{b.account_number || '—'}</td>
                                             <td>{b.ifsc || '—'}</td>
                                             <td>{b.upi_id || '—'}</td>
+                                            <td>
+                                                {b.is_default ? (
+                                                    <span className="badge" style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #86efac' }}>
+                                                        ★ Default
+                                                    </span>
+                                                ) : (
+                                                    <button className="btn sm" onClick={() => makeDefaultBankAccount(b)}>Set Default</button>
+                                                )}
+                                            </td>
                                             <td>
                                                 <div style={{ display: 'flex', gap: '6px' }}>
                                                     <button className="btn sm" onClick={() => openEditBankAccount(b)}>Edit</button>

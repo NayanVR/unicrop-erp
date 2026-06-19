@@ -154,6 +154,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('erp/settings/bank-accounts', [SettingsController::class, 'storeBankAccount'])->name('settings.bank-accounts.store');
         Route::patch('erp/settings/bank-accounts/{bankAccount}', [SettingsController::class, 'updateBankAccount'])->name('settings.bank-accounts.update');
         Route::delete('erp/settings/bank-accounts/{bankAccount}', [SettingsController::class, 'destroyBankAccount'])->name('settings.bank-accounts.destroy');
+        Route::patch('erp/settings/bank-accounts/{bankAccount}/set-default', [SettingsController::class, 'setDefaultBankAccount'])->name('settings.bank-accounts.set-default');
 
         Route::get('purchase-bills', [PurchaseBillController::class, 'index'])->name('purchase-bills.index');
         Route::post('purchase-bills', [PurchaseBillController::class, 'store'])->name('purchase-bills.store');

@@ -174,4 +174,12 @@ class SettingsController extends Controller
 
         return redirect()->back()->with('success', 'Bank account deleted.');
     }
+
+    public function setDefaultBankAccount(BankAccount $bankAccount): RedirectResponse
+    {
+        BankAccount::where('is_default', true)->update(['is_default' => false]);
+        $bankAccount->update(['is_default' => true]);
+
+        return redirect()->back()->with('success', 'Default bank account updated.');
+    }
 }
