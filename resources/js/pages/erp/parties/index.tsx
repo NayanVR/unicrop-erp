@@ -1,6 +1,7 @@
 
 import {
     destroy as partyDestroy,
+    notifySupplier as notifySupplierAction,
     store as partyStore,
     update as partyUpdate,
 } from '@/routes/parties';
@@ -51,6 +52,17 @@ type ProductGroup = {
 
 type Transport = { id: number; name: string };
 
+type PurchasedProduct = {
+    id: number;
+    name: string;
+    unit: string;
+    category: string | null;
+    stock_qty: string | number;
+    min_stock: string | number;
+    reorder_level: string | number;
+    is_low_stock: boolean;
+};
+
 type Party = {
     id: number;
     name: string;
@@ -72,6 +84,7 @@ type Party = {
     destination: string | null;
     documents_count: number;
     product_rates: PartyProduct[];
+    purchased_products?: PurchasedProduct[];
     created_at: string;
 };
 
@@ -132,6 +145,10 @@ export default function PartiesIndex() {
     // ── Document modal state ───────────────────────────────────────────────
     const [selectedParty, setSelectedParty] = useState<Party | null>(null);
     const [showDocModal,  setShowDocModal]  = useState(false);
+
+    // ── Purchase / supplier-products modal state ──────────────────────────
+    const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+    const [sendingAlert, setSendingAlert] = useState(false);
 
     // ── Product modal state ────────────────────────────────────────────────
     const [showProductModal, setShowProductModal] = useState(false);
@@ -269,6 +286,36 @@ export default function PartiesIndex() {
     const deleteDoc = (doc: Document) => {
         if (!confirm(`Remove document "${doc.original_name}"?`)) return;
         router.delete(docDestroy(doc.id).url);
+    };
+
+    // ── Purchase modal helpers ─────────────────────────────────────────────
+    const openPurchase = (p: Party) => {
+        setSelectedParty(p);
+        setShowPurchaseModal(true);
+    };
+
+    const closePurchase = () => {
+        setShowPurchaseModal(false);
+    };
+
+    const currentPurchasedProducts = useMemo(
+        () => parties.find((p) => p.id === selectedParty?.id)?.purchased_products ?? [],
+        [parties, selectedParty],
+    );
+
+    const lowStockPurchasedProducts = useMemo(
+        () => currentPurchasedProducts.filter((m) => m.is_low_stock),
+        [currentPurchasedProducts],
+    );
+
+    const sendSupplierAlert = () => {
+        if (!selectedParty || lowStockPurchasedProducts.length === 0) return;
+        if (!confirm(`Send WhatsApp low-stock alert to "${selectedParty.name}" for ${lowStockPurchasedProducts.length} product(s)?`)) return;
+        setSendingAlert(true);
+        router.post(notifySupplierAction(selectedParty.id).url, {}, {
+            preserveScroll: true,
+            onFinish: () => setSendingAlert(false),
+        });
     };
 
     // ── Product modal helpers ──────────────────────────────────────────────
@@ -412,7 +459,7 @@ export default function PartiesIndex() {
                         <thead>
                             <tr>
                                 <th>Name</th><th>Type</th><th>GST No.</th><th>Phone</th>
-                                <th>City / State</th><th>Products</th><th>Docs</th><th>Status</th><th>Actions</th>
+                                <th>City / State</th><th>{isSupplierPage ? 'Purchase' : 'Products'}</th><th>Docs</th><th>Status</th><th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -427,9 +474,20 @@ export default function PartiesIndex() {
                                     <td className="text-muted">{p.phone ?? '—'}</td>
                                     <td className="text-muted">{[p.city, p.state].filter(Boolean).join(', ') || '—'}</td>
                                     <td>
-                                        <button className="btn-xs btn-teal" onClick={() => openProducts(p)}>
-                                            📦 {p.product_rates.length}
-                                        </button>
+                                        {isSupplierPage ? (
+                                            <button
+                                                className={`btn-xs ${p.purchased_products?.some((m) => m.is_low_stock) ? '' : 'btn-teal'}`}
+                                                style={p.purchased_products?.some((m) => m.is_low_stock) ? { background: '#fef3f2', border: '1px solid #fecdca', color: '#b42318' } : undefined}
+                                                onClick={() => openPurchase(p)}
+                                            >
+                                                🧾 {p.purchased_products?.length ?? 0}
+                                                {p.purchased_products?.some((m) => m.is_low_stock) ? ' ⚠️' : ''}
+                                            </button>
+                                        ) : (
+                                            <button className="btn-xs btn-teal" onClick={() => openProducts(p)}>
+                                                📦 {p.product_rates.length}
+                                            </button>
+                                        )}
                                     </td>
                                     <td>
                                         <button className="btn-xs btn-secondary" onClick={() => openDocs(p)}>
@@ -834,6 +892,71 @@ export default function PartiesIndex() {
                                         );
                                     })}
                                 </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                </ModalPortal>
+            )}
+
+            {/* ── Purchase (supplier products) Modal ──────────────────────── */}
+            {showPurchaseModal && selectedParty && (
+                <ModalPortal>
+                <div className="modal-overlay open" onClick={closePurchase}>
+                    <div className="modal modal-lg" style={{ maxHeight: '88vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>🧾 Purchased Products — {selectedParty.name}</h2>
+                            <button className="modal-close" onClick={closePurchase}>✕</button>
+                        </div>
+                        <div className="modal-form" style={{ overflowY: 'auto', flex: 1 }}>
+                            {currentPurchasedProducts.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--tx-muted)' }}>
+                                    <div style={{ fontSize: '36px', marginBottom: '8px' }}>🧾</div>
+                                    <p>No raw materials are linked to this supplier yet.</p>
+                                    <p style={{ fontSize: '12px' }}>Set this party's name as the "Supplier" on a material in Inventory to link it here.</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+                                        <button
+                                            type="button"
+                                            className="btn-primary"
+                                            disabled={lowStockPurchasedProducts.length === 0 || sendingAlert}
+                                            onClick={sendSupplierAlert}
+                                            title={lowStockPurchasedProducts.length === 0 ? 'No low-stock products to alert about' : undefined}
+                                        >
+                                            {sendingAlert ? 'Sending…' : `📲 Send WhatsApp Alert${lowStockPurchasedProducts.length ? ` (${lowStockPurchasedProducts.length})` : ''}`}
+                                        </button>
+                                    </div>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                                        <thead>
+                                            <tr style={{ background: 'var(--bg-paper)' }}>
+                                                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tx-muted)', fontSize: '12px' }}>Material</th>
+                                                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tx-muted)', fontSize: '12px' }}>Category</th>
+                                                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tx-muted)', fontSize: '12px' }}>Stock</th>
+                                                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tx-muted)', fontSize: '12px' }}>Min Stock</th>
+                                                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tx-muted)', fontSize: '12px' }}>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {currentPurchasedProducts.map((m) => (
+                                                <tr key={m.id} style={{ borderTop: '1px solid var(--border)' }}>
+                                                    <td style={{ padding: '8px 12px', fontWeight: 600 }}>{m.name}</td>
+                                                    <td style={{ padding: '8px 12px', color: 'var(--tx-muted)' }}>{m.category ?? '—'}</td>
+                                                    <td style={{ padding: '8px 12px' }}>{Number(m.stock_qty).toLocaleString('en-IN')} {m.unit}</td>
+                                                    <td style={{ padding: '8px 12px', color: 'var(--tx-muted)' }}>{Number(m.min_stock).toLocaleString('en-IN')} {m.unit}</td>
+                                                    <td style={{ padding: '8px 12px' }}>
+                                                        {m.is_low_stock ? (
+                                                            <span className="badge" style={{ background: '#fef3f2', color: '#b42318' }}>⚠️ Low Stock</span>
+                                                        ) : (
+                                                            <span className="badge badge-teal">OK</span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </>
                             )}
                         </div>
                     </div>

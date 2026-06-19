@@ -55,6 +55,60 @@ class LowStockAlertService
         }
     }
 
+    /**
+     * Manually notify a supplier (via WhatsApp) about the products purchased
+     * from them that are currently low/out of stock.
+     *
+     * @param \Illuminate\Support\Collection<int, RawMaterial> $materials
+     */
+    public function sendSupplierLowStockAlert(Party $party, \Illuminate\Support\Collection $materials): array
+    {
+        if (empty($party->phone)) {
+            return ['ok' => false, 'detail' => 'Supplier has no phone number on record.'];
+        }
+
+        $message = $this->formatSupplierBulkMessage($party, $materials);
+        $phone   = $this->normalizePhone($party->phone);
+
+        try {
+            if (AppSetting::get('alert_provider', 'twilio') === 'twilio') {
+                $sid   = AppSetting::get('alert_twilio_sid');
+                $token = AppSetting::get('alert_twilio_token');
+                $from  = AppSetting::get('alert_twilio_from');
+
+                if (!$sid || !$token || !$from) {
+                    return ['ok' => false, 'detail' => 'Twilio credentials are not configured.'];
+                }
+
+                $detail = $this->twilioSend($sid, $token, "whatsapp:{$from}", "whatsapp:{$phone}", $message);
+            } else {
+                $detail = $this->sendViaMSG91($message, [$phone]);
+            }
+
+            return ['ok' => true, 'detail' => $detail];
+        } catch (\Throwable $e) {
+            Log::error("LowStockAlertService manual supplier alert error for party #{$party->id}: " . $e->getMessage());
+
+            return ['ok' => false, 'detail' => $e->getMessage()];
+        }
+    }
+
+    private function formatSupplierBulkMessage(Party $party, \Illuminate\Support\Collection $materials): string
+    {
+        $lines = $materials->map(function (RawMaterial $m) {
+            $stock = round((float) $m->stock_qty, 2);
+            $unit  = $m->unit ?? '';
+
+            return "• {$m->name} — current stock: {$stock} {$unit}";
+        })->implode("\n");
+
+        return "Hello {$party->name},\n"
+            . "🙏 We are running low on the following products supplied by you:\n"
+            . "{$lines}\n"
+            . "Kindly arrange the supply at the earliest.\n"
+            . "Thank you - Unicrop Biochem";
+    }
+
     private function formatMessage(RawMaterial $material): string
     {
         $stock    = round((float) $material->stock_qty, 2);

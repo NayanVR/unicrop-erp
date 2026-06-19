@@ -241,6 +241,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('parties/{party}/product-rates', [PartyController::class, 'storeProductRate'])->name('parties.product-rates.store');
         Route::patch('parties/product-rates/{productRate}', [PartyController::class, 'updateProductRate'])->name('parties.product-rates.update');
         Route::delete('parties/product-rates/{productRate}', [PartyController::class, 'destroyProductRate'])->name('parties.product-rates.destroy');
+        Route::post('parties/{party}/notify-supplier', [PartyController::class, 'notifySupplier'])->name('parties.notify-supplier');
     });
 });
 

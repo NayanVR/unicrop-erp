@@ -7,7 +7,9 @@ use App\Models\PartyDocument;
 use App\Models\ProductPhoto;
 use App\Models\ProductPhotoFolder;
 use App\Models\ProductRate;
+use App\Models\RawMaterial;
 use App\Models\Transport;
+use App\Services\LowStockAlertService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -76,10 +78,50 @@ class PartyController extends Controller
                 'photo_url'   => $p->photo_url,
             ]);
 
+        $materialsBySupplier = RawMaterial::where('approval_status', 'approved')
+            ->get(['id', 'name', 'unit', 'category', 'stock_qty', 'min_stock', 'reorder_level', 'supplier'])
+            ->groupBy(fn (RawMaterial $m) => mb_strtolower(trim($m->supplier ?? '')));
+
+        $parties->each(function (Party $party) use ($materialsBySupplier) {
+            $party->purchased_products = ($materialsBySupplier->get(mb_strtolower(trim($party->name))) ?? collect())
+                ->map(fn (RawMaterial $m) => [
+                    'id'            => $m->id,
+                    'name'          => $m->name,
+                    'unit'          => $m->unit,
+                    'category'      => $m->category,
+                    'stock_qty'     => $m->stock_qty,
+                    'min_stock'     => $m->min_stock,
+                    'reorder_level' => $m->reorder_level,
+                    'is_low_stock'  => $m->isLowStock(),
+                ])
+                ->values();
+        });
+
         $defaultFilter = 'all';
         $pageTitle     = 'Supplier / Vendor';
 
         return Inertia::render('erp/parties/index', compact('parties', 'stats', 'transports', 'couriers', 'partyPhotos', 'defaultFilter', 'pageTitle'));
+    }
+
+    public function notifySupplier(Party $party): RedirectResponse
+    {
+        $materials = RawMaterial::where('approval_status', 'approved')
+            ->whereRaw('LOWER(supplier) = ?', [mb_strtolower(trim($party->name))])
+            ->get()
+            ->filter(fn (RawMaterial $m) => $m->isLowStock());
+
+        if ($materials->isEmpty()) {
+            return redirect()->back()->with('error', 'No low-stock products found for this supplier.');
+        }
+
+        $result = app(LowStockAlertService::class)->sendSupplierLowStockAlert($party, $materials);
+
+        return redirect()->back()->with(
+            $result['ok'] ? 'success' : 'error',
+            $result['ok']
+                ? "WhatsApp alert sent to {$party->name}."
+                : "Failed to send alert: {$result['detail']}"
+        );
     }
 
     public function store(Request $request): RedirectResponse
