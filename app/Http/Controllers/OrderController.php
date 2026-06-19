@@ -310,11 +310,11 @@ class OrderController extends Controller
             abort(403);
         }
 
-        $order->load(['items', 'payments']);
+        $order->load(['items', 'payments.bankAccount']);
 
         $previousDue = $this->partyPreviousDue($order, $this->partyOutstandingTotals());
 
-        $bankAccounts = BankAccount::where('is_active', true)->orderBy('name')->get();
+        $bankAccounts = $order->payments->pluck('bankAccount')->filter()->unique('id')->values();
 
         return view('orders.print', ['order' => $order, 'previousDue' => $previousDue, 'bankAccounts' => $bankAccounts]);
     }
