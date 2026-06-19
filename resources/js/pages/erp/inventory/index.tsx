@@ -1463,7 +1463,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                             className={`pill${catFilter === 'all' ? ' active' : ''}`}
                             onClick={() => setCatFilter('all')}
                         >
-                            All Categories
+                            All Categories ({materials.length})
                         </button>
                         {categories.map((c) => (
                             <button
@@ -1471,7 +1471,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                 className={`pill${catFilter === c ? ' active' : ''}`}
                                 onClick={() => setCatFilter(c)}
                             >
-                                {c}
+                                {c} ({materials.filter((m) => m.category === c).length})
                             </button>
                         ))}
                     </div>
