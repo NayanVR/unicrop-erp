@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Events\ErpActivity;
 use App\Http\Requests\StoreOrderRequest;
 use App\Http\Requests\UpdateOrderRequest;
+use App\Models\BankAccount;
 use App\Models\DesignOrder;
 use App\Models\InventoryTransaction;
 use App\Models\Order;
 use App\Models\OrderAttachment;
+use App\Models\OrderPayment;
 use App\Models\PackingSize;
 use App\Models\Party;
 use App\Models\ProductPhoto;
@@ -42,6 +44,8 @@ class OrderController extends Controller
                 'designOrders:id,order_id,order_item_id,assigned_to,status,order_qty,pcs_to_print,labels_received,skip_party_approval,stage_log',
                 'designOrders.assignee:id,name',
                 'attachments:id,order_id,document_type,original_name,created_at',
+                'payments:id,order_id,bank_account_id,amount,reference_number,created_at',
+                'payments.bankAccount:id,name',
             ])
             ->orderByDesc('order_date')
             ->orderByDesc('id');
@@ -119,6 +123,7 @@ class OrderController extends Controller
             'userRole'      => $role,
             'productPhotos' => $this->mapProductPhotos(),
             'packingSizes'  => PackingSize::query()->orderBy('name')->get(['name', 'multiplier', 'pieces_per_box', 'pack_unit']),
+            'bankAccounts'  => BankAccount::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'account_number']),
         ]);
     }
 
@@ -235,6 +240,41 @@ class OrderController extends Controller
         return view('orders.print', ['order' => $order]);
     }
 
+    public function storePayment(Request $request, Order $order): RedirectResponse
+    {
+        if ($order->status !== 'submitted') {
+            return redirect()->back()->with('error', 'Payments can only be recorded for submitted orders, before they are confirmed.');
+        }
+
+        $data = $request->validate([
+            'bank_account_id'  => 'required|exists:bank_accounts,id',
+            'amount'           => 'required|numeric|min:0.01',
+            'reference_number' => 'nullable|string|max:100',
+        ]);
+
+        $data['order_id'] = $order->id;
+        $data['created_by'] = $request->user()?->id;
+
+        OrderPayment::create($data);
+
+        return redirect()->back()->with('success', 'Payment recorded.');
+    }
+
+    public function destroyPayment(Order $order, OrderPayment $payment): RedirectResponse
+    {
+        if ($payment->order_id !== $order->id) {
+            abort(404);
+        }
+
+        if ($order->status !== 'submitted') {
+            return redirect()->back()->with('error', 'Payments can only be removed before the order is confirmed.');
+        }
+
+        $payment->delete();
+
+        return redirect()->back()->with('success', 'Payment removed.');
+    }
+
     public function confirm(Request $request, Order $order): RedirectResponse
     {
         if ($order->status !== 'submitted') {
@@ -247,6 +287,10 @@ class OrderController extends Controller
 
         if (trim((string) $order->transport_name) === '' || trim((string) $order->destination) === '' || trim((string) $order->delivery_address) === '') {
             return redirect()->back()->with('error', 'Transport details (transport, destination, delivery address) are required before confirming the order. Please edit the order and fill them in.');
+        }
+
+        if ($order->payments()->count() === 0) {
+            return redirect()->back()->with('error', 'Record at least one payment received before confirming the order.');
         }
 
         $user = $request->user();

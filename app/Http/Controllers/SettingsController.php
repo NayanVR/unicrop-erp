@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
+use App\Models\BankAccount;
 use App\Models\PackingSize;
 use App\Models\Transport;
 use App\Services\LowStockAlertService;
@@ -35,6 +36,7 @@ class SettingsController extends Controller
             'transports'    => Transport::query()->orderBy('type')->orderBy('name')->get(),
             'alertSettings' => $alertSettings,
             'packingSizes'  => PackingSize::query()->orderBy('name')->get(),
+            'bankAccounts'  => BankAccount::query()->orderBy('name')->get(),
         ]);
     }
 
@@ -133,5 +135,39 @@ class SettingsController extends Controller
         $transport->delete();
 
         return redirect()->back()->with('success', 'Deleted.');
+    }
+
+    public function storeBankAccount(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'name'           => 'required|string|max:255',
+            'account_number' => 'nullable|string|max:50',
+            'ifsc'           => 'nullable|string|max:20',
+        ]);
+
+        BankAccount::create($data);
+
+        return redirect()->back()->with('success', 'Bank account added.');
+    }
+
+    public function updateBankAccount(Request $request, BankAccount $bankAccount): RedirectResponse
+    {
+        $data = $request->validate([
+            'name'           => 'required|string|max:255',
+            'account_number' => 'nullable|string|max:50',
+            'ifsc'           => 'nullable|string|max:20',
+            'is_active'      => 'boolean',
+        ]);
+
+        $bankAccount->update($data);
+
+        return redirect()->back()->with('success', 'Bank account updated.');
+    }
+
+    public function destroyBankAccount(BankAccount $bankAccount): RedirectResponse
+    {
+        $bankAccount->delete();
+
+        return redirect()->back()->with('success', 'Bank account deleted.');
     }
 }

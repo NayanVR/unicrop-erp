@@ -8,6 +8,11 @@ import {
     store as packingSizeStore,
     update as packingSizeUpdate,
 } from '@/routes/settings/packing-sizes';
+import {
+    destroy as bankAccountDestroy,
+    store as bankAccountStore,
+    update as bankAccountUpdate,
+} from '@/routes/settings/bank-accounts';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { ModalPortal } from '@/components/modal-portal';
@@ -41,10 +46,19 @@ type AlertSettings = {
     alert_cooldown_hours: string;
 };
 
+type BankAccountEntry = {
+    id: number;
+    name: string;
+    account_number: string | null;
+    ifsc: string | null;
+    is_active: boolean;
+};
+
 type Props = {
     transports: TransportEntry[];
     alertSettings: AlertSettings;
     packingSizes: PackingSizeEntry[];
+    bankAccounts: BankAccountEntry[];
 };
 
 type TransportForm = {
@@ -59,13 +73,22 @@ type PackingSizeForm = {
     pack_unit: string;
 };
 
-export default function SettingsIndex({ transports, alertSettings, packingSizes }: Props) {
+type BankAccountForm = {
+    name: string;
+    account_number: string;
+    ifsc: string;
+};
+
+export default function SettingsIndex({ transports, alertSettings, packingSizes, bankAccounts }: Props) {
     const [transportModalOpen, setTransportModalOpen] = useState(false);
     const [editingTransport, setEditingTransport] = useState<TransportEntry | null>(null);
     const [transportTab, setTransportTab] = useState<'transport' | 'courier'>('transport');
 
     const [packingSizeModalOpen, setPackingSizeModalOpen] = useState(false);
     const [editingPackingSize, setEditingPackingSize] = useState<PackingSizeEntry | null>(null);
+
+    const [bankAccountModalOpen, setBankAccountModalOpen] = useState(false);
+    const [editingBankAccount, setEditingBankAccount] = useState<BankAccountEntry | null>(null);
 
     const [alertSaving, setAlertSaving] = useState(false);
     const [alertTesting, setAlertTesting] = useState(false);
@@ -123,6 +146,12 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes 
         multiplier: '1',
         pieces_per_box: '',
         pack_unit: 'box',
+    });
+
+    const bankAccountForm = useForm<BankAccountForm>({
+        name: '',
+        account_number: '',
+        ifsc: '',
     });
 
     // ── Transport handlers ────────────────────────────────────────────────
@@ -195,6 +224,40 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes 
         packingSizeForm.delete(packingSizeDestroy(p.id).url, { preserveScroll: true });
     };
 
+    // ── Bank account handlers ─────────────────────────────────────────────
+    const openNewBankAccount = () => {
+        bankAccountForm.setData({ name: '', account_number: '', ifsc: '' });
+        bankAccountForm.clearErrors();
+        setEditingBankAccount(null);
+        setBankAccountModalOpen(true);
+    };
+
+    const openEditBankAccount = (b: BankAccountEntry) => {
+        bankAccountForm.setData({ name: b.name, account_number: b.account_number ?? '', ifsc: b.ifsc ?? '' });
+        bankAccountForm.clearErrors();
+        setEditingBankAccount(b);
+        setBankAccountModalOpen(true);
+    };
+
+    const closeBankAccountModal = () => {
+        setBankAccountModalOpen(false);
+        bankAccountForm.reset();
+        setEditingBankAccount(null);
+    };
+
+    const saveBankAccount = () => {
+        if (editingBankAccount) {
+            bankAccountForm.patch(bankAccountUpdate(editingBankAccount.id).url, { preserveScroll: true, onSuccess: closeBankAccountModal });
+        } else {
+            bankAccountForm.post(bankAccountStore().url, { preserveScroll: true, onSuccess: closeBankAccountModal });
+        }
+    };
+
+    const deleteBankAccount = (b: BankAccountEntry) => {
+        if (!confirm(`Delete "${b.name}"?`)) return;
+        bankAccountForm.delete(bankAccountDestroy(b.id).url, { preserveScroll: true });
+    };
+
     return (
         <>
             <Head title="Settings" />
@@ -255,6 +318,58 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes 
                                                 <div style={{ display: 'flex', gap: '6px' }}>
                                                     <button className="btn sm" onClick={() => openEditTransport(t)}>Rename</button>
                                                     <button className="btn danger-xs" onClick={() => deleteTransport(t)}>Delete</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+
+                {/* Bank Accounts */}
+                <div className="card" style={{ marginTop: '16px' }}>
+                    <div className="card-title" style={{ marginBottom: '12px' }}>
+                        🏦 Bank Accounts
+                        <span className="ct-badge">{bankAccounts.length} accounts</span>
+                    </div>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '14px' }}>
+                        Used as the "Our Bank" dropdown when recording payments received against an order.
+                    </p>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '14px' }}>
+                        <button className="btn primary" style={{ padding: '6px 14px', fontSize: '12px' }} onClick={openNewBankAccount}>
+                            ＋ Add Bank Account
+                        </button>
+                    </div>
+
+                    {bankAccounts.length === 0 ? (
+                        <div className="empty-state" style={{ padding: '28px 20px' }}>
+                            <div className="icon">🏦</div>
+                            <p>No bank accounts added yet.</p>
+                        </div>
+                    ) : (
+                        <div className="prod-wrap">
+                            <table className="prod-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Account No.</th>
+                                        <th>IFSC</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {bankAccounts.map((b) => (
+                                        <tr key={b.id}>
+                                            <td><div className="prod-name">{b.name}</div></td>
+                                            <td>{b.account_number || '—'}</td>
+                                            <td>{b.ifsc || '—'}</td>
+                                            <td>
+                                                <div style={{ display: 'flex', gap: '6px' }}>
+                                                    <button className="btn sm" onClick={() => openEditBankAccount(b)}>Edit</button>
+                                                    <button className="btn danger-xs" onClick={() => deleteBankAccount(b)}>Delete</button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -584,6 +699,57 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes 
                         <button className="btn" onClick={closePackingSizeModal}>Cancel</button>
                         <button className="btn primary" onClick={savePackingSize} disabled={packingSizeForm.processing}>
                             {editingPackingSize ? 'Save Changes' : 'Add'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+            </ModalPortal>
+
+            {/* Bank Account Modal */}
+            <ModalPortal>
+            <div className={`modal-overlay${bankAccountModalOpen ? ' open' : ''}`}>
+                <div className="modal" style={{ maxWidth: '420px' }}>
+                    <div className="modal-header">
+                        <h2>{editingBankAccount ? 'Edit' : 'Add'} Bank Account</h2>
+                        <button className="modal-close" onClick={closeBankAccountModal}>✕</button>
+                    </div>
+                    <div className="modal-body">
+                        <div className="form-group" style={{ marginBottom: '14px' }}>
+                            <label>Name *</label>
+                            <input
+                                type="text"
+                                value={bankAccountForm.data.name}
+                                onChange={(e) => bankAccountForm.setData('name', e.target.value)}
+                                placeholder="e.g. HDFC Current A/C"
+                                autoFocus
+                            />
+                            {bankAccountForm.errors.name && <span className="field-error">{bankAccountForm.errors.name}</span>}
+                        </div>
+                        <div className="form-group" style={{ marginBottom: '14px' }}>
+                            <label>Account Number</label>
+                            <input
+                                type="text"
+                                value={bankAccountForm.data.account_number}
+                                onChange={(e) => bankAccountForm.setData('account_number', e.target.value)}
+                                placeholder="e.g. 50100123456789"
+                            />
+                            {bankAccountForm.errors.account_number && <span className="field-error">{bankAccountForm.errors.account_number}</span>}
+                        </div>
+                        <div className="form-group">
+                            <label>IFSC</label>
+                            <input
+                                type="text"
+                                value={bankAccountForm.data.ifsc}
+                                onChange={(e) => bankAccountForm.setData('ifsc', e.target.value)}
+                                placeholder="e.g. HDFC0001234"
+                            />
+                            {bankAccountForm.errors.ifsc && <span className="field-error">{bankAccountForm.errors.ifsc}</span>}
+                        </div>
+                    </div>
+                    <div className="modal-footer">
+                        <button className="btn" onClick={closeBankAccountModal}>Cancel</button>
+                        <button className="btn primary" onClick={saveBankAccount} disabled={bankAccountForm.processing}>
+                            {editingBankAccount ? 'Save Changes' : 'Add'}
                         </button>
                     </div>
                 </div>

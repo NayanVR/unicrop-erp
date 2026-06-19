@@ -1,5 +1,6 @@
 import { advance as designAdvance, tracking as designTracking } from '@/routes/design';
 import { confirm as ordersConfirm, create as ordersCreate, destroy as ordersDestroy, edit as ordersEdit, labelPrint as ordersLabelPrint, sendToDesign as ordersSendToDesign } from '@/routes/orders';
+import { store as orderPaymentsStore, destroy as orderPaymentsDestroy } from '@/routes/orders/payments';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -79,6 +80,17 @@ type OrderDoc = {
     uploaded_at?: string | null;
 };
 
+type OrderPayment = {
+    id: number;
+    bank_account_id: number;
+    bank_account?: { id: number; name: string } | null;
+    amount: string | number;
+    reference_number?: string | null;
+    created_at?: string | null;
+};
+
+type BankAccount = { id: number; name: string; account_number?: string | null };
+
 type Order = {
     id: number;
     party_id?: number | null;
@@ -114,6 +126,7 @@ type Order = {
     design_items?: DesignItem[];
     items: OrderItem[];
     docs?: OrderDoc[];
+    payments?: OrderPayment[];
     eway_bill_not_required?: boolean;
 };
 
@@ -161,6 +174,7 @@ type Props = {
     userRole?: string | null;
     productPhotos?: ProductPhoto[];
     packingSizes?: { name: string; multiplier: string | number; pieces_per_box: number | null; pack_unit: string | null }[];
+    bankAccounts?: BankAccount[];
     flash?: { success?: string; error?: string };
 };
 
@@ -290,7 +304,7 @@ const statusLabel = (status?: string | null) => {
 const priorityClassName = (priority?: string | null) =>
     `badge priority-${priority ?? 'normal'}`;
 
-export default function OrdersIndex({ orders, currentUserId, userRole, productPhotos = [], packingSizes = [] }: Props) {
+export default function OrdersIndex({ orders, currentUserId, userRole, productPhotos = [], packingSizes = [], bankAccounts = [] }: Props) {
     const { flash } = usePage<Props>().props;
 
     useEffect(() => {
@@ -511,8 +525,12 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
     const [activeFilter, setActiveFilter] = useState<'mine' | 'mine-confirmed' | 'mine-dispatched' | 'all' | 'all-dispatched'>(isAccountant ? 'all' : 'mine');
     const [openOrders, setOpenOrders] = useState<number[]>([]);
     const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
-    const [confirmStep, setConfirmStep] = useState<'factory' | 'design'>('factory');
+    const [confirmStep, setConfirmStep] = useState<'payment' | 'factory' | 'design'>('payment');
     const [submitting, setSubmitting] = useState(false);
+    const [paymentBankId, setPaymentBankId] = useState('');
+    const [paymentAmount, setPaymentAmount] = useState('');
+    const [paymentRef, setPaymentRef] = useState('');
+    const [savingPayment, setSavingPayment] = useState(false);
     const [designNote, setDesignNote] = useState('');
     const [skipPartyApproval, setSkipPartyApproval] = useState(false);
     const [selectedItemIds, setSelectedItemIds] = useState<number[]>([]);
@@ -566,14 +584,41 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
 
     const openConfirm = (order: Order, e: React.MouseEvent) => {
         e.stopPropagation();
-        setConfirmStep('factory');
+        setConfirmStep('payment');
+        setPaymentBankId('');
+        setPaymentAmount('');
+        setPaymentRef('');
         setConfirmTarget({ id: order.id, number: order.order_number, companyName: order.company_name });
     };
 
     const closeConfirm = () => {
-        if (submitting) return;
+        if (submitting || savingPayment) return;
         setConfirmTarget(null);
-        setConfirmStep('factory');
+        setConfirmStep('payment');
+    };
+
+    const addPayment = () => {
+        if (!confirmTarget || !paymentBankId || !paymentAmount) return;
+        setSavingPayment(true);
+        router.post(orderPaymentsStore(confirmTarget.id).url, {
+            bank_account_id: paymentBankId,
+            amount: paymentAmount,
+            reference_number: paymentRef || undefined,
+        }, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                setPaymentBankId('');
+                setPaymentAmount('');
+                setPaymentRef('');
+            },
+            onFinish: () => setSavingPayment(false),
+        });
+    };
+
+    const removePayment = (paymentId: number) => {
+        if (!confirmTarget) return;
+        router.delete(orderPaymentsDestroy([confirmTarget.id, paymentId]).url, { preserveScroll: true, preserveState: true });
     };
 
     const advanceToDesign = () => {
@@ -797,15 +842,82 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
         <>
             <Head title="All Orders" />
 
-            {/* ── Confirm modal: Step 1 Factory, Step 2 Design ────────── */}
+            {/* ── Confirm modal: Step 1 Payment, Step 2 Factory, Step 3 Design ── */}
             {confirmTarget && (() => {
                 const targetOrder = orders.find((o) => o.id === confirmTarget.id);
+                const payments = targetOrder?.payments ?? [];
+                const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
                 return (
                     <div className="modal-overlay open" onClick={closeConfirm}>
                         <div className="modal" onClick={(e) => e.stopPropagation()}
-                            style={{ maxWidth: confirmStep === 'design' ? '520px' : '400px' }}>
+                            style={{ maxWidth: confirmStep === 'design' ? '520px' : '420px' }}>
 
-                            {/* ── Step 1: Factory ── */}
+                            {/* ── Step 1: Payment ── */}
+                            {confirmStep === 'payment' && (
+                                <>
+                                    <div className="modal-header">
+                                        <h2>💰 Record Payment</h2>
+                                        <button className="modal-close" onClick={closeConfirm} disabled={submitting || savingPayment}>✕</button>
+                                    </div>
+                                    <div className="modal-form">
+                                        <p style={{ color: 'var(--tx-muted)', fontSize: '12px', marginBottom: '6px' }}>Step 1 of 3</p>
+                                        <p style={{ color: 'var(--tx-muted)', marginBottom: '16px', fontSize: '14px' }}>
+                                            Record payment received for order <strong>{confirmTarget.number}</strong> before sending it to the factory.
+                                        </p>
+
+                                        {payments.length > 0 && (
+                                            <div style={{ marginBottom: 14, border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                                                {payments.map((p) => (
+                                                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 12px', fontSize: 13, borderBottom: '1px solid var(--border)' }}>
+                                                        <div>
+                                                            <strong>₹{Number(p.amount).toLocaleString('en-IN')}</strong>
+                                                            <span style={{ color: 'var(--tx-muted)' }}> · {p.bank_account?.name ?? '—'}</span>
+                                                            {p.reference_number && <span style={{ color: 'var(--tx-muted)' }}> · {p.reference_number}</span>}
+                                                        </div>
+                                                        <button type="button" className="btn-icon" onClick={() => removePayment(p.id)} title="Remove">🗑️</button>
+                                                    </div>
+                                                ))}
+                                                <div style={{ padding: '8px 12px', fontSize: 13, fontWeight: 700, background: 'var(--bg-soft, #f9fafb)' }}>
+                                                    Total received: ₹{totalPaid.toLocaleString('en-IN')}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="form-group" style={{ marginBottom: 10 }}>
+                                            <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--tx-muted)', textTransform: 'uppercase' }}>Our Bank</label>
+                                            <select value={paymentBankId} onChange={(e) => setPaymentBankId(e.target.value)} style={{ width: '100%', marginTop: 6 }} disabled={savingPayment}>
+                                                <option value="">— Select bank —</option>
+                                                {bankAccounts.map((b) => (
+                                                    <option key={b.id} value={b.id}>{b.name}{b.account_number ? ` (${b.account_number})` : ''}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="form-group" style={{ marginBottom: 10 }}>
+                                            <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--tx-muted)', textTransform: 'uppercase' }}>Amount (₹)</label>
+                                            <input type="number" min="0" step="any" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} style={{ width: '100%', marginTop: 6 }} disabled={savingPayment} />
+                                        </div>
+                                        <div className="form-group" style={{ marginBottom: 16 }}>
+                                            <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--tx-muted)', textTransform: 'uppercase' }}>UTR / Reference No. <span style={{ fontWeight: 400, textTransform: 'none' }}>(optional)</span></label>
+                                            <input type="text" value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} style={{ width: '100%', marginTop: 6 }} disabled={savingPayment} placeholder="e.g. UTR123456789" />
+                                        </div>
+                                        <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
+                                            <button type="button" className="btn-secondary" onClick={addPayment} disabled={savingPayment || !paymentBankId || !paymentAmount}>
+                                                {savingPayment ? 'Adding…' : '+ Add Payment'}
+                                            </button>
+                                            <div style={{ display: 'flex', gap: 8 }}>
+                                                <button type="button" className="btn-secondary" onClick={closeConfirm} disabled={submitting || savingPayment}>
+                                                    Cancel
+                                                </button>
+                                                <button type="button" className="btn-primary" onClick={() => setConfirmStep('factory')} disabled={payments.length === 0 || savingPayment}>
+                                                    Continue →
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* ── Step 2: Factory ── */}
                             {confirmStep === 'factory' && (
                                 <>
                                     <div className="modal-header">
@@ -813,24 +925,29 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                         <button className="modal-close" onClick={closeConfirm} disabled={submitting}>✕</button>
                                     </div>
                                     <div className="modal-form">
-                                        <p style={{ color: 'var(--tx-muted)', fontSize: '12px', marginBottom: '6px' }}>Step 1 of 2</p>
+                                        <p style={{ color: 'var(--tx-muted)', fontSize: '12px', marginBottom: '6px' }}>Step 2 of 3</p>
                                         <p style={{ color: 'var(--tx-muted)', marginBottom: '20px', fontSize: '14px' }}>
                                             Confirm and send order <strong>{confirmTarget.number}</strong> to the
                                             <strong> Factory</strong> to start production?
                                         </p>
-                                        <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
+                                        <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
+                                            <button type="button" className="btn-secondary" onClick={() => setConfirmStep('payment')} disabled={submitting}>
+                                                ← Back
+                                            </button>
+                                            <div style={{ display: 'flex', gap: 8 }}>
                                             <button type="button" className="btn-secondary" onClick={closeConfirm} disabled={submitting}>
                                                 Cancel
                                             </button>
                                             <button type="button" className="btn-primary" onClick={doConfirmFactory} disabled={submitting}>
                                                 {submitting ? 'Sending…' : '✓ Send to Factory →'}
                                             </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </>
                             )}
 
-                            {/* ── Step 2: Design ── */}
+                            {/* ── Step 3: Design ── */}
                             {confirmStep === 'design' && (
                                 <>
                                     <div className="modal-header">
@@ -838,7 +955,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                         <button className="modal-close" onClick={closeConfirm} disabled={submitting}>✕</button>
                                     </div>
                                     <div className="modal-form">
-                                        <p style={{ color: 'var(--tx-muted)', fontSize: '12px', marginBottom: '10px' }}>Step 2 of 2</p>
+                                        <p style={{ color: 'var(--tx-muted)', fontSize: '12px', marginBottom: '10px' }}>Step 3 of 3</p>
 
                                         {/* Order summary chip */}
                                         <div style={{ background: 'var(--accent-soft, #ede9fe)', color: 'var(--accent, #7c3aed)', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', fontWeight: 500, marginBottom: '18px' }}>

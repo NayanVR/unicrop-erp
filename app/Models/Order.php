@@ -98,6 +98,14 @@ class Order extends Model
     }
 
     /**
+     * @return HasMany<OrderPayment>
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(OrderPayment::class);
+    }
+
+    /**
      * @return BelongsTo<User, Order>
      */
     public function salesUser(): BelongsTo

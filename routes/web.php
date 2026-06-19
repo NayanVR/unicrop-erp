@@ -67,6 +67,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['role:admin,sales'])->group(function () {
         Route::delete('orders/{order}', [OrderController::class, 'destroy'])->name('orders.destroy');
         Route::post('orders/{order}/confirm', [OrderController::class, 'confirm'])->name('orders.confirm');
+        Route::post('orders/{order}/payments', [OrderController::class, 'storePayment'])->name('orders.payments.store');
+        Route::delete('orders/{order}/payments/{payment}', [OrderController::class, 'destroyPayment'])->name('orders.payments.destroy');
         Route::post('orders/{order}/send-to-design', [OrderController::class, 'sendToDesign'])->name('orders.send-to-design');
         Route::post('orders/{order}/label-print', [FactoryController::class, 'recordLabelPrint'])->name('orders.label-print');
         Route::post('erp/settings/transports', [SettingsController::class, 'storeTransport'])->name('settings.transports.store');
@@ -147,6 +149,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('erp/settings/packing-sizes', [SettingsController::class, 'storePackingSize'])->name('settings.packing-sizes.store');
         Route::patch('erp/settings/packing-sizes/{packingSize}', [SettingsController::class, 'updatePackingSize'])->name('settings.packing-sizes.update');
         Route::delete('erp/settings/packing-sizes/{packingSize}', [SettingsController::class, 'destroyPackingSize'])->name('settings.packing-sizes.destroy');
+
+        Route::post('erp/settings/bank-accounts', [SettingsController::class, 'storeBankAccount'])->name('settings.bank-accounts.store');
+        Route::patch('erp/settings/bank-accounts/{bankAccount}', [SettingsController::class, 'updateBankAccount'])->name('settings.bank-accounts.update');
+        Route::delete('erp/settings/bank-accounts/{bankAccount}', [SettingsController::class, 'destroyBankAccount'])->name('settings.bank-accounts.destroy');
 
         Route::get('purchase-bills', [PurchaseBillController::class, 'index'])->name('purchase-bills.index');
         Route::post('purchase-bills', [PurchaseBillController::class, 'store'])->name('purchase-bills.store');
