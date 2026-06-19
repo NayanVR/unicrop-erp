@@ -324,6 +324,11 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
         return parties.find((p) => String(p.id) === form.data.party_id)?.product_rates ?? [];
     }, [form.data.party_id, parties]);
 
+    const selectedParty = useMemo(
+        () => parties.find((p) => String(p.id) === form.data.party_id),
+        [form.data.party_id, parties],
+    );
+
     // Ref so updateRow always sees the latest partyRates (avoids stale closure)
     const partyRatesRef = useRef(partyRates);
     useEffect(() => { partyRatesRef.current = partyRates; }, [partyRates]);
@@ -674,15 +679,11 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                     </div>
                                 )}
                             </div>
-                            {(() => {
-                                const selectedParty = parties.find((p) => String(p.id) === form.data.party_id);
-                                if (!selectedParty?.outstanding_due || selectedParty.outstanding_due <= 0) return null;
-                                return (
-                                    <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 8, background: '#fef3c7', border: '1px solid #fcd34d', fontSize: 13 }}>
-                                        ⚠️ <strong>{selectedParty.name}</strong> has ₹{selectedParty.outstanding_due.toLocaleString('en-IN')} due from earlier orders.
-                                    </div>
-                                );
-                            })()}
+                            {!!selectedParty?.outstanding_due && selectedParty.outstanding_due > 0 && (
+                                <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 8, background: '#fef3c7', border: '1px solid #fcd34d', fontSize: 13 }}>
+                                    ⚠️ <strong>{selectedParty.name}</strong> has ₹{selectedParty.outstanding_due.toLocaleString('en-IN')} due from earlier orders.
+                                </div>
+                            )}
                         </div>
 
                         <div className="form-grid">
@@ -1107,6 +1108,20 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                 <span style={{ fontWeight: 600, fontSize: '15px', color: 'var(--tx-head)' }}>Grand Total</span>
                                 <span style={{ fontWeight: 700, fontSize: '20px', color: 'var(--accent)' }}>₹{totals.total.toFixed(2)}</span>
                             </div>
+                            {!!selectedParty?.outstanding_due && selectedParty.outstanding_due > 0 && (
+                                <>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#b45309' }}>
+                                        <span>Previous Due ({selectedParty.name})</span>
+                                        <span style={{ fontWeight: 500 }}>₹{selectedParty.outstanding_due.toFixed(2)}</span>
+                                    </div>
+                                    <div style={{ borderTop: '2px dashed #fcd34d', marginTop: '6px', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span style={{ fontWeight: 600, fontSize: '15px', color: '#b45309' }}>Total Incl. Previous Due</span>
+                                        <span style={{ fontWeight: 700, fontSize: '20px', color: '#b45309' }}>
+                                            ₹{(totals.total + selectedParty.outstanding_due).toFixed(2)}
+                                        </span>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
 
