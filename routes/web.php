@@ -250,6 +250,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('parties/product-rates/{productRate}', [PartyController::class, 'destroyProductRate'])->name('parties.product-rates.destroy');
         Route::post('parties/{party}/notify-supplier', [PartyController::class, 'notifySupplier'])->name('parties.notify-supplier');
     });
+
+    Route::middleware(['role:admin,sales,accountant'])->group(function () {
+        Route::get('party-ledger', [PartyController::class, 'ledgerIndex'])->name('parties.ledger.index');
+        Route::get('party-ledger/{party}', [PartyController::class, 'ledger'])->name('parties.ledger');
+    });
 });
 
 require __DIR__ . '/settings.php';

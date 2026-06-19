@@ -343,4 +343,90 @@ class PartyController extends Controller
 
         return redirect()->back()->with('success', 'Product rate deleted.');
     }
+
+    public function ledgerIndex(): Response
+    {
+        return Inertia::render('erp/parties/ledger', [
+            'pageTitle' => 'Party Ledger',
+            'parties'   => $this->ledgerPartyOptions(),
+            'party'     => null,
+            'entries'   => [],
+            'summary'   => null,
+        ]);
+    }
+
+    public function ledger(Party $party): Response
+    {
+        $party->load([
+            'orders' => fn ($q) => $q->orderBy('order_date')->orderBy('id'),
+            'orders.payments' => fn ($q) => $q->orderBy('created_at'),
+            'orders.payments.bankAccount:id,name',
+        ]);
+
+        $entries = collect();
+
+        foreach ($party->orders as $order) {
+            if (in_array($order->status, ['confirmed', 'dispatched'], true)) {
+                $invoiceDate = $order->confirmed_at ?? $order->order_date;
+                $entries->push([
+                    'sort'        => $invoiceDate->timestamp,
+                    'date'        => $invoiceDate->format('d M Y'),
+                    'type'        => 'invoice',
+                    'description' => "Order #{$order->order_number}",
+                    'debit'       => (float) $order->total_amount,
+                    'credit'      => 0.0,
+                ]);
+            }
+
+            foreach ($order->payments as $payment) {
+                $entries->push([
+                    'sort'        => $payment->created_at->timestamp,
+                    'date'        => $payment->created_at->format('d M Y'),
+                    'type'        => 'payment',
+                    'description' => "Payment for #{$order->order_number}"
+                        .($payment->reference_number ? " · Ref: {$payment->reference_number}" : '')
+                        .($payment->bankAccount ? " · {$payment->bankAccount->name}" : ''),
+                    'debit'       => 0.0,
+                    'credit'      => (float) $payment->amount,
+                ]);
+            }
+        }
+
+        $balance = 0.0;
+        $entries = $entries->sortBy('sort')->values()->map(function ($entry) use (&$balance) {
+            $balance += $entry['debit'] - $entry['credit'];
+            unset($entry['sort']);
+            $entry['balance'] = round($balance, 2);
+
+            return $entry;
+        });
+
+        return Inertia::render('erp/parties/ledger', [
+            'pageTitle' => 'Party Ledger',
+            'parties'   => $this->ledgerPartyOptions(),
+            'party'     => [
+                'id'            => $party->id,
+                'name'          => $party->name,
+                'customer_name' => $party->customer_name,
+                'gst_no'        => $party->gst_no,
+                'phone'         => $party->phone,
+            ],
+            'entries' => $entries->values()->all(),
+            'summary' => [
+                'total_invoiced' => round($entries->sum('debit'), 2),
+                'total_received' => round($entries->sum('credit'), 2),
+                'balance_due'    => round($balance, 2),
+            ],
+        ]);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, Party>
+     */
+    private function ledgerPartyOptions()
+    {
+        return Party::where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'customer_name']);
+    }
 }

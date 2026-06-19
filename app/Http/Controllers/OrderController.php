@@ -84,11 +84,9 @@ class OrderController extends Controller
         $orders->each(function (Order $order) use ($partyDues) {
             $order->party_previous_due = null;
             if ($order->party_id && isset($partyDues[$order->party_id])) {
-                $due = $partyDues[$order->party_id];
-                if (in_array($order->status, ['confirmed', 'dispatched'], true)) {
-                    $due -= (float) $order->total_amount - (float) $order->payments->sum('amount');
-                }
-                $order->party_previous_due = round($due, 2);
+                $ownTotalCounted = in_array($order->status, ['confirmed', 'dispatched'], true) ? (float) $order->total_amount : 0.0;
+                $ownPaid = (float) $order->payments->sum('amount');
+                $order->party_previous_due = round($partyDues[$order->party_id] - ($ownTotalCounted - $ownPaid), 2);
             }
 
             $order->confirmed_by_name = $order->confirmedBy?->name;

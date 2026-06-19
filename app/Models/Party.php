@@ -59,4 +59,9 @@ class Party extends Model
     {
         return $this->hasMany(ProductRate::class);
     }
+
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
 }

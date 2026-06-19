@@ -9,6 +9,7 @@ import { index as finishedGoodsIndex } from '@/routes/finished-goods';
 import { index as inventoryIndex } from '@/routes/inventory';
 import { create as ordersCreate, index as ordersIndex } from '@/routes/orders';
 import { index as partiesIndex } from '@/routes/parties';
+import { index as partyLedgerIndex } from '@/routes/parties/ledger';
 import { index as rateCalcIndex } from '@/routes/rate-calculator';
 import { index as settingsIndex } from '@/routes/settings';
 import { index as unitTransferIndex } from '@/routes/unit-transfer';
@@ -53,6 +54,7 @@ const NAV_DEFS: Record<string, NavItem[]> = {
         { id: 'design-orders', label: 'Design Orders', icon: '🎨', href: designIndex() },
         { id: 'photo-gallery', label: 'Product Gallery', icon: '📷', href: galleryIndex() },
         { id: 'parties', label: 'Parties', icon: '🏢', href: partiesIndex() },
+        { id: 'party-ledger', label: 'Party Ledger', icon: '📒', href: partyLedgerIndex() },
         { id: 'suppliers', label: 'Supplier / Vendor', icon: '🏭', href: '/suppliers' as NonNullable<InertiaLinkProps['href']> },
         { id: 'profit-loss', label: 'Profit / Loss', icon: '📈', href: '/reports/profit-loss' as NonNullable<InertiaLinkProps['href']> },
         { id: 'users', label: 'User Management', icon: '👥', href: usersIndex() },
@@ -63,6 +65,7 @@ const NAV_DEFS: Record<string, NavItem[]> = {
         { id: 'new-order', label: 'New Order', icon: '🌱', href: ordersCreate() },
         { id: 'all-orders', label: 'All Orders', icon: '📋', href: ordersIndex() },
         { id: 'parties', label: 'Parties', icon: '🏢', href: partiesIndex() },
+        { id: 'party-ledger', label: 'Party Ledger', icon: '📒', href: partyLedgerIndex() },
         { id: 'suppliers', label: 'Supplier / Vendor', icon: '🏭', href: '/suppliers' as NonNullable<InertiaLinkProps['href']> },
         { id: 'rate-calc', label: 'Rate Calculator', icon: '🧮', href: rateCalcIndex() },
         { id: 'inventory', label: 'Inventory', icon: '🗄️', href: inventoryIndex() },
@@ -86,6 +89,7 @@ const NAV_DEFS: Record<string, NavItem[]> = {
     accountant: [
         { id: 'acct-dashboard', label: 'Dashboard', icon: '📊', href: dashboard() },
         { id: 'all-orders', label: 'Orders', icon: '📋', href: ordersIndex() },
+        { id: 'party-ledger', label: 'Party Ledger', icon: '📒', href: partyLedgerIndex() },
         { id: 'inventory', label: 'Inventory', icon: '🗄️', href: inventoryIndex() },
     ],
 };
