@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\InventoryPurchaseBillItem;
 use App\Models\Party;
 use App\Models\PartyDocument;
 use App\Models\ProductPhoto;
@@ -78,12 +79,8 @@ class PartyController extends Controller
                 'photo_url'   => $p->photo_url,
             ]);
 
-        $materialsBySupplier = RawMaterial::where('approval_status', 'approved')
-            ->get(['id', 'name', 'unit', 'category', 'stock_qty', 'min_stock', 'reorder_level', 'supplier'])
-            ->groupBy(fn (RawMaterial $m) => mb_strtolower(trim($m->supplier ?? '')));
-
-        $parties->each(function (Party $party) use ($materialsBySupplier) {
-            $party->purchased_products = ($materialsBySupplier->get(mb_strtolower(trim($party->name))) ?? collect())
+        $parties->each(function (Party $party) {
+            $party->purchased_products = $this->purchasedMaterialsForParty($party)
                 ->map(fn (RawMaterial $m) => [
                     'id'            => $m->id,
                     'name'          => $m->name,
@@ -105,9 +102,7 @@ class PartyController extends Controller
 
     public function notifySupplier(Party $party): RedirectResponse
     {
-        $materials = RawMaterial::where('approval_status', 'approved')
-            ->whereRaw('LOWER(supplier) = ?', [mb_strtolower(trim($party->name))])
-            ->get()
+        $materials = $this->purchasedMaterialsForParty($party)
             ->filter(fn (RawMaterial $m) => $m->isLowStock());
 
         if ($materials->isEmpty()) {
@@ -122,6 +117,32 @@ class PartyController extends Controller
                 ? "WhatsApp alert sent to {$party->name}."
                 : "Failed to send alert: {$result['detail']}"
         );
+    }
+
+    /**
+     * A raw material can be bought from more than one supplier (e.g. "Humic" from ~10
+     * vendors), so a party's purchased products are the union of:
+     *  - materials whose single `supplier` name field matches this party, and
+     *  - materials this party has actually been billed for in purchase-bill history.
+     *
+     * @return \Illuminate\Support\Collection<int, RawMaterial>
+     */
+    private function purchasedMaterialsForParty(Party $party): \Illuminate\Support\Collection
+    {
+        $byName = RawMaterial::where('approval_status', 'approved')
+            ->whereRaw('LOWER(supplier) = ?', [mb_strtolower(trim($party->name))])
+            ->get();
+
+        $historyIds = InventoryPurchaseBillItem::whereNotNull('raw_material_id')
+            ->whereHas('inventoryPurchaseBill', fn ($q) => $q->where('party_id', $party->id))
+            ->pluck('raw_material_id')
+            ->unique();
+
+        $byHistory = RawMaterial::where('approval_status', 'approved')
+            ->whereIn('id', $historyIds)
+            ->get();
+
+        return $byName->concat($byHistory)->unique('id')->values();
     }
 
     public function store(Request $request): RedirectResponse
