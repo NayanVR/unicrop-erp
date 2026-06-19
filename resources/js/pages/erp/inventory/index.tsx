@@ -505,6 +505,28 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
         notes: '',
     });
 
+    // Same packaging item (e.g. an Outer Box) is often reused across multiple
+    // products — if a material with this exact category/size/shape already
+    // exists, reuse its saved dimensions instead of re-typing them.
+    const packExistingMatch = packCat
+        ? materials.find((m) =>
+              m.category === packCat.label &&
+              m.name.toLowerCase() === `${packCat.label}${packForm.size ? ' ' + packForm.size : ''}${packForm.shape ? ' ' + packForm.shape : ''}`.toLowerCase().trim() &&
+              (m.dim_l || m.dim_w || m.dim_h)
+          )
+        : undefined;
+
+    useEffect(() => {
+        if (!packExistingMatch) return;
+        setPackForm((p) => ({
+            ...p,
+            dim_l: packExistingMatch.dim_l != null ? String(packExistingMatch.dim_l) : p.dim_l,
+            dim_w: packExistingMatch.dim_w != null ? String(packExistingMatch.dim_w) : p.dim_w,
+            dim_h: packExistingMatch.dim_h != null ? String(packExistingMatch.dim_h) : p.dim_h,
+        }));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [packExistingMatch?.id]);
+
     // Bill form (local state for dynamic rows)
     const [billForm, setBillForm] = useState({
         party_id: '',
@@ -3279,6 +3301,11 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                         />
                                         <span style={{ color: '#6b7280', fontSize: 13, whiteSpace: 'nowrap' }}>mm</span>
                                     </div>
+                                    {packExistingMatch && (
+                                        <div style={{ marginTop: 5, fontSize: 12, color: '#059669', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: '4px 10px' }}>
+                                            ✓ "{packExistingMatch.name}" already exists — dimensions auto-filled from it
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="form-group">
                                     <label>HSN</label>
