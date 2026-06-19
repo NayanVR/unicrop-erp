@@ -257,6 +257,16 @@
                 <td>Grand Total</td>
                 <td class="num">₹ {{ number_format((float) $order->total_amount, 2) }}</td>
             </tr>
+            @if($previousDue > 0)
+                <tr>
+                    <td>Previous Due</td>
+                    <td class="num">₹ {{ number_format($previousDue, 2) }}</td>
+                </tr>
+                <tr class="grand">
+                    <td>Total Incl. Previous Due</td>
+                    <td class="num">₹ {{ number_format((float) $order->total_amount + $previousDue, 2) }}</td>
+                </tr>
+            @endif
         </table>
     </div>
 

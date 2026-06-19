@@ -82,12 +82,7 @@ class OrderController extends Controller
         // Surface activity attribution as plain fields, then drop the relation
         // objects whose serialized keys would clobber the created_by / confirmed_by columns.
         $orders->each(function (Order $order) use ($partyDues) {
-            $order->party_previous_due = null;
-            if ($order->party_id && isset($partyDues[$order->party_id])) {
-                $ownTotalCounted = in_array($order->status, ['confirmed', 'dispatched'], true) ? (float) $order->total_amount : 0.0;
-                $ownPaid = (float) $order->payments->sum('amount');
-                $order->party_previous_due = round($partyDues[$order->party_id] - ($ownTotalCounted - $ownPaid), 2);
-            }
+            $order->party_previous_due = $this->partyPreviousDue($order, $partyDues);
 
             $order->confirmed_by_name = $order->confirmedBy?->name;
             $order->created_by_name = $order->createdBy?->name;
@@ -218,6 +213,22 @@ class OrderController extends Controller
         return $dues;
     }
 
+    /**
+     * The party's outstanding due from their OTHER orders, excluding this order's
+     * own contribution to the totals/payments used by partyOutstandingTotals().
+     */
+    private function partyPreviousDue(Order $order, array $partyDues): ?float
+    {
+        if (! $order->party_id || ! isset($partyDues[$order->party_id])) {
+            return null;
+        }
+
+        $ownTotalCounted = in_array($order->status, ['confirmed', 'dispatched'], true) ? (float) $order->total_amount : 0.0;
+        $ownPaid = (float) $order->payments->sum('amount');
+
+        return round($partyDues[$order->party_id] - ($ownTotalCounted - $ownPaid), 2);
+    }
+
     public function store(StoreOrderRequest $request): RedirectResponse
     {
         $user = $request->user();
@@ -299,9 +310,11 @@ class OrderController extends Controller
             abort(403);
         }
 
-        $order->load('items');
+        $order->load(['items', 'payments']);
 
-        return view('orders.print', ['order' => $order]);
+        $previousDue = $this->partyPreviousDue($order, $this->partyOutstandingTotals());
+
+        return view('orders.print', ['order' => $order, 'previousDue' => $previousDue]);
     }
 
     public function storePayment(Request $request, Order $order): RedirectResponse
