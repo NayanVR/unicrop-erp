@@ -601,7 +601,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
         setConfirmStep('payment');
     };
 
-    const addPayment = () => {
+    const addPayment = (onSuccess?: () => void) => {
         if (!confirmTarget || !paymentBankId || !paymentAmount) return;
         setSavingPayment(true);
         router.post(orderPaymentsStore(confirmTarget.id).url, {
@@ -615,9 +615,22 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                 setPaymentBankId('');
                 setPaymentAmount('');
                 setPaymentRef('');
+                onSuccess?.();
             },
             onFinish: () => setSavingPayment(false),
         });
+    };
+
+    // "Continue →" should also work when the user has filled in the payment
+    // fields but hasn't explicitly clicked "+ Add Payment" yet — save it first.
+    const continueFromPayment = (hasPayments: boolean) => {
+        if (paymentBankId && paymentAmount) {
+            addPayment(() => setConfirmStep('factory'));
+            return;
+        }
+        if (hasPayments) {
+            setConfirmStep('factory');
+        }
     };
 
     const removePayment = (paymentId: number) => {
@@ -905,14 +918,19 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                             <input type="text" value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} style={{ width: '100%', marginTop: 6 }} disabled={savingPayment} placeholder="e.g. UTR123456789" />
                                         </div>
                                         <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
-                                            <button type="button" className="btn-secondary" onClick={addPayment} disabled={savingPayment || !paymentBankId || !paymentAmount}>
+                                            <button type="button" className="btn-secondary" onClick={() => addPayment()} disabled={savingPayment || !paymentBankId || !paymentAmount}>
                                                 {savingPayment ? 'Adding…' : '+ Add Payment'}
                                             </button>
                                             <div style={{ display: 'flex', gap: 8 }}>
                                                 <button type="button" className="btn-secondary" onClick={closeConfirm} disabled={submitting || savingPayment}>
                                                     Cancel
                                                 </button>
-                                                <button type="button" className="btn-primary" onClick={() => setConfirmStep('factory')} disabled={payments.length === 0 || savingPayment}>
+                                                <button
+                                                    type="button"
+                                                    className="btn-primary"
+                                                    onClick={() => continueFromPayment(payments.length > 0)}
+                                                    disabled={savingPayment || (payments.length === 0 && !(paymentBankId && paymentAmount))}
+                                                >
                                                     Continue →
                                                 </button>
                                             </div>
