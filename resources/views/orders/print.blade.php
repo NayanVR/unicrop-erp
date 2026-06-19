@@ -188,7 +188,9 @@
         <div class="order-meta">
             <h2>Order {{ $order->order_number }}</h2>
             <div>Date: {{ $order->order_date?->format('d-m-Y') ?? '—' }}</div>
-            <div>Priority: {{ ucfirst($order->priority ?? 'normal') }}</div>
+            @if($showPriority)
+                <div>Priority: {{ ucfirst($order->priority ?? 'normal') }}</div>
+            @endif
             <span class="badge">{{ ucfirst($order->status ?? '') }}</span>
         </div>
     </div>

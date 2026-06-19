@@ -316,7 +316,12 @@ class OrderController extends Controller
 
         $bankAccounts = $order->payments->pluck('bankAccount')->filter()->unique('id')->values();
 
-        return view('orders.print', ['order' => $order, 'previousDue' => $previousDue, 'bankAccounts' => $bankAccounts]);
+        return view('orders.print', [
+            'order' => $order,
+            'previousDue' => $previousDue,
+            'bankAccounts' => $bankAccounts,
+            'showPriority' => $role !== Role::SALES,
+        ]);
     }
 
     public function storePayment(Request $request, Order $order): RedirectResponse
