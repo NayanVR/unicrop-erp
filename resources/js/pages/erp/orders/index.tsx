@@ -89,7 +89,7 @@ type OrderPayment = {
     created_at?: string | null;
 };
 
-type BankAccount = { id: number; name: string; account_number?: string | null };
+type BankAccount = { id: number; name: string; bank_name?: string | null; account_number?: string | null; upi_id?: string | null };
 
 type Order = {
     id: number;
@@ -888,7 +888,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                             <select value={paymentBankId} onChange={(e) => setPaymentBankId(e.target.value)} style={{ width: '100%', marginTop: 6 }} disabled={savingPayment}>
                                                 <option value="">— Select bank —</option>
                                                 {bankAccounts.map((b) => (
-                                                    <option key={b.id} value={b.id}>{b.name}{b.account_number ? ` (${b.account_number})` : ''}</option>
+                                                    <option key={b.id} value={b.id}>{b.bank_name ? `${b.bank_name} — ` : ''}{b.name}{b.account_number ? ` (${b.account_number})` : ''}</option>
                                                 ))}
                                             </select>
                                         </div>

@@ -141,8 +141,10 @@ class SettingsController extends Controller
     {
         $data = $request->validate([
             'name'           => 'required|string|max:255',
+            'bank_name'      => 'nullable|string|max:255',
             'account_number' => 'nullable|string|max:50',
             'ifsc'           => 'nullable|string|max:20',
+            'upi_id'         => 'nullable|string|max:100',
         ]);
 
         BankAccount::create($data);
@@ -154,8 +156,10 @@ class SettingsController extends Controller
     {
         $data = $request->validate([
             'name'           => 'required|string|max:255',
+            'bank_name'      => 'nullable|string|max:255',
             'account_number' => 'nullable|string|max:50',
             'ifsc'           => 'nullable|string|max:20',
+            'upi_id'         => 'nullable|string|max:100',
             'is_active'      => 'boolean',
         ]);
 

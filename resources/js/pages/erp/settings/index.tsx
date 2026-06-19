@@ -49,8 +49,10 @@ type AlertSettings = {
 type BankAccountEntry = {
     id: number;
     name: string;
+    bank_name: string | null;
     account_number: string | null;
     ifsc: string | null;
+    upi_id: string | null;
     is_active: boolean;
 };
 
@@ -75,8 +77,10 @@ type PackingSizeForm = {
 
 type BankAccountForm = {
     name: string;
+    bank_name: string;
     account_number: string;
     ifsc: string;
+    upi_id: string;
 };
 
 export default function SettingsIndex({ transports, alertSettings, packingSizes, bankAccounts }: Props) {
@@ -150,8 +154,10 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes,
 
     const bankAccountForm = useForm<BankAccountForm>({
         name: '',
+        bank_name: '',
         account_number: '',
         ifsc: '',
+        upi_id: '',
     });
 
     // ── Transport handlers ────────────────────────────────────────────────
@@ -226,14 +232,14 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes,
 
     // ── Bank account handlers ─────────────────────────────────────────────
     const openNewBankAccount = () => {
-        bankAccountForm.setData({ name: '', account_number: '', ifsc: '' });
+        bankAccountForm.setData({ name: '', bank_name: '', account_number: '', ifsc: '', upi_id: '' });
         bankAccountForm.clearErrors();
         setEditingBankAccount(null);
         setBankAccountModalOpen(true);
     };
 
     const openEditBankAccount = (b: BankAccountEntry) => {
-        bankAccountForm.setData({ name: b.name, account_number: b.account_number ?? '', ifsc: b.ifsc ?? '' });
+        bankAccountForm.setData({ name: b.name, bank_name: b.bank_name ?? '', account_number: b.account_number ?? '', ifsc: b.ifsc ?? '', upi_id: b.upi_id ?? '' });
         bankAccountForm.clearErrors();
         setEditingBankAccount(b);
         setBankAccountModalOpen(true);
@@ -355,8 +361,10 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes,
                                 <thead>
                                     <tr>
                                         <th>Name</th>
+                                        <th>Bank</th>
                                         <th>Account No.</th>
                                         <th>IFSC</th>
+                                        <th>UPI Address</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -364,8 +372,10 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes,
                                     {bankAccounts.map((b) => (
                                         <tr key={b.id}>
                                             <td><div className="prod-name">{b.name}</div></td>
+                                            <td>{b.bank_name || '—'}</td>
                                             <td>{b.account_number || '—'}</td>
                                             <td>{b.ifsc || '—'}</td>
+                                            <td>{b.upi_id || '—'}</td>
                                             <td>
                                                 <div style={{ display: 'flex', gap: '6px' }}>
                                                     <button className="btn sm" onClick={() => openEditBankAccount(b)}>Edit</button>
@@ -715,13 +725,23 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes,
                     </div>
                     <div className="modal-body">
                         <div className="form-group" style={{ marginBottom: '14px' }}>
+                            <label>Bank</label>
+                            <input
+                                type="text"
+                                value={bankAccountForm.data.bank_name}
+                                onChange={(e) => bankAccountForm.setData('bank_name', e.target.value)}
+                                placeholder="e.g. HDFC Bank"
+                                autoFocus
+                            />
+                            {bankAccountForm.errors.bank_name && <span className="field-error">{bankAccountForm.errors.bank_name}</span>}
+                        </div>
+                        <div className="form-group" style={{ marginBottom: '14px' }}>
                             <label>Name *</label>
                             <input
                                 type="text"
                                 value={bankAccountForm.data.name}
                                 onChange={(e) => bankAccountForm.setData('name', e.target.value)}
                                 placeholder="e.g. HDFC Current A/C"
-                                autoFocus
                             />
                             {bankAccountForm.errors.name && <span className="field-error">{bankAccountForm.errors.name}</span>}
                         </div>
@@ -735,7 +755,7 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes,
                             />
                             {bankAccountForm.errors.account_number && <span className="field-error">{bankAccountForm.errors.account_number}</span>}
                         </div>
-                        <div className="form-group">
+                        <div className="form-group" style={{ marginBottom: '14px' }}>
                             <label>IFSC</label>
                             <input
                                 type="text"
@@ -744,6 +764,16 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes,
                                 placeholder="e.g. HDFC0001234"
                             />
                             {bankAccountForm.errors.ifsc && <span className="field-error">{bankAccountForm.errors.ifsc}</span>}
+                        </div>
+                        <div className="form-group">
+                            <label>UPI Address</label>
+                            <input
+                                type="text"
+                                value={bankAccountForm.data.upi_id}
+                                onChange={(e) => bankAccountForm.setData('upi_id', e.target.value)}
+                                placeholder="e.g. company@hdfcbank"
+                            />
+                            {bankAccountForm.errors.upi_id && <span className="field-error">{bankAccountForm.errors.upi_id}</span>}
                         </div>
                     </div>
                     <div className="modal-footer">
