@@ -66,7 +66,6 @@ const NAV_DEFS: Record<string, NavItem[]> = {
         { id: 'all-orders', label: 'All Orders', icon: '📋', href: ordersIndex() },
         { id: 'parties', label: 'Parties', icon: '🏢', href: partiesIndex() },
         { id: 'party-ledger', label: 'Party Ledger', icon: '📒', href: partyLedgerIndex() },
-        { id: 'suppliers', label: 'Supplier / Vendor', icon: '🏭', href: '/suppliers' as NonNullable<InertiaLinkProps['href']> },
         { id: 'rate-calc', label: 'Rate Calculator', icon: '🧮', href: rateCalcIndex() },
         { id: 'inventory', label: 'Inventory', icon: '🗄️', href: inventoryIndex() },
         { id: 'design-orders', label: 'Design Orders', icon: '🎨', href: designIndex() },

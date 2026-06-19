@@ -238,7 +238,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::middleware(['role:admin,sales'])->group(function () {
         Route::get('parties', [PartyController::class, 'index'])->name('parties.index');
-        Route::get('suppliers', [PartyController::class, 'suppliersIndex'])->name('suppliers.index');
         Route::post('parties', [PartyController::class, 'store'])->name('parties.store');
         Route::patch('parties/{party}', [PartyController::class, 'update'])->name('parties.update');
         Route::delete('parties/{party}', [PartyController::class, 'destroy'])->name('parties.destroy');
@@ -248,6 +247,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('parties/{party}/product-rates', [PartyController::class, 'storeProductRate'])->name('parties.product-rates.store');
         Route::patch('parties/product-rates/{productRate}', [PartyController::class, 'updateProductRate'])->name('parties.product-rates.update');
         Route::delete('parties/product-rates/{productRate}', [PartyController::class, 'destroyProductRate'])->name('parties.product-rates.destroy');
+    });
+
+    // Suppliers/vendors — sales users should not see supplier records, only admin manages them.
+    Route::middleware(['role:admin'])->group(function () {
+        Route::get('suppliers', [PartyController::class, 'suppliersIndex'])->name('suppliers.index');
         Route::post('parties/{party}/notify-supplier', [PartyController::class, 'notifySupplier'])->name('parties.notify-supplier');
     });
 
