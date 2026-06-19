@@ -314,7 +314,9 @@ class OrderController extends Controller
 
         $previousDue = $this->partyPreviousDue($order, $this->partyOutstandingTotals());
 
-        return view('orders.print', ['order' => $order, 'previousDue' => $previousDue]);
+        $bankAccounts = BankAccount::where('is_active', true)->orderBy('name')->get();
+
+        return view('orders.print', ['order' => $order, 'previousDue' => $previousDue, 'bankAccounts' => $bankAccounts]);
     }
 
     public function storePayment(Request $request, Order $order): RedirectResponse

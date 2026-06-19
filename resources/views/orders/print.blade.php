@@ -140,6 +140,28 @@
             font-size: 12px;
             color: #475569;
         }
+        .payment-section {
+            display: flex;
+            gap: 14px;
+            margin-top: 16px;
+            align-items: stretch;
+        }
+        .payment-section .info-box {
+            flex: 1;
+        }
+        .qr-box {
+            text-align: center;
+            max-width: 200px;
+        }
+        .qr-box img {
+            width: 140px;
+            height: 140px;
+        }
+        .qr-box p {
+            font-size: 11px;
+            color: #64748b;
+            margin-top: 6px;
+        }
         .footer {
             margin-top: 30px;
             font-size: 11px;
@@ -269,6 +291,36 @@
             @endif
         </table>
     </div>
+
+    @if($bankAccounts->isNotEmpty())
+        @php
+            $upiAccount = $bankAccounts->first(fn ($bank) => ! empty($bank->upi_id));
+            $payAmount = (float) $order->total_amount + ($previousDue > 0 ? $previousDue : 0);
+            $upiUri = $upiAccount
+                ? 'upi://pay?pa='.rawurlencode($upiAccount->upi_id).'&pn='.rawurlencode('Unicrop Biochem').'&am='.rawurlencode(number_format($payAmount, 2, '.', '')).'&cu=INR&tn='.rawurlencode('Order '.$order->order_number)
+                : null;
+        @endphp
+        <div class="payment-section">
+            <div class="info-box">
+                <h3>Bank Details</h3>
+                @foreach($bankAccounts as $bank)
+                    <p style="margin-bottom: {{ $loop->last ? 0 : 8 }}px;">
+                        <strong>{{ $bank->name }}</strong>@if($bank->bank_name) — {{ $bank->bank_name }} @endif<br>
+                        A/C No: {{ $bank->account_number }}<br>
+                        IFSC: {{ $bank->ifsc }}
+                        @if($bank->upi_id) <br>UPI: {{ $bank->upi_id }} @endif
+                    </p>
+                @endforeach
+            </div>
+            @if($upiUri)
+                <div class="info-box qr-box">
+                    <h3>Scan &amp; Pay via UPI</h3>
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data={{ urlencode($upiUri) }}" alt="UPI QR Code">
+                    <p>Pay ₹{{ number_format($payAmount, 2) }} to {{ $upiAccount->upi_id }}</p>
+                </div>
+            @endif
+        </div>
+    @endif
 
     @if($order->notes)
         <div class="notes">
