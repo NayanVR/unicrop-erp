@@ -6,7 +6,9 @@ use App\Models\FillingRecipe;
 use App\Models\FillingRun;
 use App\Models\FinishedGood;
 use App\Models\InventoryTransaction;
+use App\Models\Product;
 use App\Models\RawMaterial;
+use App\Services\InventoryPoolService;
 use App\Services\LowStockAlertService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -161,19 +163,32 @@ class FillingController extends Controller
                 $lineCost    = $qtyDeducted * (float) $item->rawMaterial->cost_per_unit;
                 $totalCost  += $lineCost;
 
-                $prev = (float) $item->rawMaterial->stock_qty;
-                $item->rawMaterial->decrement('stock_qty', $qtyDeducted);
+                $product = Product::where('raw_material_id', $item->rawMaterial->id)->first();
+                $pooled = $product
+                    ? app(InventoryPoolService::class)->decrementForProduct(
+                        $product,
+                        $qtyDeducted,
+                        "Filling: {$recipe->name} × {$qty}",
+                        $request->user(),
+                        $data['notes'] ?? null,
+                    )
+                    : false;
 
-                InventoryTransaction::create([
-                    'raw_material_id' => $item->rawMaterial->id,
-                    'user_id'         => $request->user()?->id,
-                    'type'            => 'issue',
-                    'qty'             => $qtyDeducted,
-                    'previous_stock'  => $prev,
-                    'new_stock'       => $prev - $qtyDeducted,
-                    'reference'       => "Filling: {$recipe->name} × {$qty}",
-                    'notes'           => $data['notes'] ?? null,
-                ]);
+                if (! $pooled) {
+                    $prev = (float) $item->rawMaterial->stock_qty;
+                    $item->rawMaterial->decrement('stock_qty', $qtyDeducted);
+
+                    InventoryTransaction::create([
+                        'raw_material_id' => $item->rawMaterial->id,
+                        'user_id'         => $request->user()?->id,
+                        'type'            => 'issue',
+                        'qty'             => $qtyDeducted,
+                        'previous_stock'  => $prev,
+                        'new_stock'       => $prev - $qtyDeducted,
+                        'reference'       => "Filling: {$recipe->name} × {$qty}",
+                        'notes'           => $data['notes'] ?? null,
+                    ]);
+                }
 
                 $item->rawMaterial->refresh();
                 (new LowStockAlertService())->checkAndAlert($item->rawMaterial);

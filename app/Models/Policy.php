@@ -49,6 +49,7 @@ class Policy extends Model
             'suppliers.manage',
             'party-ledger.view',
             'products.manage',
+            'products.link_inventory',
         ];
     }
 

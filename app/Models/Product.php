@@ -6,6 +6,7 @@ use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable(['raw_material_id', 'finished_good_id', 'name', 'our_brand', 'sku', 'hsn_code', 'gst_percent', 'category', 'packing_size', 'is_active'])]
 class Product extends Model
@@ -28,5 +29,10 @@ class Product extends Model
     public function finishedGood(): BelongsTo
     {
         return $this->belongsTo(FinishedGood::class);
+    }
+
+    public function inventoryLink(): HasOne
+    {
+        return $this->hasOne(ProductInventoryLink::class);
     }
 }

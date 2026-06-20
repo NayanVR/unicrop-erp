@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\BomRecipe;
 use App\Models\InventoryTransaction;
+use App\Models\Product;
 use App\Models\RawMaterial;
+use App\Services\InventoryPoolService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -157,19 +159,32 @@ class BomRecipeController extends Controller
             }
 
             foreach ($deductions as $d) {
-                $prev = (float) $d['material']->stock_qty;
-                $d['material']->decrement('stock_qty', $d['qty']);
+                $product = Product::where('raw_material_id', $d['material']->id)->first();
+                $pooled = $product
+                    ? app(InventoryPoolService::class)->decrementForProduct(
+                        $product,
+                        $d['qty'],
+                        "BOM Run: {$bom->name} × {$batchCount}",
+                        $request->user(),
+                        $data['notes'] ?? null,
+                    )
+                    : false;
 
-                InventoryTransaction::create([
-                    'raw_material_id' => $d['material']->id,
-                    'user_id'         => $request->user()?->id,
-                    'type'            => 'issue',
-                    'qty'             => $d['qty'],
-                    'previous_stock'  => $prev,
-                    'new_stock'       => $prev - $d['qty'],
-                    'reference'       => "BOM Run: {$bom->name} × {$batchCount}",
-                    'notes'           => $data['notes'] ?? null,
-                ]);
+                if (! $pooled) {
+                    $prev = (float) $d['material']->stock_qty;
+                    $d['material']->decrement('stock_qty', $d['qty']);
+
+                    InventoryTransaction::create([
+                        'raw_material_id' => $d['material']->id,
+                        'user_id'         => $request->user()?->id,
+                        'type'            => 'issue',
+                        'qty'             => $d['qty'],
+                        'previous_stock'  => $prev,
+                        'new_stock'       => $prev - $d['qty'],
+                        'reference'       => "BOM Run: {$bom->name} × {$batchCount}",
+                        'notes'           => $data['notes'] ?? null,
+                    ]);
+                }
             }
 
             // Add finished/semi-finished product to inventory

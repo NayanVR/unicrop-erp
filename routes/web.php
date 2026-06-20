@@ -13,6 +13,7 @@ use App\Http\Controllers\FinishedGoodsController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PartyController;
+use App\Http\Controllers\InventoryPoolController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductPhotoController;
 use App\Http\Controllers\PurchaseBillController;
@@ -228,6 +229,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('products', [ProductController::class, 'store'])->name('products.store');
         Route::patch('products/{product}', [ProductController::class, 'update'])->name('products.update');
         Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+    });
+
+    Route::middleware(['role:products.link_inventory'])->group(function () {
+        Route::get('inventory-pools', [InventoryPoolController::class, 'index'])->name('inventory-pools.index');
+        Route::post('inventory-pools', [InventoryPoolController::class, 'store'])->name('inventory-pools.store');
+        Route::patch('inventory-pools/{inventoryPool}', [InventoryPoolController::class, 'update'])->name('inventory-pools.update');
+        Route::delete('inventory-pools/{inventoryPool}', [InventoryPoolController::class, 'destroy'])->name('inventory-pools.destroy');
+        Route::post('inventory-pools/link', [InventoryPoolController::class, 'link'])->name('inventory-pools.link');
+        Route::delete('inventory-pools/links/{productInventoryLink}', [InventoryPoolController::class, 'unlink'])->name('inventory-pools.unlink');
     });
 
     Route::middleware(['role:design.manage'])->group(function () {
