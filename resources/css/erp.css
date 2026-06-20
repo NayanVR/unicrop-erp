@@ -762,6 +762,12 @@ body {
     gap: 8px;
     letter-spacing: -0.2px;
 }
+.card-title .chevron {
+    transition: transform var(--t-med);
+}
+.card-title.open .chevron {
+    transform: rotate(90deg);
+}
 .card-title .ct-badge {
     font-family: var(--font-body);
     font-size: 11px;

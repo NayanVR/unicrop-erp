@@ -86,6 +86,9 @@ type BankAccountForm = {
 };
 
 export default function SettingsIndex({ transports, alertSettings, packingSizes, bankAccounts }: Props) {
+    const [openCards, setOpenCards] = useState<Record<string, boolean>>({});
+    const toggleCard = (key: string) => setOpenCards((prev) => ({ ...prev, [key]: !prev[key] }));
+
     const [transportModalOpen, setTransportModalOpen] = useState(false);
     const [editingTransport, setEditingTransport] = useState<TransportEntry | null>(null);
     const [transportTab, setTransportTab] = useState<'transport' | 'courier'>('transport');
@@ -283,11 +286,19 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes,
 
                 {/* Transports & Couriers */}
                 <div className="card" style={{ marginTop: '16px' }}>
-                    <div className="card-title" style={{ marginBottom: '12px' }}>
-                        🚛 Transports &amp; Couriers
-                        <span className="ct-badge">{transports.length} entries</span>
+                    <div
+                        className={`card-title${openCards.transport ? ' open' : ''}`}
+                        style={{ marginBottom: openCards.transport ? '12px' : 0, cursor: 'pointer', justifyContent: 'space-between' }}
+                        onClick={() => toggleCard('transport')}
+                    >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            🚛 Transports &amp; Couriers
+                            <span className="ct-badge">{transports.length} entries</span>
+                        </span>
+                        <span className="chevron">▶</span>
                     </div>
 
+                    {openCards.transport && (<>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
                         <div style={{ display: 'flex', gap: '8px' }}>
                             <button className={`pill${transportTab === 'transport' ? ' active' : ''}`} onClick={() => setTransportTab('transport')}>
@@ -338,14 +349,24 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes,
                             </table>
                         </div>
                     )}
+                    </>)}
                 </div>
 
                 {/* Bank Accounts */}
                 <div className="card" style={{ marginTop: '16px' }}>
-                    <div className="card-title" style={{ marginBottom: '12px' }}>
-                        🏦 Bank Accounts
-                        <span className="ct-badge">{bankAccounts.length} accounts</span>
+                    <div
+                        className={`card-title${openCards.bank ? ' open' : ''}`}
+                        style={{ marginBottom: openCards.bank ? '12px' : 0, cursor: 'pointer', justifyContent: 'space-between' }}
+                        onClick={() => toggleCard('bank')}
+                    >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            🏦 Bank Accounts
+                            <span className="ct-badge">{bankAccounts.length} accounts</span>
+                        </span>
+                        <span className="chevron">▶</span>
                     </div>
+
+                    {openCards.bank && (<>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '14px' }}>
                         Used as the "Our Bank" dropdown when recording payments received against an order.
                     </p>
@@ -404,14 +425,24 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes,
                             </table>
                         </div>
                     )}
+                    </>)}
                 </div>
 
                 {/* Packing Sizes */}
                 <div className="card" style={{ marginTop: '16px' }}>
-                    <div className="card-title" style={{ marginBottom: '12px' }}>
-                        📐 Packing Sizes
-                        <span className="ct-badge">{packingSizes.length} sizes</span>
+                    <div
+                        className={`card-title${openCards.packing ? ' open' : ''}`}
+                        style={{ marginBottom: openCards.packing ? '12px' : 0, cursor: 'pointer', justifyContent: 'space-between' }}
+                        onClick={() => toggleCard('packing')}
+                    >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            📐 Packing Sizes
+                            <span className="ct-badge">{packingSizes.length} sizes</span>
+                        </span>
+                        <span className="chevron">▶</span>
                     </div>
+
+                    {openCards.packing && (<>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '14px' }}>
                         Define every packing size used in orders and how many inventory units (kg / L / pcs) one unit of that size consumes.
                         These appear in the packing-size dropdown on the New Order page and drive automatic stock deduction.
@@ -458,16 +489,26 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes,
                             </table>
                         </div>
                     )}
+                    </>)}
                 </div>
 
                 {/* Low Stock Alert Settings */}
                 <div className="card" style={{ marginTop: '16px' }}>
-                    <div className="card-title" style={{ marginBottom: '12px' }}>
-                        🔔 Low Stock Alerts
-                        <span className={`ct-badge ${alert.alert_enabled === '1' ? 'teal' : ''}`}>
-                            {alert.alert_enabled === '1' ? 'Enabled' : 'Disabled'}
+                    <div
+                        className={`card-title${openCards.alerts ? ' open' : ''}`}
+                        style={{ marginBottom: openCards.alerts ? '12px' : 0, cursor: 'pointer', justifyContent: 'space-between' }}
+                        onClick={() => toggleCard('alerts')}
+                    >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            🔔 Low Stock Alerts
+                            <span className={`ct-badge ${alert.alert_enabled === '1' ? 'teal' : ''}`}>
+                                {alert.alert_enabled === '1' ? 'Enabled' : 'Disabled'}
+                            </span>
                         </span>
+                        <span className="chevron">▶</span>
                     </div>
+
+                    {openCards.alerts && (<>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '18px' }}>
                         Automatically send WhatsApp or SMS when a material's stock drops below its minimum level.
                     </p>
@@ -615,6 +656,7 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes,
                             )}
                         </div>
                     </div>
+                    </>)}
                 </div>
 
             </div>
