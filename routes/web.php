@@ -14,6 +14,7 @@ use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PartyController;
 use App\Http\Controllers\InventoryPoolController;
+use App\Http\Controllers\PolicyController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductPhotoController;
 use App\Http\Controllers\PurchaseBillController;
@@ -39,6 +40,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('users', [UserController::class, 'store'])->name('users.store');
         Route::patch('users/{user}', [UserController::class, 'update'])->name('users.update');
         Route::delete('users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
+
+        Route::get('companies', [CompanyController::class, 'index'])->name('companies.index');
+        Route::post('companies', [CompanyController::class, 'store'])->name('companies.store');
+        Route::patch('companies/{company}', [CompanyController::class, 'update'])->name('companies.update');
+        Route::delete('companies/{company}', [CompanyController::class, 'destroy'])->name('companies.destroy');
+
+        Route::get('policies', [PolicyController::class, 'index'])->name('policies.index');
+        Route::post('policies', [PolicyController::class, 'store'])->name('policies.store');
+        Route::patch('policies/{policy}', [PolicyController::class, 'update'])->name('policies.update');
+        Route::delete('policies/{policy}', [PolicyController::class, 'destroy'])->name('policies.destroy');
     });
 
     // Orders list — controller filters by role; sales see confirmed/dispatched only

@@ -12,6 +12,8 @@ import { index as partiesIndex } from '@/routes/parties';
 import { index as partyLedgerIndex } from '@/routes/parties/ledger';
 import { index as productsIndex } from '@/routes/products';
 import { index as inventoryPoolsIndex } from '@/routes/inventory-pools';
+import { index as companiesIndex } from '@/routes/companies';
+import { index as policiesIndex } from '@/routes/policies';
 import { index as rateCalcIndex } from '@/routes/rate-calculator';
 import { index as settingsIndex } from '@/routes/settings';
 import { index as unitTransferIndex } from '@/routes/unit-transfer';
@@ -63,6 +65,8 @@ const NAV_DEFS: Record<string, NavItem[]> = {
         { id: 'suppliers', label: 'Supplier / Vendor', icon: '🏭', href: '/suppliers' as NonNullable<InertiaLinkProps['href']> },
         { id: 'profit-loss', label: 'Profit / Loss', icon: '📈', href: '/reports/profit-loss' as NonNullable<InertiaLinkProps['href']> },
         { id: 'users', label: 'User Management', icon: '👥', href: usersIndex() },
+        { id: 'companies', label: 'Companies', icon: '🏬', href: companiesIndex() },
+        { id: 'policies', label: 'Policies', icon: '🛡️', href: policiesIndex() },
         { id: 'settings', label: 'Settings', icon: '⚙️', href: settingsIndex() },
     ],
     sales: [

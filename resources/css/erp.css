@@ -1188,6 +1188,26 @@ html.dark .badge.indigo {
     flex-direction: column;
     gap: 5px;
 }
+.checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 16px;
+    max-height: 260px;
+    overflow-y: auto;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+.checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--tx);
+}
 .form-group label {
     font-size: 10.5px;
     font-weight: 600;
