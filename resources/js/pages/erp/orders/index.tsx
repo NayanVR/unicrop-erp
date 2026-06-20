@@ -2302,7 +2302,8 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                         <div style={{ padding: '8px 16px', fontSize: '12px', fontWeight: 700, color: '#1e293b', background: '#f8fafc', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
                             📦 {labelEditor.unitSummary}
                         </div>
-                        {/* Font size controls */}
+                        {/* Font size controls — hidden for sales users, who may only view/download */}
+                        {!isSales && (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '8px 16px', alignItems: 'center', flexShrink: 0, borderBottom: '1px solid var(--border)' }}>
                             <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, marginRight: 2 }}>Font:</span>
                             {([
@@ -2320,6 +2321,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                 </div>
                             ))}
                         </div>
+                        )}
                         {/* Scrollable labels — each card is exactly 100mm × 75mm */}
                         <div
                             style={{
@@ -2358,6 +2360,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                         <textarea
                                             value={lbl.transport}
                                             onChange={(e) => updateLabelField(idx, 'transport', e.target.value)}
+                                            readOnly={isSales}
                                             placeholder="Transport name"
                                             rows={1}
                                             style={{
@@ -2384,6 +2387,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                     <input
                                         value={lbl.destination}
                                         onChange={(e) => updateLabelField(idx, 'destination', e.target.value)}
+                                        readOnly={isSales}
                                         placeholder="Destination"
                                         style={{
                                             border: 'none', outline: 'none',
@@ -2398,6 +2402,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                     <textarea
                                         value={lbl.party}
                                         onChange={(e) => updateLabelField(idx, 'party', e.target.value)}
+                                        readOnly={isSales}
                                         placeholder="Party name"
                                         rows={2}
                                         style={{
@@ -2429,6 +2434,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                                 min={1}
                                                 value={lbl.inBoxPcs}
                                                 onChange={(e) => updateLabelField(idx, 'inBoxPcs', e.target.value)}
+                                                readOnly={isSales}
                                                 style={{
                                                     border: 'none', borderBottom: '1px dashed #bbb', outline: 'none',
                                                     fontSize: '9pt', fontWeight: 700, color: '#111',
@@ -2444,6 +2450,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                         <textarea
                                             value={lbl.brand}
                                             onChange={(e) => updateLabelField(idx, 'brand', e.target.value)}
+                                            readOnly={isSales}
                                             placeholder="Brand · packing"
                                             rows={2}
                                             style={{
@@ -2480,6 +2487,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                         <input
                                             value={lbl.orderRef}
                                             onChange={(e) => updateLabelField(idx, 'orderRef', e.target.value)}
+                                            readOnly={isSales}
                                             placeholder="Order ref"
                                             style={{
                                                 border: 'none', outline: 'none',
