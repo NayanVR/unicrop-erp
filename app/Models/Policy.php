@@ -48,6 +48,7 @@ class Policy extends Model
             'parties.manage',
             'suppliers.manage',
             'party-ledger.view',
+            'products.manage',
         ];
     }
 
@@ -71,6 +72,7 @@ class Policy extends Model
                 'design.gallery.manage',
                 'parties.manage',
                 'party-ledger.view',
+                'products.manage',
             ],
             Role::FACTORY => [
                 'users.manage',
@@ -79,6 +81,7 @@ class Policy extends Model
                 'inventory.view',
                 'inventory.edit',
                 'finished-goods.manage',
+                'products.manage',
             ],
             Role::DESIGN => [
                 'orders.view',

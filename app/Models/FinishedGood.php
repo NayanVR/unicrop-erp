@@ -11,6 +11,7 @@ class FinishedGood extends Model
     use BelongsToCompany;
 
     protected $fillable = [
+        'product_id',
         'bom_id',
         'created_by',
         'name',
@@ -35,6 +36,11 @@ class FinishedGood extends Model
     public function bom(): BelongsTo
     {
         return $this->belongsTo(Bom::class);
+    }
+
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
     }
 
     public function creator(): BelongsTo

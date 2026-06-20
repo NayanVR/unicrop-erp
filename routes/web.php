@@ -13,6 +13,7 @@ use App\Http\Controllers\FinishedGoodsController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PartyController;
+use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductPhotoController;
 use App\Http\Controllers\PurchaseBillController;
 use App\Http\Controllers\SettingsController;
@@ -220,6 +221,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('unit-transfer', [UnitTransferController::class, 'store'])->name('unit-transfer.store');
         Route::patch('unit-transfer/{unitTransfer}/status', [UnitTransferController::class, 'updateStatus'])->name('unit-transfer.status');
         Route::delete('unit-transfer/{unitTransfer}', [UnitTransferController::class, 'destroy'])->name('unit-transfer.destroy');
+    });
+
+    Route::middleware(['role:products.manage'])->group(function () {
+        Route::get('products', [ProductController::class, 'index'])->name('products.index');
+        Route::post('products', [ProductController::class, 'store'])->name('products.store');
+        Route::patch('products/{product}', [ProductController::class, 'update'])->name('products.update');
+        Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
     });
 
     Route::middleware(['role:design.manage'])->group(function () {

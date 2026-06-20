@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\RawMaterial;
 
-#[Fillable(['name', 'category', 'packing_size', 'batch_size', 'batch_unit', 'output_raw_material_id', 'notes', 'is_active'])]
+#[Fillable(['product_id', 'name', 'category', 'packing_size', 'batch_size', 'batch_unit', 'output_raw_material_id', 'notes', 'is_active'])]
 class Bom extends Model
 {
     use BelongsToCompany;
@@ -39,5 +39,10 @@ class Bom extends Model
     public function outputMaterial(): BelongsTo
     {
         return $this->belongsTo(RawMaterial::class, 'output_raw_material_id');
+    }
+
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
     }
 }
