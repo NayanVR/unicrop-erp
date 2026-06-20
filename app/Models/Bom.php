@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,6 +12,8 @@ use App\Models\RawMaterial;
 #[Fillable(['name', 'category', 'packing_size', 'batch_size', 'batch_unit', 'output_raw_material_id', 'notes', 'is_active'])]
 class Bom extends Model
 {
+    use BelongsToCompany;
+
     /**
      * @return array<string, string>
      */

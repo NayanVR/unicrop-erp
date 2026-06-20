@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['name', 'sku', 'hsn', 'gst', 'unit', 'category', 'group_name', 'shape', 'stock_qty', 'min_stock', 'reorder_level', 'cost_per_unit', 'selling_rate', 'dim_l', 'dim_w', 'dim_h', 'supplier', 'notes', 'is_active', 'approval_status', 'requested_by'])]
 class RawMaterial extends Model
 {
+    use BelongsToCompany;
+
     /**
      * @return array<string, string>
      */
