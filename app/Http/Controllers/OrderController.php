@@ -144,7 +144,7 @@ class OrderController extends Controller
             'userRole'      => $role,
             'productPhotos' => $this->mapProductPhotos(),
             'packingSizes'  => PackingSize::query()->orderBy('name')->get(['name', 'multiplier', 'pieces_per_box', 'pack_unit']),
-            'bankAccounts'  => BankAccount::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'bank_name', 'account_number', 'upi_id']),
+            'bankAccounts'  => BankAccount::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'bank_name', 'account_number', 'upi_id', 'is_default']),
         ]);
     }
 
