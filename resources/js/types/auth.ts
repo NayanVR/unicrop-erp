@@ -30,6 +30,7 @@ export type User = {
 
 export type Auth = {
     user: User | null;
+    current_company: { id: number; name: string } | null;
 };
 
 /* @chisel-passkeys */

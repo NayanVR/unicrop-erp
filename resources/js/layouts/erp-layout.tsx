@@ -14,8 +14,9 @@ import { index as rateCalcIndex } from '@/routes/rate-calculator';
 import { index as settingsIndex } from '@/routes/settings';
 import { index as unitTransferIndex } from '@/routes/unit-transfer';
 import { index as usersIndex } from '@/routes/users';
+import companies from '@/routes/companies';
 import type { Auth, Role } from '@/types';
-import { Link, usePage, type InertiaLinkProps } from '@inertiajs/react';
+import { Link, router, usePage, type InertiaLinkProps } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 type NavItem = {
@@ -255,6 +256,12 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
         updateAppearance(resolvedAppearance === 'dark' ? 'light' : 'dark');
     };
 
+    const userCompanies = auth.user?.companies ?? [];
+
+    const handleCompanyChange = (companyId: number) => {
+        router.post(companies.switch.url(), { company_id: companyId }, { preserveScroll: true });
+    };
+
     return (
         <div id="app-screen" className="visible">
             <div
@@ -280,6 +287,22 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
                         {resolvedAppearance === 'dark' ? '☀️' : '🌙'}
                     </button>
                 </div>
+                {userCompanies.length > 1 && (
+                    <div style={{ padding: '0 16px 12px' }}>
+                        <select
+                            value={auth.current_company?.id ?? ''}
+                            onChange={(event) => handleCompanyChange(Number(event.target.value))}
+                            style={{ width: '100%' }}
+                            title="Switch company"
+                        >
+                            {userCompanies.map((company) => (
+                                <option key={company.id} value={company.id}>
+                                    🏢 {company.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
                 <div className="sidebar-user">
                     <div
                         className={`u-avatar ${role ?? 'sales'}`}

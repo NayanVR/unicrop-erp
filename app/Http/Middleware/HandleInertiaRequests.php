@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\CurrentCompany;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -38,8 +39,10 @@ class HandleInertiaRequests extends Middleware
         $user = $request->user();
 
         if ($user) {
-            $user->loadMissing('roles');
+            $user->loadMissing('roles', 'companies');
         }
+
+        $currentCompany = app(CurrentCompany::class)->model();
 
         return [
             ...parent::share($request),
@@ -70,6 +73,14 @@ class HandleInertiaRequests extends Middleware
                         'slug' => $role->slug,
                     ]),
                     'role' => $user->roles->first()?->slug,
+                    'companies' => $user->companies->map(fn ($company) => [
+                        'id' => $company->id,
+                        'name' => $company->name,
+                    ]),
+                ] : null,
+                'current_company' => $currentCompany ? [
+                    'id' => $currentCompany->id,
+                    'name' => $currentCompany->name,
                 ] : null,
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',

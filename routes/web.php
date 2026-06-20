@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\BomController;
+use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\BomRecipeController;
 use App\Http\Controllers\DashboardController;
@@ -27,6 +28,7 @@ Route::get('/', function () {
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::post('companies/switch', [CompanyController::class, 'switch'])->name('companies.switch');
     Route::get('product-photos/{photo}/image', [ProductPhotoController::class, 'show'])->name('product-photos.show');
     Route::get('parties/{party}/pan-card', [PartyController::class, 'showPanCard'])->name('parties.pan-card');
 
