@@ -98,13 +98,36 @@ class User extends Authenticatable
         return Policy::find($pivot->policy_id);
     }
 
+    /**
+     * Union of permissions granted by every role this user currently holds,
+     * derived from Policy::legacyRolePermissions(). Used as the source of
+     * truth for permission checks until admins assign custom, non-system
+     * policies that should take precedence (see can()).
+     *
+     * @return array<int, string>
+     */
+    public function legacyPermissions(): array
+    {
+        $map = Policy::legacyRolePermissions();
+
+        return $this->roles
+            ->flatMap(fn (Role $role) => $map[$role->slug] ?? [])
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     public function can($abilities, $arguments = []): bool
     {
         if (is_string($abilities) && str_contains($abilities, '.')) {
             $company = $arguments instanceof Company ? $arguments : null;
+            $policy = $this->policyFor($company);
 
-            return $this->policyFor($company)?->permissions !== null
-                && in_array($abilities, $this->policyFor($company)?->permissions ?? [], true);
+            if ($policy && ! $policy->is_system) {
+                return in_array($abilities, $policy->permissions ?? [], true);
+            }
+
+            return in_array($abilities, $this->legacyPermissions(), true);
         }
 
         return parent::can($abilities, $arguments);

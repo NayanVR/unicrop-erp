@@ -23,7 +23,14 @@ class EnsureUserHasRole
 
         $user->loadMissing('roles');
 
-        if ($roles !== [] && ! $user->hasAnyRole($roles)) {
+        $permissions = array_filter($roles, fn (string $role) => str_contains($role, '.'));
+        $roleSlugs = array_diff($roles, $permissions);
+
+        if ($permissions !== [] && ! collect($permissions)->some(fn (string $permission) => $user->can($permission))) {
+            abort(403);
+        }
+
+        if ($roleSlugs !== [] && ! $user->hasAnyRole($roleSlugs)) {
             abort(403);
         }
 
