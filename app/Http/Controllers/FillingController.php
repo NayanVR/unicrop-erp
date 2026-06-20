@@ -19,7 +19,7 @@ class FillingController extends Controller
     public function index(): Response
     {
         $recipes = FillingRecipe::query()
-            ->with(['outputMaterial:id,name,unit,stock_qty,min_stock,category', 'items.rawMaterial:id,name,unit,stock_qty,cost_per_unit'])
+            ->with(['outputMaterial:id,name,unit,stock_qty,min_stock,category', 'items.rawMaterial:id,name,unit,stock_qty,cost_per_unit,category,dim_l,dim_w,dim_h'])
             ->orderByRaw("CASE WHEN group_name IS NULL OR group_name = '' THEN 1 ELSE 0 END")
             ->orderBy('group_name')
             ->orderBy('name')
@@ -28,7 +28,7 @@ class FillingController extends Controller
         $materials = RawMaterial::query()
             ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'unit', 'stock_qty', 'cost_per_unit', 'category', 'shape']);
+            ->get(['id', 'name', 'unit', 'stock_qty', 'cost_per_unit', 'category', 'shape', 'dim_l', 'dim_w', 'dim_h']);
 
         $finishedGoodMaterials = $materials->filter(fn ($m) => strtolower(trim($m->category ?? '')) === 'finished good')->values();
 

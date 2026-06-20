@@ -12,6 +12,9 @@ type RawMaterial = {
     cost_per_unit: string | number;
     category?: string | null;
     shape?: string | null;
+    dim_l?: string | number | null;
+    dim_w?: string | number | null;
+    dim_h?: string | number | null;
 };
 
 type RecipeItem = {
@@ -575,6 +578,11 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                                                 <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14, gap: 8 }}>
                                                     <span style={{ color: sufficient ? 'var(--tx-body)' : 'var(--danger)', flex: 1 }}>
                                                         {mat?.name ?? `Material #${item.raw_material_id}`}
+                                                        {(mat?.dim_l || mat?.dim_w || mat?.dim_h) && (
+                                                            <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--tx-muted)', fontWeight: 400 }}>
+                                                                📐 {[mat.dim_l, mat.dim_w, mat.dim_h].map((d) => d != null && Number(d) > 0 ? Number(d) : '?').join(' × ')} mm
+                                                            </span>
+                                                        )}
                                                     </span>
                                                     <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
                                                         {formatQty(item.qty_per_unit)}{' '}
