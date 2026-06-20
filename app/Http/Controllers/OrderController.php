@@ -13,6 +13,7 @@ use App\Models\OrderAttachment;
 use App\Models\OrderPayment;
 use App\Models\PackingSize;
 use App\Models\Party;
+use App\Models\ProductFillingConfig;
 use App\Models\ProductPhoto;
 use App\Models\RawMaterial;
 use App\Models\Role;
@@ -20,6 +21,7 @@ use App\Models\Transport;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -145,6 +147,7 @@ class OrderController extends Controller
             'productPhotos' => $this->mapProductPhotos(),
             'packingSizes'  => PackingSize::query()->orderBy('name')->get(['name', 'multiplier', 'pieces_per_box', 'pack_unit']),
             'bankAccounts'  => BankAccount::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'bank_name', 'account_number', 'upi_id', 'is_default']),
+            'boxDimensions' => $this->mapBoxDimensions(),
         ]);
     }
 
@@ -950,5 +953,22 @@ class OrderController extends Controller
         });
 
         return $rows;
+    }
+
+    private function mapBoxDimensions(): Collection
+    {
+        return ProductFillingConfig::query()
+            ->whereNotNull('outer_box_id')
+            ->with('outerBox:id,dim_l,dim_w,dim_h')
+            ->get(['id', 'our_brand', 'packing_size', 'outer_box_id'])
+            ->map(fn ($c) => [
+                'our_brand'    => $c->our_brand,
+                'packing_size' => $c->packing_size,
+                'dim_l'        => $c->outerBox?->dim_l,
+                'dim_w'        => $c->outerBox?->dim_w,
+                'dim_h'        => $c->outerBox?->dim_h,
+            ])
+            ->filter(fn ($r) => $r['dim_l'] || $r['dim_w'] || $r['dim_h'])
+            ->values();
     }
 }

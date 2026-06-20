@@ -127,6 +127,32 @@ type OrderItem = {
     stage_log?: StageLogEntry[] | null;
 };
 
+type BoxDimension = {
+    our_brand: string;
+    packing_size: string | null;
+    dim_l: string | number | null;
+    dim_w: string | number | null;
+    dim_h: string | number | null;
+};
+
+function buildBoxDimMap(boxDimensions: BoxDimension[]) {
+    const map = new Map<string, BoxDimension>();
+    for (const d of boxDimensions) {
+        const size = (d.packing_size ?? '').toLowerCase();
+        map.set(`${d.our_brand.toLowerCase()}|${size}`, d);
+        if (!d.packing_size) map.set(`${d.our_brand.toLowerCase()}|`, d);
+    }
+    return map;
+}
+
+function getItemBoxDim(item: OrderItem, map: Map<string, BoxDimension>): string {
+    if (!item.our_brand) return '';
+    const size = (item.packing_size ?? '').toLowerCase();
+    const d = map.get(`${item.our_brand.toLowerCase()}|${size}`) ?? map.get(`${item.our_brand.toLowerCase()}|`);
+    if (!d || (!d.dim_l && !d.dim_w && !d.dim_h)) return '';
+    return [d.dim_l, d.dim_w, d.dim_h].map((v) => v != null && Number(v) > 0 ? Number(v) : '?').join(' × ');
+}
+
 type DesignStatus = {
     stage: string;
     label: string;
@@ -176,6 +202,7 @@ type Props = {
     productPhotos?: ProductPhoto[];
     packingSizes?: { name: string; multiplier: string | number; pieces_per_box: number | null; pack_unit: string | null }[];
     godowns?: { id: number; name: string; is_default?: boolean }[];
+    boxDimensions?: BoxDimension[];
 };
 
 const STAGE_ORDER = ['accepted', 'filling', 'labeling', 'ready', 'dispatched'];
@@ -209,6 +236,7 @@ type EditableLabel = {
     brand: string;
     inBoxPcs: string;
     orderRef: string;
+    boxDim: string;
 };
 
 type FilterKey = 'all' | 'new' | 'in-process' | 'filling' | 'ready' | 'dispatched';
@@ -353,7 +381,7 @@ const boxesFor = (item: OrderItem, overrides: Record<string, number> = {}): numb
     return Math.ceil(Number(item.quantity) / ppb);
 };
 
-export default function FactoryIndex({ orders, urgentPending, canAdvance, productPhotos = [], packingSizes = [], godowns = [] }: Props) {
+export default function FactoryIndex({ orders, urgentPending, canAdvance, productPhotos = [], packingSizes = [], godowns = [], boxDimensions = [] }: Props) {
     const pcsPerBoxOverrides = useMemo(() => {
         const map: Record<string, number> = {};
         packingSizes.forEach((p) => {
@@ -373,6 +401,8 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
         });
         return map;
     }, [packingSizes]);
+
+    const boxDimMap = useMemo(() => buildBoxDimMap(boxDimensions), [boxDimensions]);
 
     const initialFilter = (): FilterKey => {
         const param = new URLSearchParams(window.location.search).get('filter');
@@ -681,6 +711,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                     brand: `${brand}${item.packing_size ? ' · ' + item.packing_size : ''}`,
                     inBoxPcs: ppb != null ? String(ppb) : '',
                     orderRef: order.order_number,
+                    boxDim: getItemBoxDim(item, boxDimMap),
                 });
             }
         });
@@ -730,6 +761,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                         <span class="unit-tag">${esc(lbl.unit.toUpperCase())}</span>
                         <span class="order-ref">${esc(lbl.orderRef)}</span>
                     </div>
+                    ${lbl.boxDim ? `<div class="box-dim">Dim: ${esc(lbl.boxDim)} mm</div>` : ''}
                 </div>
             </div>`,
             )
@@ -758,6 +790,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 .footer-row { display:flex; justify-content:space-between; align-items:center; margin-top:1mm; }
                 .unit-tag { font-size:8pt; font-weight:900; border:1.5px solid #000; padding:0.5mm 2.5mm; letter-spacing:1.5px; border-radius:1mm; }
                 .order-ref { font-size:7.5pt; color:#888; text-align:right; }
+                .box-dim { font-size:7pt; color:#555; text-align:right; margin-top:0.5mm; }
                 .printed-by { font-size:7pt; color:#555; margin-top:0.5mm; text-align:right; }
                 .toolbar { position:sticky; top:0; z-index:10; background:#1e293b; color:#fff; padding:10px 16px; display:flex; align-items:center; gap:12px; }
                 .toolbar button { background:#2563eb; color:#fff; border:0; border-radius:6px; padding:8px 18px; font-size:14px; font-weight:700; cursor:pointer; }

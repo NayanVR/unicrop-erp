@@ -7,12 +7,14 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Godown;
 use App\Models\PackingSize;
+use App\Models\ProductFillingConfig;
 use App\Models\ProductPhoto;
 use App\Models\Role;
 use App\Models\User;
 use App\Notifications\OrderAllItemsReady;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -122,7 +124,25 @@ class FactoryController extends Controller
                 ]),
             'packingSizes' => PackingSize::query()->orderBy('name')->get(['name', 'multiplier', 'pieces_per_box', 'pack_unit']),
             'godowns' => Godown::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'is_default']),
+            'boxDimensions' => $this->mapBoxDimensions(),
         ]);
+    }
+
+    private function mapBoxDimensions(): Collection
+    {
+        return ProductFillingConfig::query()
+            ->whereNotNull('outer_box_id')
+            ->with('outerBox:id,dim_l,dim_w,dim_h')
+            ->get(['id', 'our_brand', 'packing_size', 'outer_box_id'])
+            ->map(fn ($c) => [
+                'our_brand'    => $c->our_brand,
+                'packing_size' => $c->packing_size,
+                'dim_l'        => $c->outerBox?->dim_l,
+                'dim_w'        => $c->outerBox?->dim_w,
+                'dim_h'        => $c->outerBox?->dim_h,
+            ])
+            ->filter(fn ($r) => $r['dim_l'] || $r['dim_w'] || $r['dim_h'])
+            ->values();
     }
 
     public function advanceStage(Request $request, OrderItem $item): RedirectResponse

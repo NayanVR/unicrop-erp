@@ -39,6 +39,24 @@ function getItemPhoto(
         ?? null;
 }
 
+function buildBoxDimMap(boxDimensions: BoxDimension[]) {
+    const map = new Map<string, BoxDimension>();
+    for (const d of boxDimensions) {
+        const size = (d.packing_size ?? '').toLowerCase();
+        map.set(`${d.our_brand.toLowerCase()}|${size}`, d);
+        if (!d.packing_size) map.set(`${d.our_brand.toLowerCase()}|`, d);
+    }
+    return map;
+}
+
+function getItemBoxDim(item: OrderItem, map: Map<string, BoxDimension>): string {
+    if (!item.our_brand) return '';
+    const size = (item.packing_size ?? '').toLowerCase();
+    const d = map.get(`${item.our_brand.toLowerCase()}|${size}`) ?? map.get(`${item.our_brand.toLowerCase()}|`);
+    if (!d || (!d.dim_l && !d.dim_w && !d.dim_h)) return '';
+    return [d.dim_l, d.dim_w, d.dim_h].map((v) => v != null && Number(v) > 0 ? Number(v) : '?').join(' × ');
+}
+
 type OrderItem = {
     id: number;
     our_brand?: string | null;
@@ -180,7 +198,16 @@ type Props = {
     productPhotos?: ProductPhoto[];
     packingSizes?: { name: string; multiplier: string | number; pieces_per_box: number | null; pack_unit: string | null }[];
     bankAccounts?: BankAccount[];
+    boxDimensions?: BoxDimension[];
     flash?: { success?: string; error?: string };
+};
+
+type BoxDimension = {
+    our_brand: string;
+    packing_size: string | null;
+    dim_l: string | number | null;
+    dim_w: string | number | null;
+    dim_h: string | number | null;
 };
 
 type EditableLabel = {
@@ -196,6 +223,7 @@ type EditableLabel = {
     brand: string;
     inBoxPcs: string;
     orderRef: string;
+    boxDim: string;
 };
 
 // Standard pcs-per-box/bag/carba lookup by normalized packing size
@@ -309,7 +337,7 @@ const statusLabel = (status?: string | null) => {
 const priorityClassName = (priority?: string | null) =>
     `badge priority-${priority ?? 'normal'}`;
 
-export default function OrdersIndex({ orders, currentUserId, userRole, productPhotos = [], packingSizes = [], bankAccounts = [] }: Props) {
+export default function OrdersIndex({ orders, currentUserId, userRole, productPhotos = [], packingSizes = [], bankAccounts = [], boxDimensions = [] }: Props) {
     const { flash } = usePage<Props>().props;
 
     useEffect(() => {
@@ -335,6 +363,8 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
         });
         return map;
     }, [packingSizes]);
+
+    const boxDimMap = useMemo(() => buildBoxDimMap(boxDimensions), [boxDimensions]);
 
     const [labelEditor, setLabelEditor] = useState<{ order: Order; labels: EditableLabel[]; unitSummary: string } | null>(null);
     const [labelFS, setLabelFS] = useState({ transport: 28, totalBoxes: 22, brand: 16, boxNum: 18, party: 10 });
@@ -391,6 +421,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                     brand: `${brand}${item.packing_size ? ' · ' + item.packing_size : ''}`,
                     inBoxPcs: ppb != null ? String(ppb) : '',
                     orderRef: order.order_number,
+                    boxDim: getItemBoxDim(item, boxDimMap),
                 });
             }
         });
@@ -438,6 +469,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                         <span class="unit-tag">${esc(lbl.unit.toUpperCase())}</span>
                         <span class="order-ref">${esc(lbl.orderRef)}</span>
                     </div>
+                    ${lbl.boxDim ? `<div class="box-dim">Dim: ${esc(lbl.boxDim)} mm</div>` : ''}
                 </div>
             </div>`,
             )
@@ -466,6 +498,7 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                 .footer-row { display:flex; justify-content:space-between; align-items:center; margin-top:1mm; }
                 .unit-tag { font-size:8pt; font-weight:900; border:1.5px solid #000; padding:0.5mm 2.5mm; letter-spacing:1.5px; border-radius:1mm; }
                 .order-ref { font-size:7.5pt; color:#888; text-align:right; }
+                .box-dim { font-size:7pt; color:#555; text-align:right; margin-top:0.5mm; }
                 .toolbar { position:sticky; top:0; z-index:10; background:#1e293b; color:#fff; padding:10px 16px; display:flex; align-items:center; gap:12px; }
                 .toolbar button { background:#2563eb; color:#fff; border:0; border-radius:6px; padding:8px 18px; font-size:14px; font-weight:700; cursor:pointer; }
                 .toolbar span { color:#cbd5e1; font-size:12px; }
