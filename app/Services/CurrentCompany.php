@@ -15,13 +15,17 @@ class CurrentCompany
 
         $sessionCompanyId = $request->session()->get('current_company_id');
 
-        if ($sessionCompanyId && method_exists($user ?? '', 'companies') && $user->companies()->where('companies.id', $sessionCompanyId)->exists()) {
-            $this->company = Company::find($sessionCompanyId);
+        if ($user && $sessionCompanyId) {
+            $sessionCompany = $user->companies()->where('companies.id', $sessionCompanyId)->first();
 
-            return;
+            if ($sessionCompany) {
+                $this->company = $sessionCompany;
+
+                return;
+            }
         }
 
-        if ($user && method_exists($user, 'companies')) {
+        if ($user) {
             $first = $user->companies()->first();
 
             if ($first) {

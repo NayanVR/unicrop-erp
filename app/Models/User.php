@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Services\CurrentCompany;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -69,5 +70,43 @@ class User extends Authenticatable
     public function hasAnyRole(array $roles): bool
     {
         return $this->roles->whereIn('slug', $roles)->isNotEmpty();
+    }
+
+    /**
+     * @return BelongsToMany<Company>
+     */
+    public function companies(): BelongsToMany
+    {
+        return $this->belongsToMany(Company::class)
+            ->withPivot(['policy_id', 'role_id', 'is_default']);
+    }
+
+    public function policyFor(?Company $company = null): ?Policy
+    {
+        $company ??= app(CurrentCompany::class)->model();
+
+        if (! $company) {
+            return null;
+        }
+
+        $pivot = $this->companies->firstWhere('id', $company->id)?->pivot;
+
+        if (! $pivot || ! $pivot->policy_id) {
+            return null;
+        }
+
+        return Policy::find($pivot->policy_id);
+    }
+
+    public function can($abilities, $arguments = []): bool
+    {
+        if (is_string($abilities) && str_contains($abilities, '.')) {
+            $company = $arguments instanceof Company ? $arguments : null;
+
+            return $this->policyFor($company)?->permissions !== null
+                && in_array($abilities, $this->policyFor($company)?->permissions ?? [], true);
+        }
+
+        return parent::can($abilities, $arguments);
     }
 }
