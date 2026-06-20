@@ -42,6 +42,8 @@ class StoreUserRequest extends FormRequest
             'permissions.*' => ['string', 'max:50'],
             'company_access' => ['nullable', 'array'],
             'company_access.*' => ['string', 'max:100'],
+            'company_ids' => ['nullable', 'array'],
+            'company_ids.*' => ['integer', Rule::exists('companies', 'id')],
             'cost_access' => ['nullable', 'boolean'],
         ];
     }

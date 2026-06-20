@@ -20,6 +20,7 @@ export type User = {
     hidden_nav_items?: string[] | null;
     permissions?: string[] | null;
     company_access?: string[] | null;
+    companies?: { id: number; name: string }[];
     roles?: Role[];
     role?: string | null;
     password_plain?: string | null;

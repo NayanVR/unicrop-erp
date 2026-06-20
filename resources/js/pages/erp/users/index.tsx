@@ -25,6 +25,7 @@ type UserFormData = {
     permissions: string[];
     hidden_nav_items: string[];
     company_access: string[];
+    company_ids: number[];
     cost_access: boolean;
 };
 
@@ -91,6 +92,7 @@ export default function UsersIndex({ users, roles, companies, canManageUsers, ma
         permissions: [],
         hidden_nav_items: [],
         company_access: [],
+        company_ids: [],
         cost_access: false,
     });
 
@@ -105,6 +107,9 @@ export default function UsersIndex({ users, roles, companies, canManageUsers, ma
         if (manageableRoleSlug) {
             const restrictedRole = roles.find((r) => r.slug === manageableRoleSlug);
             if (restrictedRole) form.setData('roles', [restrictedRole.id]);
+        }
+        if (companies.length > 0) {
+            form.setData('company_ids', [companies[0].id]);
         }
         setModalOpen(true);
     };
@@ -121,6 +126,7 @@ export default function UsersIndex({ users, roles, companies, canManageUsers, ma
             permissions: (user.permissions as string[]) ?? [],
             hidden_nav_items: (user.hidden_nav_items as string[]) ?? [],
             company_access: (user.company_access as string[]) ?? [],
+            company_ids: user.companies?.map((company) => company.id) ?? [],
             cost_access: Boolean(user.cost_access),
         });
         form.clearErrors();
@@ -188,6 +194,7 @@ export default function UsersIndex({ users, roles, companies, canManageUsers, ma
                 permissions: (user.permissions as string[]) ?? [],
                 hidden_nav_items: (user.hidden_nav_items as string[]) ?? [],
                 company_access: (user.company_access as string[]) ?? [],
+                company_ids: user.companies?.map((company) => company.id) ?? [],
                 cost_access: Boolean(user.cost_access),
             },
         });
@@ -566,13 +573,13 @@ export default function UsersIndex({ users, roles, companies, canManageUsers, ma
                                             <input
                                                 type="checkbox"
                                                 style={{ width: 'auto' }}
-                                                checked={form.data.company_access.includes(
-                                                    company.name,
+                                                checked={form.data.company_ids.includes(
+                                                    company.id,
                                                 )}
                                                 onChange={() =>
                                                     toggleArrayValue(
-                                                        'company_access',
-                                                        company.name,
+                                                        'company_ids',
+                                                        company.id,
                                                     )
                                                 }
                                             />

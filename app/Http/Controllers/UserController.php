@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
+use App\Models\Company;
+use App\Models\Policy;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -13,6 +15,39 @@ use Inertia\Response;
 
 class UserController extends Controller
 {
+    /**
+     * Build company_user pivot rows for the given company IDs, assigning each
+     * the system policy matching the user's first selected role and marking
+     * the first company as default. Falls back to the single default company
+     * when none are explicitly selected, so every user keeps at least one.
+     *
+     * @param  array<int, int>  $companyIds
+     * @param  array<int, int>  $roleIds
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildCompanyPivot(array $companyIds, array $roleIds): array
+    {
+        if ($companyIds === []) {
+            $defaultCompanyId = Company::query()->orderBy('id')->value('id');
+            $companyIds = $defaultCompanyId ? [$defaultCompanyId] : [];
+        }
+
+        $roleSlug = $roleIds === [] ? null : Role::find($roleIds[0])?->slug;
+        $policyId = $roleSlug
+            ? Policy::where('is_system', true)->where('slug', $roleSlug)->value('id')
+            : null;
+
+        $pivot = [];
+        foreach (array_values($companyIds) as $index => $companyId) {
+            $pivot[$companyId] = [
+                'policy_id' => $policyId,
+                'is_default' => $index === 0,
+            ];
+        }
+
+        return $pivot;
+    }
+
     private function canManageUsers(): bool
     {
         $user = auth()->user();
@@ -47,7 +82,7 @@ class UserController extends Controller
         $canManage = $this->canManageUsers();
         $manageableRoleSlug = $canManage ? $this->manageableRoleSlug() : null;
 
-        $usersQuery = User::query()->with('roles')->orderBy('name');
+        $usersQuery = User::query()->with('roles', 'companies')->orderBy('name');
         if ($manageableRoleSlug !== null) {
             $usersQuery->whereHas('roles', fn ($q) => $q->where('slug', $manageableRoleSlug));
         }
@@ -76,7 +111,7 @@ class UserController extends Controller
             'pageTitle' => 'User Management',
             'users' => $users,
             'roles' => Role::query()->orderBy('name')->get(['id', 'name', 'slug']),
-            'companies' => [],
+            'companies' => Company::query()->orderBy('name')->get(['id', 'name']),
             'canManageUsers' => $canManage,
             'manageableRoleSlug' => $manageableRoleSlug,
         ]);
@@ -109,6 +144,7 @@ class UserController extends Controller
         ]);
 
         $user->roles()->sync($data['roles']);
+        $user->companies()->sync($this->buildCompanyPivot($data['company_ids'] ?? [], $data['roles']));
 
         return redirect()->back();
     }
@@ -146,6 +182,7 @@ class UserController extends Controller
 
         $user->save();
         $user->roles()->sync($data['roles']);
+        $user->companies()->sync($this->buildCompanyPivot($data['company_ids'] ?? [], $data['roles']));
 
         return redirect()->back();
     }
@@ -157,6 +194,7 @@ class UserController extends Controller
         $this->assertSameRole($user);
 
         $user->roles()->detach();
+        $user->companies()->detach();
         $user->delete();
 
         return redirect()->back();
