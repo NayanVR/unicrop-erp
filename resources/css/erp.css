@@ -1253,6 +1253,11 @@ html.dark .badge.indigo {
     color: var(--danger);
     margin-top: 1px;
 }
+.field-hint {
+    font-size: 11px;
+    color: var(--muted-foreground, #6b7280);
+    margin-top: 1px;
+}
 .form-group textarea {
     resize: vertical;
     min-height: 70px;

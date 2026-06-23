@@ -96,11 +96,9 @@ export default function PoliciesIndex() {
                                     </span>
                                 </td>
                                 <td className="action-cell">
+                                    <button className="btn-icon" onClick={() => openEdit(p)} title="Edit">✏️</button>
                                     {!p.is_system && (
-                                        <>
-                                            <button className="btn-icon" onClick={() => openEdit(p)} title="Edit">✏️</button>
-                                            <button className="btn-icon btn-danger-icon" onClick={() => deletePolicy(p)} title="Delete">🗑️</button>
-                                        </>
+                                        <button className="btn-icon btn-danger-icon" onClick={() => deletePolicy(p)} title="Delete">🗑️</button>
                                     )}
                                 </td>
                             </tr>
@@ -120,7 +118,15 @@ export default function PoliciesIndex() {
                         <form onSubmit={submit} className="modal-form">
                             <div className="form-group">
                                 <label>Name *</label>
-                                <input value={data.name} onChange={(e) => setData('name', e.target.value)} required />
+                                <input
+                                    value={data.name}
+                                    onChange={(e) => setData('name', e.target.value)}
+                                    required
+                                    disabled={editing?.is_system}
+                                />
+                                {editing?.is_system && (
+                                    <span className="field-hint">System policy name cannot be changed.</span>
+                                )}
                                 {errors.name && <span className="field-error">{errors.name}</span>}
                             </div>
                             <div className="form-group">

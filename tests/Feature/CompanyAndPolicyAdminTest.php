@@ -53,7 +53,7 @@ test('the last remaining company cannot be deleted', function () {
     expect(Company::find($only->id))->not->toBeNull();
 });
 
-test('admin can create a custom policy with a permission subset and it cannot be edited once system-owned', function () {
+test('admin can create a custom policy with a permission subset', function () {
     $admin = adminForCompanyAdmin();
 
     $this->actingAs($admin)->post('/policies', [
@@ -64,10 +64,23 @@ test('admin can create a custom policy with a permission subset and it cannot be
     $policy = Policy::where('name', 'Limited Sales')->first();
     expect($policy->permissions)->toBe(['orders.view', 'orders.print']);
     expect($policy->is_system)->toBeFalse();
+});
 
-    $systemPolicy = Policy::where('is_system', true)->first();
+test('admin can edit a system policy permissions while its name and slug stay fixed', function () {
+    $admin = adminForCompanyAdmin();
+
+    $systemPolicy = Policy::where('is_system', true)->where('slug', '!=', Role::ADMIN)->first();
+    $originalName = $systemPolicy->name;
+    $originalSlug = $systemPolicy->slug;
+
     $this->actingAs($admin)->patch("/policies/{$systemPolicy->id}", [
-        'name' => $systemPolicy->name,
-        'permissions' => [],
-    ])->assertRedirect()->assertSessionHas('error');
+        'name' => 'Renamed System Policy',
+        'permissions' => ['orders.view', 'orders.print'],
+    ])->assertRedirect()->assertSessionHas('success');
+
+    $systemPolicy->refresh();
+    expect($systemPolicy->permissions)->toBe(['orders.view', 'orders.print']);
+    expect($systemPolicy->name)->toBe($originalName);
+    expect($systemPolicy->slug)->toBe($originalSlug);
+    expect($systemPolicy->is_system)->toBeTrue();
 });
