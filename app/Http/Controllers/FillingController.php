@@ -61,6 +61,7 @@ class FillingController extends Controller
                 'packing_size'           => $data['packing_size'] ?? null,
                 'fill_quantity'          => $data['fill_quantity'] ?? 1,
                 'notes'                  => $data['notes'] ?? null,
+                'charges'                => $this->normalizeCharges($data['charges'] ?? []),
             ]);
 
             foreach ($data['items'] ?? [] as $item) {
@@ -90,6 +91,7 @@ class FillingController extends Controller
                 'packing_size'           => $data['packing_size'] ?? null,
                 'fill_quantity'          => $data['fill_quantity'] ?? 1,
                 'notes'                  => $data['notes'] ?? null,
+                'charges'                => $this->normalizeCharges($data['charges'] ?? []),
                 'is_active'              => $data['is_active'] ?? true,
             ]);
 
@@ -201,6 +203,18 @@ class FillingController extends Controller
                 ];
             }
 
+            // Apply extra per-piece charges (man power, electricity, etc.) scaled by quantity.
+            $runCharges = [];
+            foreach ($this->normalizeCharges($recipe->charges ?? []) as $charge) {
+                $lineTotal    = (float) $charge['amount'] * $qty;
+                $totalCost   += $lineTotal;
+                $runCharges[] = [
+                    'label'  => $charge['label'],
+                    'amount' => (float) $charge['amount'],
+                    'total'  => $lineTotal,
+                ];
+            }
+
             $costPerPc = $qty > 0 ? round($totalCost / $qty, 4) : 0;
 
             $bottleShape = trim($data['bottle_shape'] ?? '');
@@ -213,6 +227,7 @@ class FillingController extends Controller
                 'quantity'          => $qty,
                 'user_id'           => $request->user()?->id,
                 'items'             => $runItems,
+                'charges'           => $runCharges,
             ]);
 
             FinishedGood::create([
@@ -335,6 +350,9 @@ class FillingController extends Controller
             'items.*.raw_material_id' => 'required|exists:raw_materials,id',
             'items.*.qty_per_unit'    => 'required|numeric|min:0.001',
             'items.*.unit'            => 'nullable|string|max:20',
+            'charges'                 => 'array',
+            'charges.*.label'         => 'required|string|max:100',
+            'charges.*.amount'        => 'required|numeric|min:0',
         ];
         if ($withActive) {
             $rules['is_active'] = 'boolean';
@@ -359,8 +377,31 @@ class FillingController extends Controller
             $costPerPc += $qtyInMat * (float) $item->rawMaterial->cost_per_unit;
         }
 
+        // Per-piece charges add directly to the per-piece cost.
+        foreach ($this->normalizeCharges($recipe->charges ?? []) as $charge) {
+            $costPerPc += (float) $charge['amount'];
+        }
+
         RawMaterial::where('id', $recipe->output_raw_material_id)
             ->update(['cost_per_unit' => round($costPerPc, 4)]);
+    }
+
+    /**
+     * Keep only valid {label, amount} charge rows with a non-empty label.
+     *
+     * @param  array<int, mixed>  $charges
+     * @return array<int, array{label: string, amount: float}>
+     */
+    private function normalizeCharges(array $charges): array
+    {
+        $clean = [];
+        foreach ($charges as $charge) {
+            $label = trim((string) ($charge['label'] ?? ''));
+            if ($label === '') continue;
+            $clean[] = ['label' => $label, 'amount' => (float) ($charge['amount'] ?? 0)];
+        }
+
+        return $clean;
     }
 
     // Convert qty between compatible units (weight: kg/g/mg; volume: L/mL).

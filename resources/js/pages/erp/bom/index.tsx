@@ -36,6 +36,7 @@ type Bom = {
     output_raw_material_id?: number | null;
     output_material?: { id: number; name: string; unit: string; stock_qty?: string | number | null; min_stock?: string | number | null; category?: string | null } | null;
     notes?: string | null;
+    charges?: { label: string; amount: string | number }[] | null;
     is_active: boolean;
     items: BomItem[];
     created_at?: string;
@@ -59,6 +60,7 @@ type BomFormData = {
     notes: string;
     is_active: boolean;
     items: { raw_material_id: string; qty_per_batch: string; unit: string }[];
+    charges: { label: string; amount: string }[];
 };
 
 type RunFormData = { batch_number: string; batch_count: string; notes: string };
@@ -255,7 +257,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
 
     const form = useForm<BomFormData>({
         name: '', category: '', packing_size: '', batch_size: '1',
-        batch_unit: 'kg', output_raw_material_id: '', output_category: '', notes: '', is_active: true, items: [],
+        batch_unit: 'kg', output_raw_material_id: '', output_category: '', notes: '', is_active: true, items: [], charges: [],
     });
     const runForm = useForm<RunFormData>({ batch_number: '', batch_count: '1', notes: '' });
 
@@ -279,6 +281,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                 qty_per_batch: String(i.qty_per_batch),
                 unit: i.unit ?? '',
             })),
+            charges: (bom.charges ?? []).map((c) => ({ label: c.label, amount: String(c.amount) })),
         });
         const searches = bom.items.map((i) => {
             const mat = i.raw_material ?? materials.find((m) => m.id === i.raw_material_id);
@@ -296,6 +299,22 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
         form.setData('items', form.data.items.filter((_, i) => i !== idx));
         setItemSearches((prev) => prev.filter((_, i) => i !== idx));
     };
+
+    const addCharge = () => {
+        form.setData('charges', [...form.data.charges, { label: '', amount: '' }]);
+    };
+
+    const removeCharge = (idx: number) => {
+        form.setData('charges', form.data.charges.filter((_, i) => i !== idx));
+    };
+
+    const updateCharge = (idx: number, field: 'label' | 'amount', value: string) => {
+        const charges = [...form.data.charges];
+        charges[idx] = { ...charges[idx], [field]: value };
+        form.setData('charges', charges);
+    };
+
+    const chargesTotal = form.data.charges.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
 
     const updateItemSearch = (idx: number, val: string) => {
         setItemSearches((prev) => { const n = [...prev]; n[idx] = val; return n; });
@@ -458,14 +477,17 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
         win.focus();
     };
 
-    const calcCost = (bom: Bom, batches = 1) =>
-        bom.items.reduce((sum, item) => {
+    const calcCost = (bom: Bom, batches = 1) => {
+        const materialCost = bom.items.reduce((sum, item) => {
             const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
             if (!mat) return sum;
             const itemUnit = item.unit || mat.unit;
             const qtyInMatUnit = convertQty(Number(item.qty_per_batch), itemUnit, mat.unit);
             return sum + qtyInMatUnit * Number(mat.cost_per_unit) * batches;
         }, 0);
+        const chargeCost = (bom.charges ?? []).reduce((sum, c) => sum + (Number(c.amount) || 0) * batches, 0);
+        return materialCost + chargeCost;
+    };
 
     const canRun = (bom: Bom, batches = 1) =>
         bom.items.every((item) => {
@@ -1101,6 +1123,31 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                     <button type="button" className="btn danger-xs" onClick={() => removeItem(idx)} style={{ padding: '0 8px', height: 32 }}>✕</button>
                                 </div>
                             ))}
+                        </div>
+
+                        <div style={{ marginTop: 16 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)' }}>💡 Other Charges <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(per batch — man power, electricity, etc.)</span></div>
+                                <button type="button" className="btn sm" onClick={addCharge}>+ Add Charge</button>
+                            </div>
+                            {form.data.charges.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: 16, color: 'var(--tx-faint)', fontSize: 13, border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                                    No extra charges added.
+                                </div>
+                            ) : (
+                                <>
+                                    {form.data.charges.map((charge, idx) => (
+                                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 32px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                                            <input type="text" placeholder="Charge name (e.g. Man Power)" value={charge.label} onChange={(e) => updateCharge(idx, 'label', e.target.value)} />
+                                            <input type="number" placeholder="₹ / batch" value={charge.amount} onChange={(e) => updateCharge(idx, 'amount', e.target.value)} step="0.01" min="0" />
+                                            <button type="button" className="btn danger-xs" onClick={() => removeCharge(idx)} style={{ padding: '0 8px', height: 32 }}>✕</button>
+                                        </div>
+                                    ))}
+                                    <div style={{ textAlign: 'right', fontSize: 13, color: 'var(--tx-sub)', marginTop: 4 }}>
+                                        Charges per batch: <strong>₹{chargesTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                     <div className="modal-footer">

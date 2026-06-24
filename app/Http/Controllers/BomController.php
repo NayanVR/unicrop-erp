@@ -60,6 +60,9 @@ class BomController extends Controller
             'items.*.raw_material_id' => 'required|exists:raw_materials,id',
             'items.*.qty_per_batch'  => 'required|numeric|min:0.001',
             'items.*.unit'           => 'nullable|string|max:20',
+            'charges'                => 'array',
+            'charges.*.label'        => 'required|string|max:100',
+            'charges.*.amount'       => 'required|numeric|min:0',
         ]);
 
         return DB::transaction(function () use ($data) {
@@ -71,6 +74,7 @@ class BomController extends Controller
                 'batch_unit'             => $data['batch_unit'],
                 'output_raw_material_id' => $data['output_raw_material_id'] ?? null,
                 'notes'                  => $data['notes'] ?? null,
+                'charges'                => $this->normalizeCharges($data['charges'] ?? []),
             ]);
 
             // Update output material's category if provided
@@ -107,6 +111,9 @@ class BomController extends Controller
             'items.*.raw_material_id' => 'required|exists:raw_materials,id',
             'items.*.qty_per_batch'  => 'required|numeric|min:0.001',
             'items.*.unit'           => 'nullable|string|max:20',
+            'charges'                => 'array',
+            'charges.*.label'        => 'required|string|max:100',
+            'charges.*.amount'       => 'required|numeric|min:0',
         ]);
 
         return DB::transaction(function () use ($data, $bom) {
@@ -118,6 +125,7 @@ class BomController extends Controller
                 'batch_unit'             => $data['batch_unit'],
                 'output_raw_material_id' => $data['output_raw_material_id'] ?? null,
                 'notes'                  => $data['notes'] ?? null,
+                'charges'                => $this->normalizeCharges($data['charges'] ?? []),
                 'is_active'              => $data['is_active'] ?? true,
             ]);
 
@@ -259,6 +267,18 @@ class BomController extends Controller
                 $totalCost += $cost;
             }
 
+            // Apply extra per-batch charges (man power, electricity, etc.) scaled by batch count.
+            $runCharges = [];
+            foreach ($this->normalizeCharges($bom->charges ?? []) as $charge) {
+                $lineTotal   = (float) $charge['amount'] * $batchCount;
+                $totalCost  += $lineTotal;
+                $runCharges[] = [
+                    'label'  => $charge['label'],
+                    'amount' => (float) $charge['amount'],
+                    'total'  => $lineTotal,
+                ];
+            }
+
             ProductionRun::create([
                 'batch_number' => $batchNumber,
                 'bom_id'       => $bom->id,
@@ -270,6 +290,7 @@ class BomController extends Controller
                 'total_cost'   => $totalCost,
                 'notes'        => $data['notes'] ?? null,
                 'items'        => $runItems,
+                'charges'      => $runCharges,
             ]);
 
             // Add produced quantity to finished goods (semi-finished stock)
@@ -358,6 +379,24 @@ class BomController extends Controller
         });
 
         return redirect()->back()->with('success', "Production run {$run->batch_number} deleted and stock reversed.");
+    }
+
+    /**
+     * Keep only valid {label, amount} charge rows with a non-empty label.
+     *
+     * @param  array<int, mixed>  $charges
+     * @return array<int, array{label: string, amount: float}>
+     */
+    private function normalizeCharges(array $charges): array
+    {
+        $clean = [];
+        foreach ($charges as $charge) {
+            $label = trim((string) ($charge['label'] ?? ''));
+            if ($label === '') continue;
+            $clean[] = ['label' => $label, 'amount' => (float) ($charge['amount'] ?? 0)];
+        }
+
+        return $clean;
     }
 
     // Convert qty between compatible units (weight: kg/g/mg; volume: L/mL).

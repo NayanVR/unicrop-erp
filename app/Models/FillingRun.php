@@ -6,11 +6,12 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['filling_recipe_id', 'our_brand', 'packing_size', 'bottle_shape', 'quantity', 'user_id', 'items'])]
+#[Fillable(['filling_recipe_id', 'our_brand', 'packing_size', 'bottle_shape', 'quantity', 'user_id', 'items', 'charges'])]
 class FillingRun extends Model
 {
     protected $casts = [
         'items'    => 'array',
+        'charges'  => 'array',
         'quantity' => 'float',
     ];
 

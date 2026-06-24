@@ -34,6 +34,7 @@ type Recipe = {
     packing_size?: string | null;
     fill_quantity: string | number;
     notes?: string | null;
+    charges?: { label: string; amount: string | number }[] | null;
     is_active: boolean;
     items: RecipeItem[];
 };
@@ -64,6 +65,7 @@ type RecipeFormData = {
     notes: string;
     is_active: boolean;
     items: { raw_material_id: string; qty_per_unit: string; unit: string }[];
+    charges: { label: string; amount: string }[];
 };
 
 type RunFormData = { quantity: string; bottle_shape: string; notes: string };
@@ -160,7 +162,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
     };
 
     const form = useForm<RecipeFormData>({
-        output_raw_material_id: '', group_name: '', packing_size: '', fill_quantity: '1', notes: '', is_active: true, items: [],
+        output_raw_material_id: '', group_name: '', packing_size: '', fill_quantity: '1', notes: '', is_active: true, items: [], charges: [],
     });
     const runForm = useForm<RunFormData>({ quantity: '1', bottle_shape: '', notes: '' });
 
@@ -211,6 +213,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                 qty_per_unit: String(i.qty_per_unit),
                 unit: i.unit ?? '',
             })),
+            charges: (recipe.charges ?? []).map((c) => ({ label: c.label, amount: String(c.amount) })),
         });
         form.clearErrors(); setEditingRecipe(recipe); setDupWarning(null); setEditModal(true);
     };
@@ -218,6 +221,18 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
     const addItem = () => form.setData('items', [...form.data.items, { raw_material_id: '', qty_per_unit: '', unit: '' }]);
 
     const removeItem = (idx: number) => form.setData('items', form.data.items.filter((_, i) => i !== idx));
+
+    const addCharge = () => form.setData('charges', [...form.data.charges, { label: '', amount: '' }]);
+
+    const removeCharge = (idx: number) => form.setData('charges', form.data.charges.filter((_, i) => i !== idx));
+
+    const updateCharge = (idx: number, field: 'label' | 'amount', value: string) => {
+        const charges = [...form.data.charges];
+        charges[idx] = { ...charges[idx], [field]: value };
+        form.setData('charges', charges);
+    };
+
+    const chargesTotal = form.data.charges.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
 
     const updateItem = (idx: number, field: string, value: string) => {
         const items = [...form.data.items];
@@ -259,15 +274,18 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
         setRunModal(true);
     };
 
-    // Cost per 1 pc for a recipe
-    const calcCostPerPc = (recipe: Recipe) =>
-        recipe.items.reduce((sum, item) => {
+    // Cost per 1 pc for a recipe (materials + per-piece charges)
+    const calcCostPerPc = (recipe: Recipe) => {
+        const materialCost = recipe.items.reduce((sum, item) => {
             const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
             if (!mat) return sum;
             const itemUnit = item.unit || mat.unit;
             const qtyInMatUnit = convertQty(Number(item.qty_per_unit), itemUnit, mat.unit);
             return sum + qtyInMatUnit * Number(mat.cost_per_unit);
         }, 0);
+        const chargeCost = (recipe.charges ?? []).reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+        return materialCost + chargeCost;
+    };
 
     // Can we run `qty` pcs given current stock?
     const canRun = (recipe: Recipe, qty: number) =>
@@ -802,6 +820,31 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                                     <button type="button" className="btn danger-xs" onClick={() => removeItem(idx)} style={{ padding: '0 8px', height: 32 }}>✕</button>
                                 </div>
                             ))}
+                        </div>
+
+                        <div style={{ marginTop: 16 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)' }}>💡 Other Charges <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(per piece — man power, electricity, etc.)</span></div>
+                                <button type="button" className="btn sm" onClick={addCharge}>+ Add Charge</button>
+                            </div>
+                            {form.data.charges.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: 16, color: 'var(--tx-faint)', fontSize: 13, border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                                    No extra charges added.
+                                </div>
+                            ) : (
+                                <>
+                                    {form.data.charges.map((charge, idx) => (
+                                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 32px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                                            <input type="text" placeholder="Charge name (e.g. Man Power)" value={charge.label} onChange={(e) => updateCharge(idx, 'label', e.target.value)} />
+                                            <input type="number" placeholder="₹ / pc" value={charge.amount} onChange={(e) => updateCharge(idx, 'amount', e.target.value)} step="0.01" min="0" />
+                                            <button type="button" className="btn danger-xs" onClick={() => removeCharge(idx)} style={{ padding: '0 8px', height: 32 }}>✕</button>
+                                        </div>
+                                    ))}
+                                    <div style={{ textAlign: 'right', fontSize: 13, color: 'var(--tx-sub)', marginTop: 4 }}>
+                                        Charges per piece: <strong>₹{chargesTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                     <div className="modal-footer">
