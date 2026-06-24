@@ -47,4 +47,16 @@ class DesignOrder extends Model
     {
         return $this->belongsTo(Order::class);
     }
+
+    /**
+     * Limit to design orders that are either standalone (no linked order) or
+     * whose linked order has not been deleted. Keeps deleted orders' design
+     * tasks out of the design board/dashboard.
+     */
+    public function scopeForLiveOrders($query)
+    {
+        return $query->where(function ($q) {
+            $q->whereNull('order_id')->orWhereHas('order');
+        });
+    }
 }

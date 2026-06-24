@@ -22,11 +22,12 @@ class DesignController extends Controller
 
     public function index(): Response
     {
-        $designOrders = DesignOrder::with([
-            'creator:id,name',
-            'assignee:id,name',
-            'order:id,order_number,company_name,customer_name',
-        ])
+        $designOrders = DesignOrder::forLiveOrders()
+            ->with([
+                'creator:id,name',
+                'assignee:id,name',
+                'order:id,order_number,company_name,customer_name',
+            ])
             ->latest()
             ->get();
 

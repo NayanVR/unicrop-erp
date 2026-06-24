@@ -108,12 +108,14 @@ class DashboardController extends Controller
     private function designDashboard(User $user): Response
     {
         $statusCounts = DesignOrder::query()
+            ->forLiveOrders()
             ->selectRaw('status, COUNT(*) as count')
             ->groupBy('status')
             ->pluck('count', 'status')
             ->toArray();
 
         $activeOrders = DesignOrder::query()
+            ->forLiveOrders()
             ->whereNotIn('status', ['completed', 'received-factory'])
             ->with(['order:id,order_number,company_name,priority', 'assignee:id,name'])
             ->orderBy('updated_at', 'desc')
@@ -132,6 +134,7 @@ class DashboardController extends Controller
             ]);
 
         $recentlyCompleted = DesignOrder::query()
+            ->forLiveOrders()
             ->whereIn('status', ['completed', 'received-factory'])
             ->with(['order:id,order_number,company_name'])
             ->orderBy('updated_at', 'desc')
@@ -149,6 +152,7 @@ class DashboardController extends Controller
             ]);
 
         $completedThisWeek = DesignOrder::query()
+            ->forLiveOrders()
             ->whereIn('status', ['completed', 'received-factory'])
             ->where('updated_at', '>=', now()->startOfWeek())
             ->count();
@@ -231,6 +235,7 @@ class DashboardController extends Controller
         // Recently dispatched items (last 10)
         $recentDispatched = OrderItem::query()
             ->where('status', 'dispatched')
+            ->whereHas('order')
             ->with('order:id,order_number,company_name')
             ->orderBy('updated_at', 'desc')
             ->limit(10)
