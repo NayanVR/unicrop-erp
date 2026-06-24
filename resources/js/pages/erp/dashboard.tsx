@@ -69,6 +69,10 @@ export default function Dashboard({ salesData, currentUserId, recentOrders, pend
     const growthColor  = momValue >= 0 ? '#16a34a' : '#dc2626';
     const growthSymbol = momValue >= 0 ? '▲' : '▼';
 
+    const scrollToLeaderboard = () => {
+        document.getElementById('sales-leaderboard')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
     return (
         <>
             <Head title="Dashboard" />
@@ -117,34 +121,34 @@ export default function Dashboard({ salesData, currentUserId, recentOrders, pend
 
             {/* ── My performance stats ──────────────────────────────── */}
             <div className="stats-grid" style={{ marginBottom: 24 }}>
-                <div className="stat-card" style={{ borderLeft: '4px solid var(--accent)' }}>
+                <Link href={ordersIndex().url} className="stat-card dash-kpi-card" style={{ borderLeft: '4px solid var(--accent)', textDecoration: 'none', color: 'inherit' }}>
                     <div className="stat-icon" style={{ background: 'var(--accent-lt, #eff6ff)' }}>🌱</div>
                     <div>
                         <div className="stat-val">{data.myOrders}</div>
                         <div className="stat-label">My Orders</div>
                     </div>
-                </div>
-                <div className="stat-card" style={{ borderLeft: '4px solid #d97706' }}>
+                </Link>
+                <Link href={ordersIndex().url} className="stat-card dash-kpi-card" style={{ borderLeft: '4px solid #d97706', textDecoration: 'none', color: 'inherit' }}>
                     <div className="stat-icon" style={{ background: '#fffbeb' }}>💰</div>
                     <div>
                         <div className="stat-val" style={{ fontSize: 18 }}>{fmt(data.myValue)}</div>
                         <div className="stat-label">My Value</div>
                     </div>
-                </div>
-                <div className="stat-card" style={{ borderLeft: '4px solid #7c3aed' }}>
+                </Link>
+                <button type="button" onClick={scrollToLeaderboard} className="stat-card dash-kpi-card" style={{ borderLeft: '4px solid #7c3aed', textAlign: 'left', font: 'inherit' }}>
                     <div className="stat-icon" style={{ background: '#f5f3ff' }}>🏆</div>
                     <div>
                         <div className="stat-val">{myRank > 0 ? (MEDALS[myRank - 1] ?? `#${myRank}`) : '—'}</div>
                         <div className="stat-label">My Rank</div>
                     </div>
-                </div>
+                </button>
             </div>
 
             {/* ── Main grid ─────────────────────────────────────────── */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
 
                 {/* Leaderboard */}
-                <div className="card">
+                <div className="card" id="sales-leaderboard">
                     <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>🏆 Sales Leaderboard</div>
                     {data.leaderboard.length === 0 ? (
                         <div className="empty-state"><p>No confirmed orders for this period.</p></div>

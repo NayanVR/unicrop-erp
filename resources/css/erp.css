@@ -852,6 +852,16 @@ body {
     box-shadow: var(--shadow-sm);
     border-color: var(--accent);
 }
+
+/* Clickable KPI / stat cards on the dashboard */
+.dash-kpi-card {
+    cursor: pointer;
+    width: 100%;
+    display: block;
+}
+.dash-kpi-card:hover {
+    border-color: var(--accent);
+}
 .stat-card::before {
     content: '';
     position: absolute;
