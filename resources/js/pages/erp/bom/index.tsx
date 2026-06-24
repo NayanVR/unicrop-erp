@@ -180,16 +180,16 @@ function toBaseGramsMl(qty: number, unit: string): number | null {
     return null;
 }
 
-// Format a base grams/ml total as "1 L 5 ml" / "1 kg 5 gm" based on the batch unit's dimension.
+// Format a base grams/ml total as the larger unit with the smaller unit in
+// parentheses, e.g. "1.005 L (1005 ml)" / "1.005 kg (1005 gm)", based on the
+// batch unit's dimension.
 function formatMaterialTotal(base: number, batchUnit: string): string {
     const bu = batchUnit.trim().toLowerCase();
     const isWeight = ['kg', 'kgs', 'g', 'gm', 'gram', 'grams', 'mg'].includes(bu);
     const big = isWeight ? 'kg' : 'L';
     const small = isWeight ? 'gm' : 'ml';
     if (base >= 1000) {
-        const whole = Math.floor(base / 1000);
-        const rem = base - whole * 1000;
-        return rem > 0 ? `${formatQty(whole)} ${big} ${formatQty(rem)} ${small}` : `${formatQty(whole)} ${big}`;
+        return `${formatQty(base / 1000)} ${big} (${formatQty(base)} ${small})`;
     }
     return `${formatQty(base)} ${small}`;
 }
