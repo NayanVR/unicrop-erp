@@ -194,11 +194,11 @@ class ProductPhotoController extends Controller
             'party_id'    => $data['party_id'] ?? null,
             'our_brand'   => $data['our_brand'],
             'party_brand' => $data['party_brand'] ?? null,
-            'packing_size'=> $firstSize['packing_size'] ?: null,
-            'mrp'         => $firstSize['mrp'] ?: null,
+            'packing_size'=> ($firstSize['packing_size'] ?? null) ?: null,
+            'mrp'         => ($firstSize['mrp'] ?? null) ?: null,
             'sizes'       => $data['sizes'],
-            'bottle_jar'  => $data['bottle_jar'] ?: null,
-            'cap_color'   => $data['cap_color'] ?: null,
+            'bottle_jar'  => ($data['bottle_jar'] ?? null) ?: null,
+            'cap_color'   => ($data['cap_color'] ?? null) ?: null,
             'photo_path'  => $path,
             'uploaded_by' => $request->user()?->id,
         ]);
@@ -255,13 +255,13 @@ class ProductPhotoController extends Controller
 
         $photo->our_brand    = $data['our_brand'];
         $photo->party_brand  = $data['party_brand'] ?? null;
-        $photo->bottle_jar   = $data['bottle_jar'] ?: null;
-        $photo->cap_color    = $data['cap_color'] ?: null;
+        $photo->bottle_jar   = ($data['bottle_jar'] ?? null) ?: null;
+        $photo->cap_color    = ($data['cap_color'] ?? null) ?: null;
 
         if (!empty($data['sizes'])) {
             $firstSize = $data['sizes'][0];
-            $photo->packing_size = $firstSize['packing_size'] ?: null;
-            $photo->mrp          = $firstSize['mrp'] ?: null;
+            $photo->packing_size = ($firstSize['packing_size'] ?? null) ?: null;
+            $photo->mrp          = ($firstSize['mrp'] ?? null) ?: null;
             $photo->sizes        = $data['sizes'];
         } else {
             $photo->packing_size = $data['packing_size'] ?? null;
