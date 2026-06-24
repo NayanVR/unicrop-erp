@@ -66,6 +66,14 @@ class BomController extends Controller
         ]);
 
         return DB::transaction(function () use ($data) {
+            // BOM name always follows its linked output product (like Filling recipes).
+            if (! empty($data['output_raw_material_id'])) {
+                $outputMat = RawMaterial::find($data['output_raw_material_id']);
+                if ($outputMat) {
+                    $data['name'] = $outputMat->name;
+                }
+            }
+
             $bom = Bom::create([
                 'name'                   => $data['name'],
                 'category'               => $data['category'] ?? null,
@@ -117,6 +125,14 @@ class BomController extends Controller
         ]);
 
         return DB::transaction(function () use ($data, $bom) {
+            // BOM name always follows its linked output product (like Filling recipes).
+            if (! empty($data['output_raw_material_id'])) {
+                $outputMat = RawMaterial::find($data['output_raw_material_id']);
+                if ($outputMat) {
+                    $data['name'] = $outputMat->name;
+                }
+            }
+
             $bom->update([
                 'name'                   => $data['name'],
                 'category'               => $data['category'] ?? null,
