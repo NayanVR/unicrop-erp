@@ -510,6 +510,43 @@ body {
     color: rgba(255, 255, 255, 0.85);
 }
 
+.sidebar-company-switch {
+    padding: 0 16px 12px;
+}
+.company-switcher {
+    width: 100%;
+    padding: 8px 30px 8px 12px;
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.85);
+    background-color: var(--sb-bg2);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    border: 1px solid var(--sb-border);
+    border-radius: var(--radius-sm);
+    outline: none;
+    cursor: pointer;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    transition:
+        border-color var(--t-fast),
+        box-shadow var(--t-fast);
+}
+.company-switcher:hover {
+    background-color: var(--sb-hover);
+}
+.company-switcher:focus {
+    border-color: var(--sb-accent);
+    box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.25);
+}
+.company-switcher option {
+    color: var(--tx-body);
+    background: #fff;
+}
+
 .sidebar-user {
     margin: 10px 10px 4px;
     padding: 10px 12px;

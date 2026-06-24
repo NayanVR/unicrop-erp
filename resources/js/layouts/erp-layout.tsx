@@ -298,11 +298,11 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
                     </button>
                 </div>
                 {userCompanies.length > 1 && (
-                    <div style={{ padding: '0 16px 12px' }}>
+                    <div className="sidebar-company-switch">
                         <select
+                            className="company-switcher"
                             value={auth.current_company?.id ?? ''}
                             onChange={(event) => handleCompanyChange(Number(event.target.value))}
-                            style={{ width: '100%' }}
                             title="Switch company"
                         >
                             {userCompanies.map((company) => (
