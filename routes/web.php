@@ -82,6 +82,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::middleware(['role:orders.process'])->group(function () {
         Route::delete('orders/{order}', [OrderController::class, 'destroy'])->name('orders.destroy');
+        Route::post('orders/{order}/restore', [OrderController::class, 'restore'])->name('orders.restore');
         Route::post('orders/{order}/confirm', [OrderController::class, 'confirm'])->name('orders.confirm');
         Route::post('orders/{order}/payments', [OrderController::class, 'storePayment'])->name('orders.payments.store');
         Route::delete('orders/{order}/payments/{payment}', [OrderController::class, 'destroyPayment'])->name('orders.payments.destroy');

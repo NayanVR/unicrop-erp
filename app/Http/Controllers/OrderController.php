@@ -141,9 +141,31 @@ class OrderController extends Controller
             $order->unsetRelation('payments');
         });
 
+        // Recently deleted orders that the current user is allowed to restore.
+        $isAdmin = $user->roles->contains('slug', Role::ADMIN);
+        $deletedQuery = Order::onlyTrashed()
+            ->with(['salesUser:id,name', 'createdBy:id,name'])
+            ->orderByDesc('deleted_at')
+            ->limit(50);
+        if (! $isAdmin) {
+            $deletedQuery->where('created_by', $user->id)
+                ->whereIn('status', ['draft', 'submitted']);
+        }
+        $deletedOrders = $deletedQuery->get()->map(fn (Order $o) => [
+            'id'           => $o->id,
+            'order_number' => $o->order_number,
+            'company_name' => $o->company_name,
+            'total_amount' => $o->total_amount,
+            'status'       => $o->status,
+            'created_by'   => $o->created_by,
+            'created_by_name' => $o->createdBy?->name,
+            'deleted_at'   => $o->deleted_at?->format('d M Y, h:i A'),
+        ])->all();
+
         return Inertia::render('erp/orders/index', [
             'pageTitle'     => 'All Orders',
             'orders'        => $orders,
+            'deletedOrders' => $deletedOrders,
             'currentUserId' => $user?->id,
             'userRole'      => $role,
             'productPhotos' => $this->mapProductPhotos(),
@@ -658,9 +680,33 @@ class OrderController extends Controller
         }
 
         $orderNumber = $order->order_number;
-        $order->delete(); // cascades to order_items, order_attachments
+        $order->delete(); // soft delete — order_items & attachments are kept so it can be restored
 
-        return redirect()->route('orders.index')->with('success', "Order {$orderNumber} deleted.");
+        return redirect()->route('orders.index')->with('success', "Order {$orderNumber} deleted. You can restore it from “Deleted orders”.");
+    }
+
+    public function restore(Request $request, int $order): RedirectResponse
+    {
+        $trashed = Order::onlyTrashed()->findOrFail($order);
+
+        $user = $request->user();
+        $user->loadMissing('roles');
+        $isAdmin = $user->roles->contains('slug', Role::ADMIN);
+
+        if (in_array($trashed->status, ['draft', 'submitted'])) {
+            if (! $isAdmin && $trashed->created_by !== $user->id) {
+                return redirect()->back()->with('error', 'You can only restore orders you created.');
+            }
+        } else {
+            // Confirmed or later — admin only
+            if (! $isAdmin) {
+                return redirect()->back()->with('error', 'Only admins can restore confirmed orders.');
+            }
+        }
+
+        $trashed->restore();
+
+        return redirect()->back()->with('success', "Order {$trashed->order_number} restored.");
     }
 
     public function update(UpdateOrderRequest $request, Order $order): RedirectResponse

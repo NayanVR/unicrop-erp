@@ -190,9 +190,21 @@ type ProductPhoto = {
 
 type ConfirmTarget = { id: number; number: string; companyName: string };
 
+type DeletedOrder = {
+    id: number;
+    order_number: string;
+    company_name: string | null;
+    total_amount: number | string | null;
+    status: string | null;
+    created_by: number | null;
+    created_by_name: string | null;
+    deleted_at: string | null;
+};
+
 type Props = {
     pageTitle: string;
     orders: Order[];
+    deletedOrders?: DeletedOrder[];
     currentUserId?: number | null;
     userRole?: string | null;
     productPhotos?: ProductPhoto[];
@@ -337,7 +349,7 @@ const statusLabel = (status?: string | null) => {
 const priorityClassName = (priority?: string | null) =>
     `badge priority-${priority ?? 'normal'}`;
 
-export default function OrdersIndex({ orders, currentUserId, userRole, productPhotos = [], packingSizes = [], bankAccounts = [], boxDimensions = [] }: Props) {
+export default function OrdersIndex({ orders, deletedOrders = [], currentUserId, userRole, productPhotos = [], packingSizes = [], bankAccounts = [], boxDimensions = [] }: Props) {
     const { flash } = usePage<Props>().props;
 
     useEffect(() => {
@@ -617,8 +629,13 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
 
     const deleteOrder = (order: Order, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!confirm(`Delete order ${order.order_number} for ${order.company_name}?\n\nThis cannot be undone.`)) return;
+        if (!confirm(`Delete order ${order.order_number} for ${order.company_name}?\n\nYou can restore it later from “Deleted orders”.`)) return;
         router.delete(ordersDestroy(order.id).url, { preserveScroll: true });
+    };
+
+    const [showDeleted, setShowDeleted] = useState(false);
+    const restoreOrder = (id: number) => {
+        router.post(`/orders/${id}/restore`, {}, { preserveScroll: true });
     };
 
     const openConfirm = (order: Order, e: React.MouseEvent) => {
@@ -1340,12 +1357,63 @@ export default function OrdersIndex({ orders, currentUserId, userRole, productPh
                                 : 'Track order status, production progress, and dispatch.'}
                         </p>
                     </div>
-                    {canCreateOrder && (
-                        <Link className="btn primary" href={ordersCreate()}>
-                            ＋ New Order
-                        </Link>
-                    )}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        {!isDesign && deletedOrders.length > 0 && (
+                            <button
+                                type="button"
+                                className="btn"
+                                onClick={() => setShowDeleted((v) => !v)}
+                                title="View and restore recently deleted orders"
+                            >
+                                🗑 Deleted ({deletedOrders.length})
+                            </button>
+                        )}
+                        {canCreateOrder && (
+                            <Link className="btn primary" href={ordersCreate()}>
+                                ＋ New Order
+                            </Link>
+                        )}
+                    </div>
                 </div>
+
+                {!isDesign && showDeleted && (
+                    <div className="card" style={{ marginBottom: 16, border: '1px solid #fca5a5' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                            <div style={{ fontWeight: 700, fontSize: 15 }}>🗑 Deleted Orders</div>
+                            <button type="button" className="btn sm" onClick={() => setShowDeleted(false)}>✕ Close</button>
+                        </div>
+                        {deletedOrders.length === 0 ? (
+                            <div className="empty-state"><p>No deleted orders.</p></div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {deletedOrders.map((o) => (
+                                    <div key={o.id} style={{
+                                        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                                        padding: '10px 12px', borderRadius: 8,
+                                        border: '1px solid var(--border-color, #e5e7eb)', background: 'var(--bg-paper)',
+                                    }}>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                                <span style={{ fontWeight: 700, fontSize: 13 }}>#{o.order_number}</span>
+                                                {o.status && (
+                                                    <span style={{ fontSize: 11, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: '#f3f4f6', color: '#6b7280' }}>{o.status}</span>
+                                                )}
+                                            </div>
+                                            <div style={{ fontSize: 12, color: 'var(--tx-muted)', marginTop: 2 }}>
+                                                {o.company_name}
+                                                {o.deleted_at && <> · deleted {o.deleted_at}</>}
+                                                {o.created_by_name && <> · by {o.created_by_name}</>}
+                                            </div>
+                                        </div>
+                                        <button type="button" className="btn sm primary" onClick={() => restoreOrder(o.id)}>
+                                            ♻ Restore
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {!isDesign && (
                     <div className="filter-bar">
