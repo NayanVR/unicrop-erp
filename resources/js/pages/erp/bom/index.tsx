@@ -169,6 +169,31 @@ function fmtSmart(qty: number, unit: string): string {
     return `${s.qty.toLocaleString('en-IN', { maximumFractionDigits: 4 })} ${s.unit}`;
 }
 
+// Convert a quantity to a base value in grams/ml (treating 1 gm = 1 ml).
+// Returns null for non weight/volume units (e.g. pcs) so they can be excluded.
+function toBaseGramsMl(qty: number, unit: string): number | null {
+    const u = unit.trim().toLowerCase();
+    const weight: Record<string, number> = { kg: 1000, kgs: 1000, g: 1, gm: 1, gram: 1, grams: 1, mg: 0.001 };
+    const volume: Record<string, number> = { l: 1000, ltr: 1000, liter: 1000, litre: 1000, liters: 1000, litres: 1000, ml: 1, milliliter: 1, millilitre: 1, milliliters: 1, millilitres: 1 };
+    if (weight[u] !== undefined) return qty * weight[u];
+    if (volume[u] !== undefined) return qty * volume[u];
+    return null;
+}
+
+// Format a base grams/ml total as "1 L 5 ml" / "1 kg 5 gm" based on the batch unit's dimension.
+function formatMaterialTotal(base: number, batchUnit: string): string {
+    const bu = batchUnit.trim().toLowerCase();
+    const isWeight = ['kg', 'kgs', 'g', 'gm', 'gram', 'grams', 'mg'].includes(bu);
+    const big = isWeight ? 'kg' : 'L';
+    const small = isWeight ? 'gm' : 'ml';
+    if (base >= 1000) {
+        const whole = Math.floor(base / 1000);
+        const rem = base - whole * 1000;
+        return rem > 0 ? `${formatQty(whole)} ${big} ${formatQty(rem)} ${small}` : `${formatQty(whole)} ${big}`;
+    }
+    return `${formatQty(base)} ${small}`;
+}
+
 export default function BomIndex({ boms, materials, categories, productionRuns }: Props) {
     const { auth, flash } = usePage<{ auth: Auth; flash?: { success?: string; error?: string } }>().props;
     const canSeeCost  = auth.user?.role === 'admin' || auth.user?.cost_access === true;
@@ -870,6 +895,31 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                         {bom.items.length === 0 && (
                                             <div style={{ fontSize: 13, color: 'var(--tx-faint)' }}>No ingredients added.</div>
                                         )}
+                                        {(() => {
+                                            if (bom.items.length === 0) return null;
+                                            let total = 0;
+                                            let counted = 0;
+                                            let skipped = 0;
+                                            for (const item of bom.items) {
+                                                const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
+                                                const itemUnit = item.unit || mat?.unit || '';
+                                                const base = toBaseGramsMl(Number(item.qty_per_batch) || 0, itemUnit);
+                                                if (base === null) { skipped++; continue; }
+                                                total += base;
+                                                counted++;
+                                            }
+                                            if (counted === 0) return null;
+                                            return (
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14, gap: 8, borderTop: '1px dashed var(--border)', marginTop: 4, paddingTop: 7 }}>
+                                                    <span style={{ fontWeight: 600, color: 'var(--tx-muted)' }}>
+                                                        Total material used{skipped > 0 ? ` (+${skipped} other)` : ''}
+                                                    </span>
+                                                    <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                                        {formatMaterialTotal(total, bom.batch_unit)}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
 
                                     {/* Cost info — admin / cost_access only */}
