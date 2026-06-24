@@ -404,6 +404,43 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
     const [statusFilter, setStatusFilter] = useState<'all' | 'low' | 'out'>('all');
     const [catFilter, setCatFilter] = useState<string>('all');
 
+    // Bulk HSN/GST fill (accountant)
+    const [bulkSel, setBulkSel] = useState<Set<number>>(new Set());
+    const [bulkHsn, setBulkHsn] = useState('');
+    const [bulkGst, setBulkGst] = useState('');
+    const [bulkSaving, setBulkSaving] = useState(false);
+
+    const toggleBulkOne = (id: number) =>
+        setBulkSel((prev) => {
+            const next = new Set(prev);
+            next.has(id) ? next.delete(id) : next.add(id);
+            return next;
+        });
+    const toggleBulkMany = (ids: number[], on: boolean) =>
+        setBulkSel((prev) => {
+            const next = new Set(prev);
+            ids.forEach((id) => (on ? next.add(id) : next.delete(id)));
+            return next;
+        });
+    const applyBulkTax = () => {
+        const hsn = bulkHsn.trim();
+        const gst = bulkGst.trim();
+        if (bulkSel.size === 0 || (!hsn && gst === '')) return;
+        const payload: Record<string, string | number[]> = { ids: Array.from(bulkSel) };
+        if (hsn) payload.hsn = hsn;
+        if (gst !== '') payload.gst = gst;
+        setBulkSaving(true);
+        router.post('/inventory/materials/bulk-tax', payload, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setBulkSel(new Set());
+                setBulkHsn('');
+                setBulkGst('');
+            },
+            onFinish: () => setBulkSaving(false),
+        });
+    };
+
     // Group name combobox
     const [groupNameOpen, setGroupNameOpen] = useState(false);
     const groupNameRef = useRef<HTMLDivElement>(null);
@@ -1482,10 +1519,22 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                     ) : role === 'accountant' ? (() => {
                         const missingHsnGst = filteredMaterials.filter((m) => !m.hsn || m.gst == null || m.gst === '');
                         const complete      = filteredMaterials.filter((m) =>  m.hsn && m.gst != null && m.gst !== '');
-                        const renderTable   = (rows: typeof filteredMaterials) => (
+                        const renderTable   = (rows: typeof filteredMaterials, selectable = false) => {
+                            const allSelected = rows.length > 0 && rows.every((m) => bulkSel.has(m.id));
+                            return (
                             <table className="prod-table">
                                 <thead>
                                     <tr>
+                                        {selectable && (
+                                            <th style={{ width: 34 }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={allSelected}
+                                                    onChange={(e) => toggleBulkMany(rows.map((m) => m.id), e.target.checked)}
+                                                    title="Select all"
+                                                />
+                                            </th>
+                                        )}
                                         <th>Product</th>
                                         <th>SKU</th>
                                         <th>Category</th>
@@ -1498,7 +1547,16 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                 </thead>
                                 <tbody>
                                     {rows.map((m) => (
-                                        <tr key={m.id}>
+                                        <tr key={m.id} style={selectable && bulkSel.has(m.id) ? { background: '#eff6ff' } : undefined}>
+                                            {selectable && (
+                                                <td>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={bulkSel.has(m.id)}
+                                                        onChange={() => toggleBulkOne(m.id)}
+                                                    />
+                                                </td>
+                                            )}
                                             <td><div className="prod-name">{m.name}</div></td>
                                             <td>{m.sku ? <span style={{ fontFamily: 'monospace', fontSize: 13 }}>{m.sku}</span> : <span style={{ color: '#9ca3af' }}>—</span>}</td>
                                             <td>{m.category ?? <span style={{ color: '#9ca3af' }}>—</span>}</td>
@@ -1521,7 +1579,8 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                     ))}
                                 </tbody>
                             </table>
-                        );
+                            );
+                        };
                         return (
                             <>
                                 {missingHsnGst.length > 0 && (
@@ -1530,7 +1589,45 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                             <span style={{ fontSize: 15 }}>⚠️</span>
                                             <span style={{ fontWeight: 700, color: '#92400e', fontSize: 14 }}>HSN / GST Missing ({missingHsnGst.length})</span>
                                         </div>
-                                        <div className="prod-wrap">{renderTable(missingHsnGst)}</div>
+
+                                        {/* Bulk fill bar — set one HSN/GST for many similar products at once */}
+                                        <div style={{
+                                            display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                                            padding: '10px 12px', marginBottom: 10, borderRadius: 8,
+                                            background: '#f8fafc', border: '1px dashed #cbd5e1',
+                                        }}>
+                                            <span style={{ fontWeight: 600, fontSize: 13, color: '#475569' }}>
+                                                Bulk fill {bulkSel.size > 0 ? `(${bulkSel.size} selected)` : '— tick rows below'}:
+                                            </span>
+                                            <input
+                                                type="text"
+                                                placeholder="HSN code"
+                                                value={bulkHsn}
+                                                onChange={(e) => setBulkHsn(e.target.value)}
+                                                style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', width: 130 }}
+                                            />
+                                            <input
+                                                type="number"
+                                                placeholder="GST %"
+                                                value={bulkGst}
+                                                min={0}
+                                                max={100}
+                                                onChange={(e) => setBulkGst(e.target.value)}
+                                                style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', width: 90 }}
+                                            />
+                                            <button
+                                                className="btn primary sm"
+                                                onClick={applyBulkTax}
+                                                disabled={bulkSaving || bulkSel.size === 0 || (!bulkHsn.trim() && bulkGst.trim() === '')}
+                                            >
+                                                {bulkSaving ? 'Applying…' : `Apply to ${bulkSel.size || ''} selected`}
+                                            </button>
+                                            <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                                                Tip: search above to narrow to similar products, then “select all”.
+                                            </span>
+                                        </div>
+
+                                        <div className="prod-wrap">{renderTable(missingHsnGst, true)}</div>
                                     </div>
                                 )}
                                 {complete.length > 0 && (

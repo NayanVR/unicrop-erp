@@ -276,6 +276,33 @@ class InventoryController extends Controller
         return redirect()->back()->with('success', 'Material updated.');
     }
 
+    /** Apply a single HSN code and/or GST rate to many materials at once. */
+    public function bulkTax(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'ids'   => 'required|array|min:1',
+            'ids.*' => 'integer|exists:raw_materials,id',
+            'hsn'   => 'nullable|string|max:50',
+            'gst'   => 'nullable|numeric|min:0|max:100',
+        ]);
+
+        $update = [];
+        if (isset($data['hsn']) && trim((string) $data['hsn']) !== '') {
+            $update['hsn'] = trim((string) $data['hsn']);
+        }
+        if (isset($data['gst']) && $data['gst'] !== '') {
+            $update['gst'] = $data['gst'];
+        }
+
+        if (empty($update)) {
+            return redirect()->back()->with('error', 'Enter an HSN code or GST % to apply.');
+        }
+
+        $count = RawMaterial::whereIn('id', $data['ids'])->update($update);
+
+        return redirect()->back()->with('success', "HSN/GST applied to {$count} product(s).");
+    }
+
     public function destroyMaterial(RawMaterial $material): RedirectResponse
     {
         $material->delete();

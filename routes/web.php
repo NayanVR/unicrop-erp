@@ -144,6 +144,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Inventory — edit material + bill entry: factory, accountant, and admin
     Route::middleware(['role:inventory.edit'])->group(function () {
         Route::post('inventory/materials', [InventoryController::class, 'storeMaterial'])->name('inventory.materials.store');
+        Route::post('inventory/materials/bulk-tax', [InventoryController::class, 'bulkTax'])->name('inventory.materials.bulk-tax');
         Route::patch('inventory/materials/{material}', [InventoryController::class, 'updateMaterial'])->name('inventory.materials.update');
         Route::post('inventory/purchase-bills', [InventoryController::class, 'storePurchaseBill'])->name('inventory.purchase-bills.store');
         Route::delete('inventory/purchase-bills/{bill}', [InventoryController::class, 'destroyPurchaseBill'])->name('inventory.purchase-bills.destroy');
