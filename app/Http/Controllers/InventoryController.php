@@ -270,8 +270,16 @@ class InventoryController extends Controller
             $data[$field] = $data[$field] ?? 0;
         }
 
+        $originalName = $material->name;
+
         $material->update($data);
         $this->ensureSupplierParty($data['supplier'] ?? null);
+
+        // Keep BOM / Filling recipe names in sync when their output product is renamed.
+        if (isset($data['name']) && $data['name'] !== $originalName) {
+            Bom::where('output_raw_material_id', $material->id)->update(['name' => $data['name']]);
+            FillingRecipe::where('output_raw_material_id', $material->id)->update(['name' => $data['name']]);
+        }
 
         return redirect()->back()->with('success', 'Material updated.');
     }
