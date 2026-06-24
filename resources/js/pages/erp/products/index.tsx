@@ -6,6 +6,7 @@ import {
 import { router, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { ModalPortal } from '@/components/modal-portal';
+import SearchableSelect from '@/components/searchable-select';
 
 type RawMaterial = { id: number; name: string };
 type FinishedGood = { id: number; name: string };
@@ -184,17 +185,21 @@ export default function ProductsIndex() {
                             <div className="form-row">
                                 <div className="form-group">
                                     <label>Linked Raw Material</label>
-                                    <select value={data.raw_material_id} onChange={(e) => setData('raw_material_id', e.target.value)}>
-                                        <option value="">— None —</option>
-                                        {rawMaterials.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                                    </select>
+                                    <SearchableSelect
+                                        options={[{ value: '', label: '— None —' }, ...rawMaterials.map((m) => ({ value: m.id, label: m.name }))]}
+                                        value={data.raw_material_id}
+                                        onChange={(v) => setData('raw_material_id', v)}
+                                        placeholder="— Search raw material —"
+                                    />
                                 </div>
                                 <div className="form-group">
                                     <label>Linked Finished Good</label>
-                                    <select value={data.finished_good_id} onChange={(e) => setData('finished_good_id', e.target.value)}>
-                                        <option value="">— None —</option>
-                                        {finishedGoods.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                                    </select>
+                                    <SearchableSelect
+                                        options={[{ value: '', label: '— None —' }, ...finishedGoods.map((g) => ({ value: g.id, label: g.name }))]}
+                                        value={data.finished_good_id}
+                                        onChange={(v) => setData('finished_good_id', v)}
+                                        placeholder="— Search finished good —"
+                                    />
                                 </div>
                             </div>
                             <div className="form-row">
