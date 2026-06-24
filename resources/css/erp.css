@@ -838,6 +838,20 @@ body {
     transform: translateY(-2px);
     box-shadow: var(--shadow);
 }
+
+/* Clickable order rows on the dashboard */
+.dash-order-row {
+    cursor: pointer;
+    transition:
+        transform var(--t-med),
+        box-shadow var(--t-med),
+        border-color var(--t-med);
+}
+.dash-order-row:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+    border-color: var(--accent);
+}
 .stat-card::before {
     content: '';
     position: absolute;

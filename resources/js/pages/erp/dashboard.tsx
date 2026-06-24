@@ -1,5 +1,5 @@
 import LowStockProductionCard, { type LowStockProduction } from '@/components/low-stock-production-card';
-import { create as ordersCreate, index as ordersIndex } from '@/routes/orders';
+import { create as ordersCreate, edit as ordersEdit, index as ordersIndex } from '@/routes/orders';
 import { Head, Link } from '@inertiajs/react';
 import { useState } from 'react';
 
@@ -247,11 +247,12 @@ export default function Dashboard({ salesData, currentUserId, recentOrders, pend
                                 const ss = statusStyle[o.status] ?? statusStyle.confirmed;
                                 const pc = priorityColor[o.priority] ?? priorityColor.normal;
                                 return (
-                                    <div key={o.id} style={{
+                                    <Link key={o.id} href={ordersEdit(o.id).url} className="dash-order-row" style={{
                                         display: 'flex', alignItems: 'center', gap: 10,
                                         padding: '9px 12px', borderRadius: 8,
                                         border: '1px solid var(--border-color, #e5e7eb)',
                                         background: 'var(--bg-paper)',
+                                        textDecoration: 'none', color: 'inherit',
                                     }}>
                                         <div style={{ flex: 1, minWidth: 0 }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -267,7 +268,7 @@ export default function Dashboard({ salesData, currentUserId, recentOrders, pend
                                             <div style={{ fontWeight: 700, fontSize: 13, color: '#d97706' }}>{fmt(o.total_amount)}</div>
                                             <div style={{ fontSize: 11, color: 'var(--tx-muted)' }}>{o.order_date}</div>
                                         </div>
-                                    </div>
+                                    </Link>
                                 );
                             })}
                         </div>
@@ -296,11 +297,12 @@ export default function Dashboard({ salesData, currentUserId, recentOrders, pend
                             {pendingOrders.map((o) => {
                                 const pc = priorityColor[o.priority] ?? priorityColor.normal;
                                 return (
-                                    <div key={o.id} style={{
+                                    <Link key={o.id} href={ordersEdit(o.id).url} className="dash-order-row" style={{
                                         display: 'flex', alignItems: 'center', gap: 10,
                                         padding: '9px 12px', borderRadius: 8,
                                         border: '1px solid #fcd34d',
                                         background: '#fffbeb',
+                                        textDecoration: 'none', color: 'inherit',
                                     }}>
                                         <div style={{ flex: 1, minWidth: 0 }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -315,7 +317,7 @@ export default function Dashboard({ salesData, currentUserId, recentOrders, pend
                                             <div style={{ fontWeight: 700, fontSize: 13, color: '#d97706' }}>{fmtFull(o.total_amount)}</div>
                                             <div style={{ fontSize: 11, color: '#b45309' }}>{o.order_date}</div>
                                         </div>
-                                    </div>
+                                    </Link>
                                 );
                             })}
                         </div>
