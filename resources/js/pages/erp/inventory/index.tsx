@@ -722,7 +722,8 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
             if (
                 !m.name.toLowerCase().includes(q) &&
                 !(m.sku ?? '').toLowerCase().includes(q) &&
-                !(m.category ?? '').toLowerCase().includes(q)
+                !(m.category ?? '').toLowerCase().includes(q) &&
+                !(m.hsn ?? '').toLowerCase().includes(q)
             )
                 return false;
         }
@@ -1445,7 +1446,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                     <div className="filter-bar" style={{ marginBottom: 12 }}>
                         <input
                             type="text"
-                            placeholder="Search materials..."
+                            placeholder="Search by name, SKU, HSN..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #d1d5db', minWidth: 200 }}

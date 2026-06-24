@@ -657,7 +657,8 @@ class InventoryController extends Controller
             ->where('is_active', true)
             ->when(strlen($q) >= 1, fn ($query) => $query->where(function ($sub) use ($q) {
                 $sub->where('name', 'like', "%{$q}%")
-                    ->orWhere('sku', 'like', "%{$q}%");
+                    ->orWhere('sku', 'like', "%{$q}%")
+                    ->orWhere('hsn', 'like', "%{$q}%");
             }))
             ->orderBy('name')
             ->limit(15)
