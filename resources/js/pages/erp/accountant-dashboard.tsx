@@ -105,7 +105,7 @@ export default function AccountantDashboard({ pendingInvoice, pendingEway, billi
 
             {/* Stats */}
             <div className="stats-grid" style={{ marginBottom: 24 }}>
-                <div className="stat-card" style={{ borderLeft: '4px solid #ef4444' }}>
+                <Link href={ordersIndex().url} className="stat-card dash-kpi-card" style={{ borderLeft: '4px solid #ef4444', textDecoration: 'none', color: 'inherit' }}>
                     <div className="stat-icon" style={{ background: '#fee2e2' }}>📄</div>
                     <div>
                         <div className="stat-val" style={{ color: stats.pendingInvoiceCount > 0 ? '#b91c1c' : undefined }}>
@@ -113,9 +113,9 @@ export default function AccountantDashboard({ pendingInvoice, pendingEway, billi
                         </div>
                         <div className="stat-label">Invoice Pending</div>
                     </div>
-                </div>
+                </Link>
 
-                <div className="stat-card" style={{ borderLeft: '4px solid #f59e0b' }}>
+                <Link href={ordersIndex().url} className="stat-card dash-kpi-card" style={{ borderLeft: '4px solid #f59e0b', textDecoration: 'none', color: 'inherit' }}>
                     <div className="stat-icon" style={{ background: '#fef3c7' }}>🚚</div>
                     <div>
                         <div className="stat-val" style={{ color: stats.pendingEwayCount > 0 ? '#b45309' : undefined }}>
@@ -123,17 +123,17 @@ export default function AccountantDashboard({ pendingInvoice, pendingEway, billi
                         </div>
                         <div className="stat-label">E-way Pending</div>
                     </div>
-                </div>
+                </Link>
 
-                <div className="stat-card" style={{ borderLeft: '4px solid #059669' }}>
+                <Link href={ordersIndex().url} className="stat-card dash-kpi-card" style={{ borderLeft: '4px solid #059669', textDecoration: 'none', color: 'inherit' }}>
                     <div className="stat-icon" style={{ background: '#d1fae5' }}>📊</div>
                     <div>
                         <div className="stat-val" style={{ fontSize: 18 }}>{fmtAmt(stats.thisMonthValue)}</div>
                         <div className="stat-label">This Month ({stats.thisMonthCount} orders)</div>
                     </div>
-                </div>
+                </Link>
 
-                <div className="stat-card" style={{ borderLeft: '4px solid #6366f1' }}>
+                <Link href={inventoryIndex().url} className="stat-card dash-kpi-card" style={{ borderLeft: '4px solid #6366f1', textDecoration: 'none', color: 'inherit' }}>
                     <div className="stat-icon" style={{ background: '#ede9fe' }}>🌿</div>
                     <div>
                         <div className="stat-val" style={{ color: stats.missingHsnGstCount > 0 ? '#4f46e5' : undefined }}>
@@ -141,7 +141,7 @@ export default function AccountantDashboard({ pendingInvoice, pendingEway, billi
                         </div>
                         <div className="stat-label">Missing HSN / GST</div>
                     </div>
-                </div>
+                </Link>
             </div>
 
             {/* Main two-column layout */}
