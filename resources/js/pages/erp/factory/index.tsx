@@ -1418,6 +1418,22 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                         </div>
                                                                     )}
 
+                                                                    {/* Clear "filling is finished" action while the item is being filled */}
+                                                                    {canAdvance && item.status === 'filling' && (
+                                                                        <div>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn sm"
+                                                                                style={{ background: '#16a34a', borderColor: '#16a34a', color: '#fff', fontWeight: 700 }}
+                                                                                disabled={stagingItem === item.id}
+                                                                                onClick={(e) => { e.stopPropagation(); setItemStage(item.id, 'labeling', item.status ?? ''); }}
+                                                                                title="Mark filling as finished and move to Labeling"
+                                                                            >
+                                                                                ✓ Filling Done → Labeling
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+
                                                                     {/* Inline stage history */}
                                                                     {log.length > 0 && (
                                                                         <div style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
