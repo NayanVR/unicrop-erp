@@ -128,12 +128,43 @@ class ProductPhotoController extends Controller
         ]);
     }
 
-    public function show(ProductPhoto $photo)
+    public function show(Request $request, ProductPhoto $photo)
     {
+        // Version tag from the stored path + updated_at, so the browser can
+        // cache aggressively but still pick up a re-uploaded image.
+        $etag = '"' . md5($photo->photo_path . '|' . $photo->updated_at) . '"';
+        $cacheHeaders = [
+            'ETag'          => $etag,
+            'Cache-Control' => 'public, max-age=604800', // 7 days
+        ];
+
+        // Browser already holds the current version — answer without touching S3.
+        if (trim((string) $request->headers->get('If-None-Match')) === $etag) {
+            return response('', 304, $cacheHeaders);
+        }
+
         /** @var FilesystemAdapter $storage */
         $storage = Storage::disk($this->storageDisk());
 
-        return $storage->response($photo->photo_path);
+        try {
+            $contents = $storage->get($photo->photo_path);
+        } catch (\Throwable $e) {
+            Log::warning('Product photo fetch failed', ['id' => $photo->id, 'path' => $photo->photo_path, 'error' => $e->getMessage()]);
+            $contents = null;
+        }
+
+        if ($contents === null) {
+            abort(404);
+        }
+
+        $ext = strtolower(pathinfo($photo->photo_path, PATHINFO_EXTENSION));
+        $mime = match ($ext) {
+            'webp' => 'image/webp',
+            'png'  => 'image/png',
+            default => 'image/jpeg',
+        };
+
+        return response($contents, 200, $cacheHeaders + ['Content-Type' => $mime]);
     }
 
     public function store(Request $request): RedirectResponse

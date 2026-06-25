@@ -141,6 +141,19 @@ type FolderForm   = { party_id: string };
 // null = folder list, 'our-brand' = Our Brand, number = party_id
 type ActiveFolder = null | 'our-brand' | number;
 
+// Shown in place of a photo whose file can't be loaded (e.g. missing on storage).
+const PLACEHOLDER_IMG =
+    'data:image/svg+xml;utf8,' +
+    encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="160"><rect width="100%" height="100%" fill="#f3f4f6"/><text x="50%" y="46%" font-size="40" text-anchor="middle" dominant-baseline="middle">📷</text><text x="50%" y="72%" font-size="13" fill="#9ca3af" text-anchor="middle" font-family="sans-serif">Image unavailable</text></svg>',
+    );
+const onImgError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const el = e.currentTarget;
+    if (el.dataset.fallback) return;
+    el.dataset.fallback = '1';
+    el.src = PLACEHOLDER_IMG;
+};
+
 export default function DesignGallery() {
     const { photos, folders, parties, ourBrands, allCategories, partyRates, packingSizes, bottleJarOptions, capColorOptions, brandBottleMap, flash } =
         usePage<PageProps>().props;
@@ -478,6 +491,8 @@ export default function DesignGallery() {
                                         <img
                                             src={photo.photo_url}
                                             alt={photo.party_brand ?? photo.our_brand}
+                                            loading="lazy"
+                                            onError={onImgError}
                                             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#fff', padding: '6px' }}
                                         />
                                     </div>
@@ -749,6 +764,7 @@ export default function DesignGallery() {
                         <img
                             src={lightbox.photo_url}
                             alt=""
+                            onError={onImgError}
                             style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', padding: '20px', background: '#fff' }}
                         />
                     </div>
