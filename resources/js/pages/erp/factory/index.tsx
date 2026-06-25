@@ -2065,7 +2065,9 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                 </div>
                                 {current !== taken && (
                                     <div style={{ fontSize: '12px', fontWeight: 600, color: current < taken ? '#dc2626' : '#d97706', marginTop: '6px' }}>
-                                        {current < taken ? `${formatQty(taken - current)} less than ${stageQty.takenLabel.toLowerCase()}` : `${formatQty(current - taken)} more than ${stageQty.takenLabel.toLowerCase()}`}
+                                        {current < taken
+                                            ? `${formatQty(taken - current)} pcs બાકી — એ ${STAGE_LABELS[stageQty.item.status] ?? stageQty.item.status} માં pending રહેશे (નવી row).`
+                                            : `${formatQty(current - taken)} more than ${stageQty.takenLabel.toLowerCase()}`}
                                     </div>
                                 )}
                                 <div className="modal-actions" style={{ justifyContent: 'flex-end', marginTop: '16px' }}>

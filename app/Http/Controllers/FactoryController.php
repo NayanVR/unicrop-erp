@@ -273,7 +273,56 @@ class FactoryController extends Controller
             $update['labeled_qty'] = $data['labeled_qty'];
         }
 
+        // Partial completion: if fewer pcs were filled/labeled than the item holds,
+        // split off the remainder as a new item that stays in the current stage.
+        $qtyField = $hasFilled ? 'filled_qty' : ($hasLabeled ? 'labeled_qty' : null);
+        $doneQty  = $qtyField ? (float) $data[$qtyField] : null;
+        $totalQty = (float) $item->quantity;
+        $remaining = ($qtyField !== null && $doneQty !== null && $doneQty > 0 && $doneQty < $totalQty)
+            ? round($totalQty - $doneQty, 2)
+            : null;
+
+        if ($remaining !== null) {
+            $rate = (float) $item->rate;
+            $gstPercent = (float) $item->gst_percent;
+
+            // Original item keeps only the completed quantity.
+            $doneAmount = round($doneQty * $rate, 2);
+            $update['quantity'] = $doneQty;
+            $update['amount'] = $doneAmount;
+            $update['gst_amount'] = round($doneAmount * $gstPercent / 100, 2);
+            if ($hasLabeled && $item->filled_qty !== null) {
+                $update['filled_qty'] = min((float) $item->filled_qty, $doneQty);
+            }
+        }
+
         $item->update($update);
+
+        if ($remaining !== null) {
+            $rate = (float) $item->rate;
+            $gstPercent = (float) $item->gst_percent;
+            $remAmount = round($remaining * $rate, 2);
+
+            $newItem = $item->replicate();
+            $newItem->quantity = $remaining;
+            $newItem->amount = $remAmount;
+            $newItem->gst_amount = round($remAmount * $gstPercent / 100, 2);
+            $newItem->status = $currentStage; // stays in the stage it was being advanced from
+            // The remainder is already filled if we are splitting at labeling, otherwise not.
+            $newItem->filled_qty = $currentStage === 'labeling' ? $remaining : null;
+            $newItem->labeled_qty = null;
+            $newItem->dispatched_qty = null;
+            $newItem->labels_received = null;
+            $newItem->stage_log = [[
+                'to' => $currentStage,
+                'by' => $user?->id,
+                'name' => $user?->name,
+                'at' => now()->toISOString(),
+                'split_from' => $item->id,
+                'note' => "Remaining {$remaining} pcs pending after partial {$currentStage}",
+            ]];
+            $newItem->save();
+        }
 
         $order = $item->order;
         if ($targetStage === 'dispatched') {
@@ -299,7 +348,12 @@ class FactoryController extends Controller
             meta: ['order_id' => $order->id, 'item_id' => $item->id, 'stage' => $targetStage],
         ));
 
-        return redirect()->back()->with('success', "Item set to {$targetStage}.");
+        $msg = "Item set to {$targetStage}.";
+        if ($remaining !== null) {
+            $msg = "{$doneQty} pcs moved to {$targetStage}; {$remaining} pcs kept in {$currentStage} to finish later.";
+        }
+
+        return redirect()->back()->with('success', $msg);
     }
 
     public function updateItem(Request $request, OrderItem $item): RedirectResponse
