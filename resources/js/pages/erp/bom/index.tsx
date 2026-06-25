@@ -8,6 +8,7 @@ import type { Auth } from '@/types/auth';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 import { ModalPortal } from '@/components/modal-portal';
+import SearchableSelect from '@/components/searchable-select';
 
 type RawMaterial = {
     id: number;
@@ -1063,10 +1064,17 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                     </span>
                                 </label>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px 32px', gap: 8 }}>
-                                    <select
+                                    <SearchableSelect
                                         value={form.data.output_raw_material_id}
-                                        onChange={(e) => {
-                                            const id = e.target.value;
+                                        placeholder="🔍 Search output product (typos ok)…"
+                                        options={[
+                                            { value: '', label: "— Not linked (won't update inventory stock) —" },
+                                            ...materials.map((m) => ({
+                                                value: m.id,
+                                                label: `${m.name} (${m.unit}) — Stock: ${formatQty(m.stock_qty)}`,
+                                            })),
+                                        ]}
+                                        onChange={(id) => {
                                             const mat = id ? materials.find((m) => m.id === Number(id)) : null;
                                             form.setData({
                                                 ...form.data,
@@ -1075,14 +1083,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                                 name: mat?.name ?? form.data.name,
                                             });
                                         }}
-                                    >
-                                        <option value="">— Not linked (won't update inventory stock) —</option>
-                                        {materials.map((m) => (
-                                            <option key={m.id} value={m.id}>
-                                                {m.name} ({m.unit}) — Stock: {formatQty(m.stock_qty)}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    />
                                     <select
                                         value={form.data.output_category}
                                         onChange={(e) => form.setData('output_category', e.target.value)}
