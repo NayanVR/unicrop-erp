@@ -207,11 +207,12 @@ type Props = {
     boxDimensions?: BoxDimension[];
 };
 
-const STAGE_ORDER = ['accepted', 'filling', 'labeling', 'ready', 'dispatched'];
+const STAGE_ORDER = ['accepted', 'filling', 'filled', 'labeling', 'ready', 'dispatched'];
 
 const STAGE_LABELS: Record<string, string> = {
     accepted:   'Accept Order',
     filling:    'Filling',
+    filled:     'Filled',
     labeling:   'Labeling',
     ready:      'Ready',
     dispatched: 'Dispatched',
@@ -220,6 +221,7 @@ const STAGE_LABELS: Record<string, string> = {
 const STAGE_CLASS: Record<string, string> = {
     accepted:   's-processing',
     filling:    's-filling',
+    filled:     's-filling',
     labeling:   's-labeling',
     ready:      's-ready',
     dispatched: 's-dispatched',
@@ -285,9 +287,9 @@ const matchesFilter = (order: Order, filter: FilterKey) => {
         case 'new':
             return statuses.some((s) => isNewItem(s));
         case 'in-process':
-            return statuses.some((s) => ['accepted', 'filling', 'labeling'].includes(s ?? ''));
+            return statuses.some((s) => ['accepted', 'filling', 'filled', 'labeling'].includes(s ?? ''));
         case 'filling':
-            return statuses.some((s) => s === 'filling');
+            return statuses.some((s) => s === 'filling' || s === 'filled');
         case 'ready':
             return statuses.some((s) => s === 'ready');
         case 'dispatched':
@@ -553,9 +555,9 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
         const taken = Number(item.quantity);
         setStageQtyVal(String(taken));
         setStageQty({
-            item, toStage: 'labeling', field: 'filled_qty',
+            item, toStage: 'filled', field: 'filled_qty',
             title: '✓ Filling Done', question: 'How many pcs filled?',
-            doneLabel: '✓ Done → Labeling', takenLabel: 'Taken for filling', taken,
+            doneLabel: '✓ Filling Done', takenLabel: 'Taken for filling', taken,
         });
     };
     const openLabelingDone = (item: OrderItem) => {
@@ -1479,7 +1481,21 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                                 onClick={(e) => { e.stopPropagation(); openFillingDone(item); }}
                                                                                 title="Mark filling as finished and record filled pcs"
                                                                             >
-                                                                                ✓ Filling Done → Labeling
+                                                                                ✓ Filling Done
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                    {canAdvance && item.status === 'filled' && (
+                                                                        <div>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn sm"
+                                                                                style={{ background: '#7c3aed', borderColor: '#7c3aed', color: '#fff', fontWeight: 700 }}
+                                                                                disabled={stagingItem === item.id}
+                                                                                onClick={(e) => { e.stopPropagation(); setItemStage(item.id, 'labeling', item.status ?? ''); }}
+                                                                                title="Start labeling for this item"
+                                                                            >
+                                                                                🏷 Start Labeling
                                                                             </button>
                                                                         </div>
                                                                     )}

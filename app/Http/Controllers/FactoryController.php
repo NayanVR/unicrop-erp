@@ -23,7 +23,8 @@ class FactoryController extends Controller
 {
     private const STAGE_FLOW = [
         'accepted' => 'filling',
-        'filling'  => 'labeling',
+        'filling'  => 'filled',
+        'filled'   => 'labeling',
         'labeling' => 'ready',
         'ready'    => 'dispatched',
     ];

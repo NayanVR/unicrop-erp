@@ -57,6 +57,7 @@ const STAGES = [
     { key: 'pending',    label: 'Pending',    color: '#64748b', bg: '#f8fafc', border: '#cbd5e1' },
     { key: 'processing', label: 'Processing', color: '#d97706', bg: '#fffbeb', border: '#fcd34d' },
     { key: 'filling',    label: 'Filling',    color: '#7c3aed', bg: '#f5f3ff', border: '#c4b5fd' },
+    { key: 'filled',     label: 'Filled',     color: '#7c3aed', bg: '#f5f3ff', border: '#c4b5fd' },
     { key: 'labeling',   label: 'Labeling',   color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc' },
     { key: 'ready',      label: 'Ready',      color: '#16a34a', bg: '#f0fdf4', border: '#86efac' },
     { key: 'dispatched', label: 'Dispatched', color: '#059669', bg: '#ecfdf5', border: '#6ee7b7' },
@@ -79,7 +80,7 @@ export default function FactoryDashboard({
     stageCounts, activeOrders, urgentPending, lowStock, pendingTransfers, finishedThisWeek, recentDispatched, lowStockProduction,
 }: Props) {
     const totalActive = STAGES.filter((s) => s.key !== 'dispatched').reduce((sum, s) => sum + (stageCounts[s.key] ?? 0), 0);
-    const inProduction = (stageCounts['processing'] ?? 0) + (stageCounts['filling'] ?? 0) + (stageCounts['labeling'] ?? 0);
+    const inProduction = (stageCounts['processing'] ?? 0) + (stageCounts['filling'] ?? 0) + (stageCounts['filled'] ?? 0) + (stageCounts['labeling'] ?? 0);
     const readyCount = stageCounts['ready'] ?? 0;
 
     return (
