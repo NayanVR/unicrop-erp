@@ -246,6 +246,19 @@ function capColorHex(name: string): string {
     return '#9ca3af';
 }
 
+// Shown when a product photo file can't be loaded (e.g. missing on storage).
+const PLACEHOLDER_IMG =
+    'data:image/svg+xml;utf8,' +
+    encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96"><rect width="100%" height="100%" fill="#f3f4f6"/><text x="50%" y="54%" font-size="34" text-anchor="middle" dominant-baseline="middle">📷</text></svg>',
+    );
+const onImgError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const el = e.currentTarget;
+    if (el.dataset.fallback) return;
+    el.dataset.fallback = '1';
+    el.src = PLACEHOLDER_IMG;
+};
+
 type EditableLabel = {
     key: string;
     transport: string;
@@ -1267,6 +1280,8 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                         <img
                                                                             src={photo}
                                                                             alt=""
+                                                                            loading="lazy"
+                                                                            onError={onImgError}
                                                                             onClick={(e) => { e.stopPropagation(); setPhotoLightbox(photo); }}
                                                                             style={{ width: '48px', height: '48px', objectFit: 'contain', borderRadius: '6px', border: '1px solid var(--border)', background: '#fff', padding: '2px', flexShrink: 0, cursor: 'zoom-in' }}
                                                                         />
@@ -2121,6 +2136,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                         <img
                             src={photoLightbox}
                             alt=""
+                            onError={onImgError}
                             style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: '8px', background: '#fff', padding: '8px', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}
                         />
                         <button
