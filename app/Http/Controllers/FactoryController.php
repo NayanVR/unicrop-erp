@@ -230,6 +230,7 @@ class FactoryController extends Controller
 
         $data = $request->validate([
             'stage' => 'required|string|in:' . implode(',', $stages),
+            'filled_qty' => 'nullable|numeric|min:0',
         ]);
 
         $user = $request->user();
@@ -251,12 +252,19 @@ class FactoryController extends Controller
             'name' => $user?->name,
             'at' => now()->toISOString(),
             'revert' => $isBackward ?: null,
+            'filled_qty' => array_key_exists('filled_qty', $data) && $data['filled_qty'] !== null ? (float) $data['filled_qty'] : null,
         ], fn ($v) => $v !== null);
 
-        $item->update([
+        $update = [
             'status' => $targetStage,
             'stage_log' => $stageLog,
-        ]);
+        ];
+        // Record how many pcs were actually filled when filling is completed.
+        if (array_key_exists('filled_qty', $data) && $data['filled_qty'] !== null) {
+            $update['filled_qty'] = $data['filled_qty'];
+        }
+
+        $item->update($update);
 
         $order = $item->order;
         if ($targetStage === 'dispatched') {

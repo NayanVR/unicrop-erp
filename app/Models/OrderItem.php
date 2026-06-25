@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'labels_received',
     'quantity',
     'dispatched_qty',
+    'filled_qty',
     'rate',
     'amount',
     'gst_percent',
@@ -42,6 +43,7 @@ class OrderItem extends Model
         return [
             'quantity' => 'decimal:2',
             'dispatched_qty' => 'decimal:2',
+            'filled_qty' => 'decimal:2',
             'rate' => 'decimal:2',
             'amount' => 'decimal:2',
             'gst_percent' => 'decimal:2',

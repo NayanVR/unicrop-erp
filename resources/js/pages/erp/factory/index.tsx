@@ -118,6 +118,7 @@ type OrderItem = {
     labels_received?: number | null;
     quantity: string | number;
     dispatched_qty?: string | number | null;
+    filled_qty?: string | number | null;
     rate: string | number;
     amount: string | number;
     type?: string | null;
@@ -416,6 +417,8 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
     const [openOrders, setOpenOrders] = useState<number[]>([]);
     const [stagingItem, setStagingItem] = useState<number | null>(null);
     const [fillingPrompt, setFillingPrompt] = useState<{ item: OrderItem; current: string | null } | null>(null);
+    const [fillingDoneModal, setFillingDoneModal] = useState<OrderItem | null>(null);
+    const [filledQty, setFilledQty] = useState('');
     const [dispatchingOrder, setDispatchingOrder] = useState<number | null>(null);
     const [approvingId, setApprovingId] = useState<number | null>(null);
     const [rejectingId, setRejectingId] = useState<number | null>(null);
@@ -526,7 +529,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
     const toggleOrder = (orderId: number) =>
         setOpenOrders((curr) => (curr.includes(orderId) ? curr.filter((id) => id !== orderId) : [...curr, orderId]));
 
-    const setItemStage = (itemId: number, stage: string, current: string | null, onDone?: () => void) => {
+    const setItemStage = (itemId: number, stage: string, current: string | null, onDone?: () => void, extra?: Record<string, string | number>) => {
         if (stage === current) {
             onDone?.();
             return;
@@ -537,8 +540,27 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
         setStagingItem(itemId);
         router.post(
             itemSetStage(itemId).url,
-            { stage },
+            { stage, ...(extra ?? {}) },
             { preserveScroll: true, onFinish: () => { setStagingItem(null); onDone?.(); } },
+        );
+    };
+
+    const openFillingDone = (item: OrderItem) => {
+        setFilledQty(String(Number(item.quantity)));
+        setFillingDoneModal(item);
+    };
+    const stepFilledQty = (delta: number) => {
+        setFilledQty((prev) => String(Math.max(0, (parseFloat(prev) || 0) + delta)));
+    };
+    const submitFillingDone = () => {
+        if (!fillingDoneModal) return;
+        const qty = Math.max(0, parseFloat(filledQty) || 0);
+        setItemStage(
+            fillingDoneModal.id,
+            'labeling',
+            fillingDoneModal.status ?? '',
+            () => setFillingDoneModal(null),
+            { filled_qty: qty },
         );
     };
 
@@ -1233,6 +1255,11 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                 <div style={{ fontSize: '13px' }}>
                                                                     {item.packing_size ? `${item.packing_size} · ` : ''}Qty: {formatQty(item.quantity)}
                                                                 </div>
+                                                                {item.filled_qty != null && (
+                                                                    <div style={{ fontSize: '12px', fontWeight: 600, color: Number(item.filled_qty) < Number(item.quantity) ? '#d97706' : '#16a34a' }}>
+                                                                        🧪 Filled: {formatQty(item.filled_qty)} pcs
+                                                                    </div>
+                                                                )}
                                                                 {isDispatched && item.dispatched_qty != null && Number(item.dispatched_qty) !== Number(item.quantity) && (
                                                                     <div style={{ fontSize: '12px', fontWeight: 600, color: Number(item.dispatched_qty) < Number(item.quantity) ? '#dc2626' : '#d97706' }}>
                                                                         Dispatched: {Number(item.dispatched_qty)}
@@ -1426,8 +1453,8 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                                 className="btn sm"
                                                                                 style={{ background: '#16a34a', borderColor: '#16a34a', color: '#fff', fontWeight: 700 }}
                                                                                 disabled={stagingItem === item.id}
-                                                                                onClick={(e) => { e.stopPropagation(); setItemStage(item.id, 'labeling', item.status ?? ''); }}
-                                                                                title="Mark filling as finished and move to Labeling"
+                                                                                onClick={(e) => { e.stopPropagation(); openFillingDone(item); }}
+                                                                                title="Mark filling as finished and record filled pcs"
                                                                             >
                                                                                 ✓ Filling Done → Labeling
                                                                             </button>
@@ -1935,6 +1962,70 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                     </div>
                 </div>
             )}
+
+            {/* Filling Done — record how many pcs were actually filled */}
+            {fillingDoneModal && (() => {
+                const ordered = Number(fillingDoneModal.quantity);
+                const current = parseFloat(filledQty) || 0;
+                const busy = stagingItem === fillingDoneModal.id;
+                return (
+                    <div className="modal-overlay open" onClick={() => !busy && setFillingDoneModal(null)}>
+                        <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400 }}>
+                            <div className="modal-header">
+                                <h2>✓ Filling Done</h2>
+                                <button className="modal-close" onClick={() => !busy && setFillingDoneModal(null)}>✕</button>
+                            </div>
+                            <div className="modal-body">
+                                <div style={{ marginBottom: 14, fontSize: 13, color: 'var(--tx-muted)' }}>
+                                    <strong>{fillingDoneModal.our_brand ?? '—'}</strong>
+                                    {fillingDoneModal.packing_size ? ` (${fillingDoneModal.packing_size})` : ''}
+                                    <div style={{ marginTop: 2 }}>Taken for filling: {formatQty(ordered)} pcs</div>
+                                </div>
+                                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>How many pcs filled?</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <button
+                                        type="button"
+                                        className="btn sm"
+                                        onClick={() => stepFilledQty(-1)}
+                                        disabled={busy || current <= 0}
+                                        style={{ width: '38px', padding: '6px 0', fontWeight: 700, fontSize: 16 }}
+                                    >
+                                        −
+                                    </button>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={filledQty}
+                                        onChange={(e) => setFilledQty(e.target.value)}
+                                        disabled={busy}
+                                        style={{ flex: 1, padding: '8px 10px', fontSize: '15px', textAlign: 'center', fontWeight: 700, border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-input, #fff)' }}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="btn sm"
+                                        onClick={() => stepFilledQty(1)}
+                                        disabled={busy}
+                                        style={{ width: '38px', padding: '6px 0', fontWeight: 700, fontSize: 16 }}
+                                    >
+                                        ＋
+                                    </button>
+                                </div>
+                                {current !== ordered && (
+                                    <div style={{ fontSize: '12px', fontWeight: 600, color: current < ordered ? '#dc2626' : '#d97706', marginTop: '6px' }}>
+                                        {current < ordered ? `${formatQty(ordered - current)} less than taken` : `${formatQty(current - ordered)} more than taken`}
+                                    </div>
+                                )}
+                                <div className="modal-actions" style={{ justifyContent: 'flex-end', marginTop: '16px' }}>
+                                    <button type="button" className="btn-secondary" onClick={() => setFillingDoneModal(null)} disabled={busy}>Cancel</button>
+                                    <button type="button" className="btn-primary" onClick={submitFillingDone} disabled={busy}>
+                                        {busy ? 'Saving…' : '✓ Done → Labeling'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* Photo lightbox */}
             {photoLightbox && (
