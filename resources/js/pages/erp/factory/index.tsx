@@ -119,6 +119,7 @@ type OrderItem = {
     quantity: string | number;
     dispatched_qty?: string | number | null;
     filled_qty?: string | number | null;
+    labeled_qty?: string | number | null;
     rate: string | number;
     amount: string | number;
     type?: string | null;
@@ -417,8 +418,11 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
     const [openOrders, setOpenOrders] = useState<number[]>([]);
     const [stagingItem, setStagingItem] = useState<number | null>(null);
     const [fillingPrompt, setFillingPrompt] = useState<{ item: OrderItem; current: string | null } | null>(null);
-    const [fillingDoneModal, setFillingDoneModal] = useState<OrderItem | null>(null);
-    const [filledQty, setFilledQty] = useState('');
+    const [stageQty, setStageQty] = useState<{
+        item: OrderItem; toStage: string; field: 'filled_qty' | 'labeled_qty';
+        title: string; question: string; doneLabel: string; takenLabel: string; taken: number;
+    } | null>(null);
+    const [stageQtyVal, setStageQtyVal] = useState('');
     const [dispatchingOrder, setDispatchingOrder] = useState<number | null>(null);
     const [approvingId, setApprovingId] = useState<number | null>(null);
     const [rejectingId, setRejectingId] = useState<number | null>(null);
@@ -546,21 +550,35 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
     };
 
     const openFillingDone = (item: OrderItem) => {
-        setFilledQty(String(Number(item.quantity)));
-        setFillingDoneModal(item);
+        const taken = Number(item.quantity);
+        setStageQtyVal(String(taken));
+        setStageQty({
+            item, toStage: 'labeling', field: 'filled_qty',
+            title: '✓ Filling Done', question: 'How many pcs filled?',
+            doneLabel: '✓ Done → Labeling', takenLabel: 'Taken for filling', taken,
+        });
     };
-    const stepFilledQty = (delta: number) => {
-        setFilledQty((prev) => String(Math.max(0, (parseFloat(prev) || 0) + delta)));
+    const openLabelingDone = (item: OrderItem) => {
+        const taken = item.filled_qty != null ? Number(item.filled_qty) : Number(item.quantity);
+        setStageQtyVal(String(taken));
+        setStageQty({
+            item, toStage: 'ready', field: 'labeled_qty',
+            title: '✓ Labeling Done', question: 'How many pcs labeled?',
+            doneLabel: '✓ Done → Ready', takenLabel: 'Filled', taken,
+        });
     };
-    const submitFillingDone = () => {
-        if (!fillingDoneModal) return;
-        const qty = Math.max(0, parseFloat(filledQty) || 0);
+    const stepStageQty = (delta: number) => {
+        setStageQtyVal((prev) => String(Math.max(0, (parseFloat(prev) || 0) + delta)));
+    };
+    const submitStageQty = () => {
+        if (!stageQty) return;
+        const qty = Math.max(0, parseFloat(stageQtyVal) || 0);
         setItemStage(
-            fillingDoneModal.id,
-            'labeling',
-            fillingDoneModal.status ?? '',
-            () => setFillingDoneModal(null),
-            { filled_qty: qty },
+            stageQty.item.id,
+            stageQty.toStage,
+            stageQty.item.status ?? '',
+            () => setStageQty(null),
+            { [stageQty.field]: qty },
         );
     };
 
@@ -1260,6 +1278,11 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                         🧪 Filled: {formatQty(item.filled_qty)} pcs
                                                                     </div>
                                                                 )}
+                                                                {item.labeled_qty != null && (
+                                                                    <div style={{ fontSize: '12px', fontWeight: 600, color: Number(item.labeled_qty) < Number(item.filled_qty ?? item.quantity) ? '#d97706' : '#16a34a' }}>
+                                                                        🏷 Labeled: {formatQty(item.labeled_qty)} pcs
+                                                                    </div>
+                                                                )}
                                                                 {isDispatched && item.dispatched_qty != null && Number(item.dispatched_qty) !== Number(item.quantity) && (
                                                                     <div style={{ fontSize: '12px', fontWeight: 600, color: Number(item.dispatched_qty) < Number(item.quantity) ? '#dc2626' : '#d97706' }}>
                                                                         Dispatched: {Number(item.dispatched_qty)}
@@ -1445,7 +1468,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                         </div>
                                                                     )}
 
-                                                                    {/* Clear "filling is finished" action while the item is being filled */}
+                                                                    {/* Clear "stage finished" action with a qty prompt */}
                                                                     {canAdvance && item.status === 'filling' && (
                                                                         <div>
                                                                             <button
@@ -1457,6 +1480,20 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                                 title="Mark filling as finished and record filled pcs"
                                                                             >
                                                                                 ✓ Filling Done → Labeling
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                    {canAdvance && item.status === 'labeling' && (
+                                                                        <div>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn sm"
+                                                                                style={{ background: '#16a34a', borderColor: '#16a34a', color: '#fff', fontWeight: 700 }}
+                                                                                disabled={stagingItem === item.id}
+                                                                                onClick={(e) => { e.stopPropagation(); openLabelingDone(item); }}
+                                                                                title="Mark labeling as finished and record labeled pcs"
+                                                                            >
+                                                                                ✓ Labeling Done → Ready
                                                                             </button>
                                                                         </div>
                                                                     )}
@@ -1963,30 +2000,30 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                 </div>
             )}
 
-            {/* Filling Done — record how many pcs were actually filled */}
-            {fillingDoneModal && (() => {
-                const ordered = Number(fillingDoneModal.quantity);
-                const current = parseFloat(filledQty) || 0;
-                const busy = stagingItem === fillingDoneModal.id;
+            {/* Stage Done — record how many pcs were filled / labeled */}
+            {stageQty && (() => {
+                const taken = stageQty.taken;
+                const current = parseFloat(stageQtyVal) || 0;
+                const busy = stagingItem === stageQty.item.id;
                 return (
-                    <div className="modal-overlay open" onClick={() => !busy && setFillingDoneModal(null)}>
+                    <div className="modal-overlay open" onClick={() => !busy && setStageQty(null)}>
                         <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400 }}>
                             <div className="modal-header">
-                                <h2>✓ Filling Done</h2>
-                                <button className="modal-close" onClick={() => !busy && setFillingDoneModal(null)}>✕</button>
+                                <h2>{stageQty.title}</h2>
+                                <button className="modal-close" onClick={() => !busy && setStageQty(null)}>✕</button>
                             </div>
                             <div className="modal-body">
                                 <div style={{ marginBottom: 14, fontSize: 13, color: 'var(--tx-muted)' }}>
-                                    <strong>{fillingDoneModal.our_brand ?? '—'}</strong>
-                                    {fillingDoneModal.packing_size ? ` (${fillingDoneModal.packing_size})` : ''}
-                                    <div style={{ marginTop: 2 }}>Taken for filling: {formatQty(ordered)} pcs</div>
+                                    <strong>{stageQty.item.our_brand ?? '—'}</strong>
+                                    {stageQty.item.packing_size ? ` (${stageQty.item.packing_size})` : ''}
+                                    <div style={{ marginTop: 2 }}>{stageQty.takenLabel}: {formatQty(taken)} pcs</div>
                                 </div>
-                                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>How many pcs filled?</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{stageQty.question}</div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <button
                                         type="button"
                                         className="btn sm"
-                                        onClick={() => stepFilledQty(-1)}
+                                        onClick={() => stepStageQty(-1)}
                                         disabled={busy || current <= 0}
                                         style={{ width: '38px', padding: '6px 0', fontWeight: 700, fontSize: 16 }}
                                     >
@@ -1995,30 +2032,30 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                     <input
                                         type="number"
                                         min={0}
-                                        value={filledQty}
-                                        onChange={(e) => setFilledQty(e.target.value)}
+                                        value={stageQtyVal}
+                                        onChange={(e) => setStageQtyVal(e.target.value)}
                                         disabled={busy}
                                         style={{ flex: 1, padding: '8px 10px', fontSize: '15px', textAlign: 'center', fontWeight: 700, border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-input, #fff)' }}
                                     />
                                     <button
                                         type="button"
                                         className="btn sm"
-                                        onClick={() => stepFilledQty(1)}
+                                        onClick={() => stepStageQty(1)}
                                         disabled={busy}
                                         style={{ width: '38px', padding: '6px 0', fontWeight: 700, fontSize: 16 }}
                                     >
                                         ＋
                                     </button>
                                 </div>
-                                {current !== ordered && (
-                                    <div style={{ fontSize: '12px', fontWeight: 600, color: current < ordered ? '#dc2626' : '#d97706', marginTop: '6px' }}>
-                                        {current < ordered ? `${formatQty(ordered - current)} less than taken` : `${formatQty(current - ordered)} more than taken`}
+                                {current !== taken && (
+                                    <div style={{ fontSize: '12px', fontWeight: 600, color: current < taken ? '#dc2626' : '#d97706', marginTop: '6px' }}>
+                                        {current < taken ? `${formatQty(taken - current)} less than ${stageQty.takenLabel.toLowerCase()}` : `${formatQty(current - taken)} more than ${stageQty.takenLabel.toLowerCase()}`}
                                     </div>
                                 )}
                                 <div className="modal-actions" style={{ justifyContent: 'flex-end', marginTop: '16px' }}>
-                                    <button type="button" className="btn-secondary" onClick={() => setFillingDoneModal(null)} disabled={busy}>Cancel</button>
-                                    <button type="button" className="btn-primary" onClick={submitFillingDone} disabled={busy}>
-                                        {busy ? 'Saving…' : '✓ Done → Labeling'}
+                                    <button type="button" className="btn-secondary" onClick={() => setStageQty(null)} disabled={busy}>Cancel</button>
+                                    <button type="button" className="btn-primary" onClick={submitStageQty} disabled={busy}>
+                                        {busy ? 'Saving…' : stageQty.doneLabel}
                                     </button>
                                 </div>
                             </div>

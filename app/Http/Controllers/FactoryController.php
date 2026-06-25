@@ -231,6 +231,7 @@ class FactoryController extends Controller
         $data = $request->validate([
             'stage' => 'required|string|in:' . implode(',', $stages),
             'filled_qty' => 'nullable|numeric|min:0',
+            'labeled_qty' => 'nullable|numeric|min:0',
         ]);
 
         $user = $request->user();
@@ -244,6 +245,9 @@ class FactoryController extends Controller
         // Determine if this is a backward move (for the history "revert" marker).
         $isBackward = array_search($targetStage, $stages, true) < array_search($currentStage, $stages, true);
 
+        $hasFilled = array_key_exists('filled_qty', $data) && $data['filled_qty'] !== null;
+        $hasLabeled = array_key_exists('labeled_qty', $data) && $data['labeled_qty'] !== null;
+
         $stageLog = (array) ($item->stage_log ?? []);
         $stageLog[] = array_filter([
             'from' => $currentStage,
@@ -252,16 +256,20 @@ class FactoryController extends Controller
             'name' => $user?->name,
             'at' => now()->toISOString(),
             'revert' => $isBackward ?: null,
-            'filled_qty' => array_key_exists('filled_qty', $data) && $data['filled_qty'] !== null ? (float) $data['filled_qty'] : null,
+            'filled_qty' => $hasFilled ? (float) $data['filled_qty'] : null,
+            'labeled_qty' => $hasLabeled ? (float) $data['labeled_qty'] : null,
         ], fn ($v) => $v !== null);
 
         $update = [
             'status' => $targetStage,
             'stage_log' => $stageLog,
         ];
-        // Record how many pcs were actually filled when filling is completed.
-        if (array_key_exists('filled_qty', $data) && $data['filled_qty'] !== null) {
+        // Record how many pcs were actually filled / labeled when that stage completes.
+        if ($hasFilled) {
             $update['filled_qty'] = $data['filled_qty'];
+        }
+        if ($hasLabeled) {
+            $update['labeled_qty'] = $data['labeled_qty'];
         }
 
         $item->update($update);
