@@ -227,6 +227,25 @@ const STAGE_CLASS: Record<string, string> = {
     dispatched: 's-dispatched',
 };
 
+// Map common cap-colour names to a swatch colour so factory staff can see
+// at a glance which cap colour each bottle needs.
+const CAP_COLOR_HEX: Record<string, string> = {
+    red: '#dc2626', green: '#16a34a', blue: '#2563eb', white: '#ffffff', black: '#111827',
+    yellow: '#eab308', orange: '#f97316', purple: '#7c3aed', violet: '#7c3aed', pink: '#ec4899',
+    brown: '#92400e', grey: '#6b7280', gray: '#6b7280', silver: '#cbd5e1', gold: '#d4af37',
+    'sky blue': '#38bdf8', skyblue: '#38bdf8', 'light green': '#86efac', 'dark blue': '#1e3a8a',
+    transparent: '#e5e7eb', clear: '#e5e7eb', natural: '#e5e7eb',
+};
+function capColorHex(name: string): string {
+    const k = name.trim().toLowerCase();
+    if (CAP_COLOR_HEX[k]) return CAP_COLOR_HEX[k];
+    try {
+        if (typeof CSS !== 'undefined' && CSS.supports?.('color', k)) return k;
+        if (typeof CSS !== 'undefined' && CSS.supports?.('color', k.replace(/\s+/g, ''))) return k.replace(/\s+/g, '');
+    } catch { /* ignore */ }
+    return '#9ca3af';
+}
+
 type EditableLabel = {
     key: string;
     transport: string;
@@ -1275,6 +1294,27 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                 <div style={{ fontSize: '13px' }}>
                                                                     {item.packing_size ? `${item.packing_size} · ` : ''}Qty: {formatQty(item.quantity)}
                                                                 </div>
+                                                                {(item.shape || item.cap_color) && (
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '3px' }}>
+                                                                        {item.shape && (
+                                                                            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--tx-body)' }}>🫙 {item.shape}</span>
+                                                                        )}
+                                                                        {item.cap_color && (
+                                                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 700, color: 'var(--tx-body)' }}>
+                                                                                <span
+                                                                                    style={{
+                                                                                        width: '15px', height: '15px', borderRadius: '50%',
+                                                                                        background: capColorHex(item.cap_color),
+                                                                                        border: '1.5px solid rgba(0,0,0,0.25)', flexShrink: 0,
+                                                                                        boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.4)',
+                                                                                    }}
+                                                                                    title={`Cap: ${item.cap_color}`}
+                                                                                />
+                                                                                {item.cap_color} cap
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                )}
                                                                 {item.filled_qty != null && (
                                                                     <div style={{ fontSize: '12px', fontWeight: 600, color: Number(item.filled_qty) < Number(item.quantity) ? '#d97706' : '#16a34a' }}>
                                                                         🧪 Filled: {formatQty(item.filled_qty)} pcs
@@ -1394,22 +1434,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                                                     );
                                                                 })()}
                                                                 {item.type && (
-                                                                    <div className="prod-detail" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                                        {item.type}
-                                                                        {item.cap_color && (
-                                                                            <span
-                                                                                title={item.cap_color}
-                                                                                style={{
-                                                                                    display: 'inline-block',
-                                                                                    width: '10px',
-                                                                                    height: '10px',
-                                                                                    borderRadius: '50%',
-                                                                                    border: '1px solid var(--border)',
-                                                                                    background: item.cap_color,
-                                                                                }}
-                                                                            />
-                                                                        )}
-                                                                    </div>
+                                                                    <div className="prod-detail">{item.type}</div>
                                                                 )}
                                                             </td>
 
