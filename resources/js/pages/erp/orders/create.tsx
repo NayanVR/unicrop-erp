@@ -79,7 +79,7 @@ type EditingOrder = {
     items: EditingOrderItem[];
 };
 
-type FinishGoodBrand = { name: string; group: string | null; shape: string | null; stock: number | null; unit: string };
+type FinishGoodBrand = { name: string; group: string | null; shape: string | null; stock: number | null; unit: string; selling_rate?: number | null };
 
 type Props = {
     pageTitle: string;
@@ -962,12 +962,19 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
 
                                         const rowPhoto = getRowPhoto(row);
 
-                                        // Selling-rate guard: the matched product rate is the standard
-                                        // selling rate. Warn (red) if the entered rate is below it.
+                                        // Selling-rate guard: warn (red) if the entered rate is below the
+                                        // product's selling rate. Prefer the party's product rate; fall
+                                        // back to the finished-good master selling rate so it works for
+                                        // any product.
                                         const matchedRate = (row.packing_size
                                             ? sizeOptions.find((r) => r.packing_size === row.packing_size)
                                             : undefined) ?? sizeOptions[0];
-                                        const sellingRate = matchedRate ? toNumber(String(matchedRate.rate)) : null;
+                                        const brandSell = finishGoodBrands.find(
+                                            (b) => b.name.trim().toLowerCase() === row.our_brand.trim().toLowerCase(),
+                                        )?.selling_rate ?? null;
+                                        const sellingRate = matchedRate
+                                            ? toNumber(String(matchedRate.rate))
+                                            : (brandSell != null && brandSell > 0 ? brandSell : null);
                                         const enteredRate = toNumber(row.rate);
                                         const belowSelling = sellingRate != null && sellingRate > 0 && enteredRate > 0 && enteredRate < sellingRate;
 

@@ -982,13 +982,14 @@ class OrderController extends Controller
             ->where('is_active', true)
             ->orderBy('group_name')
             ->orderBy('name')
-            ->get(['name', 'group_name', 'shape', 'stock_qty', 'unit'])
+            ->get(['name', 'group_name', 'shape', 'stock_qty', 'unit', 'selling_rate'])
             ->map(fn ($m) => [
                 'name'  => $m->name,
                 'group' => $m->group_name,
                 'shape' => $m->shape,
                 'stock' => (float) $m->stock_qty,
                 'unit'  => $m->unit ?? '',
+                'selling_rate' => $m->selling_rate !== null ? (float) $m->selling_rate : null,
             ]);
     }
 
