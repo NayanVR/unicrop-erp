@@ -962,6 +962,15 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
 
                                         const rowPhoto = getRowPhoto(row);
 
+                                        // Selling-rate guard: the matched product rate is the standard
+                                        // selling rate. Warn (red) if the entered rate is below it.
+                                        const matchedRate = (row.packing_size
+                                            ? sizeOptions.find((r) => r.packing_size === row.packing_size)
+                                            : undefined) ?? sizeOptions[0];
+                                        const sellingRate = matchedRate ? toNumber(String(matchedRate.rate)) : null;
+                                        const enteredRate = toNumber(row.rate);
+                                        const belowSelling = sellingRate != null && sellingRate > 0 && enteredRate > 0 && enteredRate < sellingRate;
+
                                         return (
                                             <tr key={`row-${index}`}>
                                                 <td style={{ textAlign: 'center', padding: '4px' }}>
@@ -1047,7 +1056,22 @@ export default function OrdersCreate({ salesUsers, transports, couriers, parties
                                                         </div>
                                                     )}
                                                 </td>
-                                                <td><input type="number" value={row.rate} onChange={(e) => updateRow(index, 'rate', e.target.value)} min="0" step="0.01" /></td>
+                                                <td>
+                                                    <input
+                                                        type="number"
+                                                        value={row.rate}
+                                                        onChange={(e) => updateRow(index, 'rate', e.target.value)}
+                                                        min="0"
+                                                        step="0.01"
+                                                        title={belowSelling ? `Below selling rate ₹${sellingRate}` : undefined}
+                                                        style={belowSelling ? { border: '2px solid #dc2626', background: '#fef2f2', color: '#b91c1c', fontWeight: 700 } : undefined}
+                                                    />
+                                                    {belowSelling && (
+                                                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#dc2626', marginTop: '2px', whiteSpace: 'nowrap' }}>
+                                                            ⚠ Below selling ₹{sellingRate}
+                                                        </div>
+                                                    )}
+                                                </td>
                                                 <td><input type="number" value={row.gst_percent} onChange={(e) => updateRow(index, 'gst_percent', e.target.value)} min="0" step="0.01" /></td>
                                                 <td>
                                                     <input type="text" value={row.shape} onChange={(e) => updateRow(index, 'shape', e.target.value)} placeholder="Bottle/Jar" />
