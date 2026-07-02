@@ -64,7 +64,7 @@ export default function Login({ status }: Props) {
                 <div className="login-container">
                     <div className="login-logo">
                         <div className="login-logo-mark">
-                            <span>UBC</span>
+                            <img src="/ubc-logo.svg" alt="UBC" style={{ width: '48px', height: '48px', objectFit: 'contain' }} />
                         </div>
                         <h1>Unicrop Biochem</h1>
                         <p>Agrochemical Order Management Portal</p>
