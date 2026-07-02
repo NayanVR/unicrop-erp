@@ -284,7 +284,7 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
             >
                 <div className="sidebar-brand">
                     <div className="sb-icon">
-                        <img src="/ubc-logo.svg" alt="UBC" style={{ width: '28px', height: '28px', objectFit: 'contain' }} />
+                        <img src="/ubc-logo.png" alt="UBC" style={{ width: '28px', height: '28px', objectFit: 'contain' }} />
                     </div>
                     <div className="sb-text">
                         <h3>Unicrop Biochem</h3>
