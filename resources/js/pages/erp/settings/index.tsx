@@ -47,6 +47,13 @@ type AlertSettings = {
     alert_cooldown_hours: string;
 };
 
+type ReminderSettings = {
+    reminder_enabled: string;
+    reminder_days: string;
+    reminder_channel: string;
+    reminder_message: string;
+};
+
 type BankAccountEntry = {
     id: number;
     name: string;
@@ -61,6 +68,7 @@ type BankAccountEntry = {
 type Props = {
     transports: TransportEntry[];
     alertSettings: AlertSettings;
+    reminderSettings: ReminderSettings;
     packingSizes: PackingSizeEntry[];
     bankAccounts: BankAccountEntry[];
 };
@@ -85,7 +93,7 @@ type BankAccountForm = {
     upi_id: string;
 };
 
-export default function SettingsIndex({ transports, alertSettings, packingSizes, bankAccounts }: Props) {
+export default function SettingsIndex({ transports, alertSettings, reminderSettings, packingSizes, bankAccounts }: Props) {
     const [openCards, setOpenCards] = useState<Record<string, boolean>>({});
     const toggleCard = (key: string) => setOpenCards((prev) => ({ ...prev, [key]: !prev[key] }));
 
@@ -115,6 +123,47 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes,
         alert_msg91_template_id: alertSettings.alert_msg91_template_id ?? '',
         alert_cooldown_hours:    alertSettings.alert_cooldown_hours || '6',
     });
+
+    const [reminderSaving, setReminderSaving] = useState(false);
+    const [reminderTesting, setReminderTesting] = useState(false);
+    const [reminderTestResult, setReminderTestResult] = useState<{ ok: boolean; detail: string } | null>(null);
+    const [reminderTestPhone, setReminderTestPhone] = useState('');
+    const [reminder, setReminder] = useState<ReminderSettings>({
+        reminder_enabled: reminderSettings.reminder_enabled ?? '0',
+        reminder_days:    reminderSettings.reminder_days || '7',
+        reminder_channel: reminderSettings.reminder_channel || 'whatsapp',
+        reminder_message: reminderSettings.reminder_message || 'Dear {customer_name}, your order {order_number} from Unicrop Biochem was confirmed {days} days ago. Kindly clear the pending payment of ₹{amount}. Thank you.',
+    });
+
+    const saveReminderSettings = () => {
+        setReminderSaving(true);
+        router.post('/erp/settings/reminder', { ...reminder }, {
+            preserveScroll: true,
+            onFinish: () => setReminderSaving(false),
+        });
+    };
+
+    const testReminder = async () => {
+        setReminderTesting(true);
+        setReminderTestResult(null);
+        try {
+            const res = await fetch('/erp/settings/reminder/test', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ phone: reminderTestPhone }),
+            });
+            const data = await res.json();
+            setReminderTestResult(data);
+        } catch (e: unknown) {
+            setReminderTestResult({ ok: false, detail: String(e) });
+        } finally {
+            setReminderTesting(false);
+        }
+    };
 
     const saveAlertSettings = () => {
         setAlertSaving(true);
@@ -654,6 +703,123 @@ export default function SettingsIndex({ transports, alertSettings, packingSizes,
                                     {alertTestResult.ok ? '✅ ' : '❌ '}{alertTestResult.detail}
                                 </span>
                             )}
+                        </div>
+                    </div>
+                    </>)}
+                </div>
+
+                {/* Payment Reminders */}
+                <div className="card" style={{ marginTop: '16px' }}>
+                    <div
+                        className={`card-title${openCards.reminder ? ' open' : ''}`}
+                        style={{ marginBottom: openCards.reminder ? '12px' : 0, cursor: 'pointer', justifyContent: 'space-between' }}
+                        onClick={() => toggleCard('reminder')}
+                    >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            💰 Payment Reminders
+                            <span className={`ct-badge ${reminder.reminder_enabled === '1' ? 'teal' : ''}`}>
+                                {reminder.reminder_enabled === '1' ? 'Enabled' : 'Disabled'}
+                            </span>
+                        </span>
+                        <span className="chevron">▶</span>
+                    </div>
+
+                    {openCards.reminder && (<>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '18px' }}>
+                        Automatically send a payment reminder via WhatsApp or SMS to customers a set number of days after their order is confirmed.
+                    </p>
+
+                    <div className="form-grid" style={{ maxWidth: '640px' }}>
+                        {/* Enable toggle */}
+                        <div className="form-group" style={{ gridColumn: '1/-1', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <label style={{ margin: 0, fontWeight: 600 }}>Enable Reminders</label>
+                            <button
+                                type="button"
+                                className={`pill${reminder.reminder_enabled === '1' ? ' active' : ''}`}
+                                style={{ fontSize: '13px' }}
+                                onClick={() => setReminder(r => ({ ...r, reminder_enabled: r.reminder_enabled === '1' ? '0' : '1' }))}
+                            >
+                                {reminder.reminder_enabled === '1' ? '✅ On' : '⬜ Off'}
+                            </button>
+                        </div>
+
+                        {/* Days after confirmation */}
+                        <div className="form-group">
+                            <label>Days After Confirmation</label>
+                            <input
+                                type="number"
+                                min={1} max={365}
+                                value={reminder.reminder_days}
+                                onChange={e => setReminder(r => ({ ...r, reminder_days: e.target.value }))}
+                                placeholder="7"
+                                style={{ maxWidth: '120px' }}
+                            />
+                            <small style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>Send reminder this many days after the order is confirmed.</small>
+                        </div>
+
+                        {/* Channel */}
+                        <div className="form-group">
+                            <label>Channel</label>
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                {(['whatsapp', 'sms', 'both'] as const).map(ch => (
+                                    <button key={ch} type="button" className={`pill${reminder.reminder_channel === ch ? ' active' : ''}`}
+                                        onClick={() => setReminder(r => ({ ...r, reminder_channel: ch }))}>
+                                        {ch === 'whatsapp' ? '💬 WhatsApp' : ch === 'sms' ? '📩 SMS' : '🔀 Both'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Message template */}
+                        <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                            <label>Message Template</label>
+                            <textarea
+                                rows={4}
+                                value={reminder.reminder_message}
+                                onChange={e => setReminder(r => ({ ...r, reminder_message: e.target.value }))}
+                                placeholder="Dear {customer_name}, your order {order_number}..."
+                                style={{ width: '100%', resize: 'vertical' }}
+                            />
+                            <small style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                                Placeholders: <code>{'{customer_name}'}</code>, <code>{'{order_number}'}</code>, <code>{'{company_name}'}</code>, <code>{'{days}'}</code>, <code>{'{amount}'}</code>
+                            </small>
+                        </div>
+
+                        {/* Save */}
+                        <div className="form-group" style={{ gridColumn: '1/-1', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginTop: '4px' }}>
+                            <button className="btn primary" onClick={saveReminderSettings} disabled={reminderSaving}>
+                                {reminderSaving ? 'Saving…' : '💾 Save Reminder Settings'}
+                            </button>
+                        </div>
+
+                        {/* Test */}
+                        <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                            <label>Send Test Reminder</label>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <input
+                                    type="text"
+                                    value={reminderTestPhone}
+                                    onChange={e => setReminderTestPhone(e.target.value)}
+                                    placeholder="e.g. 9876543210"
+                                    style={{ maxWidth: '200px' }}
+                                />
+                                <button className="btn" onClick={testReminder} disabled={reminderTesting || !reminderTestPhone.trim()}>
+                                    {reminderTesting ? 'Sending…' : '🧪 Send Test'}
+                                </button>
+                                {reminderTestResult && (
+                                    <span style={{
+                                        fontSize: '13px',
+                                        color: reminderTestResult.ok ? 'var(--color-success, #16a34a)' : 'var(--color-danger, #dc2626)',
+                                        background: reminderTestResult.ok ? '#f0fdf4' : '#fef2f2',
+                                        padding: '4px 10px',
+                                        borderRadius: '6px',
+                                        border: `1px solid ${reminderTestResult.ok ? '#bbf7d0' : '#fecaca'}`,
+                                    }}>
+                                        {reminderTestResult.ok ? '✅ ' : '❌ '}{reminderTestResult.detail}
+                                    </span>
+                                )}
+                            </div>
+                            <small style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>Uses Twilio credentials from Low Stock Alerts. Sends a sample message with placeholder values.</small>
                         </div>
                     </div>
                     </>)}

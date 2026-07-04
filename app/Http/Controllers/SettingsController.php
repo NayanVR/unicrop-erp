@@ -7,6 +7,7 @@ use App\Models\BankAccount;
 use App\Models\PackingSize;
 use App\Models\Transport;
 use App\Services\LowStockAlertService;
+use App\Services\PaymentReminderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,12 +32,32 @@ class SettingsController extends Controller
         // ensure boolean strings are consistent
         $alertSettings['alert_enabled'] = AppSetting::get('alert_enabled', '0');
 
+        $reminderKeys = [
+            'reminder_enabled', 'reminder_days', 'reminder_channel', 'reminder_message',
+        ];
+
+        $reminderSettings = [];
+        foreach ($reminderKeys as $key) {
+            $reminderSettings[$key] = AppSetting::get($key, '');
+        }
+        $reminderSettings['reminder_enabled'] = AppSetting::get('reminder_enabled', '0');
+        if ($reminderSettings['reminder_days'] === '') {
+            $reminderSettings['reminder_days'] = '7';
+        }
+        if ($reminderSettings['reminder_channel'] === '') {
+            $reminderSettings['reminder_channel'] = 'whatsapp';
+        }
+        if ($reminderSettings['reminder_message'] === '') {
+            $reminderSettings['reminder_message'] = 'Dear {customer_name}, your order {order_number} from Unicrop Biochem was confirmed {days} days ago. Kindly clear the pending payment of ₹{amount}. Thank you.';
+        }
+
         return Inertia::render('erp/settings/index', [
-            'pageTitle'     => 'Settings',
-            'transports'    => Transport::query()->orderBy('type')->orderBy('name')->get(),
-            'alertSettings' => $alertSettings,
-            'packingSizes'  => PackingSize::query()->orderBy('name')->get(),
-            'bankAccounts'  => BankAccount::query()->orderBy('name')->get(),
+            'pageTitle'        => 'Settings',
+            'transports'       => Transport::query()->orderBy('type')->orderBy('name')->get(),
+            'alertSettings'    => $alertSettings,
+            'reminderSettings' => $reminderSettings,
+            'packingSizes'     => PackingSize::query()->orderBy('name')->get(),
+            'bankAccounts'     => BankAccount::query()->orderBy('name')->get(),
         ]);
     }
 
@@ -102,6 +123,34 @@ class SettingsController extends Controller
     {
         $service = new LowStockAlertService();
         $result  = $service->sendTest("🧪 Test alert from UniCrop ERP — your low stock alerts are working!");
+
+        return response()->json($result);
+    }
+
+    public function updateReminderSettings(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'reminder_enabled' => 'boolean',
+            'reminder_days'    => 'nullable|integer|min:1|max:365',
+            'reminder_channel' => 'nullable|in:sms,whatsapp,both',
+            'reminder_message' => 'nullable|string|max:1000',
+        ]);
+
+        $data['reminder_enabled'] = isset($data['reminder_enabled']) && $data['reminder_enabled'] ? '1' : '0';
+
+        AppSetting::setMany($data);
+
+        return redirect()->back()->with('success', 'Reminder settings saved.');
+    }
+
+    public function testReminder(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'phone' => 'required|string|max:20',
+        ]);
+
+        $service = new PaymentReminderService();
+        $result  = $service->sendTest($data['phone']);
 
         return response()->json($result);
     }

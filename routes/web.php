@@ -164,6 +164,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('erp/settings/alert', [SettingsController::class, 'updateAlertSettings'])->name('settings.alert.update');
         Route::post('erp/settings/alert/test', [SettingsController::class, 'testAlert'])->name('settings.alert.test');
 
+        Route::post('erp/settings/reminder', [SettingsController::class, 'updateReminderSettings'])->name('settings.reminder.update');
+        Route::post('erp/settings/reminder/test', [SettingsController::class, 'testReminder'])->name('settings.reminder.test');
+
         Route::post('erp/settings/packing-sizes', [SettingsController::class, 'storePackingSize'])->name('settings.packing-sizes.store');
         Route::patch('erp/settings/packing-sizes/{packingSize}', [SettingsController::class, 'updatePackingSize'])->name('settings.packing-sizes.update');
         Route::delete('erp/settings/packing-sizes/{packingSize}', [SettingsController::class, 'destroyPackingSize'])->name('settings.packing-sizes.destroy');
