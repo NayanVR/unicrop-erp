@@ -7,6 +7,7 @@ type LeaderboardEntry = { userId: number; name: string; orders: number; value: n
 type TopParty        = { company_name: string; orders: number; value: number };
 type OrderRow        = { id: number; order_number: string; company_name: string; total_amount: number; status: string; order_date: string | null; priority: string };
 type PendingRow      = { id: number; order_number: string; company_name: string; total_amount: number; order_date: string | null; priority: string };
+type PendingPayment  = { order_id: number; order_number: string; party_name: string; total_amount: number; paid_amount: number; balance: number; confirmed_at: string };
 
 type PeriodData = {
     myOrders: number;
@@ -22,6 +23,7 @@ type Props = {
     currentUserId: number | null;
     recentOrders: OrderRow[];
     pendingOrders: PendingRow[];
+    pendingPayments: PendingPayment[];
     lowStockProduction: LowStockProduction | null;
 };
 
@@ -51,7 +53,7 @@ const statusStyle: Record<string, { bg: string; color: string; label: string }> 
     submitted:  { bg: '#fef3c7', color: '#b45309', label: 'Pending' },
 };
 
-export default function Dashboard({ salesData, currentUserId, recentOrders, pendingOrders, lowStockProduction }: Props) {
+export default function Dashboard({ salesData, currentUserId, recentOrders, pendingOrders, pendingPayments, lowStockProduction }: Props) {
     const [period, setPeriod] = useState<Period>('thisMonth');
     const data    = salesData[period];
     const prevData = salesData['lastMonth'];
@@ -232,6 +234,66 @@ export default function Dashboard({ salesData, currentUserId, recentOrders, pend
                         </div>
                     )}
                 </div>
+            </div>
+
+            {/* ── Pending Payments ──────────────────────────────────── */}
+            <div className="card" style={{ marginBottom: 20 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>
+                        ⚠ Pending Payments
+                        {pendingPayments.length > 0 && (
+                            <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 700, background: '#fee2e2', color: '#b91c1c', borderRadius: 10, padding: '2px 8px' }}>
+                                {pendingPayments.length}
+                            </span>
+                        )}
+                    </div>
+                </div>
+                {pendingPayments.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '20px 0', color: '#16a34a', fontSize: 13, fontWeight: 600 }}>
+                        ✅ No pending payments
+                    </div>
+                ) : (
+                    <>
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '2px solid var(--border-color, #e5e7eb)' }}>
+                                        <th style={{ textAlign: 'left', padding: '6px 10px', fontWeight: 700, color: 'var(--tx-muted, #6b7280)', fontSize: 12 }}>Party Name</th>
+                                        <th style={{ textAlign: 'left', padding: '6px 10px', fontWeight: 700, color: 'var(--tx-muted, #6b7280)', fontSize: 12 }}>Order #</th>
+                                        <th style={{ textAlign: 'right', padding: '6px 10px', fontWeight: 700, color: 'var(--tx-muted, #6b7280)', fontSize: 12 }}>Order Amount</th>
+                                        <th style={{ textAlign: 'right', padding: '6px 10px', fontWeight: 700, color: 'var(--tx-muted, #6b7280)', fontSize: 12 }}>Paid</th>
+                                        <th style={{ textAlign: 'right', padding: '6px 10px', fontWeight: 700, color: 'var(--tx-muted, #6b7280)', fontSize: 12 }}>Balance Due</th>
+                                        <th style={{ textAlign: 'right', padding: '6px 10px', fontWeight: 700, color: 'var(--tx-muted, #6b7280)', fontSize: 12 }}>Confirmed</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {pendingPayments.map((p) => (
+                                        <Link key={p.order_id} href={`/erp/orders/${p.order_id}`} style={{ display: 'contents', textDecoration: 'none', color: 'inherit' }}>
+                                            <tr style={{ borderBottom: '1px solid var(--border-color, #e5e7eb)', cursor: 'pointer' }}
+                                                className="dash-order-row">
+                                                <td style={{ padding: '9px 10px', fontWeight: 600 }}>{p.party_name}</td>
+                                                <td style={{ padding: '9px 10px', color: 'var(--tx-muted, #6b7280)' }}>#{p.order_number}</td>
+                                                <td style={{ padding: '9px 10px', textAlign: 'right' }}>{fmtFull(Number(p.total_amount))}</td>
+                                                <td style={{ padding: '9px 10px', textAlign: 'right', color: '#16a34a' }}>{fmtFull(Number(p.paid_amount))}</td>
+                                                <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: 700, color: '#dc2626' }}>{fmtFull(Number(p.balance))}</td>
+                                                <td style={{ padding: '9px 10px', textAlign: 'right', color: 'var(--tx-muted, #6b7280)', fontSize: 12 }}>{p.confirmed_at}</td>
+                                            </tr>
+                                        </Link>
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr style={{ borderTop: '2px solid var(--border-color, #e5e7eb)', background: 'var(--bg-paper)' }}>
+                                        <td colSpan={4} style={{ padding: '9px 10px', fontWeight: 700, fontSize: 13 }}>Total Balance Due</td>
+                                        <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: 800, fontSize: 14, color: '#dc2626' }}>
+                                            {fmtFull(pendingPayments.reduce((sum, p) => sum + Number(p.balance), 0))}
+                                        </td>
+                                        <td />
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* ── Bottom grid ───────────────────────────────────────── */}

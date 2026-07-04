@@ -449,12 +449,35 @@ class DashboardController extends Controller
                 'priority'     => $o->priority ?? 'normal',
             ]);
 
+        // Get confirmed orders for this user where total paid < total_amount
+        $pendingPayments = \App\Models\Order::with('party:id,name')
+            ->where('sales_user_id', $user->id)
+            ->where('status', 'confirmed')
+            ->whereNotNull('confirmed_at')
+            ->get(['id', 'order_number', 'company_name', 'party_id', 'total_amount', 'confirmed_at'])
+            ->map(function ($order) {
+                $paid = $order->payments()->sum('amount');
+                $balance = $order->total_amount - $paid;
+                return [
+                    'order_id'     => $order->id,
+                    'order_number' => $order->order_number,
+                    'party_name'   => $order->party?->name ?? $order->company_name,
+                    'total_amount' => $order->total_amount,
+                    'paid_amount'  => $paid,
+                    'balance'      => $balance,
+                    'confirmed_at' => $order->confirmed_at?->format('d M Y'),
+                ];
+            })
+            ->filter(fn($r) => $r['balance'] > 0.01)
+            ->values();
+
         return Inertia::render('erp/dashboard', [
             'pageTitle'          => 'Dashboard',
             'salesData'          => $salesData,
             'currentUserId'      => $user->id,
             'recentOrders'       => $recentOrders,
             'pendingOrders'      => $pendingOrders,
+            'pendingPayments'    => $pendingPayments,
             'lowStockProduction' => $this->lowStockProduction($user),
         ]);
     }
