@@ -130,25 +130,27 @@ export default function ProductsIndex() {
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th>Parent Product (Unicrop)</th>
-                            <th>Child Product</th>
+                            {parentProducts.length > 0 && <th>Parent Product (Unicrop)</th>}
+                            <th>{parentProducts.length === 0 ? 'Product Name' : 'Child Product'}</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {filtered.length === 0 && (
-                            <tr><td colSpan={4} className="empty-row">No products found.</td></tr>
+                            <tr><td colSpan={parentProducts.length > 0 ? 4 : 3} className="empty-row">No products found.</td></tr>
                         )}
                         {filtered.map((p) => (
                             <tr key={p.id}>
-                                <td>
-                                    {p.parent ? (
-                                        <span className="badge badge-green">
-                                            {p.parent.name}{p.parent.packing_size ? ` (${p.parent.packing_size})` : ''}
-                                        </span>
-                                    ) : <span className="text-muted">—</span>}
-                                </td>
+                                {parentProducts.length > 0 && (
+                                    <td>
+                                        {p.parent ? (
+                                            <span className="badge badge-green">
+                                                {p.parent.name}{p.parent.packing_size ? ` (${p.parent.packing_size})` : ''}
+                                            </span>
+                                        ) : <span className="text-muted">—</span>}
+                                    </td>
+                                )}
                                 <td className="font-medium">{p.name}</td>
                                 <td>
                                     <span className={`badge ${p.is_active ? 'badge-teal' : 'badge-gray'}`}>
@@ -174,30 +176,43 @@ export default function ProductsIndex() {
                             <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
                         </div>
                         <form onSubmit={submit} className="modal-form">
-                            <div className="form-group">
-                                <label>Parent Product (Unicrop) *</label>
-                                {parentProducts.length === 0 ? (
-                                    <p className="text-sm text-muted">No parent products available from other companies</p>
-                                ) : (
-                                    <SearchableSelect
-                                        options={[{ value: '', label: '— Select Unicrop product —' }, ...parentProducts.map((p) => ({ value: p.id, label: p.label }))]}
-                                        value={data.parent_product_id}
-                                        onChange={(v) => setData('parent_product_id', v)}
-                                        placeholder="Search Unicrop product..."
+                            {parentProducts.length === 0 ? (
+                                /* Unicrop (mother company) — just a product name */
+                                <div className="form-group">
+                                    <label>Product Name *</label>
+                                    <input
+                                        value={data.name}
+                                        onChange={(e) => setData('name', e.target.value)}
+                                        placeholder="Enter product name"
+                                        required
                                     />
-                                )}
-                                {errors.parent_product_id && <span className="field-error">{errors.parent_product_id}</span>}
-                            </div>
-                            <div className="form-group">
-                                <label>Child Product Name *</label>
-                                <input
-                                    value={data.name}
-                                    onChange={(e) => setData('name', e.target.value)}
-                                    placeholder="This company's product name"
-                                    required
-                                />
-                                {errors.name && <span className="field-error">{errors.name}</span>}
-                            </div>
+                                    {errors.name && <span className="field-error">{errors.name}</span>}
+                                </div>
+                            ) : (
+                                /* Child company — link to a Unicrop (parent) product */
+                                <>
+                                    <div className="form-group">
+                                        <label>Parent Product (Unicrop) *</label>
+                                        <SearchableSelect
+                                            options={[{ value: '', label: '— Select Unicrop product —' }, ...parentProducts.map((p) => ({ value: p.id, label: p.label }))]}
+                                            value={data.parent_product_id}
+                                            onChange={(v) => setData('parent_product_id', v)}
+                                            placeholder="Search Unicrop product..."
+                                        />
+                                        {errors.parent_product_id && <span className="field-error">{errors.parent_product_id}</span>}
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Child Product Name *</label>
+                                        <input
+                                            value={data.name}
+                                            onChange={(e) => setData('name', e.target.value)}
+                                            placeholder="This company's product name"
+                                            required
+                                        />
+                                        {errors.name && <span className="field-error">{errors.name}</span>}
+                                    </div>
+                                </>
+                            )}
                             {editing && (
                                 <div className="form-group">
                                     <label>
