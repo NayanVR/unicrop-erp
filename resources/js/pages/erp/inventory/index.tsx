@@ -1749,6 +1749,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                                                     <StatusBadge m={m} />
                                                                 </div>
                                                                 {m.sku && <div style={{ fontSize: 12, color: 'var(--tx-muted)', fontFamily: 'monospace' }}>{m.sku}</div>}
+                                                                {!isSales && <ExpiryBadge materialId={m.id} />}
                                                                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 13 }}>
                                                                     <div>
                                                                         <span style={{ color: 'var(--tx-muted)', fontSize: 11 }}>Stock</span>
@@ -2710,6 +2711,24 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                     />
                                     {txnForm.errors.notes && <div className="form-error">{txnForm.errors.notes}</div>}
                                 </div>
+                                <div className="form-group">
+                                    <label>MFG Date</label>
+                                    <input
+                                        type="date"
+                                        value={txnForm.data.mfg_date}
+                                        onChange={(e) => txnForm.setData('mfg_date', e.target.value)}
+                                    />
+                                    {txnForm.errors.mfg_date && <div className="form-error">{txnForm.errors.mfg_date}</div>}
+                                </div>
+                                <div className="form-group">
+                                    <label>Expiry Date</label>
+                                    <input
+                                        type="date"
+                                        value={txnForm.data.expiry_date}
+                                        onChange={(e) => txnForm.setData('expiry_date', e.target.value)}
+                                    />
+                                    {txnForm.errors.expiry_date && <div className="form-error">{txnForm.errors.expiry_date}</div>}
+                                </div>
                                 {computedNewStock !== null && (
                                     <div style={{ gridColumn: '1 / -1', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '8px 14px', fontWeight: 600, color: '#1e40af' }}>
                                         New Stock: {fmt(computedNewStock)} {txnTarget?.unit}
@@ -2917,14 +2936,16 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                 <div style={{ overflowX: 'auto' }}>
                                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, tableLayout: 'fixed', border: '1px solid #e5e7eb' }}>
                                         <colgroup>
-                                            <col style={{ width: '22%' }} />
-                                            <col style={{ width: '8%' }} />
-                                            <col style={{ width: '11%' }} />
-                                            <col style={{ width: '7%' }} />
-                                            <col style={{ width: '7%' }} />
+                                            <col style={{ width: '18%' }} />
                                             <col style={{ width: '7%' }} />
                                             <col style={{ width: '9%' }} />
+                                            <col style={{ width: '6%' }} />
+                                            <col style={{ width: '6%' }} />
+                                            <col style={{ width: '6%' }} />
                                             <col style={{ width: '8%' }} />
+                                            <col style={{ width: '6%' }} />
+                                            <col style={{ width: '8%' }} />
+                                            <col style={{ width: '9%' }} />
                                             <col style={{ width: '9%' }} />
                                             <col style={{ width: '3%' }} />
                                         </colgroup>
@@ -2939,6 +2960,8 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                                 <th style={{ padding: '5px 6px', textAlign: 'right', border: '1px solid #d1d5db' }}>Rate (₹)</th>
                                                 <th style={{ padding: '5px 6px', textAlign: 'right', border: '1px solid #d1d5db' }}>GST%</th>
                                                 <th style={{ padding: '5px 6px', textAlign: 'right', border: '1px solid #d1d5db' }}>Amount</th>
+                                                <th style={{ padding: '5px 6px', textAlign: 'left', border: '1px solid #d1d5db' }}>MFG Date</th>
+                                                <th style={{ padding: '5px 6px', textAlign: 'left', border: '1px solid #d1d5db' }}>Expiry Date</th>
                                                 <th style={{ border: '1px solid #d1d5db' }}></th>
                                             </tr>
                                         </thead>
@@ -3005,6 +3028,12 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                                         </td>
                                                         <td style={{ padding: '3px 4px', border: '1px solid #e5e7eb', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap', fontSize: 12 }}>
                                                             {row.amount ? fmtAmt(row.amount) : '—'}
+                                                        </td>
+                                                        <td style={{ padding: '3px 4px', border: '1px solid #e5e7eb' }}>
+                                                            <input type="date" value={row.mfg_date} onChange={(e) => updateBillRow(i, 'mfg_date', e.target.value)} style={{ width: '100%', fontSize: 12 }} />
+                                                        </td>
+                                                        <td style={{ padding: '3px 4px', border: '1px solid #e5e7eb' }}>
+                                                            <input type="date" value={row.expiry_date} onChange={(e) => updateBillRow(i, 'expiry_date', e.target.value)} style={{ width: '100%', fontSize: 12 }} />
                                                         </td>
                                                         <td style={{ padding: '4px 6px', border: '1px solid #e5e7eb', textAlign: 'center' }}>
                                                             <button type="button" className="btn danger sm" onClick={() => removeBillRow(i)}>×</button>
