@@ -36,12 +36,14 @@ export default function ProductsIndex() {
     const { products, unicropProducts, companies, flash } = usePage<PageProps>().props;
     const [showModal, setShowModal] = useState(false);
     const [editing, setEditing] = useState<Product | null>(null);
+    const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
     const [search, setSearch] = useState('');
 
     const { data, setData, post, patch, processing, reset, errors } = useForm(defaultForm);
 
     const openAdd = () => {
         reset();
+        if (selectedCompanyId) setData('company_id', selectedCompanyId);
         setEditing(null);
         setShowModal(true);
     };
@@ -70,18 +72,77 @@ export default function ProductsIndex() {
         router.delete(productsDestroy(p.id).url);
     };
 
+    const selectedCompany = companies.find(c => c.id === selectedCompanyId);
+
+    // Products filtered by selected company + search
     const filtered = products.filter((p) => {
+        if (selectedCompanyId && p.company?.id !== selectedCompanyId) return false;
         if (!search) return true;
         const q = search.toLowerCase();
         return p.name.toLowerCase().includes(q)
-            || (p.company?.name ?? '').toLowerCase().includes(q)
             || (p.parent?.name ?? '').toLowerCase().includes(q);
     });
 
+    // Product count per company
+    const countFor = (companyId: number) => products.filter(p => p.company?.id === companyId).length;
+
+    // If no company selected, show company list
+    if (!selectedCompanyId) {
+        return (
+            <>
+                <div className="page-header">
+                    <h1 className="page-title">Product Mappings</h1>
+                </div>
+
+                {flash?.success && <div className="alert-success">{flash.success}</div>}
+                {flash?.error && <div className="alert-error">{flash.error}</div>}
+
+                {companies.length === 0 ? (
+                    <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
+                        No child companies found. Add companies first.
+                    </div>
+                ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
+                        {companies.map((c) => (
+                            <div
+                                key={c.id}
+                                onClick={() => setSelectedCompanyId(c.id)}
+                                style={{
+                                    background: 'var(--card-bg, #1e293b)',
+                                    border: '1px solid var(--border, #334155)',
+                                    borderRadius: '12px',
+                                    padding: '24px 20px',
+                                    cursor: 'pointer',
+                                    transition: 'border-color 0.15s, transform 0.1s',
+                                }}
+                                onMouseEnter={e => (e.currentTarget.style.borderColor = '#0d9488')}
+                                onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border, #334155)')}
+                            >
+                                <div style={{ fontSize: '32px', marginBottom: '10px' }}>🏢</div>
+                                <div style={{ fontWeight: 700, fontSize: '16px', marginBottom: '6px' }}>{c.name}</div>
+                                <div style={{ color: 'var(--muted)', fontSize: '13px' }}>
+                                    {countFor(c.id)} product{countFor(c.id) !== 1 ? 's' : ''} linked
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </>
+        );
+    }
+
+    // Company selected — show its product mappings
     return (
         <>
             <div className="page-header">
-                <h1 className="page-title">Product Mappings</h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <button
+                        onClick={() => { setSelectedCompanyId(null); setSearch(''); }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: '20px', padding: '0 4px' }}
+                        title="Back to companies"
+                    >←</button>
+                    <h1 className="page-title">{selectedCompany?.name} — Products</h1>
+                </div>
                 <button className="btn-primary" onClick={openAdd}>+ Add Mapping</button>
             </div>
 
@@ -92,7 +153,7 @@ export default function ProductsIndex() {
                 <div className="card-toolbar">
                     <input
                         className="search-input"
-                        placeholder="Search company, product name..."
+                        placeholder="Search product name..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
@@ -101,7 +162,6 @@ export default function ProductsIndex() {
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th>Company</th>
                             <th>Unicrop Product</th>
                             <th>Child Product Name</th>
                             <th>Actions</th>
@@ -109,11 +169,10 @@ export default function ProductsIndex() {
                     </thead>
                     <tbody>
                         {filtered.length === 0 && (
-                            <tr><td colSpan={4} className="empty-row">No product mappings found.</td></tr>
+                            <tr><td colSpan={3} className="empty-row">No product mappings for this company.</td></tr>
                         )}
                         {filtered.map((p) => (
                             <tr key={p.id}>
-                                <td>{p.company?.name ?? <span className="text-muted">—</span>}</td>
                                 <td>
                                     {p.parent ? (
                                         <span className="badge badge-green">
@@ -137,25 +196,26 @@ export default function ProductsIndex() {
                 <div className="modal-overlay open" onClick={() => setShowModal(false)}>
                     <div className="modal" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h2>{editing ? 'Edit Mapping' : 'Add Product Mapping'}</h2>
+                            <h2>{editing ? 'Edit Mapping' : `Add Mapping — ${selectedCompany?.name}`}</h2>
                             <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
                         </div>
                         <form onSubmit={submit} className="modal-form">
-                            <div className="form-group">
-                                <label>Child Company *</label>
-                                <select
-                                    value={data.company_id}
-                                    onChange={(e) => setData('company_id', e.target.value)}
-                                    required
-                                    disabled={!!editing}
-                                >
-                                    <option value="">— Select company —</option>
-                                    {companies.map((c) => (
-                                        <option key={c.id} value={c.id}>{c.name}</option>
-                                    ))}
-                                </select>
-                                {errors.company_id && <span className="field-error">{errors.company_id}</span>}
-                            </div>
+                            {!editing && (
+                                <div className="form-group">
+                                    <label>Child Company *</label>
+                                    <select
+                                        value={data.company_id}
+                                        onChange={(e) => setData('company_id', e.target.value)}
+                                        required
+                                    >
+                                        <option value="">— Select company —</option>
+                                        {companies.map((c) => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                    </select>
+                                    {errors.company_id && <span className="field-error">{errors.company_id}</span>}
+                                </div>
+                            )}
 
                             <div className="form-group">
                                 <label>Unicrop Product *</label>
@@ -179,7 +239,7 @@ export default function ProductsIndex() {
                                 <input
                                     value={data.name}
                                     onChange={(e) => setData('name', e.target.value)}
-                                    placeholder="What this company calls the product"
+                                    placeholder="This company's product name"
                                     required
                                 />
                                 {errors.name && <span className="field-error">{errors.name}</span>}
