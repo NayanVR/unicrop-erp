@@ -147,8 +147,16 @@ class InventoryController extends Controller
             ->get()
             ->map(fn ($r) => ['name' => $r->group_name, 'count' => (int) $r->cnt]);
 
+        // Get nearest upcoming expiry dates per material
+        $expiryMap = $isSales ? [] : \App\Models\InventoryTransaction::whereNotNull('expiry_date')
+            ->where('expiry_date', '>=', now()->toDateString())
+            ->orderBy('expiry_date')
+            ->get(['raw_material_id', 'expiry_date'])
+            ->groupBy('raw_material_id')
+            ->map(fn ($group) => $group->first()->expiry_date->format('Y-m-d'));
+
         return Inertia::render('erp/inventory/index', array_merge(
-            compact('materials', 'pendingMaterials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats', 'vendors', 'inventoryCategories', 'bomOutputMap', 'fillingOutputMap', 'godowns', 'finishGoodGroups'),
+            compact('materials', 'pendingMaterials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats', 'vendors', 'inventoryCategories', 'bomOutputMap', 'fillingOutputMap', 'godowns', 'finishGoodGroups', 'expiryMap'),
             ['pageTitle' => 'Inventory']
         ));
     }
@@ -327,6 +335,8 @@ class InventoryController extends Controller
             'cost_per_unit' => 'nullable|numeric|min:0',
             'reference'     => 'nullable|string|max:255',
             'notes'         => 'nullable|string|max:500',
+            'mfg_date'      => 'nullable|date',
+            'expiry_date'   => 'nullable|date',
         ]);
 
         return DB::transaction(function () use ($data, $material, $request) {
@@ -351,6 +361,8 @@ class InventoryController extends Controller
                 'cost_per_unit'   => $data['cost_per_unit'] ?? null,
                 'reference'       => $data['reference'] ?? null,
                 'notes'           => $data['notes'] ?? null,
+                'mfg_date'        => $data['mfg_date'] ?? null,
+                'expiry_date'     => $data['expiry_date'] ?? null,
             ]);
 
             $material->update(['stock_qty' => $new]);
@@ -414,6 +426,8 @@ class InventoryController extends Controller
             'items.*.rate'             => 'nullable|numeric|min:0',
             'items.*.gst'              => 'nullable|numeric|min:0|max:100',
             'items.*.amount'           => 'nullable|numeric|min:0',
+            'items.*.mfg_date'         => 'nullable|date',
+            'items.*.expiry_date'      => 'nullable|date',
         ]);
 
         if (empty($data['vendor_name']) && empty($data['party_id'])) {
@@ -500,6 +514,8 @@ class InventoryController extends Controller
                     'rate'                       => $item['rate'] ?? 0,
                     'gst'                        => $item['gst'] ?? 0,
                     'amount'                     => $item['amount'] ?? 0,
+                    'mfg_date'                   => $item['mfg_date'] ?? null,
+                    'expiry_date'                => $item['expiry_date'] ?? null,
                 ]);
 
                 if ($addToStock && (float) $item['qty'] > 0) {
@@ -521,6 +537,8 @@ class InventoryController extends Controller
                         'previous_stock'  => $previous,
                         'new_stock'       => $new,
                         'reference'       => $billNumber,
+                        'mfg_date'        => $item['mfg_date'] ?? null,
+                        'expiry_date'     => $item['expiry_date'] ?? null,
                     ]);
 
                     if (! empty($data['godown_id'])) {

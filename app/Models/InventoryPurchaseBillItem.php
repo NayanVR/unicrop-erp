@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['inventory_purchase_bill_id', 'raw_material_id', 'material_name', 'sku', 'category', 'hsn', 'qty', 'unit', 'rate', 'gst', 'amount'])]
+#[Fillable(['inventory_purchase_bill_id', 'raw_material_id', 'material_name', 'sku', 'category', 'hsn', 'qty', 'unit', 'rate', 'gst', 'amount', 'mfg_date', 'expiry_date'])]
 class InventoryPurchaseBillItem extends Model
 {
     /**
@@ -19,6 +19,8 @@ class InventoryPurchaseBillItem extends Model
             'rate' => 'decimal:2',
             'gst' => 'decimal:2',
             'amount' => 'decimal:2',
+            'mfg_date' => 'date',
+            'expiry_date' => 'date',
         ];
     }
 

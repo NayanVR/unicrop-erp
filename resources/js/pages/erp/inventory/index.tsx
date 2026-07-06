@@ -166,6 +166,7 @@ type Props = {
     fillingOutputMap: Record<string, string[]>;
     godowns: Godown[];
     finishGoodGroups: FinishGoodGroup[];
+    expiryMap: Record<string, string>;
 };
 
 // ── Route constants ───────────────────────────────────────────────────────────
@@ -362,7 +363,7 @@ function SupplierField({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function InventoryIndex({ materials, pendingMaterials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomOutputMap, fillingOutputMap, godowns, finishGoodGroups }: Props) {
+export default function InventoryIndex({ materials, pendingMaterials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomOutputMap, fillingOutputMap, godowns, finishGoodGroups, expiryMap }: Props) {
     const { auth, flash } = usePage<{ auth: Auth; flash?: { success?: string; error?: string } }>().props;
     const role = auth.user?.role ?? auth.user?.roles?.[0]?.slug ?? '';
     const canSeeCost      = role === 'admin' || auth.user?.cost_access === true;
@@ -577,7 +578,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
     });
     const [billFile, setBillFile] = useState<File | null>(null);
     const [billRows, setBillRows] = useState<
-        { raw_material_id: string; material_name: string; matSearch: string; sku: string; category: string; hsn: string; qty: string; unit: string; rate: string; gst: string; amount: string }[]
+        { raw_material_id: string; material_name: string; matSearch: string; sku: string; category: string; hsn: string; qty: string; unit: string; rate: string; gst: string; amount: string; mfg_date: string; expiry_date: string }[]
     >([]);
     const [billProcessing, setBillProcessing] = useState(false);
     const [billMatDropdown, setBillMatDropdown] = useState<number | null>(null);
@@ -692,6 +693,8 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
         cost_per_unit: '',
         reference: '',
         notes: '',
+        mfg_date: '',
+        expiry_date: '',
     });
 
     // Reorder form
@@ -922,7 +925,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
     const addBillRow = () => {
         setBillRows((prev) => [
             ...prev,
-            { raw_material_id: '', material_name: '', matSearch: '', sku: '', category: '', hsn: '', qty: '', unit: 'pcs', rate: '', gst: '18', amount: '' },
+            { raw_material_id: '', material_name: '', matSearch: '', sku: '', category: '', hsn: '', qty: '', unit: 'pcs', rate: '', gst: '18', amount: '', mfg_date: '', expiry_date: '' },
         ]);
     };
 
@@ -954,6 +957,8 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                     rate: rate ? String(rate) : '',
                     gst: String(gst),
                     amount,
+                    mfg_date: '',
+                    expiry_date: '',
                 },
             ];
         });
@@ -1077,7 +1082,9 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
         billRows.forEach((row, i) => {
             const { raw_material_id, matSearch: _ms, ...rest } = row;
             if (raw_material_id) fd.append(`items[${i}][raw_material_id]`, raw_material_id);
-            Object.entries(rest).forEach(([k, v]) => fd.append(`items[${i}][${k}]`, String(v)));
+            Object.entries(rest).forEach(([k, v]) => {
+                if (v !== '') fd.append(`items[${i}][${k}]`, String(v));
+            });
         });
         setBillProcessing(true);
         router.post(ROUTES.storePurchaseBill, fd, {
@@ -1195,6 +1202,27 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
             preserveScroll: true,
             onSuccess: () => setPackModal(false),
         });
+    };
+
+    // ── Expiry badge helper ───────────────────────────────────────────────────
+
+    const ExpiryBadge = ({ materialId }: { materialId: number }) => {
+        const dateStr = expiryMap[String(materialId)];
+        if (!dateStr) return null;
+        const expiry = new Date(dateStr);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const diffDays = Math.floor((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        const label = `Exp: ${expiry.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+        let bg = '#dcfce7'; let color = '#15803d'; let border = '#86efac';
+        if (diffDays < 0) { bg = '#fee2e2'; color = '#dc2626'; border = '#fca5a5'; }
+        else if (diffDays < 30) { bg = '#fee2e2'; color = '#dc2626'; border = '#fca5a5'; }
+        else if (diffDays < 90) { bg = '#fff7ed'; color = '#c2410c'; border = '#fdba74'; }
+        return (
+            <span style={{ fontSize: 11, fontWeight: 600, background: bg, color, border: `1px solid ${border}`, borderRadius: 5, padding: '1px 7px', whiteSpace: 'nowrap' }}>
+                {diffDays < 0 ? '⚠ Expired' : '🗓'} {label}
+            </span>
+        );
     };
 
     // ── Status badge helper ───────────────────────────────────────────────────
@@ -1788,7 +1816,10 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                             <td>{m.category ?? <span style={{ color: '#9ca3af' }}>—</span>}</td>
                                             <td>{fmt(m.stock_qty)} {m.unit}</td>
                                             {!isSales && <td>{fmt(m.min_stock)}</td>}
-                                            <td><StatusBadge m={m} /></td>
+                                            <td>
+                                                <StatusBadge m={m} />
+                                                {!isSales && <div style={{ marginTop: 3 }}><ExpiryBadge materialId={m.id} /></div>}
+                                            </td>
                                             {canSeeCost && <td>{fmtAmt(m.cost_per_unit)}</td>}
                                             {canSeeCost && <td>{fmtAmt(Number(m.stock_qty) * Number(m.cost_per_unit))}</td>}
                                             <td>{fmtAmt(m.selling_rate)}</td>
