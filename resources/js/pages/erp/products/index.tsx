@@ -8,53 +8,32 @@ import { useState } from 'react';
 import { ModalPortal } from '@/components/modal-portal';
 import SearchableSelect from '@/components/searchable-select';
 
-type RawMaterial = { id: number; name: string };
-type FinishedGood = { id: number; name: string };
+type Company = { id: number; name: string };
+type UnicropProduct = { id: number; name: string; packing_size: string | null };
 
 type Product = {
     id: number;
-    raw_material_id: number | null;
-    finished_good_id: number | null;
-    parent_product_id: number | null;
     name: string;
-    our_brand: string | null;
-    sku: string | null;
-    hsn_code: string | null;
-    gst_percent: string | number;
-    category: string | null;
-    packing_size: string | null;
-    is_active: boolean;
-    raw_material: RawMaterial | null;
-    finished_good: FinishedGood | null;
-    parent?: { id: number; name: string; our_brand: string; packing_size: string } | null;
+    parent_product_id: number | null;
+    company?: Company | null;
+    parent?: { id: number; name: string; packing_size: string | null } | null;
 };
-
-type ParentProduct = { id: number; label: string; name: string; our_brand: string; packing_size: string };
 
 type PageProps = {
     products: Product[];
-    rawMaterials: RawMaterial[];
-    finishedGoods: FinishedGood[];
-    parentProducts: ParentProduct[];
+    unicropProducts: UnicropProduct[];
+    companies: Company[];
     flash?: { success?: string; error?: string };
 };
 
 const defaultForm = {
-    raw_material_id: '',
-    finished_good_id: '',
-    parent_product_id: '' as string | number,
+    company_id: '' as string | number,
     name: '',
-    our_brand: '',
-    sku: '',
-    hsn_code: '',
-    gst_percent: '18',
-    category: '',
-    packing_size: '',
-    is_active: true,
+    parent_product_id: '' as string | number,
 };
 
 export default function ProductsIndex() {
-    const { products, rawMaterials, finishedGoods, parentProducts, flash } = usePage<PageProps>().props;
+    const { products, unicropProducts, companies, flash } = usePage<PageProps>().props;
     const [showModal, setShowModal] = useState(false);
     const [editing, setEditing] = useState<Product | null>(null);
     const [search, setSearch] = useState('');
@@ -70,17 +49,9 @@ export default function ProductsIndex() {
     const openEdit = (p: Product) => {
         setEditing(p);
         setData({
-            raw_material_id: p.raw_material_id?.toString() ?? '',
-            finished_good_id: p.finished_good_id?.toString() ?? '',
-            parent_product_id: p.parent_product_id ?? '',
+            company_id: p.company?.id ?? '',
             name: p.name,
-            our_brand: p.our_brand ?? '',
-            sku: p.sku ?? '',
-            hsn_code: p.hsn_code ?? '',
-            gst_percent: p.gst_percent.toString(),
-            category: p.category ?? '',
-            packing_size: p.packing_size ?? '',
-            is_active: p.is_active,
+            parent_product_id: p.parent_product_id ?? '',
         });
         setShowModal(true);
     };
@@ -95,7 +66,7 @@ export default function ProductsIndex() {
     };
 
     const deleteProduct = (p: Product) => {
-        if (!confirm(`Delete product "${p.name}"?`)) return;
+        if (!confirm(`Delete mapping for "${p.name}"?`)) return;
         router.delete(productsDestroy(p.id).url);
     };
 
@@ -103,15 +74,15 @@ export default function ProductsIndex() {
         if (!search) return true;
         const q = search.toLowerCase();
         return p.name.toLowerCase().includes(q)
-            || (p.our_brand ?? '').toLowerCase().includes(q)
-            || (p.sku ?? '').toLowerCase().includes(q);
+            || (p.company?.name ?? '').toLowerCase().includes(q)
+            || (p.parent?.name ?? '').toLowerCase().includes(q);
     });
 
     return (
         <>
             <div className="page-header">
-                <h1 className="page-title">Products</h1>
-                <button className="btn-primary" onClick={openAdd}>+ Add Product</button>
+                <h1 className="page-title">Product Mappings</h1>
+                <button className="btn-primary" onClick={openAdd}>+ Add Mapping</button>
             </div>
 
             {flash?.success && <div className="alert-success">{flash.success}</div>}
@@ -121,7 +92,7 @@ export default function ProductsIndex() {
                 <div className="card-toolbar">
                     <input
                         className="search-input"
-                        placeholder="Search name, brand or SKU..."
+                        placeholder="Search company, product name..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
@@ -130,33 +101,27 @@ export default function ProductsIndex() {
                 <table className="data-table">
                     <thead>
                         <tr>
-                            {parentProducts.length > 0 && <th>Parent Product (Unicrop)</th>}
-                            <th>{parentProducts.length === 0 ? 'Product Name' : 'Child Product'}</th>
-                            <th>Status</th>
+                            <th>Company</th>
+                            <th>Unicrop Product</th>
+                            <th>Child Product Name</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {filtered.length === 0 && (
-                            <tr><td colSpan={parentProducts.length > 0 ? 4 : 3} className="empty-row">No products found.</td></tr>
+                            <tr><td colSpan={4} className="empty-row">No product mappings found.</td></tr>
                         )}
                         {filtered.map((p) => (
                             <tr key={p.id}>
-                                {parentProducts.length > 0 && (
-                                    <td>
-                                        {p.parent ? (
-                                            <span className="badge badge-green">
-                                                {p.parent.name}{p.parent.packing_size ? ` (${p.parent.packing_size})` : ''}
-                                            </span>
-                                        ) : <span className="text-muted">—</span>}
-                                    </td>
-                                )}
-                                <td className="font-medium">{p.name}</td>
+                                <td>{p.company?.name ?? <span className="text-muted">—</span>}</td>
                                 <td>
-                                    <span className={`badge ${p.is_active ? 'badge-teal' : 'badge-gray'}`}>
-                                        {p.is_active ? 'Active' : 'Inactive'}
-                                    </span>
+                                    {p.parent ? (
+                                        <span className="badge badge-green">
+                                            {p.parent.name}{p.parent.packing_size ? ` (${p.parent.packing_size})` : ''}
+                                        </span>
+                                    ) : <span className="text-muted">—</span>}
                                 </td>
+                                <td className="font-medium">{p.name}</td>
                                 <td className="action-cell">
                                     <button className="btn-icon" onClick={() => openEdit(p)} title="Edit">✏️</button>
                                     <button className="btn-icon btn-danger-icon" onClick={() => deleteProduct(p)} title="Delete">🗑️</button>
@@ -172,58 +137,58 @@ export default function ProductsIndex() {
                 <div className="modal-overlay open" onClick={() => setShowModal(false)}>
                     <div className="modal" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h2>{editing ? 'Edit Product' : 'Add Product'}</h2>
+                            <h2>{editing ? 'Edit Mapping' : 'Add Product Mapping'}</h2>
                             <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
                         </div>
                         <form onSubmit={submit} className="modal-form">
-                            {parentProducts.length === 0 ? (
-                                /* Unicrop (mother company) — just a product name */
-                                <div className="form-group">
-                                    <label>Product Name *</label>
-                                    <input
-                                        value={data.name}
-                                        onChange={(e) => setData('name', e.target.value)}
-                                        placeholder="Enter product name"
-                                        required
-                                    />
-                                    {errors.name && <span className="field-error">{errors.name}</span>}
-                                </div>
-                            ) : (
-                                /* Child company — link to a Unicrop (parent) product */
-                                <>
-                                    <div className="form-group">
-                                        <label>Parent Product (Unicrop) *</label>
-                                        <SearchableSelect
-                                            options={[{ value: '', label: '— Select Unicrop product —' }, ...parentProducts.map((p) => ({ value: p.id, label: p.label }))]}
-                                            value={data.parent_product_id}
-                                            onChange={(v) => setData('parent_product_id', v)}
-                                            placeholder="Search Unicrop product..."
-                                        />
-                                        {errors.parent_product_id && <span className="field-error">{errors.parent_product_id}</span>}
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Child Product Name *</label>
-                                        <input
-                                            value={data.name}
-                                            onChange={(e) => setData('name', e.target.value)}
-                                            placeholder="This company's product name"
-                                            required
-                                        />
-                                        {errors.name && <span className="field-error">{errors.name}</span>}
-                                    </div>
-                                </>
-                            )}
-                            {editing && (
-                                <div className="form-group">
-                                    <label>
-                                        <input type="checkbox" checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} /> Active
-                                    </label>
-                                </div>
-                            )}
+                            <div className="form-group">
+                                <label>Child Company *</label>
+                                <select
+                                    value={data.company_id}
+                                    onChange={(e) => setData('company_id', e.target.value)}
+                                    required
+                                    disabled={!!editing}
+                                >
+                                    <option value="">— Select company —</option>
+                                    {companies.map((c) => (
+                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                </select>
+                                {errors.company_id && <span className="field-error">{errors.company_id}</span>}
+                            </div>
+
+                            <div className="form-group">
+                                <label>Unicrop Product *</label>
+                                <SearchableSelect
+                                    options={[
+                                        { value: '', label: '— Select Unicrop product —' },
+                                        ...unicropProducts.map((p) => ({
+                                            value: p.id,
+                                            label: p.packing_size ? `${p.name} (${p.packing_size})` : p.name,
+                                        })),
+                                    ]}
+                                    value={data.parent_product_id}
+                                    onChange={(v) => setData('parent_product_id', v)}
+                                    placeholder="Search Unicrop product..."
+                                />
+                                {errors.parent_product_id && <span className="field-error">{errors.parent_product_id}</span>}
+                            </div>
+
+                            <div className="form-group">
+                                <label>Child Product Name *</label>
+                                <input
+                                    value={data.name}
+                                    onChange={(e) => setData('name', e.target.value)}
+                                    placeholder="What this company calls the product"
+                                    required
+                                />
+                                {errors.name && <span className="field-error">{errors.name}</span>}
+                            </div>
+
                             <div className="modal-actions">
                                 <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
                                 <button type="submit" className="btn-primary" disabled={processing}>
-                                    {processing ? 'Saving…' : editing ? 'Update' : 'Add Product'}
+                                    {processing ? 'Saving…' : editing ? 'Update' : 'Add Mapping'}
                                 </button>
                             </div>
                         </form>
