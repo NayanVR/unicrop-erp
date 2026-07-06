@@ -141,9 +141,9 @@ export default function ProductsIndex() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <button
                         onClick={() => { setSelectedCompanyId(null); setSearch(''); }}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: '20px', padding: '0 4px' }}
-                        title="Back to companies"
-                    >←</button>
+                        className="btn-secondary"
+                        style={{ padding: '6px 14px', fontSize: '14px' }}
+                    >← Back</button>
                     <h1 className="page-title">{selectedCompany?.name} — Products</h1>
                 </div>
                 <button className="btn-primary" onClick={openAdd}>+ Add Mapping</button>
