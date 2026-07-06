@@ -14,9 +14,9 @@ type UnicropProduct = { id: number; name: string; packing_size: string | null };
 type Product = {
     id: number;
     name: string;
-    parent_product_id: number | null;
+    finished_good_id: number | null;
     company?: Company | null;
-    parent?: { id: number; name: string; packing_size: string | null } | null;
+    finished_good?: { id: number; name: string } | null;
 };
 
 type PageProps = {
@@ -29,7 +29,7 @@ type PageProps = {
 const defaultForm = {
     company_id: '' as string | number,
     name: '',
-    parent_product_id: '' as string | number,
+    finished_good_id: '' as string | number,
 };
 
 export default function ProductsIndex() {
@@ -53,7 +53,7 @@ export default function ProductsIndex() {
         setData({
             company_id: p.company?.id ?? '',
             name: p.name,
-            parent_product_id: p.parent_product_id ?? '',
+            finished_good_id: p.finished_good_id ?? '',
         });
         setShowModal(true);
     };
@@ -80,7 +80,7 @@ export default function ProductsIndex() {
         if (!search) return true;
         const q = search.toLowerCase();
         return p.name.toLowerCase().includes(q)
-            || (p.parent?.name ?? '').toLowerCase().includes(q);
+            || (p.finished_good?.name ?? '').toLowerCase().includes(q);
     });
 
     // Product count per company
@@ -174,10 +174,8 @@ export default function ProductsIndex() {
                         {filtered.map((p) => (
                             <tr key={p.id}>
                                 <td>
-                                    {p.parent ? (
-                                        <span className="badge badge-green">
-                                            {p.parent.name}{p.parent.packing_size ? ` (${p.parent.packing_size})` : ''}
-                                        </span>
+                                    {p.finished_good ? (
+                                        <span className="badge badge-green">{p.finished_good.name}</span>
                                     ) : <span className="text-muted">—</span>}
                                 </td>
                                 <td className="font-medium">{p.name}</td>
@@ -210,11 +208,11 @@ export default function ProductsIndex() {
                                             label: p.packing_size ? `${p.name} (${p.packing_size})` : p.name,
                                         })),
                                     ]}
-                                    value={data.parent_product_id}
-                                    onChange={(v) => setData('parent_product_id', v)}
+                                    value={data.finished_good_id}
+                                    onChange={(v) => setData('finished_good_id', v)}
                                     placeholder="Search Unicrop product..."
                                 />
-                                {errors.parent_product_id && <span className="field-error">{errors.parent_product_id}</span>}
+                                {errors.finished_good_id && <span className="field-error">{errors.finished_good_id}</span>}
                             </div>
 
                             <div className="form-group">
