@@ -200,23 +200,6 @@ export default function ProductsIndex() {
                             <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
                         </div>
                         <form onSubmit={submit} className="modal-form">
-                            {!editing && (
-                                <div className="form-group">
-                                    <label>Child Company *</label>
-                                    <select
-                                        value={data.company_id}
-                                        onChange={(e) => setData('company_id', e.target.value)}
-                                        required
-                                    >
-                                        <option value="">— Select company —</option>
-                                        {companies.map((c) => (
-                                            <option key={c.id} value={c.id}>{c.name}</option>
-                                        ))}
-                                    </select>
-                                    {errors.company_id && <span className="field-error">{errors.company_id}</span>}
-                                </div>
-                            )}
-
                             <div className="form-group">
                                 <label>Unicrop Product *</label>
                                 <SearchableSelect
