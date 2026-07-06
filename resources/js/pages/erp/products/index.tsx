@@ -15,6 +15,7 @@ type Product = {
     id: number;
     raw_material_id: number | null;
     finished_good_id: number | null;
+    parent_product_id: number | null;
     name: string;
     our_brand: string | null;
     sku: string | null;
@@ -25,18 +26,23 @@ type Product = {
     is_active: boolean;
     raw_material: RawMaterial | null;
     finished_good: FinishedGood | null;
+    parent?: { id: number; name: string; our_brand: string; packing_size: string } | null;
 };
+
+type ParentProduct = { id: number; label: string; name: string; our_brand: string; packing_size: string };
 
 type PageProps = {
     products: Product[];
     rawMaterials: RawMaterial[];
     finishedGoods: FinishedGood[];
+    parentProducts: ParentProduct[];
     flash?: { success?: string; error?: string };
 };
 
 const defaultForm = {
     raw_material_id: '',
     finished_good_id: '',
+    parent_product_id: '' as string | number,
     name: '',
     our_brand: '',
     sku: '',
@@ -48,7 +54,7 @@ const defaultForm = {
 };
 
 export default function ProductsIndex() {
-    const { products, rawMaterials, finishedGoods, flash } = usePage<PageProps>().props;
+    const { products, rawMaterials, finishedGoods, parentProducts, flash } = usePage<PageProps>().props;
     const [showModal, setShowModal] = useState(false);
     const [editing, setEditing] = useState<Product | null>(null);
     const [search, setSearch] = useState('');
@@ -66,6 +72,7 @@ export default function ProductsIndex() {
         setData({
             raw_material_id: p.raw_material_id?.toString() ?? '',
             finished_good_id: p.finished_good_id?.toString() ?? '',
+            parent_product_id: p.parent_product_id ?? '',
             name: p.name,
             our_brand: p.our_brand ?? '',
             sku: p.sku ?? '',
@@ -128,6 +135,7 @@ export default function ProductsIndex() {
                             <th>SKU</th>
                             <th>Packing Size</th>
                             <th>Linked To</th>
+                            <th>Parent Product</th>
                             <th>GST %</th>
                             <th>Status</th>
                             <th>Actions</th>
@@ -135,7 +143,7 @@ export default function ProductsIndex() {
                     </thead>
                     <tbody>
                         {filtered.length === 0 && (
-                            <tr><td colSpan={8} className="empty-row">No products found.</td></tr>
+                            <tr><td colSpan={9} className="empty-row">No products found.</td></tr>
                         )}
                         {filtered.map((p) => (
                             <tr key={p.id}>
@@ -145,6 +153,13 @@ export default function ProductsIndex() {
                                 <td>{p.packing_size ?? '—'}</td>
                                 <td>
                                     {p.raw_material ? `Raw: ${p.raw_material.name}` : p.finished_good ? `FG: ${p.finished_good.name}` : '—'}
+                                </td>
+                                <td>
+                                    {p.parent ? (
+                                        <span className="badge badge-green" title={p.parent.name}>
+                                            {p.parent.name}{p.parent.packing_size ? ` (${p.parent.packing_size})` : ''}
+                                        </span>
+                                    ) : '—'}
                                 </td>
                                 <td>{Number(p.gst_percent).toFixed(2)}%</td>
                                 <td>
@@ -226,6 +241,19 @@ export default function ProductsIndex() {
                             <div className="form-group">
                                 <label>Category</label>
                                 <input value={data.category} onChange={(e) => setData('category', e.target.value)} />
+                            </div>
+                            <div className="form-group">
+                                <label>Parent Product (Unicrop)</label>
+                                {parentProducts.length === 0 ? (
+                                    <p className="text-sm text-muted">No parent products available</p>
+                                ) : (
+                                    <SearchableSelect
+                                        options={[{ value: '', label: '— None —' }, ...parentProducts.map((p) => ({ value: p.id, label: p.label }))]}
+                                        value={data.parent_product_id}
+                                        onChange={(v) => setData('parent_product_id', v)}
+                                        placeholder="Select Unicrop product to link..."
+                                    />
+                                )}
                             </div>
                             {editing && (
                                 <div className="form-group">

@@ -16,14 +16,28 @@ class ProductController extends Controller
 {
     public function index(): Response
     {
-        $products = Product::with(['rawMaterial:id,name', 'finishedGood:id,name'])
+        $products = Product::with(['rawMaterial:id,name', 'finishedGood:id,name', 'parent:id,name,our_brand,packing_size'])
             ->latest()
             ->get();
 
         $rawMaterials = RawMaterial::where('is_active', true)->get(['id', 'name']);
         $finishedGoods = FinishedGood::latest()->get(['id', 'name']);
 
-        return Inertia::render('erp/products/index', compact('products', 'rawMaterials', 'finishedGoods'));
+        $currentCompanyId = app(CurrentCompany::class)->id();
+        $parentProducts = Product::withoutGlobalScopes()
+            ->where('company_id', '!=', $currentCompanyId)
+            ->where('is_active', true)
+            ->with('company:id,name')
+            ->get(['id', 'company_id', 'name', 'our_brand', 'packing_size'])
+            ->map(fn($p) => [
+                'id' => $p->id,
+                'label' => "[{$p->company->name}] {$p->name} ({$p->packing_size})",
+                'name' => $p->name,
+                'our_brand' => $p->our_brand,
+                'packing_size' => $p->packing_size,
+            ]);
+
+        return Inertia::render('erp/products/index', compact('products', 'rawMaterials', 'finishedGoods', 'parentProducts'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -77,6 +91,7 @@ class ProductController extends Controller
             'category' => 'nullable|string|max:100',
             'packing_size' => 'nullable|string|max:100',
             'is_active' => 'boolean',
+            'parent_product_id' => 'nullable|integer|exists:products,id',
         ]);
 
         return $data;
