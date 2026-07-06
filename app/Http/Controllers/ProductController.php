@@ -27,6 +27,15 @@ class ProductController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        // Each child company's finished goods (for child product dropdown)
+        $companyIds = $companies->pluck('id');
+        $childProducts = FinishedGood::withoutGlobalScopes()
+            ->whereIn('company_id', $companyIds)
+            ->orderBy('name')
+            ->get(['id', 'company_id', 'name'])
+            ->groupBy('company_id')
+            ->map(fn($items) => $items->values());
+
         // All child-company product mappings (products linked to a finished good)
         $products = Product::withoutGlobalScopes()
             ->whereNotNull('finished_good_id')
@@ -35,7 +44,7 @@ class ProductController extends Controller
             ->latest()
             ->get();
 
-        return Inertia::render('erp/products/index', compact('products', 'unicropProducts', 'companies'));
+        return Inertia::render('erp/products/index', compact('products', 'unicropProducts', 'companies', 'childProducts'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -43,10 +52,10 @@ class ProductController extends Controller
         $data = $this->validateProduct($request);
 
         $product = new Product();
-        $product->company_id = $data['company_id'];
-        $product->name = $data['name'];
+        $product->company_id       = $data['company_id'];
+        $product->name             = $data['name'];
         $product->finished_good_id = $data['finished_good_id'];
-        $product->gst_percent = 18;
+        $product->gst_percent      = 18;
         $product->save();
 
         return redirect()->back()->with('success', 'Product mapping added.');

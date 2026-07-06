@@ -19,10 +19,13 @@ type Product = {
     finished_good?: { id: number; name: string } | null;
 };
 
+type ChildProduct = { id: number; company_id: number; name: string };
+
 type PageProps = {
     products: Product[];
     unicropProducts: UnicropProduct[];
     companies: Company[];
+    childProducts: Record<string, ChildProduct[]>;
     flash?: { success?: string; error?: string };
 };
 
@@ -33,7 +36,7 @@ const defaultForm = {
 };
 
 export default function ProductsIndex() {
-    const { products, unicropProducts, companies, flash } = usePage<PageProps>().props;
+    const { products, unicropProducts, companies, childProducts, flash } = usePage<PageProps>().props;
     const [showModal, setShowModal] = useState(false);
     const [editing, setEditing] = useState<Product | null>(null);
     const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
@@ -216,13 +219,26 @@ export default function ProductsIndex() {
                             </div>
 
                             <div className="form-group">
-                                <label>Child Product Name *</label>
-                                <input
-                                    value={data.name}
-                                    onChange={(e) => setData('name', e.target.value)}
-                                    placeholder="This company's product name"
-                                    required
-                                />
+                                <label>Child Product *</label>
+                                {(() => {
+                                    const cid = String(data.company_id || selectedCompanyId || '');
+                                    const opts = childProducts[cid] ?? [];
+                                    return opts.length === 0 ? (
+                                        <p style={{ color: 'var(--muted)', fontSize: '13px' }}>
+                                            No finished goods found for this company.
+                                        </p>
+                                    ) : (
+                                        <SearchableSelect
+                                            options={[
+                                                { value: '', label: '— Select child product —' },
+                                                ...opts.map((p) => ({ value: p.name, label: p.name })),
+                                            ]}
+                                            value={data.name}
+                                            onChange={(v) => setData('name', String(v))}
+                                            placeholder="Search child product..."
+                                        />
+                                    );
+                                })()}
                                 {errors.name && <span className="field-error">{errors.name}</span>}
                             </div>
 
