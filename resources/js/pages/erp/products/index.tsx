@@ -130,38 +130,26 @@ export default function ProductsIndex() {
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Brand</th>
-                            <th>SKU</th>
-                            <th>Packing Size</th>
-                            <th>Linked To</th>
-                            <th>Parent Product</th>
-                            <th>GST %</th>
+                            <th>Parent Product (Unicrop)</th>
+                            <th>Child Product</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {filtered.length === 0 && (
-                            <tr><td colSpan={9} className="empty-row">No products found.</td></tr>
+                            <tr><td colSpan={4} className="empty-row">No products found.</td></tr>
                         )}
                         {filtered.map((p) => (
                             <tr key={p.id}>
-                                <td className="font-medium">{p.name}</td>
-                                <td>{p.our_brand ?? '—'}</td>
-                                <td><code>{p.sku ?? '—'}</code></td>
-                                <td>{p.packing_size ?? '—'}</td>
-                                <td>
-                                    {p.raw_material ? `Raw: ${p.raw_material.name}` : p.finished_good ? `FG: ${p.finished_good.name}` : '—'}
-                                </td>
                                 <td>
                                     {p.parent ? (
-                                        <span className="badge badge-green" title={p.parent.name}>
+                                        <span className="badge badge-green">
                                             {p.parent.name}{p.parent.packing_size ? ` (${p.parent.packing_size})` : ''}
                                         </span>
-                                    ) : '—'}
+                                    ) : <span className="text-muted">—</span>}
                                 </td>
-                                <td>{Number(p.gst_percent).toFixed(2)}%</td>
+                                <td className="font-medium">{p.name}</td>
                                 <td>
                                     <span className={`badge ${p.is_active ? 'badge-teal' : 'badge-gray'}`}>
                                         {p.is_active ? 'Active' : 'Inactive'}
@@ -186,74 +174,29 @@ export default function ProductsIndex() {
                             <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
                         </div>
                         <form onSubmit={submit} className="modal-form">
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Name *</label>
-                                    <input value={data.name} onChange={(e) => setData('name', e.target.value)} required />
-                                    {errors.name && <span className="field-error">{errors.name}</span>}
-                                </div>
-                                <div className="form-group">
-                                    <label>Our Brand</label>
-                                    <input value={data.our_brand} onChange={(e) => setData('our_brand', e.target.value)} />
-                                </div>
-                            </div>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Linked Raw Material</label>
-                                    <SearchableSelect
-                                        options={[{ value: '', label: '— None —' }, ...rawMaterials.map((m) => ({ value: m.id, label: m.name }))]}
-                                        value={data.raw_material_id}
-                                        onChange={(v) => setData('raw_material_id', v)}
-                                        placeholder="— Search raw material —"
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Linked Finished Good</label>
-                                    <SearchableSelect
-                                        options={[{ value: '', label: '— None —' }, ...finishedGoods.map((g) => ({ value: g.id, label: g.name }))]}
-                                        value={data.finished_good_id}
-                                        onChange={(v) => setData('finished_good_id', v)}
-                                        placeholder="— Search finished good —"
-                                    />
-                                </div>
-                            </div>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>SKU</label>
-                                    <input value={data.sku} onChange={(e) => setData('sku', e.target.value)} />
-                                </div>
-                                <div className="form-group">
-                                    <label>Packing Size</label>
-                                    <input value={data.packing_size} onChange={(e) => setData('packing_size', e.target.value)} placeholder="e.g. 1L, 500ml" />
-                                </div>
-                            </div>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>HSN Code</label>
-                                    <input value={data.hsn_code} onChange={(e) => setData('hsn_code', e.target.value)} />
-                                </div>
-                                <div className="form-group">
-                                    <label>GST % *</label>
-                                    <input type="number" step="0.01" min="0" max="100" value={data.gst_percent} onChange={(e) => setData('gst_percent', e.target.value)} required />
-                                    {errors.gst_percent && <span className="field-error">{errors.gst_percent}</span>}
-                                </div>
-                            </div>
                             <div className="form-group">
-                                <label>Category</label>
-                                <input value={data.category} onChange={(e) => setData('category', e.target.value)} />
-                            </div>
-                            <div className="form-group">
-                                <label>Parent Product (Unicrop)</label>
+                                <label>Parent Product (Unicrop) *</label>
                                 {parentProducts.length === 0 ? (
-                                    <p className="text-sm text-muted">No parent products available</p>
+                                    <p className="text-sm text-muted">No parent products available from other companies</p>
                                 ) : (
                                     <SearchableSelect
-                                        options={[{ value: '', label: '— None —' }, ...parentProducts.map((p) => ({ value: p.id, label: p.label }))]}
+                                        options={[{ value: '', label: '— Select Unicrop product —' }, ...parentProducts.map((p) => ({ value: p.id, label: p.label }))]}
                                         value={data.parent_product_id}
                                         onChange={(v) => setData('parent_product_id', v)}
-                                        placeholder="Select Unicrop product to link..."
+                                        placeholder="Search Unicrop product..."
                                     />
                                 )}
+                                {errors.parent_product_id && <span className="field-error">{errors.parent_product_id}</span>}
+                            </div>
+                            <div className="form-group">
+                                <label>Child Product Name *</label>
+                                <input
+                                    value={data.name}
+                                    onChange={(e) => setData('name', e.target.value)}
+                                    placeholder="This company's product name"
+                                    required
+                                />
+                                {errors.name && <span className="field-error">{errors.name}</span>}
                             </div>
                             {editing && (
                                 <div className="form-group">
