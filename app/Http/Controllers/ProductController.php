@@ -27,14 +27,23 @@ class ProductController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        // Each child company's finished goods (for child product dropdown)
+        // Each child company's products (finished goods + raw materials combined)
         $companyIds = $companies->pluck('id');
-        $childProducts = FinishedGood::withoutGlobalScopes()
+
+        $fgItems = FinishedGood::withoutGlobalScopes()
             ->whereIn('company_id', $companyIds)
             ->orderBy('name')
-            ->get(['id', 'company_id', 'name'])
-            ->groupBy('company_id')
-            ->map(fn($items) => $items->values());
+            ->get(['id', 'company_id', 'name']);
+
+        $rmItems = \App\Models\RawMaterial::withoutGlobalScopes()
+            ->whereIn('company_id', $companyIds)
+            ->orderBy('name')
+            ->get(['id', 'company_id', 'name']);
+
+        $childProducts = $fgItems->concat($rmItems)
+            ->sortBy('name')
+            ->groupBy(fn($item) => (string) $item->company_id)
+            ->map(fn($items) => $items->values()->map(fn($i) => ['id' => $i->id, 'name' => $i->name]));
 
         // All child-company product mappings (products linked to a finished good)
         $products = Product::withoutGlobalScopes()

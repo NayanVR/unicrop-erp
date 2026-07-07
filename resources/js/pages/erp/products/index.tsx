@@ -222,7 +222,7 @@ export default function ProductsIndex() {
                                 <label>Child Product *</label>
                                 {(() => {
                                     const cid = String(data.company_id || selectedCompanyId || '');
-                                    const opts = childProducts[cid] ?? [];
+                                    const opts = childProducts[cid] ?? childProducts[Number(cid)] ?? [];
                                     return opts.length === 0 ? (
                                         <p style={{ color: 'var(--muted)', fontSize: '13px' }}>
                                             No finished goods found for this company.
