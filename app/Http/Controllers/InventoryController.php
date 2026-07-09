@@ -40,7 +40,7 @@ class InventoryController extends Controller
 
         $pendingMaterials = collect();
         if ($role === 'admin') {
-            $pendingMaterials = RawMaterial::query()
+            $pendingMaterials = RawMaterial::withoutGlobalScopes()
                 ->where('approval_status', 'pending')
                 ->with('requestedByUser:id,name')
                 ->orderByDesc('id')

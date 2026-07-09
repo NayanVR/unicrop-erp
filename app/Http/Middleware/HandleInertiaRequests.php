@@ -85,7 +85,7 @@ class HandleInertiaRequests extends Middleware
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'pendingApprovalsCount' => $user && in_array($user->roles->first()?->slug, ['admin'])
-                ? \App\Models\RawMaterial::where('approval_status', 'pending')->count()
+                ? \App\Models\RawMaterial::withoutGlobalScopes()->where('approval_status', 'pending')->count()
                 : 0,
         ];
     }
