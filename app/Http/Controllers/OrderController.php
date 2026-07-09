@@ -964,9 +964,19 @@ class OrderController extends Controller
 
     private function generateOrderNumber(): string
     {
-        $nextId = (Order::max('id') ?? 0) + 1;
+        $latest = Order::withTrashed()
+            ->where('order_number', 'like', 'ORD-%')
+            ->orderByRaw('CAST(SUBSTRING(order_number, 5) AS UNSIGNED) DESC')
+            ->value('order_number');
 
-        return 'ORD-'.str_pad((string) $nextId, 4, '0', STR_PAD_LEFT);
+        $next = $latest ? ((int) substr($latest, 4)) + 1 : 1;
+
+        // Ensure uniqueness in case of concurrent inserts
+        while (Order::withTrashed()->where('order_number', 'ORD-'.str_pad((string) $next, 4, '0', STR_PAD_LEFT))->exists()) {
+            $next++;
+        }
+
+        return 'ORD-'.str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }
 
     /**
