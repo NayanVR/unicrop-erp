@@ -33,6 +33,7 @@ type NavItem = {
 type PageProps = {
     auth: Auth;
     pageTitle?: string;
+    pendingApprovalsCount?: number;
 };
 
 const NAV_DEFS: Record<string, NavItem[]> = {
@@ -152,7 +153,7 @@ type NotificationItem = {
 };
 
 export default function ErpLayout({ children }: { children: React.ReactNode }) {
-    const { auth, pageTitle } = usePage<PageProps>().props;
+    const { auth, pageTitle, pendingApprovalsCount } = usePage<PageProps>().props;
     const [isMobileOpen, setIsMobileOpen] = useState(false);
     const [timeLabel, setTimeLabel] = useState('');
     const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -343,6 +344,13 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
                             >
                                 <span className="nav-icon">{item.icon}</span>
                                 <span>{item.label}</span>
+                                {item.id === 'inventory' && pendingApprovalsCount && pendingApprovalsCount > 0 ? (
+                                    <span style={{
+                                        marginLeft: 'auto', background: '#ef4444', color: '#fff',
+                                        borderRadius: '10px', fontSize: '11px', fontWeight: 700,
+                                        padding: '1px 6px', minWidth: '18px', textAlign: 'center',
+                                    }}>{pendingApprovalsCount}</span>
+                                ) : null}
                             </Link>
                         ) : (
                             <button
