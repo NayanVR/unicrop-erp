@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Bom;
+use App\Services\CurrentCompany;
+use Illuminate\Validation\Rule;
 use App\Models\FillingRecipe;
 use App\Models\Godown;
 use App\Models\GodownStock;
@@ -164,8 +166,8 @@ class InventoryController extends Controller
     public function storeMaterial(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'name'          => 'required|string|max:255|unique:raw_materials,name',
-            'sku'           => 'nullable|string|max:100|unique:raw_materials,sku',
+            'name'          => ['required','string','max:255', Rule::unique('raw_materials','name')->where('company_id', app(CurrentCompany::class)->id())],
+            'sku'           => ['nullable','string','max:100', Rule::unique('raw_materials','sku')->where('company_id', app(CurrentCompany::class)->id())],
             'hsn'           => 'nullable|string|max:50',
             'gst'           => 'nullable|numeric|min:0|max:100',
             'unit'          => 'required|string|max:20',
@@ -254,8 +256,8 @@ class InventoryController extends Controller
     public function updateMaterial(Request $request, RawMaterial $material): RedirectResponse
     {
         $data = $request->validate([
-            'name'          => 'required|string|max:255|unique:raw_materials,name,' . $material->id,
-            'sku'           => 'nullable|string|max:100|unique:raw_materials,sku,' . $material->id,
+            'name'          => ['required','string','max:255', Rule::unique('raw_materials','name')->where('company_id', app(CurrentCompany::class)->id())->ignore($material->id)],
+            'sku'           => ['nullable','string','max:100', Rule::unique('raw_materials','sku')->where('company_id', app(CurrentCompany::class)->id())->ignore($material->id)],
             'hsn'           => 'nullable|string|max:50',
             'gst'           => 'nullable|numeric|min:0|max:100',
             'unit'          => 'required|string|max:20',
