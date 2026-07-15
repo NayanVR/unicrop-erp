@@ -116,6 +116,31 @@ class DesignController extends Controller
         return redirect()->back()->with('success', "Moved to: {$next}");
     }
 
+    public function setStage(Request $request, DesignOrder $designOrder): RedirectResponse
+    {
+        $allStages = array_keys(self::STAGE_FLOW);
+        $allStages[] = 'received-factory';
+
+        $data = $request->validate([
+            'stage' => ['required', 'string', 'in:' . implode(',', $allStages)],
+        ]);
+
+        $stage = $data['stage'];
+
+        $log = $designOrder->stage_log ?? [];
+        $log[] = ['stage' => $stage, 'at' => now()->toISOString(), 'by' => $request->user()?->name];
+
+        $update = ['status' => $stage, 'stage_log' => $log];
+
+        if (! $designOrder->assigned_to) {
+            $update['assigned_to'] = $request->user()?->id;
+        }
+
+        $designOrder->update($update);
+
+        return redirect()->back()->with('success', "Stage updated.");
+    }
+
     public function updateTracking(Request $request, DesignOrder $designOrder): RedirectResponse
     {
         if ($designOrder->status === 'pending') {

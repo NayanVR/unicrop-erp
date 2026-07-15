@@ -261,6 +261,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('design', [DesignController::class, 'store'])->name('design.store');
         Route::patch('design/{designOrder}', [DesignController::class, 'update'])->name('design.update');
         Route::post('design/{designOrder}/advance', [DesignController::class, 'advance'])->name('design.advance');
+        Route::post('design/{designOrder}/set-stage', [DesignController::class, 'setStage'])->name('design.set-stage');
         Route::patch('design/{designOrder}/tracking', [DesignController::class, 'updateTracking'])->name('design.tracking');
         Route::delete('design/{designOrder}', [DesignController::class, 'destroy'])->name('design.destroy');
     });

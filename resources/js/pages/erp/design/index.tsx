@@ -1,6 +1,7 @@
 
 import {
     destroy as designDestroy,
+    setStage as designSetStage,
     store as designStore,
     update as designUpdate,
 } from '@/routes/design';
@@ -102,6 +103,10 @@ export default function DesignIndex() {
     const deleteOrder = (d: DesignOrder) => {
         if (!confirm(`Delete design order for "${d.party_brand} – ${d.product_name}"?`)) return;
         router.delete(designDestroy(d.id).url);
+    };
+
+    const changeStage = (d: DesignOrder, stage: string) => {
+        router.post(designSetStage(d.id).url, { stage });
     };
 
     const filtered = designOrders.filter((d) => {
@@ -225,7 +230,26 @@ export default function DesignIndex() {
                                                 <td><strong>{d.order_qty || '—'}</strong></td>
                                                 <td>{d.pcs_to_print ?? '—'}</td>
                                                 <td>{d.labels_received ?? '—'}</td>
-                                                <td><span className="badge purple">{statusLabel(d.status)}</span></td>
+                                                <td>
+                                                    <select
+                                                        value={d.status}
+                                                        onChange={(e) => changeStage(d, e.target.value)}
+                                                        style={{
+                                                            fontSize: '12px',
+                                                            padding: '3px 6px',
+                                                            borderRadius: '6px',
+                                                            border: '1px solid var(--border)',
+                                                            background: 'var(--bg-card)',
+                                                            color: 'var(--tx)',
+                                                            cursor: 'pointer',
+                                                            minWidth: '140px',
+                                                        }}
+                                                    >
+                                                        {STAGES.map((s) => (
+                                                            <option key={s.key} value={s.key}>{s.label}</option>
+                                                        ))}
+                                                    </select>
+                                                </td>
                                                 <td>
                                                     <button className="btn-icon" onClick={() => openEdit(d)} title="Edit">✏️</button>
                                                     <button className="btn-icon btn-danger-icon" onClick={() => deleteOrder(d)} title="Delete">🗑️</button>
