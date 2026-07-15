@@ -108,10 +108,22 @@ export default function DesignIndex() {
         if (filterStage !== 'all' && d.status !== filterStage) return false;
         if (search) {
             const q = search.toLowerCase();
-            return d.party_brand.toLowerCase().includes(q) || d.product_name.toLowerCase().includes(q);
+            return d.party_brand.toLowerCase().includes(q)
+                || d.product_name.toLowerCase().includes(q)
+                || (d.order?.order_number ?? '').toLowerCase().includes(q)
+                || (d.order?.company_name ?? '').toLowerCase().includes(q);
         }
         return true;
     });
+
+    // Group by order_id — same order = one card; standalone (no order_id) = own card each
+    const grouped: { key: string; items: DesignOrder[] }[] = [];
+    const seen = new Map<string, DesignOrder[]>();
+    for (const d of filtered) {
+        const key = d.order_id ? `order-${d.order_id}` : `standalone-${d.id}`;
+        if (!seen.has(key)) { seen.set(key, []); grouped.push({ key, items: seen.get(key)! }); }
+        seen.get(key)!.push(d);
+    }
 
     return (
         <>
@@ -159,86 +171,94 @@ export default function DesignIndex() {
                 ))}
             </div>
 
-            {/* Order cards */}
-            {filtered.length === 0 ? (
+            {/* Order cards — one per order */}
+            {grouped.length === 0 ? (
                 <div className="empty-state"><div className="icon">🎨</div><p>No design orders found.</p></div>
             ) : (
-                filtered.map((d) => (
-                    <div key={d.id} className="design-order-card">
-                        {/* ── Card Header ── */}
-                        <div className="design-card-head">
-                            <div className="design-card-left">
-                                {d.order && (
-                                    <span className="design-order-num">{d.order.order_number}</span>
-                                )}
-                                <span className="design-company">
-                                    {d.order?.company_name ?? '—'}
-                                </span>
-                                <div className="design-card-meta">
-                                    {d.order?.customer_name && <span>{d.order.customer_name}</span>}
-                                    {d.assignee && <span>· {d.assignee.name}</span>}
-                                    <span>· {fmt(d.created_at)}</span>
+                grouped.map(({ key, items }) => {
+                    const first = items[0];
+                    const order = first.order;
+                    return (
+                        <div key={key} className="design-order-card">
+                            {/* ── Card Header ── */}
+                            <div className="design-card-head">
+                                <div className="design-card-left">
+                                    {order && <span className="design-order-num">{order.order_number}</span>}
+                                    <span className="design-company">{order?.company_name ?? '—'}</span>
+                                    <div className="design-card-meta">
+                                        {order?.customer_name && <span>{order.customer_name}</span>}
+                                        <span>· {fmt(first.created_at)}</span>
+                                    </div>
+                                </div>
+                                <div className="design-card-right" style={{ alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ fontSize: '13px', color: 'var(--tx-muted)' }}>
+                                        {items.length} item{items.length > 1 ? 's' : ''}
+                                    </span>
                                 </div>
                             </div>
-                            <div className="design-card-right" style={{ alignItems: 'center', gap: '8px' }}>
-                                <span className="badge purple">{statusLabel(d.status)}</span>
-                                <button className="btn-icon" onClick={() => openEdit(d)} title="Edit">✏️</button>
-                                <button className="btn-icon btn-danger-icon" onClick={() => deleteOrder(d)} title="Delete">🗑️</button>
+
+                            {/* ── Items Table ── */}
+                            <div className="prod-wrap">
+                                <table className="prod-table design-items-table">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Our Brand</th>
+                                            <th>Party Brand</th>
+                                            <th>Size</th>
+                                            <th>Label Dimensions</th>
+                                            <th>Order Qty</th>
+                                            <th>Pcs to Print</th>
+                                            <th>Labels Recv'd</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {items.map((d, i) => (
+                                            <tr key={d.id}>
+                                                <td>{i + 1}</td>
+                                                <td><span className="prod-name">{d.product_name}</span></td>
+                                                <td>{d.party_brand}</td>
+                                                <td>{d.packing_size ?? '—'}</td>
+                                                <td>{d.label_dimensions ?? '—'}</td>
+                                                <td><strong>{d.order_qty || '—'}</strong></td>
+                                                <td>{d.pcs_to_print ?? '—'}</td>
+                                                <td>{d.labels_received ?? '—'}</td>
+                                                <td><span className="badge purple">{statusLabel(d.status)}</span></td>
+                                                <td>
+                                                    <button className="btn-icon" onClick={() => openEdit(d)} title="Edit">✏️</button>
+                                                    <button className="btn-icon btn-danger-icon" onClick={() => deleteOrder(d)} title="Delete">🗑️</button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
+
+                            {/* Instructions */}
+                            {first.instructions && (
+                                <div style={{ padding: '8px 16px', fontSize: '13px', color: 'var(--tx-muted)', borderTop: '1px solid var(--border)' }}>
+                                    📌 {first.instructions}
+                                </div>
+                            )}
+
+                            {/* Stage log of first item */}
+                            {first.stage_log && first.stage_log.length > 0 && (
+                                <div className="design-stage-log">
+                                    {first.stage_log.slice().reverse().map((entry, i) => (
+                                        <span key={i} className="stage-log-chip">
+                                            {STAGES.find((s) => s.key === entry.stage)?.label ?? entry.stage}
+                                            {entry.by ? ` · ${entry.by}` : ''}
+                                            {' · '}
+                                            {new Date(entry.at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-
-                        {/* ── Products Table ── */}
-                        <div className="prod-wrap">
-                            <table className="prod-table design-items-table">
-                                <thead>
-                                    <tr>
-                                        <th>#</th>
-                                        <th>Our Brand</th>
-                                        <th>Party Brand</th>
-                                        <th>Size</th>
-                                        <th>Label Dimensions</th>
-                                        <th>Order Qty</th>
-                                        <th>Pcs to Print</th>
-                                        <th>Labels Recv'd</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td>1</td>
-                                        <td><span className="prod-name">{d.product_name}</span></td>
-                                        <td>{d.party_brand}</td>
-                                        <td>{d.packing_size ?? '—'}</td>
-                                        <td>{d.label_dimensions ?? '—'}</td>
-                                        <td><strong>{d.order_qty || '—'}</strong></td>
-                                        <td>{d.pcs_to_print ?? '—'}</td>
-                                        <td>{d.labels_received ?? '—'}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Instructions if any */}
-                        {d.instructions && (
-                            <div style={{ padding: '8px 16px', fontSize: '13px', color: 'var(--tx-muted)', borderTop: '1px solid var(--border)' }}>
-                                📌 {d.instructions}
-                            </div>
-                        )}
-
-                        {/* Stage log */}
-                        {d.stage_log && d.stage_log.length > 0 && (
-                            <div className="design-stage-log">
-                                {d.stage_log.slice().reverse().map((entry, i) => (
-                                    <span key={i} className="stage-log-chip">
-                                        {STAGES.find((s) => s.key === entry.stage)?.label ?? entry.stage}
-                                        {entry.by ? ` · ${entry.by}` : ''}
-                                        {' · '}
-                                        {new Date(entry.at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                ))
+                    );
+                })
             )}
 
             {/* ── Create / Edit Modal ── */}
