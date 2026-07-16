@@ -155,6 +155,7 @@ type FinishGoodGroup = { name: string; count: number };
 
 // ── Admin Company Inventory Component ────────────────────────────────────────
 function AdminCompanyInventory({ companies, expiryMap }: { companies: CompanyInventory[]; expiryMap: Record<string, string> }) {
+    const [open, setOpen] = useState(false);
     const [activeCompany, setActiveCompany] = useState<number>(companies[0]?.id ?? 0);
     const [search, setSearch] = useState('');
 
@@ -176,8 +177,14 @@ function AdminCompanyInventory({ companies, expiryMap }: { companies: CompanyInv
 
     return (
         <div className="card" style={{ marginTop: 16 }}>
-            <div style={{ padding: '12px 16px 0', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, color: 'var(--tx-muted)' }}>Company-wise Inventory</div>
+            <div
+                onClick={() => setOpen((o) => !o)}
+                style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', userSelect: 'none', borderBottom: open ? '1px solid var(--border)' : 'none' }}
+            >
+                <span style={{ fontWeight: 600, fontSize: 14 }}>Company-wise Inventory</span>
+                <span style={{ fontSize: 18, color: 'var(--tx-muted)', transition: 'transform 0.2s', display: 'inline-block', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+            </div>
+            {open && <div style={{ padding: '12px 16px 0', borderBottom: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {companies.map((c) => (
                         <button
@@ -198,8 +205,8 @@ function AdminCompanyInventory({ companies, expiryMap }: { companies: CompanyInv
                         </button>
                     ))}
                 </div>
-            </div>
-            <div style={{ padding: '12px 16px' }}>
+            </div>}
+            {open && <div style={{ padding: '12px 16px' }}>
                 <input
                     type="text"
                     placeholder="Search…"
@@ -260,7 +267,7 @@ function AdminCompanyInventory({ companies, expiryMap }: { companies: CompanyInv
                         </tbody>
                     </table>
                 </div>
-            </div>
+            </div>}
         </div>
     );
 }
