@@ -34,11 +34,27 @@ class InventoryController extends Controller
         $fullAccessRoles = ['admin', 'factory', 'accountant'];
         $isSales = ! in_array($role, $fullAccessRoles);
 
-        $materials = RawMaterial::query()
+        // Admin sees all companies' inventory; others see only current company
+        $materialsQuery = $role === 'admin'
+            ? RawMaterial::withoutGlobalScopes()
+            : RawMaterial::query();
+
+        $materials = $materialsQuery
             ->withCount('transactions')
             ->where('approval_status', 'approved')
             ->orderBy('name')
             ->get();
+
+        // For admin: attach company names grouped by company_id
+        $allCompaniesInventory = collect();
+        if ($role === 'admin') {
+            $companies = \App\Models\Company::orderBy('name')->get(['id', 'name']);
+            $allCompaniesInventory = $companies->map(fn ($c) => [
+                'id'    => $c->id,
+                'name'  => $c->name,
+                'items' => $materials->where('company_id', $c->id)->values(),
+            ])->filter(fn ($c) => $c['items']->isNotEmpty())->values();
+        }
 
         $pendingMaterials = collect();
         if ($role === 'admin') {
@@ -158,7 +174,7 @@ class InventoryController extends Controller
             ->map(fn ($group) => $group->first()->expiry_date->format('Y-m-d'));
 
         return Inertia::render('erp/inventory/index', array_merge(
-            compact('materials', 'pendingMaterials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats', 'vendors', 'inventoryCategories', 'bomOutputMap', 'fillingOutputMap', 'godowns', 'finishGoodGroups', 'expiryMap'),
+            compact('materials', 'pendingMaterials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats', 'vendors', 'inventoryCategories', 'bomOutputMap', 'fillingOutputMap', 'godowns', 'finishGoodGroups', 'expiryMap', 'allCompaniesInventory'),
             ['pageTitle' => 'Inventory']
         ));
     }

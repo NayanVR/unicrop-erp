@@ -153,6 +153,124 @@ type Godown = {
 
 type FinishGoodGroup = { name: string; count: number };
 
+// ── Admin Company Inventory Component ────────────────────────────────────────
+function AdminCompanyInventory({ companies, expiryMap }: { companies: CompanyInventory[]; expiryMap: Record<string, string> }) {
+    const [activeCompany, setActiveCompany] = useState<number>(companies[0]?.id ?? 0);
+    const [search, setSearch] = useState('');
+
+    const company = companies.find((c) => c.id === activeCompany);
+    const items = (company?.items ?? []).filter((m) =>
+        !search || m.name.toLowerCase().includes(search.toLowerCase()) || (m.sku ?? '').toLowerCase().includes(search.toLowerCase())
+    );
+
+    const today = new Date();
+    const expiryStatus = (materialId: number) => {
+        const d = expiryMap[materialId];
+        if (!d) return null;
+        const days = Math.ceil((new Date(d).getTime() - today.getTime()) / 86400000);
+        if (days <= 0) return { label: 'Expired', color: '#ef4444' };
+        if (days <= 30) return { label: `${days}d`, color: '#f97316' };
+        if (days <= 90) return { label: `${days}d`, color: '#eab308' };
+        return null;
+    };
+
+    return (
+        <div className="card" style={{ marginTop: 16 }}>
+            <div style={{ padding: '12px 16px 0', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, color: 'var(--tx-muted)' }}>Company-wise Inventory</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {companies.map((c) => (
+                        <button
+                            key={c.id}
+                            onClick={() => { setActiveCompany(c.id); setSearch(''); }}
+                            style={{
+                                padding: '5px 14px',
+                                borderRadius: 20,
+                                border: '1px solid var(--border)',
+                                background: activeCompany === c.id ? 'var(--accent)' : 'var(--bg-card)',
+                                color: activeCompany === c.id ? '#fff' : 'var(--tx)',
+                                fontWeight: activeCompany === c.id ? 600 : 400,
+                                fontSize: 13,
+                                cursor: 'pointer',
+                            }}
+                        >
+                            {c.name} <span style={{ opacity: 0.7 }}>({c.items.length})</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+            <div style={{ padding: '12px 16px' }}>
+                <input
+                    type="text"
+                    placeholder="Search…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, marginBottom: 10, minWidth: 200 }}
+                />
+                <div style={{ overflowX: 'auto' }}>
+                    <table className="prod-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Name</th>
+                                <th>SKU</th>
+                                <th>Category</th>
+                                <th>Unit</th>
+                                <th>Stock</th>
+                                <th>Min Stock</th>
+                                <th>Expiry</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {items.length === 0 ? (
+                                <tr><td colSpan={9} style={{ textAlign: 'center', padding: 20, color: 'var(--tx-muted)' }}>No items found.</td></tr>
+                            ) : items.map((m, i) => {
+                                const expiry = expiryStatus(m.id);
+                                const isLow = parseFloat(String(m.stock_qty)) <= parseFloat(String(m.min_stock)) && parseFloat(String(m.stock_qty)) > 0;
+                                const isOut = parseFloat(String(m.stock_qty)) <= 0;
+                                return (
+                                    <tr key={m.id}>
+                                        <td>{i + 1}</td>
+                                        <td><span className="prod-name">{m.name}</span></td>
+                                        <td>{m.sku ?? '—'}</td>
+                                        <td>{m.category ?? '—'}</td>
+                                        <td>{m.unit}</td>
+                                        <td>
+                                            <strong style={{ color: isOut ? '#ef4444' : isLow ? '#f97316' : undefined }}>
+                                                {parseFloat(String(m.stock_qty)).toFixed(2)}
+                                            </strong>
+                                        </td>
+                                        <td>{parseFloat(String(m.min_stock)).toFixed(2)}</td>
+                                        <td>
+                                            {expiry
+                                                ? <span style={{ background: expiry.color, color: '#fff', borderRadius: 10, padding: '2px 7px', fontSize: 11, fontWeight: 600 }}>{expiry.label}</span>
+                                                : '—'}
+                                        </td>
+                                        <td>
+                                            {isOut
+                                                ? <span className="badge red">Out of Stock</span>
+                                                : isLow
+                                                    ? <span className="badge orange">Low</span>
+                                                    : <span className="badge green">OK</span>}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+type CompanyInventory = {
+    id: number;
+    name: string;
+    items: RawMaterial[];
+};
+
 type Props = {
     materials: RawMaterial[];
     pendingMaterials: PendingMaterial[];
@@ -167,6 +285,7 @@ type Props = {
     godowns: Godown[];
     finishGoodGroups: FinishGoodGroup[];
     expiryMap: Record<string, string>;
+    allCompaniesInventory: CompanyInventory[];
 };
 
 // ── Route constants ───────────────────────────────────────────────────────────
@@ -363,7 +482,7 @@ function SupplierField({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function InventoryIndex({ materials, pendingMaterials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomOutputMap, fillingOutputMap, godowns, finishGoodGroups, expiryMap }: Props) {
+export default function InventoryIndex({ materials, pendingMaterials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomOutputMap, fillingOutputMap, godowns, finishGoodGroups, expiryMap, allCompaniesInventory }: Props) {
     const { auth, flash } = usePage<{ auth: Auth; flash?: { success?: string; error?: string } }>().props;
     const role = auth.user?.role ?? auth.user?.roles?.[0]?.slug ?? '';
     const canSeeCost      = role === 'admin' || auth.user?.cost_access === true;
@@ -1503,6 +1622,11 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                     </button>
                 ))}
             </div>
+
+            {/* ── Admin: Company-wise Inventory ─────────────────────────────── */}
+            {tab === 'materials' && role === 'admin' && allCompaniesInventory.length > 1 && (
+                <AdminCompanyInventory companies={allCompaniesInventory} expiryMap={expiryMap} />
+            )}
 
             {/* ── Materials Tab ─────────────────────────────────────────────── */}
             {tab === 'materials' && (
