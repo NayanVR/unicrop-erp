@@ -51,6 +51,7 @@ export default function InventoryPoolsIndex() {
     const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
     const [showPoolModal, setShowPoolModal] = useState(false);
     const [editingPool, setEditingPool] = useState<Pool | null>(null);
+    const [search, setSearch] = useState('');
 
     const poolForm = useForm(defaultPoolForm);
     const linkForm = useForm(defaultLinkForm);
@@ -61,7 +62,6 @@ export default function InventoryPoolsIndex() {
         poolForm.setData({ name: pool.name, stock_qty: pool.stock_qty.toString(), unit: pool.unit, notes: pool.notes ?? '' });
         setShowPoolModal(true);
     };
-
     const submitPool = (e: React.FormEvent) => {
         e.preventDefault();
         if (editingPool) {
@@ -70,9 +70,8 @@ export default function InventoryPoolsIndex() {
             poolForm.post(poolStore().url, { onSuccess: () => { setShowPoolModal(false); poolForm.reset(); } });
         }
     };
-
     const deletePool = (pool: Pool) => {
-        if (!confirm(`Delete inventory pool "${pool.name}"? Linked products will be unlinked.`)) return;
+        if (!confirm(`Delete pool "${pool.name}"?`)) return;
         router.delete(poolDestroy(pool.id).url);
     };
 
@@ -80,167 +79,120 @@ export default function InventoryPoolsIndex() {
         e.preventDefault();
         linkForm.post(poolLink().url, { onSuccess: () => linkForm.reset() });
     };
-
     const removeLink = (link: Link) => {
-        if (!confirm('Unlink this product from its shared inventory pool?')) return;
+        if (!confirm('Unlink this product?')) return;
         router.delete(poolUnlink(link.id).url);
     };
 
-    // links for selected company
+    const selectedCompany = companies.find((c) => c.id === selectedCompanyId);
+    const linkedCountFor = (cid: number) => links.filter((l) => l.product?.company_id === cid).length;
+
     const companyLinks = selectedCompanyId
         ? links.filter((l) => l.product?.company_id === selectedCompanyId)
         : [];
-
-    // unlinked products for selected company
-    const companyUnlinkedProducts = selectedCompanyId
+    const companyUnlinked = selectedCompanyId
         ? products.filter((p) => p.company_id === selectedCompanyId)
         : [];
+    const filteredLinks = companyLinks.filter((l) =>
+        !search || (l.product?.name ?? '').toLowerCase().includes(search.toLowerCase())
+    );
 
-    // linked product count per company
-    const linkedCountFor = (cid: number) => links.filter((l) => l.product?.company_id === cid).length;
-    const unlinkedCountFor = (cid: number) => products.filter((p) => p.company_id === cid).length;
-
-    const selectedCompany = companies.find((c) => c.id === selectedCompanyId);
-
-    // ── Company cards view ────────────────────────────────────────────────────
+    // ── Company cards ─────────────────────────────────────────────────────────
     if (!selectedCompanyId) {
         return (
             <>
                 <div className="page-header">
-                    <div className="page-header-left">
-                        <h1 className="page-title">Inventory Pools</h1>
-                        <p style={{ color: 'var(--tx-muted)', fontSize: 13, margin: 0 }}>Select a company to view or manage pool links</p>
-                    </div>
-                    <button className="btn primary" onClick={openAddPool}>＋ Add Pool</button>
+                    <h1 className="page-title">Shared Inventory Pools</h1>
+                    <button className="btn-primary" onClick={openAddPool}>+ Add Pool</button>
                 </div>
 
                 {flash?.success && <div className="alert-success">{flash.success}</div>}
                 {flash?.error && <div className="alert-error">{flash.error}</div>}
 
-                {/* Pool summary cards */}
-                {pools.length > 0 && (
-                    <div className="stats-grid" style={{ marginBottom: 20 }}>
-                        {pools.map((pool) => (
-                            <div key={pool.id} className="stat-card">
-                                <div className="stat-value">{Number(pool.stock_qty).toFixed(2)} <span style={{ fontSize: 13, fontWeight: 400 }}>{pool.unit}</span></div>
-                                <div className="stat-label">{pool.name}</div>
-                                <div style={{ fontSize: 11, color: 'var(--tx-muted)', marginTop: 2 }}>{pool.links_count} linked</div>
+                {companies.length === 0 ? (
+                    <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
+                        No companies with products found.
+                    </div>
+                ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
+                        {companies.map((c) => (
+                            <div
+                                key={c.id}
+                                onClick={() => setSelectedCompanyId(c.id)}
+                                style={{
+                                    background: 'var(--card-bg, #1e293b)',
+                                    border: '1px solid var(--border, #334155)',
+                                    borderRadius: '12px',
+                                    padding: '24px 20px',
+                                    cursor: 'pointer',
+                                    transition: 'border-color 0.15s',
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#0d9488')}
+                                onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border, #334155)')}
+                            >
+                                <div style={{ fontSize: '32px', marginBottom: '10px' }}>🏢</div>
+                                <div style={{ fontWeight: 700, fontSize: '16px', marginBottom: '6px' }}>{c.name}</div>
+                                <div style={{ color: 'var(--muted)', fontSize: '13px' }}>
+                                    {linkedCountFor(c.id)} product{linkedCountFor(c.id) !== 1 ? 's' : ''} linked
+                                </div>
                             </div>
                         ))}
                     </div>
                 )}
 
-                {/* Company cards */}
-                {companies.length === 0 ? (
-                    <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--tx-muted)' }}>
-                        No companies with products found.
-                    </div>
-                ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
-                        {companies.map((c) => {
-                            const linked = linkedCountFor(c.id);
-                            const unlinked = unlinkedCountFor(c.id);
-                            return (
-                                <div
-                                    key={c.id}
-                                    onClick={() => setSelectedCompanyId(c.id)}
-                                    style={{
-                                        background: 'var(--bg-card)',
-                                        border: '1px solid var(--border)',
-                                        borderRadius: 12,
-                                        padding: '24px 20px',
-                                        cursor: 'pointer',
-                                        transition: 'border-color 0.15s, transform 0.1s',
-                                    }}
-                                    onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#0d9488')}
-                                    onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
-                                >
-                                    <div style={{ fontSize: 32, marginBottom: 10 }}>🏢</div>
-                                    <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>{c.name}</div>
-                                    <div style={{ fontSize: 13, color: 'var(--tx-muted)' }}>
-                                        {linked} linked · {unlinked} unlinked
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                {showPoolModal && (
+                    <PoolModal poolForm={poolForm} editingPool={editingPool} onClose={() => setShowPoolModal(false)} onSubmit={submitPool} />
                 )}
-
-                {/* Pools management table */}
-                <div className="card" style={{ marginTop: 24 }}>
-                    <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <h2>All Pools</h2>
-                    </div>
-                    <table className="prod-table">
-                        <thead>
-                            <tr>
-                                <th>Pool Name</th>
-                                <th>Stock</th>
-                                <th>Unit</th>
-                                <th>Linked Products</th>
-                                <th>Notes</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {pools.length === 0 && (
-                                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 20, color: 'var(--tx-muted)' }}>No pools yet.</td></tr>
-                            )}
-                            {pools.map((pool) => (
-                                <tr key={pool.id}>
-                                    <td className="font-medium">{pool.name}</td>
-                                    <td>{Number(pool.stock_qty).toFixed(3)}</td>
-                                    <td>{pool.unit}</td>
-                                    <td>{pool.links_count}</td>
-                                    <td>{pool.notes ?? '—'}</td>
-                                    <td>
-                                        <button className="btn-icon" onClick={() => openEditPool(pool)} title="Edit">✏️</button>
-                                        <button className="btn-icon btn-danger-icon" onClick={() => deletePool(pool)} title="Delete">🗑️</button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-
-                {showPoolModal && <PoolModal poolForm={poolForm} editingPool={editingPool} onClose={() => setShowPoolModal(false)} onSubmit={submitPool} />}
             </>
         );
     }
 
-    // ── Company detail view ───────────────────────────────────────────────────
+    // ── Company detail ────────────────────────────────────────────────────────
     return (
         <>
             <div className="page-header">
-                <div className="page-header-left">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <button
-                        onClick={() => setSelectedCompanyId(null)}
+                        onClick={() => { setSelectedCompanyId(null); setSearch(''); linkForm.reset(); }}
                         className="btn-secondary"
-                        style={{ marginBottom: 8 }}
+                        style={{ padding: '6px 14px', fontSize: '14px' }}
                     >← Back</button>
                     <h1 className="page-title">{selectedCompany?.name} — Pool Links</h1>
                 </div>
-                <button className="btn primary" onClick={openAddPool}>＋ Add Pool</button>
+                <button className="btn-primary" onClick={openAddPool}>+ Add Pool</button>
             </div>
 
             {flash?.success && <div className="alert-success">{flash.success}</div>}
             {flash?.error && <div className="alert-error">{flash.error}</div>}
 
-            {/* Link a product */}
-            {companyUnlinkedProducts.length > 0 && (
-                <div className="card" style={{ marginBottom: 16 }}>
-                    <div className="card-header"><h2>Link Product to Pool</h2></div>
-                    <form onSubmit={submitLink} className="form-row" style={{ padding: '1rem', alignItems: 'flex-end' }}>
-                        <div className="form-group">
+            <div className="card">
+                <div className="card-toolbar">
+                    <input
+                        className="search-input"
+                        placeholder="Search product name..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
+                    {companyUnlinked.length > 0 && (
+                        <button className="btn-primary" style={{ fontSize: 13 }} onClick={() => setShowPoolModal(false)}>
+                            {/* Link form inline below */}
+                        </button>
+                    )}
+                </div>
+
+                {/* Link form */}
+                {companyUnlinked.length > 0 && (
+                    <form onSubmit={submitLink} className="form-row" style={{ padding: '0 16px 16px', alignItems: 'flex-end', borderBottom: '1px solid var(--border)' }}>
+                        <div className="form-group" style={{ flex: 1 }}>
                             <label>Product</label>
                             <select value={linkForm.data.product_id} onChange={(e) => linkForm.setData('product_id', e.target.value)} required>
-                                <option value="">— Select product —</option>
-                                {companyUnlinkedProducts.map((p) => (
+                                <option value="">— Select unlinked product —</option>
+                                {companyUnlinked.map((p) => (
                                     <option key={p.id} value={p.id}>{p.name}</option>
                                 ))}
                             </select>
                         </div>
-                        <div className="form-group">
+                        <div className="form-group" style={{ flex: 1 }}>
                             <label>Inventory Pool</label>
                             <select value={linkForm.data.inventory_pool_id} onChange={(e) => linkForm.setData('inventory_pool_id', e.target.value)} required>
                                 <option value="">— Select pool —</option>
@@ -249,15 +201,11 @@ export default function InventoryPoolsIndex() {
                                 ))}
                             </select>
                         </div>
-                        <button type="submit" className="btn primary" disabled={linkForm.processing}>Link</button>
+                        <button type="submit" className="btn-primary" disabled={linkForm.processing}>Link</button>
                     </form>
-                </div>
-            )}
+                )}
 
-            {/* Active links for this company */}
-            <div className="card">
-                <div className="card-header"><h2>Active Links</h2></div>
-                <table className="prod-table">
+                <table className="data-table">
                     <thead>
                         <tr>
                             <th>Product</th>
@@ -267,16 +215,19 @@ export default function InventoryPoolsIndex() {
                         </tr>
                     </thead>
                     <tbody>
-                        {companyLinks.length === 0 ? (
-                            <tr><td colSpan={4} style={{ textAlign: 'center', padding: 20, color: 'var(--tx-muted)' }}>No products linked yet.</td></tr>
-                        ) : companyLinks.map((link) => {
+                        {filteredLinks.length === 0 && (
+                            <tr><td colSpan={4} className="empty-row">No products linked to a pool for this company.</td></tr>
+                        )}
+                        {filteredLinks.map((link) => {
                             const pool = pools.find((p) => p.id === link.inventory_pool?.id);
                             return (
                                 <tr key={link.id}>
-                                    <td><span className="prod-name">{link.product?.name ?? '—'}</span></td>
-                                    <td><span className="badge purple">{link.inventory_pool?.name ?? '—'}</span></td>
-                                    <td>{pool ? `${Number(pool.stock_qty).toFixed(2)} ${pool.unit}` : '—'}</td>
+                                    <td className="font-medium">{link.product?.name ?? '—'}</td>
                                     <td>
+                                        <span className="badge badge-green">{link.inventory_pool?.name ?? '—'}</span>
+                                    </td>
+                                    <td>{pool ? `${Number(pool.stock_qty).toFixed(2)} ${pool.unit}` : '—'}</td>
+                                    <td className="action-cell">
                                         <button className="btn-icon btn-danger-icon" onClick={() => removeLink(link)} title="Unlink">🗑️</button>
                                     </td>
                                 </tr>
@@ -286,7 +237,38 @@ export default function InventoryPoolsIndex() {
                 </table>
             </div>
 
-            {showPoolModal && <PoolModal poolForm={poolForm} editingPool={editingPool} onClose={() => setShowPoolModal(false)} onSubmit={submitPool} />}
+            {/* Pools management */}
+            <div className="card" style={{ marginTop: 16 }}>
+                <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <h2>Manage Pools</h2>
+                </div>
+                <table className="data-table">
+                    <thead>
+                        <tr><th>Pool</th><th>Stock</th><th>Unit</th><th>Links</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        {pools.length === 0 && (
+                            <tr><td colSpan={5} className="empty-row">No pools yet.</td></tr>
+                        )}
+                        {pools.map((pool) => (
+                            <tr key={pool.id}>
+                                <td className="font-medium">{pool.name}</td>
+                                <td>{Number(pool.stock_qty).toFixed(3)}</td>
+                                <td>{pool.unit}</td>
+                                <td>{pool.links_count}</td>
+                                <td className="action-cell">
+                                    <button className="btn-icon" onClick={() => openEditPool(pool)}>✏️</button>
+                                    <button className="btn-icon btn-danger-icon" onClick={() => deletePool(pool)}>🗑️</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {showPoolModal && (
+                <PoolModal poolForm={poolForm} editingPool={editingPool} onClose={() => setShowPoolModal(false)} onSubmit={submitPool} />
+            )}
         </>
     );
 }
