@@ -27,12 +27,7 @@ class InventoryPoolController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'company_id']);
 
-        // All companies with at least one product (linked or unlinked)
-        $allProductCompanyIds = Product::withoutGlobalScopes()
-            ->distinct()
-            ->pluck('company_id');
-
-        $companies = Company::whereIn('id', $allProductCompanyIds)
+        $companies = Company::where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name']);
 
