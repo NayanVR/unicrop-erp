@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Company;
 use App\Models\InventoryPool;
 use App\Models\Product;
 use App\Models\ProductInventoryLink;
@@ -26,7 +27,16 @@ class InventoryPoolController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'company_id']);
 
-        return Inertia::render('erp/inventory-pools/index', compact('pools', 'links', 'products'));
+        // All companies with at least one product (linked or unlinked)
+        $allProductCompanyIds = Product::withoutGlobalScopes()
+            ->distinct()
+            ->pluck('company_id');
+
+        $companies = Company::whereIn('id', $allProductCompanyIds)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return Inertia::render('erp/inventory-pools/index', compact('pools', 'links', 'products', 'companies'));
     }
 
     public function store(Request $request): RedirectResponse
