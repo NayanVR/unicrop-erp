@@ -824,6 +824,30 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                         </span>
                                     </div>
 
+                                    {/* Yield efficiency vs ingredient total */}
+                                    {(() => {
+                                        const outBase = toBaseGramsMl(Number(bom.batch_size), bom.batch_unit);
+                                        let inBase = 0;
+                                        let allConvertible = true;
+                                        for (const it of bom.items) {
+                                            const b = toBaseGramsMl(Number(it.qty_per_batch), it.unit);
+                                            if (b === null) { allConvertible = false; break; }
+                                            inBase += b;
+                                        }
+                                        if (!allConvertible || outBase === null || inBase <= 0) return null;
+                                        const pct = (outBase / inBase) * 100;
+                                        const loss = 100 - pct;
+                                        if (Math.abs(loss) < 0.5) return null;
+                                        const isLoss = loss > 0;
+                                        return (
+                                            <div style={{ fontSize: 12, color: isLoss ? '#b45309' : '#0369a1', fontWeight: 600 }}>
+                                                {isLoss
+                                                    ? `⚠️ Process loss: ${loss.toFixed(1)}% (input ${fmtSmart(inBase, 'gm')} → output ${formatQty(bom.batch_size)} ${bom.batch_unit})`
+                                                    : `Output ${(pct - 100).toFixed(1)}% more than ingredient total`}
+                                            </div>
+                                        );
+                                    })()}
+
                                     {/* Type + product badge */}
                                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                                         <span style={{ background: cfg.bg, color: cfg.color, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, letterSpacing: '.5px' }}>
