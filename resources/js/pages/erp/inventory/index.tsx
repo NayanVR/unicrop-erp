@@ -995,6 +995,15 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
 
     const submitMat = (e: React.FormEvent) => {
         e.preventDefault();
+        // Duplicate name check — block and tell the user which category it's in
+        const newName = matForm.data.name.trim().toLowerCase();
+        const dup = [...materials, ...pendingMaterials].find(
+            (m) => m.name.trim().toLowerCase() === newName && m.id !== editingMat?.id
+        );
+        if (dup) {
+            window.alert(`⚠️ "${dup.name}" already exists in category "${dup.category ?? 'Uncategorized'}"${dup.approval_status === 'pending' ? ' (pending approval)' : ''}. Duplicate names are not allowed.`);
+            return;
+        }
         if (editingMat) {
             matForm.patch(matUpdate(editingMat.id).url, {
                 preserveScroll: true,
@@ -2445,13 +2454,13 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                     {!matForm.errors.name && matForm.data.name.trim().length >= 3 && (() => {
                                         const nameVal = matForm.data.name.trim();
                                         const q = nameVal.toLowerCase();
-                                        const dup = materials.find((m) =>
+                                        const dup = [...materials, ...pendingMaterials].find((m) =>
                                             m.name.toLowerCase() === q && m.id !== editingMat?.id
                                         );
                                         if (dup) {
                                             return (
-                                                <div style={{ marginTop: 4, padding: '5px 10px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 5, fontSize: 12, color: '#9a3412' }}>
-                                                    ⚠️ "{dup.name}" નામ already exist છે
+                                                <div style={{ marginTop: 4, padding: '5px 10px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 5, fontSize: 12, color: '#991b1b', fontWeight: 600 }}>
+                                                    ⚠️ "{dup.name}" already exists in category "{dup.category ?? 'Uncategorized'}"{dup.approval_status === 'pending' ? ' (pending approval)' : ''} — duplicate name allowed નથી
                                                 </div>
                                             );
                                         }
