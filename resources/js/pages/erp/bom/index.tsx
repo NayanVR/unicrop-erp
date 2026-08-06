@@ -14,6 +14,7 @@ type RawMaterial = {
     id: number;
     name: string;
     unit: string;
+    density?: string | number | null;
     stock_qty: string | number;
     cost_per_unit: string | number;
     category?: string | null;
@@ -109,7 +110,7 @@ function bomType(unit: string): 'liquid' | 'powder' | 'other' {
 
 // Convert qty from one unit to another (weight: kg/g/mg; volume: L/ml)
 // Returns original qty if units are the same or incompatible dimensions.
-function convertQty(qty: number, fromUnit: string, toUnit: string): number {
+function convertQty(qty: number, fromUnit: string, toUnit: string, density?: number | string | null): number {
     const from = fromUnit.trim().toLowerCase();
     const to   = toUnit.trim().toLowerCase();
     if (from === to || !from || !to) return qty;
@@ -128,6 +129,15 @@ function convertQty(qty: number, fromUnit: string, toUnit: string): number {
         return qty * (weightFactor[from] / weightFactor[to]);
     if (volumeFactor[from] !== undefined && volumeFactor[to] !== undefined)
         return qty * (volumeFactor[from] / volumeFactor[to]);
+
+    // Cross weight<->volume via density (kg per litre)
+    const d = Number(density);
+    if (d > 0) {
+        if (weightFactor[from] !== undefined && volumeFactor[to] !== undefined)
+            return (qty * weightFactor[from] / d) / volumeFactor[to];
+        if (volumeFactor[from] !== undefined && weightFactor[to] !== undefined)
+            return (qty * volumeFactor[from] * d) / weightFactor[to];
+    }
 
     return qty; // incompatible dimensions — no conversion
 }
@@ -423,7 +433,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
             const matUnit  = mat?.unit ?? '';
             const itemUnit = item.unit || matUnit;
             const qtyUsed     = Number(item.qty_per_batch) * batchCount;
-            const qtyDeducted = mat ? convertQty(qtyUsed, itemUnit, matUnit) : qtyUsed;
+            const qtyDeducted = mat ? convertQty(qtyUsed, itemUnit, matUnit, mat.density) : qtyUsed;
             const cost        = mat ? qtyDeducted * Number(mat.cost_per_unit) : 0;
             return { name: mat?.name ?? `Material #${item.raw_material_id}`, qtyUsed, itemUnit, qtyDeducted, matUnit, cost };
         });
@@ -508,7 +518,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
             const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
             if (!mat) return sum;
             const itemUnit = item.unit || mat.unit;
-            const qtyInMatUnit = convertQty(Number(item.qty_per_batch), itemUnit, mat.unit);
+            const qtyInMatUnit = convertQty(Number(item.qty_per_batch), itemUnit, mat.unit, mat.density);
             return sum + qtyInMatUnit * Number(mat.cost_per_unit) * batches;
         }, 0);
         const chargeCost = (bom.charges ?? []).reduce((sum, c) => sum + (Number(c.amount) || 0) * batches, 0);
@@ -520,7 +530,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
             const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
             if (!mat) return false;
             const itemUnit = item.unit || mat.unit;
-            const needed = convertQty(Number(item.qty_per_batch) * batches, itemUnit, mat.unit);
+            const needed = convertQty(Number(item.qty_per_batch) * batches, itemUnit, mat.unit, mat.density);
             return Number(mat.stock_qty) >= needed;
         });
 
@@ -889,7 +899,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                             const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
                                             const matUnit = mat?.unit ?? '';
                                             const itemUnit = item.unit || matUnit;
-                                            const neededInMatUnit = mat ? convertQty(Number(item.qty_per_batch), itemUnit, matUnit) : Number(item.qty_per_batch);
+                                            const neededInMatUnit = mat ? convertQty(Number(item.qty_per_batch), itemUnit, matUnit, mat.density) : Number(item.qty_per_batch);
                                             const inStock = mat ? Number(mat.stock_qty) : 0;
                                             const sufficient = inStock >= neededInMatUnit;
                                             return (
@@ -1398,7 +1408,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                         const matUnit  = mat?.unit ?? '';
                                         const itemUnit = item.unit || matUnit;
                                         const needed   = Number(item.qty_per_batch) * qty;
-                                        const neededInMatUnit = mat ? convertQty(needed, itemUnit, matUnit) : needed;
+                                        const neededInMatUnit = mat ? convertQty(needed, itemUnit, matUnit, mat.density) : needed;
                                         const inStock  = mat ? Number(mat.stock_qty) : 0;
                                         const ok       = inStock >= neededInMatUnit;
                                         return (

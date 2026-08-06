@@ -223,7 +223,7 @@ class BomController extends Controller
 
             foreach ($bom->items()->with('rawMaterial')->get() as $item) {
                 $itemUnit  = $item->unit ?: $item->rawMaterial->unit;
-                $required  = $this->convertQty((float) $item->qty_per_batch * $batchCount, $itemUnit, $item->rawMaterial->unit);
+                $required  = $this->convertQty((float) $item->qty_per_batch * $batchCount, $itemUnit, $item->rawMaterial->unit, $item->rawMaterial->density ? (float) $item->rawMaterial->density : null);
                 $available = (float) $item->rawMaterial->stock_qty;
 
                 if ($available < $required) {
@@ -242,7 +242,7 @@ class BomController extends Controller
                 $itemUnit    = $item->unit ?: $item->rawMaterial->unit;
                 $matUnit     = $item->rawMaterial->unit;
                 $qtyUsed     = (float) $item->qty_per_batch * $batchCount;
-                $qtyDeducted = $this->convertQty($qtyUsed, $itemUnit, $matUnit);
+                $qtyDeducted = $this->convertQty($qtyUsed, $itemUnit, $matUnit, $item->rawMaterial->density ? (float) $item->rawMaterial->density : null);
                 $cost        = $qtyDeducted * (float) $item->rawMaterial->cost_per_unit;
 
                 $product = Product::where('raw_material_id', $item->rawMaterial->id)->first();
@@ -416,7 +416,7 @@ class BomController extends Controller
     }
 
     // Convert qty between compatible units (weight: kg/g/mg; volume: L/mL).
-    private function convertQty(float $qty, string $fromUnit, string $toUnit): float
+    private function convertQty(float $qty, string $fromUnit, string $toUnit, ?float $density = null): float
     {
         $from = strtolower(trim($fromUnit));
         $to   = strtolower(trim($toUnit));
@@ -427,6 +427,18 @@ class BomController extends Controller
 
         if (isset($weight[$from], $weight[$to])) return $qty * ($weight[$from] / $weight[$to]);
         if (isset($volume[$from], $volume[$to])) return $qty * ($volume[$from] / $volume[$to]);
+
+        // Cross weight<->volume conversion via density (kg per litre)
+        if ($density && $density > 0) {
+            if (isset($weight[$from], $volume[$to])) {
+                // weight -> kg -> litres -> target volume unit
+                return ($qty * $weight[$from] / $density) / $volume[$to];
+            }
+            if (isset($volume[$from], $weight[$to])) {
+                // volume -> litres -> kg -> target weight unit
+                return ($qty * $volume[$from] * $density) / $weight[$to];
+            }
+        }
 
         return $qty;
     }

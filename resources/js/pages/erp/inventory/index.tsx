@@ -20,6 +20,7 @@ type RawMaterial = {
     group_name: string | null;
     shape: string | null;
     unit: string;
+    density: string | number | null;
     stock_qty: string | number;
     min_stock: string | number;
     reorder_level: string | number;
@@ -796,6 +797,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
         hsn: '',
         gst: '18',
         unit: 'kg',
+        density: '',
         category: '',
         group_name: '',
         shape: '',
@@ -963,6 +965,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
             hsn: m.hsn ?? '',
             gst: num(m.gst),
             unit: m.unit,
+            density: m.density != null ? num(m.density) : '',
             category: m.category ?? '',
             group_name: m.group_name ?? '',
             shape: m.shape ?? '',
@@ -2483,6 +2486,18 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                     >
                                         {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
                                     </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>Density (kg/L)</label>
+                                    <input
+                                        type="number"
+                                        step="0.0001"
+                                        min="0"
+                                        placeholder="e.g. 0.9 (1L = 900gm)"
+                                        value={matForm.data.density}
+                                        onChange={(e) => matForm.setData('density', e.target.value)}
+                                    />
+                                    <small style={{ fontSize: 11, color: 'var(--tx-muted)' }}>BOM માં kg↔L conversion માટે (optional)</small>
                                     {matForm.errors.unit && <div className="form-error">{matForm.errors.unit}</div>}
                                 </div>
                                 <div className="form-group">
