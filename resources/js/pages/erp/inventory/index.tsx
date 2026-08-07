@@ -21,6 +21,7 @@ type RawMaterial = {
     shape: string | null;
     unit: string;
     density: string | number | null;
+    company_id?: number;
     stock_qty: string | number;
     min_stock: string | number;
     reorder_level: string | number;
@@ -1000,22 +1001,31 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
         e.preventDefault();
         // Duplicate name check — block and tell the user which category it's in
         const newName = matForm.data.name.trim().toLowerCase();
+        const currentCompanyId = auth.current_company?.id;
         const dup = [...materials, ...pendingMaterials].find(
-            (m) => m.name.trim().toLowerCase() === newName && m.id !== editingMat?.id
+            (m) => m.name.trim().toLowerCase() === newName
+                && m.id !== editingMat?.id
+                && (m.company_id == null || currentCompanyId == null || m.company_id === currentCompanyId)
         );
         if (dup) {
             window.alert(`⚠️ "${dup.name}" already exists in category "${dup.category ?? 'Uncategorized'}"${dup.approval_status === 'pending' ? ' (pending approval)' : ''}. Duplicate names are not allowed.`);
             return;
         }
+        const showFirstError = (errs: Record<string, string>) => {
+            const first = Object.values(errs)[0];
+            if (first) window.alert(`⚠️ ${first}`);
+        };
         if (editingMat) {
             matForm.patch(matUpdate(editingMat.id).url, {
                 preserveScroll: true,
                 onSuccess: () => { setMatModal(false); setEditingMat(null); matForm.reset(); },
+                onError: showFirstError,
             });
         } else {
             matForm.post(matStore().url, {
                 preserveScroll: true,
                 onSuccess: () => { setMatModal(false); matForm.reset(); },
+                onError: showFirstError,
             });
         }
     };
@@ -2457,8 +2467,10 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                     {!matForm.errors.name && matForm.data.name.trim().length >= 3 && (() => {
                                         const nameVal = matForm.data.name.trim();
                                         const q = nameVal.toLowerCase();
+                                        const ccid = auth.current_company?.id;
                                         const dup = [...materials, ...pendingMaterials].find((m) =>
                                             m.name.toLowerCase() === q && m.id !== editingMat?.id
+                                            && (m.company_id == null || ccid == null || m.company_id === ccid)
                                         );
                                         if (dup) {
                                             return (
