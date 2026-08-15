@@ -1,4 +1,5 @@
 import SearchableSelect from '@/components/searchable-select';
+import { fuzzyMatch } from '@/lib/similar-name';
 import type { Auth } from '@/types/auth';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
@@ -373,10 +374,11 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
 
     const filtered = recipes.filter((r) => {
         if (!search.trim()) return true;
-        const q = search.toLowerCase();
-        return r.name.toLowerCase().includes(q)
-            || (r.packing_size ?? '').toLowerCase().includes(q)
-            || r.items.some((i) => (i.raw_material?.name ?? '').toLowerCase().includes(q));
+        const q = search.trim();
+        return fuzzyMatch(r.name, q)
+            || fuzzyMatch(r.group_name, q)
+            || fuzzyMatch(r.packing_size, q)
+            || r.items.some((i) => fuzzyMatch(i.raw_material?.name, q));
     });
 
     return (
@@ -439,7 +441,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                         type="search"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="🔍 Search products..."
+                        placeholder="🔍 Search product, group or material…"
                         style={{ width: 220 }}
                     />
                 </div>
@@ -466,7 +468,8 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
 
                     return sortedKeys.map((groupKey) => {
                         const groupRecipes  = groupMap[groupKey];
-                        const isCollapsed   = collapsedGroups.has(groupKey);
+                        // While searching, keep every matching group open
+                        const isCollapsed   = search.trim() ? false : collapsedGroups.has(groupKey);
                         const hasLowStock   = groupRecipes.some((r) => {
                             const m = r.output_material;
                             return m && (Number(m.stock_qty) <= Number(m.min_stock ?? 0) || Number(m.stock_qty) <= 0);

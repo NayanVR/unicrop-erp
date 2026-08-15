@@ -9,7 +9,7 @@ import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 import { ModalPortal } from '@/components/modal-portal';
 import SearchableSelect from '@/components/searchable-select';
-import { isSimilarName } from '@/lib/similar-name';
+import { fuzzyMatch, isSimilarName } from '@/lib/similar-name';
 
 type RawMaterial = {
     id: number;
@@ -648,10 +648,10 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
         if (typeFilter !== 'all' && bomType(b.batch_unit) !== typeFilter) return false;
         if (categoryFilter !== 'all' && ((b.category ?? '').trim() || UNCATEGORIZED) !== categoryFilter) return false;
         if (search.trim()) {
-            const q = search.toLowerCase();
-            return b.name.toLowerCase().includes(q)
-                || (b.category ?? '').toLowerCase().includes(q)
-                || b.items.some((i) => (i.raw_material?.name ?? '').toLowerCase().includes(q));
+            const q = search.trim();
+            return fuzzyMatch(b.name, q)
+                || fuzzyMatch((b.category ?? '').trim() || UNCATEGORIZED, q)
+                || b.items.some((i) => fuzzyMatch(i.raw_material?.name, q));
         }
         return true;
     });
@@ -737,8 +737,8 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                         type="search"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="🔍 Search BOMs..."
-                        style={{ width: 220 }}
+                        placeholder="🔍 Search BOM, group or material…"
+                        style={{ width: 260 }}
                     />
                     <div className="filter-bar" style={{ margin: 0 }}>
                         {(['all', 'liquid', 'powder', 'other'] as const).map((t) => (
@@ -783,7 +783,8 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                     </div>
                 ) : (
                     groupedBoms.map(([cat, list]) => {
-                    const isCollapsed = collapsedGroups.has(cat);
+                    // While searching, keep every matching group open
+                    const isCollapsed = search.trim() ? false : collapsedGroups.has(cat);
                     return (
                     <div key={cat} style={{ marginBottom: 24 }}>
                         {showGroupHeaders && (

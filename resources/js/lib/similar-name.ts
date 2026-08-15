@@ -47,6 +47,31 @@ export function isSimilarName(a: string, b: string): boolean {
     return fuzzyEq(baseName(a), baseName(b));
 }
 
+// Search match: plain substring first, then typo-tolerant fuzzy fallback.
+// Use for search boxes so "amino liqid" still finds "Amino Liquid".
+export function fuzzyMatch(haystack: string | null | undefined, query: string): boolean {
+    const h = (haystack ?? '').toLowerCase();
+    const q = query.toLowerCase().trim();
+    if (!q) return true;
+    if (!h) return false;
+    if (h.includes(q)) return true;
+
+    const nh = normalize(h), nq = normalize(q);
+    if (!nq) return false;
+    if (nh.includes(nq)) return true;
+    // Too short to guess at typos — avoid matching everything
+    if (nq.length < 4) return false;
+
+    // Allow ~20% of the query length as typos, checked against the whole
+    // string and against each word (so one wrong word still matches).
+    const budget = Math.max(1, Math.floor(nq.length * 0.2));
+    if (levenshtein(nh, nq) <= budget) return true;
+    return h.split(/[\s,/()-]+/).some((word) => {
+        const nw = normalize(word);
+        return nw.length >= 3 && levenshtein(nw, nq) <= budget;
+    });
+}
+
 // Find similar existing names from a list (excluding an exact self-match)
 export function findSimilar(name: string, existing: string[], excludeExact = true): string[] {
     const trimmed = name.trim();
