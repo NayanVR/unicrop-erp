@@ -231,7 +231,7 @@ class BomController extends Controller
             foreach ($bom->items()->with('rawMaterial')->get() as $item) {
                 $itemUnit  = $item->unit ?: $item->rawMaterial->unit;
                 $potencyMul = $this->potencyFactor(
-                    $item->base_potency ? (float) $item->base_potency : null,
+                    $this->basePotency($item),
                     $this->runPotency($item, $data['potencies'] ?? []),
                 );
                 $required  = $this->convertQty((float) $item->qty_per_batch * $batchCount * $potencyMul, $itemUnit, $item->rawMaterial->unit, $item->rawMaterial->density ? (float) $item->rawMaterial->density : null);
@@ -253,7 +253,7 @@ class BomController extends Controller
                 $itemUnit    = $item->unit ?: $item->rawMaterial->unit;
                 $matUnit     = $item->rawMaterial->unit;
                 $qtyUsed     = (float) $item->qty_per_batch * $batchCount * $this->potencyFactor(
-                    $item->base_potency ? (float) $item->base_potency : null,
+                    $this->basePotency($item),
                     $this->runPotency($item, $data['potencies'] ?? []),
                 );
                 $qtyDeducted = $this->convertQty($qtyUsed, $itemUnit, $matUnit, $item->rawMaterial->density ? (float) $item->rawMaterial->density : null);
@@ -435,6 +435,19 @@ class BomController extends Controller
      * When a BOM item declares the assay its quantity was written for,
      * scale the quantity to whatever the stock actually tests at.
      */
+    /**
+     * Assay the recipe quantity was written for. Falls back to the assay
+     * recorded on the material, so an ordinary BOM needs no extra setup.
+     */
+    private function basePotency($item): ?float
+    {
+        if ($item->base_potency && (float) $item->base_potency > 0) {
+            return (float) $item->base_potency;
+        }
+
+        return $item->rawMaterial->potency ? (float) $item->rawMaterial->potency : null;
+    }
+
     /**
      * Assay to dose against for this run: the value entered on the run form
      * wins over whatever is stored on the material.

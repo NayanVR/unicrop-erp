@@ -448,9 +448,11 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
         runForm.reset();
         const prefill: Record<string, string> = {};
         for (const item of bom.items) {
-            if (!item.base_potency) continue;
             const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
-            prefill[String(item.raw_material_id)] = mat?.potency != null ? String(Number(mat.potency)) : '';
+            // Recipe assay = the item's own value, else whatever the material is recorded at
+            const base = item.base_potency ?? mat?.potency;
+            if (!Number(base)) continue;
+            prefill[String(item.raw_material_id)] = String(Number(base));
         }
         runForm.setData((prev) => ({ ...prev, batch_number: suggested, potencies: prefill }));
         setRunTarget(bom);
@@ -477,7 +479,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
             const matUnit  = mat?.unit ?? '';
             const itemUnit = item.unit || matUnit;
             const qtyUsed     = Number(item.qty_per_batch) * batchCount;
-            const qtyAdj      = potencyAdjusted(qtyUsed, item.base_potency, mat?.potency);
+            const qtyAdj      = potencyAdjusted(qtyUsed, item.base_potency ?? mat?.potency, mat?.potency);
             const qtyDeducted = mat ? convertQty(qtyAdj, itemUnit, matUnit, mat.density) : qtyAdj;
             const cost        = mat ? qtyDeducted * Number(mat.cost_per_unit) : 0;
             return { name: mat?.name ?? `Material #${item.raw_material_id}`, qtyUsed, itemUnit, qtyDeducted, matUnit, cost };
@@ -563,7 +565,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
             const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
             if (!mat) return sum;
             const itemUnit = item.unit || mat.unit;
-            const qtyInMatUnit = convertQty(potencyAdjusted(Number(item.qty_per_batch), item.base_potency, mat.potency), itemUnit, mat.unit, mat.density);
+            const qtyInMatUnit = convertQty(potencyAdjusted(Number(item.qty_per_batch), item.base_potency ?? mat.potency, mat.potency), itemUnit, mat.unit, mat.density);
             return sum + qtyInMatUnit * Number(mat.cost_per_unit) * batches;
         }, 0);
         const chargeCost = (bom.charges ?? []).reduce((sum, c) => sum + (Number(c.amount) || 0) * batches, 0);
@@ -575,7 +577,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
             const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
             if (!mat) return false;
             const itemUnit = item.unit || mat.unit;
-            const needed = convertQty(potencyAdjusted(Number(item.qty_per_batch) * batches, item.base_potency, mat.potency), itemUnit, mat.unit, mat.density);
+            const needed = convertQty(potencyAdjusted(Number(item.qty_per_batch) * batches, item.base_potency ?? mat.potency, mat.potency), itemUnit, mat.unit, mat.density);
             return Number(mat.stock_qty) >= needed;
         });
 
@@ -945,7 +947,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                             const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
                                             const matUnit = mat?.unit ?? '';
                                             const itemUnit = item.unit || matUnit;
-                                            const neededInMatUnit = mat ? convertQty(potencyAdjusted(Number(item.qty_per_batch), item.base_potency, mat.potency), itemUnit, matUnit, mat.density) : Number(item.qty_per_batch);
+                                            const neededInMatUnit = mat ? convertQty(potencyAdjusted(Number(item.qty_per_batch), item.base_potency ?? mat.potency, mat.potency), itemUnit, matUnit, mat.density) : Number(item.qty_per_batch);
                                             const inStock = mat ? Number(mat.stock_qty) : 0;
                                             const sufficient = inStock >= neededInMatUnit;
                                             return (
@@ -956,7 +958,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                                     <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
                                                         {(() => {
                                                             const raw = Number(item.qty_per_batch);
-                                                            const adj = potencyAdjusted(raw, item.base_potency, mat?.potency);
+                                                            const adj = potencyAdjusted(raw, item.base_potency ?? mat?.potency, mat?.potency);
                                                             return Math.abs(adj - raw) < 0.0005 ? formatQty(raw) : (
                                                                 <>
                                                                     {formatQty(adj)}
@@ -1280,14 +1282,22 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                   </div>
                                   {(() => {
                                       const mat = materials.find((m) => String(m.id) === String(item.raw_material_id));
-                                      const base = Number(item.base_potency);
                                       const actual = Number(mat?.potency);
+                                      const base = Number(item.base_potency) || actual;
                                       const qty = Number(item.qty_per_batch);
-                                      if (!mat || !base || !qty) return null;
-                                      if (!actual) {
+                                      if (!mat || !qty) return null;
+                                      if (Number(item.base_potency) && !actual) {
                                           return (
                                               <div style={{ fontSize: 11, color: '#b45309', marginTop: 3 }}>
                                                   ⚠️ "{mat.name}" માં potency % set નથી — Inventory માં ઉમેરો, પછી quantity આપોઆપ ગોઠવાશે.
+                                              </div>
+                                          );
+                                      }
+                                      if (!base || !actual) return null;
+                                      if (!Number(item.base_potency)) {
+                                          return (
+                                              <div style={{ fontSize: 11, color: 'var(--tx-muted)', marginTop: 3 }}>
+                                                  🧪 {qty} {item.unit || mat.unit} @ {actual}% ({mat.name} ની નોંધેલી assay) — production run વખતે બીજી assay નાખી શકાશે
                                               </div>
                                           );
                                       }
@@ -1505,11 +1515,13 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                         const needed   = Number(item.qty_per_batch) * qty;
                                         // Assay entered for this run wins over the material's stored value
                                         const key      = String(item.raw_material_id);
-                                        const runAssay = item.base_potency
-                                            ? (runForm.data.potencies[key] ?? (mat?.potency != null ? String(Number(mat.potency)) : ''))
+                                        const baseAssay = item.base_potency ?? mat?.potency;
+                                        const hasAssay = Number(baseAssay) > 0;
+                                        const runAssay = hasAssay
+                                            ? (runForm.data.potencies[key] ?? String(Number(baseAssay)))
                                             : '';
-                                        const effAssay = Number(runAssay) > 0 ? runAssay : mat?.potency;
-                                        const neededAdj = potencyAdjusted(needed, item.base_potency, effAssay);
+                                        const effAssay = Number(runAssay) > 0 ? runAssay : baseAssay;
+                                        const neededAdj = potencyAdjusted(needed, baseAssay, effAssay);
                                         const neededInMatUnit = mat ? convertQty(neededAdj, itemUnit, matUnit, mat.density) : neededAdj;
                                         const inStock  = mat ? Number(mat.stock_qty) : 0;
                                         const ok       = inStock >= neededInMatUnit;
@@ -1518,7 +1530,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                             <div key={i} style={{ padding: '7px 12px', borderBottom: i < runTarget.items.length - 1 ? '1px solid var(--border)' : undefined, fontSize: 13 }}>
                                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                                                 <span style={{ flex: 1, color: ok ? 'var(--tx-body)' : '#dc2626' }}>{mat?.name ?? `Material #${item.raw_material_id}`}</span>
-                                                {item.base_potency ? (
+                                                {hasAssay ? (
                                                     <span style={{ display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                                                         <span style={{ fontSize: 11, color: 'var(--tx-muted)' }}>assay</span>
                                                         <input
@@ -1526,7 +1538,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                                             value={runAssay}
                                                             onChange={(e) => runForm.setData('potencies', { ...runForm.data.potencies, [key]: e.target.value })}
                                                             step="0.001" min="0" max="100"
-                                                            placeholder={String(item.base_potency)}
+                                                            placeholder={String(Number(baseAssay))}
                                                             title="આ lot ની ખરી ટકાવારી"
                                                             style={{ width: 64, padding: '2px 5px', fontSize: 12 }}
                                                         />
@@ -1539,14 +1551,9 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                                     {ok && <span style={{ marginLeft: 8, fontSize: 11, color: '#059669', background: '#d1fae5', padding: '1px 6px', borderRadius: 8 }}>✓</span>}
                                                 </span>
                                               </div>
-                                              {item.base_potency && shifted && (
+                                              {hasAssay && shifted && (
                                                   <div style={{ fontSize: 11, color: '#0369a1', marginTop: 2 }}>
-                                                      🧪 recipe {fmtSmart(needed, itemUnit)} @ {item.base_potency}% → {effAssay}% માટે <strong>{fmtSmart(neededAdj, itemUnit)}</strong> નાખવું
-                                                  </div>
-                                              )}
-                                              {item.base_potency && !Number(effAssay) && (
-                                                  <div style={{ fontSize: 11, color: '#b45309', marginTop: 2 }}>
-                                                      ⚠️ assay % નાખો, નહીં તો recipe ની quantity જ વપરાશે
+                                                      🧪 recipe {fmtSmart(needed, itemUnit)} @ {Number(baseAssay)}% → {effAssay}% માટે <strong>{fmtSmart(neededAdj, itemUnit)}</strong> નાખવું
                                                   </div>
                                               )}
                                             </div>
