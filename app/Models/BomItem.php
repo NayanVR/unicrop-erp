@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['bom_id', 'raw_material_id', 'qty_per_batch', 'unit', 'notes'])]
+#[Fillable(['bom_id', 'raw_material_id', 'qty_per_batch', 'base_potency', 'unit', 'notes'])]
 class BomItem extends Model
 {
     /**
@@ -16,6 +16,7 @@ class BomItem extends Model
     {
         return [
             'qty_per_batch' => 'decimal:3',
+            'base_potency' => 'decimal:3',
         ];
     }
 

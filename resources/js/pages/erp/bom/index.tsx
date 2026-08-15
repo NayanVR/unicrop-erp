@@ -16,6 +16,7 @@ type RawMaterial = {
     name: string;
     unit: string;
     density?: string | number | null;
+    potency?: string | number | null;
     stock_qty: string | number;
     cost_per_unit: string | number;
     category?: string | null;
@@ -25,6 +26,7 @@ type BomItem = {
     id?: number;
     raw_material_id: number;
     qty_per_batch: string | number;
+    base_potency?: string | number | null;
     unit?: string | null;
     raw_material?: RawMaterial | null;
 };
@@ -62,7 +64,7 @@ type BomFormData = {
     output_category: string;
     notes: string;
     is_active: boolean;
-    items: { raw_material_id: string; qty_per_batch: string; unit: string }[];
+    items: { raw_material_id: string; qty_per_batch: string; base_potency: string; unit: string }[];
     charges: { label: string; amount: string }[];
 };
 
@@ -141,6 +143,15 @@ function convertQty(qty: number, fromUnit: string, toUnit: string, density?: num
     }
 
     return qty; // incompatible dimensions — no conversion
+}
+
+// Technical materials are bought at varying assay. When a BOM item records the
+// assay its quantity assumes, scale it to whatever the stock actually tests at.
+function potencyAdjusted(qty: number, basePotency?: string | number | null, actualPotency?: string | number | null): number {
+    const base = Number(basePotency);
+    const actual = Number(actualPotency);
+    if (!base || base <= 0 || !actual || actual <= 0) return qty;
+    return qty * base / actual;
 }
 
 const TYPE_CONFIG = {
@@ -328,6 +339,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
             items: bom.items.map((i) => ({
                 raw_material_id: String(i.raw_material_id),
                 qty_per_batch: String(i.qty_per_batch),
+                base_potency: i.base_potency != null ? String(i.base_potency) : '',
                 unit: i.unit ?? '',
             })),
             charges: (bom.charges ?? []).map((c) => ({ label: c.label, amount: String(c.amount) })),
@@ -340,7 +352,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
     };
 
     const addItem = () => {
-        form.setData('items', [...form.data.items, { raw_material_id: '', qty_per_batch: '', unit: '' }]);
+        form.setData('items', [...form.data.items, { raw_material_id: '', qty_per_batch: '', base_potency: '', unit: '' }]);
         setItemSearches((prev) => [...prev, '']);
     };
 
@@ -459,7 +471,8 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
             const matUnit  = mat?.unit ?? '';
             const itemUnit = item.unit || matUnit;
             const qtyUsed     = Number(item.qty_per_batch) * batchCount;
-            const qtyDeducted = mat ? convertQty(qtyUsed, itemUnit, matUnit, mat.density) : qtyUsed;
+            const qtyAdj      = potencyAdjusted(qtyUsed, item.base_potency, mat?.potency);
+            const qtyDeducted = mat ? convertQty(qtyAdj, itemUnit, matUnit, mat.density) : qtyAdj;
             const cost        = mat ? qtyDeducted * Number(mat.cost_per_unit) : 0;
             return { name: mat?.name ?? `Material #${item.raw_material_id}`, qtyUsed, itemUnit, qtyDeducted, matUnit, cost };
         });
@@ -544,7 +557,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
             const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
             if (!mat) return sum;
             const itemUnit = item.unit || mat.unit;
-            const qtyInMatUnit = convertQty(Number(item.qty_per_batch), itemUnit, mat.unit, mat.density);
+            const qtyInMatUnit = convertQty(potencyAdjusted(Number(item.qty_per_batch), item.base_potency, mat.potency), itemUnit, mat.unit, mat.density);
             return sum + qtyInMatUnit * Number(mat.cost_per_unit) * batches;
         }, 0);
         const chargeCost = (bom.charges ?? []).reduce((sum, c) => sum + (Number(c.amount) || 0) * batches, 0);
@@ -556,7 +569,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
             const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
             if (!mat) return false;
             const itemUnit = item.unit || mat.unit;
-            const needed = convertQty(Number(item.qty_per_batch) * batches, itemUnit, mat.unit, mat.density);
+            const needed = convertQty(potencyAdjusted(Number(item.qty_per_batch) * batches, item.base_potency, mat.potency), itemUnit, mat.unit, mat.density);
             return Number(mat.stock_qty) >= needed;
         });
 
@@ -926,7 +939,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                             const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
                                             const matUnit = mat?.unit ?? '';
                                             const itemUnit = item.unit || matUnit;
-                                            const neededInMatUnit = mat ? convertQty(Number(item.qty_per_batch), itemUnit, matUnit, mat.density) : Number(item.qty_per_batch);
+                                            const neededInMatUnit = mat ? convertQty(potencyAdjusted(Number(item.qty_per_batch), item.base_potency, mat.potency), itemUnit, matUnit, mat.density) : Number(item.qty_per_batch);
                                             const inStock = mat ? Number(mat.stock_qty) : 0;
                                             const sufficient = inStock >= neededInMatUnit;
                                             return (
@@ -935,7 +948,18 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                                         {mat?.name ?? `Material #${item.raw_material_id}`}
                                                     </span>
                                                     <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
-                                                        {formatQty(item.qty_per_batch)}{' '}
+                                                        {(() => {
+                                                            const raw = Number(item.qty_per_batch);
+                                                            const adj = potencyAdjusted(raw, item.base_potency, mat?.potency);
+                                                            return Math.abs(adj - raw) < 0.0005 ? formatQty(raw) : (
+                                                                <>
+                                                                    {formatQty(adj)}
+                                                                    <span style={{ fontWeight: 400, color: '#0369a1', fontSize: 11 }} title={`Recipe asks ${raw} at ${item.base_potency}%, stock is ${mat?.potency}%`}>
+                                                                        {' '}🧪
+                                                                    </span>
+                                                                </>
+                                                            );
+                                                        })()}{' '}
                                                         <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 12 }}>{normalizeUnitDisplay(itemUnit)}</span>
                                                     </span>
                                                     {canSeeCost && mat && (
@@ -1213,12 +1237,18 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                     <option key={m.id} value={m.name}>{formatQty(m.stock_qty)} {m.unit}</option>
                                 ))}
                             </datalist>
+                            {form.data.items.length > 0 && (
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 90px 32px', gap: 8, marginBottom: 4, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px', color: 'var(--tx-faint)' }}>
+                                    <span>Material</span><span>Qty</span><span>Unit</span><span title="Assay % the quantity assumes — for technical materials">Assay %</span><span />
+                                </div>
+                            )}
                             {form.data.items.length === 0 ? (
                                 <div style={{ textAlign: 'center', padding: 16, color: 'var(--tx-faint)', fontSize: 13, border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)' }}>
                                     No ingredients added yet.
                                 </div>
                             ) : form.data.items.map((item, idx) => (
-                                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 32px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                                <div key={idx} style={{ marginBottom: 8 }}>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 90px 32px', gap: 8, alignItems: 'center' }}>
                                     <input
                                         type="text"
                                         list="bom-materials-list"
@@ -1232,7 +1262,39 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                         <option value="">— unit —</option>
                                         {['kg', 'gm', 'g', 'mg', 'L', 'ml', 'pcs', 'nos'].map((u) => <option key={u} value={u}>{u}</option>)}
                                     </select>
+                                    <input
+                                        type="number"
+                                        placeholder="@ %"
+                                        title="Assay % this quantity assumes — leave blank if the material has no potency"
+                                        value={item.base_potency}
+                                        onChange={(e) => updateItem(idx, 'base_potency', e.target.value)}
+                                        step="0.001" min="0" max="100"
+                                    />
                                     <button type="button" className="btn danger-xs" onClick={() => removeItem(idx)} style={{ padding: '0 8px', height: 32 }}>✕</button>
+                                  </div>
+                                  {(() => {
+                                      const mat = materials.find((m) => String(m.id) === String(item.raw_material_id));
+                                      const base = Number(item.base_potency);
+                                      const actual = Number(mat?.potency);
+                                      const qty = Number(item.qty_per_batch);
+                                      if (!mat || !base || !qty) return null;
+                                      if (!actual) {
+                                          return (
+                                              <div style={{ fontSize: 11, color: '#b45309', marginTop: 3 }}>
+                                                  ⚠️ "{mat.name}" માં potency % set નથી — Inventory માં ઉમેરો, પછી quantity આપોઆપ ગોઠવાશે.
+                                              </div>
+                                          );
+                                      }
+                                      const adjusted = qty * base / actual;
+                                      if (Math.abs(adjusted - qty) < 0.0005) return null;
+                                      return (
+                                          <div style={{ fontSize: 11, color: '#0369a1', marginTop: 3 }}>
+                                              🧪 {mat.name} stock {actual}% છે → ખરેખર વપરાશે{' '}
+                                              <strong>{adjusted.toLocaleString('en-IN', { maximumFractionDigits: 3 })} {item.unit || mat.unit}</strong>
+                                              {' '}({qty} @ {base}%)
+                                          </div>
+                                      );
+                                  })()}
                                 </div>
                             ))}
                         </div>
@@ -1435,7 +1497,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                         const matUnit  = mat?.unit ?? '';
                                         const itemUnit = item.unit || matUnit;
                                         const needed   = Number(item.qty_per_batch) * qty;
-                                        const neededInMatUnit = mat ? convertQty(needed, itemUnit, matUnit, mat.density) : needed;
+                                        const neededInMatUnit = mat ? convertQty(potencyAdjusted(needed, item.base_potency, mat.potency), itemUnit, matUnit, mat.density) : needed;
                                         const inStock  = mat ? Number(mat.stock_qty) : 0;
                                         const ok       = inStock >= neededInMatUnit;
                                         return (

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'alternative_names', 'sku', 'hsn', 'gst', 'unit', 'density', 'category', 'group_name', 'shape', 'stock_qty', 'min_stock', 'reorder_level', 'cost_per_unit', 'selling_rate', 'dim_l', 'dim_w', 'dim_h', 'supplier', 'notes', 'is_active', 'approval_status', 'requested_by'])]
+#[Fillable(['name', 'alternative_names', 'sku', 'hsn', 'gst', 'unit', 'density', 'potency', 'category', 'group_name', 'shape', 'stock_qty', 'min_stock', 'reorder_level', 'cost_per_unit', 'selling_rate', 'dim_l', 'dim_w', 'dim_h', 'supplier', 'notes', 'is_active', 'approval_status', 'requested_by'])]
 class RawMaterial extends Model
 {
     use BelongsToCompany;
@@ -21,6 +21,7 @@ class RawMaterial extends Model
         return [
             'stock_qty' => 'decimal:3',
             'density' => 'decimal:4',
+            'potency' => 'decimal:3',
             'min_stock' => 'decimal:3',
             'cost_per_unit' => 'decimal:2',
             'is_active' => 'boolean',

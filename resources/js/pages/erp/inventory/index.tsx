@@ -23,6 +23,7 @@ type RawMaterial = {
     shape: string | null;
     unit: string;
     density: string | number | null;
+    potency: string | number | null;
     company_id?: number;
     stock_qty: string | number;
     min_stock: string | number;
@@ -778,6 +779,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
         gst: '18',
         unit: 'kg',
         density: '',
+        potency: '',
         category: '',
         group_name: '',
         shape: '',
@@ -948,6 +950,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
             gst: num(m.gst),
             unit: m.unit,
             density: m.density != null ? num(m.density) : '',
+            potency: m.potency != null ? num(m.potency) : '',
             category: m.category ?? '',
             group_name: m.group_name ?? '',
             shape: m.shape ?? '',
@@ -2519,6 +2522,19 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                         onChange={(e) => matForm.setData('density', e.target.value)}
                                     />
                                     <small style={{ fontSize: 11, color: 'var(--tx-muted)' }}>BOM માં kg↔L conversion માટે (optional)</small>
+                                </div>
+                                <div className="form-group">
+                                    <label>Potency / Assay (%)</label>
+                                    <input
+                                        type="number"
+                                        step="0.001"
+                                        min="0"
+                                        max="100"
+                                        placeholder="e.g. 70 for 70% technical"
+                                        value={matForm.data.potency}
+                                        onChange={(e) => matForm.setData('potency', e.target.value)}
+                                    />
+                                    <small style={{ fontSize: 11, color: 'var(--tx-muted)' }}>Technical material ની ખરી ટકાવારી — BOM માં quantity આપોઆપ ગોઠવાશે</small>
                                     {matForm.errors.unit && <div className="form-error">{matForm.errors.unit}</div>}
                                 </div>
                                 <div className="form-group">

@@ -23,11 +23,11 @@ class BomController extends Controller
     public function index(): Response
     {
         $boms = Bom::query()
-            ->with(['items.rawMaterial:id,name,unit,density,stock_qty,cost_per_unit', 'outputMaterial:id,name,unit,stock_qty,min_stock,category'])
+            ->with(['items.rawMaterial:id,name,unit,density,potency,stock_qty,cost_per_unit', 'outputMaterial:id,name,unit,stock_qty,min_stock,category'])
             ->orderBy('name')
             ->get();
 
-        $materials  = RawMaterial::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'unit', 'stock_qty', 'cost_per_unit', 'category']);
+        $materials  = RawMaterial::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'unit', 'density', 'potency', 'stock_qty', 'cost_per_unit', 'category']);
         $categories = InventoryCategory::orderBy('name')->pluck('name');
 
         $productionRuns = ProductionRun::query()
@@ -59,6 +59,7 @@ class BomController extends Controller
             'items'                  => 'array',
             'items.*.raw_material_id' => 'required|exists:raw_materials,id',
             'items.*.qty_per_batch'  => 'required|numeric|min:0.001',
+            'items.*.base_potency'   => 'nullable|numeric|min:0.001|max:100',
             'items.*.unit'           => 'nullable|string|max:20',
             'charges'                => 'array',
             'charges.*.label'        => 'required|string|max:100',
@@ -95,6 +96,7 @@ class BomController extends Controller
                 $bom->items()->create([
                     'raw_material_id' => $item['raw_material_id'],
                     'qty_per_batch'   => $item['qty_per_batch'],
+                    'base_potency'    => $item['base_potency'] ?? null,
                     'unit'            => $item['unit'] ?? null,
                 ]);
             }
@@ -118,6 +120,7 @@ class BomController extends Controller
             'items'                  => 'array',
             'items.*.raw_material_id' => 'required|exists:raw_materials,id',
             'items.*.qty_per_batch'  => 'required|numeric|min:0.001',
+            'items.*.base_potency'   => 'nullable|numeric|min:0.001|max:100',
             'items.*.unit'           => 'nullable|string|max:20',
             'charges'                => 'array',
             'charges.*.label'        => 'required|string|max:100',
@@ -156,6 +159,7 @@ class BomController extends Controller
                 $bom->items()->create([
                     'raw_material_id' => $item['raw_material_id'],
                     'qty_per_batch'   => $item['qty_per_batch'],
+                    'base_potency'    => $item['base_potency'] ?? null,
                     'unit'            => $item['unit'] ?? null,
                 ]);
             }
@@ -223,7 +227,11 @@ class BomController extends Controller
 
             foreach ($bom->items()->with('rawMaterial')->get() as $item) {
                 $itemUnit  = $item->unit ?: $item->rawMaterial->unit;
-                $required  = $this->convertQty((float) $item->qty_per_batch * $batchCount, $itemUnit, $item->rawMaterial->unit, $item->rawMaterial->density ? (float) $item->rawMaterial->density : null);
+                $potencyMul = $this->potencyFactor(
+                    $item->base_potency ? (float) $item->base_potency : null,
+                    $item->rawMaterial->potency ? (float) $item->rawMaterial->potency : null,
+                );
+                $required  = $this->convertQty((float) $item->qty_per_batch * $batchCount * $potencyMul, $itemUnit, $item->rawMaterial->unit, $item->rawMaterial->density ? (float) $item->rawMaterial->density : null);
                 $available = (float) $item->rawMaterial->stock_qty;
 
                 if ($available < $required) {
@@ -241,7 +249,10 @@ class BomController extends Controller
             foreach ($bom->items()->with('rawMaterial')->get() as $item) {
                 $itemUnit    = $item->unit ?: $item->rawMaterial->unit;
                 $matUnit     = $item->rawMaterial->unit;
-                $qtyUsed     = (float) $item->qty_per_batch * $batchCount;
+                $qtyUsed     = (float) $item->qty_per_batch * $batchCount * $this->potencyFactor(
+                    $item->base_potency ? (float) $item->base_potency : null,
+                    $item->rawMaterial->potency ? (float) $item->rawMaterial->potency : null,
+                );
                 $qtyDeducted = $this->convertQty($qtyUsed, $itemUnit, $matUnit, $item->rawMaterial->density ? (float) $item->rawMaterial->density : null);
                 $cost        = $qtyDeducted * (float) $item->rawMaterial->cost_per_unit;
 
@@ -416,6 +427,19 @@ class BomController extends Controller
     }
 
     // Convert qty between compatible units (weight: kg/g/mg; volume: L/mL).
+    /**
+     * Technical materials are bought at varying assay (70%, 90%, 95%…).
+     * When a BOM item declares the assay its quantity was written for,
+     * scale the quantity to whatever the stock actually tests at.
+     */
+    private function potencyFactor(?float $basePotency, ?float $actualPotency): float
+    {
+        if (! $basePotency || $basePotency <= 0) return 1.0;
+        if (! $actualPotency || $actualPotency <= 0) return 1.0;
+
+        return $basePotency / $actualPotency;
+    }
+
     private function convertQty(float $qty, string $fromUnit, string $toUnit, ?float $density = null): float
     {
         $from = strtolower(trim($fromUnit));
