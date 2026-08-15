@@ -183,6 +183,7 @@ class InventoryController extends Controller
     {
         $data = $request->validate([
             'name'          => ['required','string','max:255', Rule::unique('raw_materials','name')->where('company_id', app(CurrentCompany::class)->id())],
+            'alternative_names' => 'nullable|string|max:500',
             'sku'           => ['nullable','string','max:100', Rule::unique('raw_materials','sku')->where('company_id', app(CurrentCompany::class)->id())],
             'hsn'           => 'nullable|string|max:50',
             'gst'           => 'nullable|numeric|min:0|max:100',
@@ -274,6 +275,7 @@ class InventoryController extends Controller
     {
         $data = $request->validate([
             'name'          => ['required','string','max:255', Rule::unique('raw_materials','name')->where('company_id', app(CurrentCompany::class)->id())->ignore($material->id)],
+            'alternative_names' => 'nullable|string|max:500',
             'sku'           => ['nullable','string','max:100', Rule::unique('raw_materials','sku')->where('company_id', app(CurrentCompany::class)->id())->ignore($material->id)],
             'hsn'           => 'nullable|string|max:50',
             'gst'           => 'nullable|numeric|min:0|max:100',

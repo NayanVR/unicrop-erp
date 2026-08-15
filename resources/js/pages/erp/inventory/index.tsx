@@ -7,13 +7,14 @@ import type { Auth } from '@/types/auth';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { ModalPortal } from '@/components/modal-portal';
-import { isSimilarName } from '@/lib/similar-name';
+import { fuzzyMatch, isSimilarName } from '@/lib/similar-name';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type RawMaterial = {
     id: number;
     name: string;
+    alternative_names: string | null;
     sku: string | null;
     hsn: string | null;
     gst: string | number;
@@ -771,6 +772,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
     // Material form
     const matForm = useForm({
         name: '',
+        alternative_names: '',
         sku: '',
         hsn: '',
         gst: '18',
@@ -864,12 +866,13 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
         if (statusFilter === 'out' && s !== 'out') return false;
         if (catFilter !== 'all' && m.category !== catFilter) return false;
         if (search.trim()) {
-            const q = search.toLowerCase();
+            const q = search.trim();
             if (
-                !m.name.toLowerCase().includes(q) &&
-                !(m.sku ?? '').toLowerCase().includes(q) &&
-                !(m.category ?? '').toLowerCase().includes(q) &&
-                !(m.hsn ?? '').toLowerCase().includes(q)
+                !fuzzyMatch(m.name, q) &&
+                !fuzzyMatch(m.alternative_names, q) &&
+                !fuzzyMatch(m.sku, q) &&
+                !fuzzyMatch(m.category, q) &&
+                !fuzzyMatch(m.hsn, q)
             )
                 return false;
         }
@@ -939,6 +942,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
             v == null || v === '' ? '' : String(Number(v));
         matForm.setData({
             name: m.name,
+            alternative_names: m.alternative_names ?? '',
             sku: m.sku ?? '',
             hsn: m.hsn ?? '',
             gst: num(m.gst),
@@ -1887,6 +1891,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                                                     <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.3 }}>{m.name}</div>
                                                                     <StatusBadge m={m} />
                                                                 </div>
+                                                                {m.alternative_names && <div style={{ fontSize: 11, color: 'var(--tx-muted)', fontStyle: 'italic' }}>aka {m.alternative_names}</div>}
                                                                 {m.sku && <div style={{ fontSize: 12, color: 'var(--tx-muted)', fontFamily: 'monospace' }}>{m.sku}</div>}
                                                                 {!isSales && <ExpiryBadge materialId={m.id} />}
                                                                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 13 }}>
@@ -1946,6 +1951,11 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                         <tr key={m.id}>
                                             <td>
                                                 <div className="prod-name">{m.name}</div>
+                                                {m.alternative_names && (
+                                                    <div className="prod-detail" style={{ fontStyle: 'italic', color: '#6b7280' }}>
+                                                        aka {m.alternative_names}
+                                                    </div>
+                                                )}
                                                 {!isSales && m.sku && <div className="prod-detail">{m.sku}</div>}
                                                 {!isSales && (m.dim_l || m.dim_w || m.dim_h) && (
                                                     <div className="prod-detail" style={{ color: '#6b7280' }}>
@@ -2474,6 +2484,19 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                             </div>
                                         ) : null;
                                     })()}
+                                </div>
+                                <div className="form-group">
+                                    <label>Alternative Names</label>
+                                    <input
+                                        type="text"
+                                        value={matForm.data.alternative_names}
+                                        onChange={(e) => matForm.setData('alternative_names', e.target.value)}
+                                        placeholder="e.g. emamectine 1.9 ec, EMA 1.9"
+                                    />
+                                    <small style={{ fontSize: 11, color: 'var(--tx-muted)' }}>
+                                        Technical / બીજું નામ — comma થી અલગ કરો. Search માં આ નામથી પણ મળશે.
+                                    </small>
+                                    {matForm.errors.alternative_names && <div className="form-error">{matForm.errors.alternative_names}</div>}
                                 </div>
                                 <div className="form-group">
                                     <label>Unit *</label>
