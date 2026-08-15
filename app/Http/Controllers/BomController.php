@@ -23,11 +23,11 @@ class BomController extends Controller
     public function index(): Response
     {
         $boms = Bom::query()
-            ->with(['items.rawMaterial:id,name,unit,density,potency,stock_qty,cost_per_unit', 'outputMaterial:id,name,unit,stock_qty,min_stock,category'])
+            ->with(['items.rawMaterial:id,name,alternative_names,unit,density,potency,stock_qty,cost_per_unit', 'outputMaterial:id,name,unit,stock_qty,min_stock,category'])
             ->orderBy('name')
             ->get();
 
-        $materials  = RawMaterial::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'unit', 'density', 'potency', 'stock_qty', 'cost_per_unit', 'category']);
+        $materials  = RawMaterial::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'alternative_names', 'unit', 'density', 'potency', 'stock_qty', 'cost_per_unit', 'category']);
         $categories = InventoryCategory::orderBy('name')->pluck('name');
 
         $productionRuns = ProductionRun::query()

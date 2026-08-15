@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 type RawMaterial = {
     id: number;
     name: string;
+    alternative_names?: string | null;
     unit: string;
     stock_qty: string | number;
     min_stock?: string | number | null;
@@ -378,7 +379,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
         return fuzzyMatch(r.name, q)
             || fuzzyMatch(r.group_name, q)
             || fuzzyMatch(r.packing_size, q)
-            || r.items.some((i) => fuzzyMatch(i.raw_material?.name, q));
+            || r.items.some((i) => fuzzyMatch(i.raw_material?.name, q) || fuzzyMatch(i.raw_material?.alternative_names, q));
     });
 
     return (
@@ -741,7 +742,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                 <label>Product Name *</label>
                                 <SearchableSelect
-                                    options={finishedGoodMaterials.map((m) => ({ value: m.id, label: m.name }))}
+                                    options={finishedGoodMaterials.map((m) => ({ value: m.id, label: m.alternative_names ? `${m.name} / ${m.alternative_names}` : m.name }))}
                                     value={form.data.output_raw_material_id}
                                     onChange={(v) => { form.setData('output_raw_material_id', v); checkDuplicate(v); }}
                                     placeholder="— Search finished good —"
@@ -810,7 +811,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                             ) : form.data.items.map((item, idx) => (
                                 <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 32px', gap: 8, marginBottom: 8, alignItems: 'start' }}>
                                     <SearchableSelect
-                                        options={materials.map((m) => ({ value: m.id, label: `${m.name} (${formatQty(m.stock_qty)} ${m.unit})` }))}
+                                        options={materials.map((m) => ({ value: m.id, label: `${m.name}${m.alternative_names ? ` / ${m.alternative_names}` : ''} (${formatQty(m.stock_qty)} ${m.unit})` }))}
                                         value={item.raw_material_id}
                                         onChange={(v) => updateItem(idx, 'raw_material_id', v)}
                                         placeholder="— Search material —"

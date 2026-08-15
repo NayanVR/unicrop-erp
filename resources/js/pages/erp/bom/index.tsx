@@ -15,6 +15,7 @@ type RawMaterial = {
     id: number;
     name: string;
     unit: string;
+    alternative_names?: string | null;
     density?: string | number | null;
     potency?: string | number | null;
     stock_qty: string | number;
@@ -379,7 +380,9 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
 
     const updateItemSearch = (idx: number, val: string) => {
         setItemSearches((prev) => { const n = [...prev]; n[idx] = val; return n; });
-        const mat = materials.find((m) => m.name.toLowerCase() === val.trim().toLowerCase());
+        const typed = val.trim().toLowerCase();
+        const mat = materials.find((m) => m.name.toLowerCase() === typed)
+            ?? materials.find((m) => (m.alternative_names ?? '').split(',').some((alt) => alt.trim().toLowerCase() === typed && alt.trim() !== ''));
         const items = [...form.data.items];
         if (mat) {
             items[idx] = { ...items[idx], raw_material_id: String(mat.id), unit: mat.unit };
@@ -672,7 +675,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
             const q = search.trim();
             return fuzzyMatch(b.name, q)
                 || fuzzyMatch((b.category ?? '').trim() || UNCATEGORIZED, q)
-                || b.items.some((i) => fuzzyMatch(i.raw_material?.name, q));
+                || b.items.some((i) => fuzzyMatch(i.raw_material?.name, q) || fuzzyMatch(i.raw_material?.alternative_names, q));
         }
         return true;
     });
@@ -1244,6 +1247,11 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                 {materials.map((m) => (
                                     <option key={m.id} value={m.name}>{formatQty(m.stock_qty)} {m.unit}</option>
                                 ))}
+                                {materials.flatMap((m) =>
+                                    (m.alternative_names ?? '').split(',').map((alt) => alt.trim()).filter(Boolean).map((alt) => (
+                                        <option key={`${m.id}-${alt}`} value={alt}>{m.name} — {formatQty(m.stock_qty)} {m.unit}</option>
+                                    )),
+                                )}
                             </datalist>
                             {form.data.items.length > 0 && (
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 90px 32px', gap: 8, marginBottom: 4, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px', color: 'var(--tx-faint)' }}>
