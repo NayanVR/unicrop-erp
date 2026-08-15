@@ -65,6 +65,7 @@ class ProductPhotoController extends Controller
                 'id' => $f->id,
                 'party_id' => $f->party_id,
                 'party_name' => $f->party?->name,
+                'is_mine' => $isSales ? in_array($f->party_id, $myPartyIds) : true,
             ]);
 
         $parties = Party::where('is_active', true)
@@ -135,6 +136,7 @@ class ProductPhotoController extends Controller
             'bottleJarOptions' => $bottleJarOptions,
             'capColorOptions' => $capColorOptions,
             'brandBottleMap' => $brandBottleMap,
+            'isSales' => $isSales,
         ]);
     }
 

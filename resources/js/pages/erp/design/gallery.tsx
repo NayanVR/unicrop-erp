@@ -99,7 +99,7 @@ function SearchableSelect({
 }
 
 type Party  = { id: number; name: string };
-type Folder = { id: number; party_id: number; party_name: string };
+type Folder = { id: number; party_id: number; party_name: string; is_mine?: boolean };
 type PartyRate = { party_id: number | null; our_brand: string; party_brand: string; packing_size: string };
 
 type SizeRow = { packing_size: string; mrp: string };
@@ -133,6 +133,7 @@ type PageProps = {
     bottleJarOptions: string[];
     capColorOptions: string[];
     brandBottleMap: Record<string, string>;
+    isSales?: boolean;
     flash?: { success?: string; error?: string };
 };
 
@@ -156,9 +157,10 @@ const onImgError = (e: React.SyntheticEvent<HTMLImageElement>) => {
 };
 
 export default function DesignGallery() {
-    const { photos, folders, parties, ourBrands, allCategories, partyRates, packingSizes, bottleJarOptions, capColorOptions, brandBottleMap, flash } =
+    const { photos, folders, parties, ourBrands, allCategories, partyRates, packingSizes, bottleJarOptions, capColorOptions, brandBottleMap, isSales, flash } =
         usePage<PageProps>().props;
 
+    const [partyScope,    setPartyScope]    = useState<'mine' | 'all'>(isSales ? 'mine' : 'all');
     const [activeFolder,  setActiveFolder]  = useState<ActiveFolder>(null);
     const [showUpload,    setShowUpload]    = useState(false);
     const [showCreate,    setShowCreate]    = useState(false);
@@ -236,9 +238,13 @@ export default function DesignGallery() {
               : (folders.find((f) => f.party_id === activeFolder)?.party_name ?? '');
 
     const folderQuery = folderSearch.toLowerCase().trim();
-    const filteredFolders = folderQuery
-        ? folders.filter((f) => f.party_name.toLowerCase().includes(folderQuery))
+    // Sales users can flip between their own parties and every party
+    const scopedFolders = isSales && partyScope === 'mine'
+        ? folders.filter((f) => f.is_mine)
         : folders;
+    const filteredFolders = folderQuery
+        ? scopedFolders.filter((f) => f.party_name.toLowerCase().includes(folderQuery))
+        : scopedFolders;
     const showOurBrand = !folderQuery || 'our brand'.includes(folderQuery);
 
     // Cross-folder photo search — only active when there's a query
@@ -402,15 +408,31 @@ export default function DesignGallery() {
 
                 <FlashBar flash={flash} />
 
-                {/* Search bar */}
-                <div style={{ marginBottom: '18px' }}>
+                {/* Search bar + party scope toggle */}
+                <div style={{ marginBottom: '18px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <input
                         type="search"
                         placeholder="Search folders…"
                         value={folderSearch}
                         onChange={(e) => setFolderSearch(e.target.value)}
-                        style={{ width: '100%', maxWidth: '340px' }}
+                        style={{ flex: 1, minWidth: '220px', maxWidth: '340px' }}
                     />
+                    {isSales && (
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                            {(['mine', 'all'] as const).map((scope) => (
+                                <button
+                                    key={scope}
+                                    type="button"
+                                    className={`pill${partyScope === scope ? ' active' : ''}`}
+                                    onClick={() => setPartyScope(scope)}
+                                >
+                                    {scope === 'mine'
+                                        ? `My Parties (${folders.filter((f) => f.is_mine).length})`
+                                        : `All Parties (${folders.length})`}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* Folder grid */}
@@ -437,6 +459,7 @@ export default function DesignGallery() {
                             label={folder.party_name}
                             icon="🏢"
                             count={partyPhotoMap.get(folder.party_id)?.length ?? 0}
+                            mine={isSales && folder.is_mine}
                             onClick={() => goToFolder(folder.party_id)}
                             onUpload={() => openUpload(folder.party_id)}
                         />
@@ -959,9 +982,9 @@ function FlashBar({ flash }: { flash?: { success?: string; error?: string } }) {
 }
 
 function FolderCard({
-    label, icon, count, onClick, onUpload,
+    label, icon, count, onClick, onUpload, mine,
 }: {
-    label: string; icon: string; count: number;
+    label: string; icon: string; count: number; mine?: boolean;
     onClick: () => void; onUpload: () => void;
 }) {
     return (
@@ -989,8 +1012,13 @@ function FolderCard({
                 {icon}
             </div>
             <div style={{ padding: '12px 14px 14px' }}>
-                <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--tx-head)', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {label}
+                <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--tx-head)', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+                    {mine && (
+                        <span style={{ flexShrink: 0, background: '#d1fae5', color: '#065f46', fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '4px' }}>
+                            MINE
+                        </span>
+                    )}
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--tx-muted)', marginBottom: '10px' }}>
                     {count} product{count !== 1 ? 's' : ''}
