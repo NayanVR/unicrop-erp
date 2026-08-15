@@ -87,15 +87,31 @@ export default function DesignIndex() {
     const [showModal, setShowModal]     = useState(false);
     const [galleryPopup, setGalleryPopup] = useState<{ item: DesignOrder; matches: GalleryPhoto[] } | null>(null);
 
-    const norm = (s: string | null | undefined) => (s ?? '').trim().toLowerCase();
+    const norm = (s: string | null | undefined) => (s ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+
     const openGalleryPopup = (d: DesignOrder) => {
         const pn = norm(d.product_name);
         const pb = norm(d.party_brand);
-        const matches = (galleryPhotos ?? []).filter((g) => {
-            const ob = norm(g.our_brand), gpb = norm(g.party_brand);
-            return (pn && (ob.includes(pn) || pn.includes(ob) || gpb.includes(pn) || pn.includes(gpb)))
-                || (pb && (gpb.includes(pb) || pb.includes(gpb) || ob.includes(pb) || pb.includes(ob)));
-        });
+        const photos = galleryPhotos ?? [];
+
+        // Both strings must be non-empty and long enough before we accept a
+        // partial hit — otherwise an empty field matches every product.
+        const partial = (a: string, b: string) =>
+            a.length >= 4 && b.length >= 4 && (a.includes(b) || b.includes(a));
+
+        // 1. Exact product-name match on either brand field
+        let matches = photos.filter((g) => pn && (norm(g.our_brand) === pn || norm(g.party_brand) === pn));
+
+        // 2. Same product name + party brand pair
+        if (matches.length === 0 && pn && pb) {
+            matches = photos.filter((g) => partial(norm(g.our_brand), pn) && partial(norm(g.party_brand), pb));
+        }
+
+        // 3. Fall back to a partial hit on the product name alone
+        if (matches.length === 0 && pn) {
+            matches = photos.filter((g) => partial(norm(g.our_brand), pn) || partial(norm(g.party_brand), pn));
+        }
+
         setGalleryPopup({ item: d, matches });
     };
     const [editing, setEditing]         = useState<DesignOrder | null>(null);
