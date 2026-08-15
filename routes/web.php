@@ -184,6 +184,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::middleware(['role:rate-calculator.view'])->group(function () {
         Route::get('rate-calculator', [\App\Http\Controllers\RateCalculatorController::class, 'index'])->name('rate-calculator.index');
+        Route::post('rate-calculator/other-cost', [\App\Http\Controllers\RateCalculatorController::class, 'saveOtherCost'])
+            ->middleware('role:admin.settings')
+            ->name('rate-calculator.other-cost');
     });
 
     // In-app notifications (JSON API, no Inertia)

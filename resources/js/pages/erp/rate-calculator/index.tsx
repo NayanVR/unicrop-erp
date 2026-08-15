@@ -1,4 +1,4 @@
-import { Head, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import type { Auth } from '@/types/auth';
 import { Fragment, useMemo, useState } from 'react';
 
@@ -26,7 +26,7 @@ type Recipe = {
     charges_cost: number;
 };
 
-type Props = { recipes: Recipe[] };
+type Props = { recipes: Recipe[]; otherCostPct: number; canEditOtherCost: boolean };
 
 const money = (v: number) =>
     '₹' + (Number.isFinite(v) ? v : 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -57,7 +57,7 @@ function sizeInBaseUnits(packingSize: string | null): number | null {
 // Sort 5ml → 5ltr rather than alphabetically
 const sizeRank = (r: Recipe) => sizeInBaseUnits(r.packing_size) ?? Number.MAX_SAFE_INTEGER;
 
-export default function RateCalculator({ recipes }: Props) {
+export default function RateCalculator({ recipes, otherCostPct, canEditOtherCost }: Props) {
     const { auth } = usePage<{ auth: Auth }>().props;
     // Only cost-cleared users see where the rate comes from; everyone else
     // just gets the final per-pcs number.
@@ -67,6 +67,8 @@ export default function RateCalculator({ recipes }: Props) {
     const [shape, setShape] = useState<string>('');
     const [expanded, setExpanded] = useState<number | null>(null);
     const [margin, setMargin] = useState('');
+    const [otherCost, setOtherCost] = useState(String(otherCostPct ?? 0));
+    const [savingOther, setSavingOther] = useState(false);
 
     const shapes = useMemo(() => {
         const set = new Set<string>();
@@ -84,13 +86,28 @@ export default function RateCalculator({ recipes }: Props) {
     const rate = parseFloat(materialRate) || 0;
     const marginPct = parseFloat(margin) || 0;
 
+    // Admin-set overhead, applied to every size. Non-admins never see the field,
+    // the percentage is simply part of the rate they get.
+    const overheadPct = canEditOtherCost ? (parseFloat(otherCost) || 0) : (otherCostPct || 0);
+
     const computed = rows.map((r) => {
         // Size decides how much bulk goes in; fill_quantity is the fallback
         const size = sizeInBaseUnits(r.packing_size) ?? r.fill_quantity ?? 0;
         const materialCost = size * rate;
-        const total = materialCost + r.packaging_cost + r.charges_cost;
-        return { r, size, materialCost, total, withMargin: total * (1 + marginPct / 100) };
+        const subtotal = materialCost + r.packaging_cost + r.charges_cost;
+        const otherAmt = subtotal * (overheadPct / 100);
+        const total = subtotal + otherAmt;
+        return { r, size, materialCost, otherAmt, total, withMargin: total * (1 + marginPct / 100) };
     });
+
+    const saveOtherCost = () => {
+        setSavingOther(true);
+        router.post('/rate-calculator/other-cost', { other_cost_pct: parseFloat(otherCost) || 0 }, {
+            preserveScroll: true,
+            preserveState: true,
+            onFinish: () => setSavingOther(false),
+        });
+    };
 
     return (
         <>
@@ -119,6 +136,34 @@ export default function RateCalculator({ recipes }: Props) {
                                 min="0"
                             />
                         </div>
+                        {canEditOtherCost && (
+                            <div className="form-group">
+                                <label>Other Cost % <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 12 }}>(admin only — બધા rate પર લાગુ)</span></label>
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                    <input
+                                        type="number"
+                                        inputMode="decimal"
+                                        value={otherCost}
+                                        onChange={(e) => setOtherCost(e.target.value)}
+                                        placeholder="e.g. 5"
+                                        step="0.01"
+                                        min="0"
+                                        style={{ flex: 1 }}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="btn primary"
+                                        onClick={saveOtherCost}
+                                        disabled={savingOther || parseFloat(otherCost || '0') === otherCostPct}
+                                    >
+                                        {savingOther ? '…' : 'Save'}
+                                    </button>
+                                </div>
+                                <small style={{ fontSize: 11, color: 'var(--tx-muted)' }}>
+                                    બીજા users ને આ field દેખાશે નહીં — rate માં ગણાઈને જ જશે
+                                </small>
+                            </div>
+                        )}
                         <div className="form-group">
                             <label>Margin % <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 12 }}>(optional)</span></label>
                             <input
@@ -183,13 +228,14 @@ export default function RateCalculator({ recipes }: Props) {
                                         {canSeeCost && <th style={{ textAlign: 'right' }}>Material</th>}
                                         {canSeeCost && <th style={{ textAlign: 'right' }}>Bottle + Box</th>}
                                         {canSeeCost && <th style={{ textAlign: 'right' }}>Charges</th>}
+                                        {canEditOtherCost && overheadPct > 0 && <th style={{ textAlign: 'right' }}>Other {overheadPct}%</th>}
                                         <th style={{ textAlign: 'right' }}>Per pcs</th>
                                         {marginPct > 0 && <th style={{ textAlign: 'right' }}>+{marginPct}%</th>}
                                         {canSeeCost && <th />}
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {computed.map(({ r, size, materialCost, total, withMargin }) => (
+                                    {computed.map(({ r, size, materialCost, otherAmt, total, withMargin }) => (
                                         <Fragment key={r.id}>
                                             <tr>
                                                 <td><strong>{r.packing_size ?? '—'}</strong></td>
@@ -216,6 +262,7 @@ export default function RateCalculator({ recipes }: Props) {
                                                 )}
                                                 {canSeeCost && <td style={{ textAlign: 'right' }}>{money(r.packaging_cost)}</td>}
                                                 {canSeeCost && <td style={{ textAlign: 'right' }}>{money(r.charges_cost)}</td>}
+                                                {canEditOtherCost && overheadPct > 0 && <td style={{ textAlign: 'right' }}>{money(otherAmt)}</td>}
                                                 <td style={{ textAlign: 'right', fontWeight: 700, fontSize: 15 }}>{money(total)}</td>
                                                 {marginPct > 0 && (
                                                     <td style={{ textAlign: 'right', fontWeight: 700, color: '#059669' }}>{money(withMargin)}</td>
@@ -235,7 +282,7 @@ export default function RateCalculator({ recipes }: Props) {
                                             </tr>
                                             {canSeeCost && expanded === r.id && (
                                                 <tr>
-                                                    <td colSpan={marginPct > 0 ? 8 : 7} style={{ background: 'var(--bg-paper)', padding: '10px 16px' }}>
+                                                    <td colSpan={7 + (marginPct > 0 ? 1 : 0) + (canEditOtherCost && overheadPct > 0 ? 1 : 0)} style={{ background: 'var(--bg-paper)', padding: '10px 16px' }}>
                                                         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--tx-muted)', marginBottom: 6 }}>
                                                             Filling recipe માંથી — bottle + outer box
                                                         </div>

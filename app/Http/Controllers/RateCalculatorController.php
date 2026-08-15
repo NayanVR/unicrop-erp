@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AppSetting;
 use App\Models\FillingRecipe;
 use Inertia\Inertia;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Response;
 
 class RateCalculatorController extends Controller
@@ -62,10 +65,28 @@ class RateCalculatorController extends Controller
             })
             ->values();
 
+        $otherCostPct = (float) AppSetting::get('rate_calc_other_cost_pct', 0);
+        $isAdmin = $user?->roles->first()?->slug === 'admin';
+
         return Inertia::render('erp/rate-calculator/index', [
             'pageTitle' => 'Product Rate Calculator',
             'recipes'   => $recipes,
+            // Loaded into every rate; only admin sees the field itself.
+            'otherCostPct'     => $otherCostPct,
+            'canEditOtherCost' => $isAdmin,
         ]);
+    }
+
+    /** Admin-only overhead percentage folded into every calculated rate. */
+    public function saveOtherCost(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'other_cost_pct' => 'required|numeric|min:0|max:500',
+        ]);
+
+        AppSetting::set('rate_calc_other_cost_pct', (string) $data['other_cost_pct']);
+
+        return redirect()->back()->with('success', 'Other cost updated.');
     }
 
     /** Bottle/jar and outer box only — the two packaging costs we quote. */
