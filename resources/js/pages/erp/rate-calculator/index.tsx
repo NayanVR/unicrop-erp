@@ -194,6 +194,11 @@ export default function RateCalculator({ recipes }: Props) {
                                                             ⚠️ size વંચાઈ નથી — fill qty {r.fill_quantity} વપરાયું
                                                         </div>
                                                     )}
+                                                    {r.items.some((it) => !it.rate) && (
+                                                        <div style={{ fontSize: 11, color: '#b45309' }}>
+                                                            ⚠️ {r.items.filter((it) => !it.rate).length} item માં selling rate નથી
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 <td style={{ textAlign: 'right' }}>
                                                     {money(materialCost)}
@@ -229,7 +234,14 @@ export default function RateCalculator({ recipes }: Props) {
                                                                 <tbody>
                                                                     {r.items.map((it, i) => (
                                                                         <tr key={i}>
-                                                                            <td style={{ padding: '2px 0' }}>{it.name}</td>
+                                                                            <td style={{ padding: '2px 0' }}>
+                                                                                {it.name}
+                                                                                {!it.rate && (
+                                                                                    <span style={{ marginLeft: 6, fontSize: 11, color: '#b45309' }}>
+                                                                                        ⚠️ selling rate નથી
+                                                                                    </span>
+                                                                                )}
+                                                                            </td>
                                                                             <td style={{ padding: '2px 8px', color: 'var(--tx-muted)' }}>
                                                                                 {it.qty} {it.unit} × {money(it.rate)}
                                                                             </td>

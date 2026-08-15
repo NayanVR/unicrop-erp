@@ -17,7 +17,7 @@ class RateCalculatorController extends Controller
             ->where('is_active', true)
             ->with([
                 'outputMaterial:id,name,unit,shape,category',
-                'items.rawMaterial:id,name,unit,category,cost_per_unit,selling_rate',
+                'items.rawMaterial:id,name,unit,category,selling_rate',
             ])
             ->orderBy('name')
             ->get()
@@ -27,8 +27,8 @@ class RateCalculatorController extends Controller
                     'category' => $i->rawMaterial?->category,
                     'qty'      => (float) $i->qty_per_unit,
                     'unit'     => $i->unit ?: $i->rawMaterial?->unit,
-                    // Packaging is quoted at its selling rate; fall back to cost.
-                    'rate'     => (float) ($i->rawMaterial?->selling_rate ?: $i->rawMaterial?->cost_per_unit ?: 0),
+                    // Always quoted at the material's selling rate.
+                    'rate'     => (float) ($i->rawMaterial?->selling_rate ?? 0),
                 ])->values();
 
                 $charges = collect($r->charges ?? [])->map(fn ($c) => [
