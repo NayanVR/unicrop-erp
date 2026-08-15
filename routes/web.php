@@ -256,8 +256,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('inventory-pools/links/{productInventoryLink}', [InventoryPoolController::class, 'unlink'])->name('inventory-pools.unlink');
     });
 
-    Route::middleware(['role:design.manage'])->group(function () {
+    // Design page view: design users + sales (order processors) can see status
+    Route::middleware(['role:design.manage,orders.process'])->group(function () {
         Route::get('design', [DesignController::class, 'index'])->name('design.index');
+    });
+
+    Route::middleware(['role:design.manage'])->group(function () {
         Route::post('design', [DesignController::class, 'store'])->name('design.store');
         Route::patch('design/{designOrder}', [DesignController::class, 'update'])->name('design.update');
         Route::post('design/{designOrder}/advance', [DesignController::class, 'advance'])->name('design.advance');

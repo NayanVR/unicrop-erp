@@ -80,7 +80,9 @@ const fmt = (d: string) =>
     new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
 export default function DesignIndex() {
-    const { designOrders, designers, stats, galleryPhotos, flash } = usePage<PageProps>().props;
+    const { designOrders, designers, stats, galleryPhotos, flash, auth } = usePage<PageProps & { auth: { user?: { role?: string; roles?: { slug: string }[] } } }>().props;
+    const userRole = auth?.user?.role ?? auth?.user?.roles?.[0]?.slug ?? '';
+    const canManage = userRole === 'design' || userRole === 'admin';
 
     const [showModal, setShowModal]     = useState(false);
     const [galleryPopup, setGalleryPopup] = useState<{ item: DesignOrder; matches: GalleryPhoto[] } | null>(null);
@@ -165,7 +167,7 @@ export default function DesignIndex() {
                     <h1>Design Workflow</h1>
                     <p>Manage label design orders and track printing progress.</p>
                 </div>
-                <button className="btn primary" onClick={openAdd}>＋ New Design Order</button>
+                {canManage && <button className="btn primary" onClick={openAdd}>＋ New Design Order</button>}
             </div>
 
             {flash?.success && <div className="alert-success">{flash.success}</div>}
@@ -266,6 +268,9 @@ export default function DesignIndex() {
                                                 <td>{d.pcs_to_print ?? '—'}</td>
                                                 <td>{d.labels_received ?? '—'}</td>
                                                 <td>
+                                                    {!canManage ? (
+                                                        <span className="badge purple">{statusLabel(d.status)}</span>
+                                                    ) : (
                                                     <select
                                                         value={d.status}
                                                         onChange={(e) => changeStage(d, e.target.value)}
@@ -284,10 +289,15 @@ export default function DesignIndex() {
                                                             <option key={s.key} value={s.key}>{s.label}</option>
                                                         ))}
                                                     </select>
+                                                    )}
                                                 </td>
                                                 <td>
-                                                    <button className="btn-icon" onClick={() => openEdit(d)} title="Edit">✏️</button>
-                                                    <button className="btn-icon btn-danger-icon" onClick={() => deleteOrder(d)} title="Delete">🗑️</button>
+                                                    {canManage ? (
+                                                        <>
+                                                            <button className="btn-icon" onClick={() => openEdit(d)} title="Edit">✏️</button>
+                                                            <button className="btn-icon btn-danger-icon" onClick={() => deleteOrder(d)} title="Delete">🗑️</button>
+                                                        </>
+                                                    ) : <span style={{ color: 'var(--tx-muted)', fontSize: 12 }}>—</span>}
                                                 </td>
                                             </tr>
                                         ))}
