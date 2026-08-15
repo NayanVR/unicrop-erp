@@ -34,6 +34,22 @@ class DesignController extends Controller
         $designers = User::whereHas('roles', fn ($q) => $q->where('slug', 'design'))
             ->get(['id', 'name']);
 
+        $galleryPhotos = \App\Models\ProductPhoto::with('party:id,name')
+            ->get()
+            ->map(fn ($p) => [
+                'id'           => $p->id,
+                'party_name'   => $p->party?->name,
+                'our_brand'    => $p->our_brand,
+                'party_brand'  => $p->party_brand,
+                'packing_size' => $p->packing_size,
+                'mrp'          => $p->mrp,
+                'sizes'        => $p->sizes ?? [['packing_size' => $p->packing_size ?? '', 'mrp' => $p->mrp ?? '']],
+                'bottle_jar'   => $p->bottle_jar,
+                'cap_color'    => $p->cap_color,
+                'photo_url'    => $p->photo_url,
+            ])
+            ->values();
+
         $stats = [
             'total'            => $designOrders->count(),
             'pending'          => $designOrders->where('status', 'pending')->count(),
@@ -42,7 +58,7 @@ class DesignController extends Controller
             'received_factory' => $designOrders->where('status', 'received-factory')->count(),
         ];
 
-        return Inertia::render('erp/design/index', compact('designOrders', 'designers', 'stats'));
+        return Inertia::render('erp/design/index', compact('designOrders', 'designers', 'stats', 'galleryPhotos'));
     }
 
     public function store(Request $request): RedirectResponse

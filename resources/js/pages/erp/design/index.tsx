@@ -37,10 +37,25 @@ type DesignOrder = {
 };
 
 type Stats = { total: number; pending: number; in_progress: number; completed: number; received_factory: number };
+
+type GalleryPhoto = {
+    id: number;
+    party_name: string | null;
+    our_brand: string | null;
+    party_brand: string | null;
+    packing_size: string | null;
+    mrp: string | number | null;
+    sizes: { packing_size: string; mrp: string | number }[];
+    bottle_jar: string | null;
+    cap_color: string | null;
+    photo_url: string;
+};
+
 type PageProps = {
     designOrders: DesignOrder[];
     designers: Designer[];
     stats: Stats;
+    galleryPhotos: GalleryPhoto[];
     flash?: { success?: string; error?: string };
 };
 
@@ -65,9 +80,22 @@ const fmt = (d: string) =>
     new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
 export default function DesignIndex() {
-    const { designOrders, designers, stats, flash } = usePage<PageProps>().props;
+    const { designOrders, designers, stats, galleryPhotos, flash } = usePage<PageProps>().props;
 
     const [showModal, setShowModal]     = useState(false);
+    const [galleryPopup, setGalleryPopup] = useState<{ item: DesignOrder; matches: GalleryPhoto[] } | null>(null);
+
+    const norm = (s: string | null | undefined) => (s ?? '').trim().toLowerCase();
+    const openGalleryPopup = (d: DesignOrder) => {
+        const pn = norm(d.product_name);
+        const pb = norm(d.party_brand);
+        const matches = (galleryPhotos ?? []).filter((g) => {
+            const ob = norm(g.our_brand), gpb = norm(g.party_brand);
+            return (pn && (ob.includes(pn) || pn.includes(ob) || gpb.includes(pn) || pn.includes(gpb)))
+                || (pb && (gpb.includes(pb) || pb.includes(gpb) || ob.includes(pb) || pb.includes(ob)));
+        });
+        setGalleryPopup({ item: d, matches });
+    };
     const [editing, setEditing]         = useState<DesignOrder | null>(null);
     const [search, setSearch]           = useState('');
     const [filterStage, setFilterStage] = useState('all');
@@ -223,7 +251,14 @@ export default function DesignIndex() {
                                         {items.map((d, i) => (
                                             <tr key={d.id}>
                                                 <td>{i + 1}</td>
-                                                <td><span className="prod-name">{d.product_name}</span></td>
+                                                <td>
+                                                    <span
+                                                        className="prod-name"
+                                                        onClick={() => openGalleryPopup(d)}
+                                                        style={{ cursor: 'pointer', color: '#0d9488', textDecoration: 'underline', textDecorationStyle: 'dotted' }}
+                                                        title="View product details from gallery"
+                                                    >{d.product_name}</span>
+                                                </td>
                                                 <td>{d.party_brand}</td>
                                                 <td>{d.packing_size ?? '—'}</td>
                                                 <td>{d.label_dimensions ?? '—'}</td>
@@ -283,6 +318,57 @@ export default function DesignIndex() {
                         </div>
                     );
                 })
+            )}
+
+            {/* ── Gallery Product Details Popup ── */}
+            {galleryPopup && (
+                <ModalPortal>
+                <div className="modal-overlay open" onClick={() => setGalleryPopup(null)}>
+                    <div className="modal" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>📦 {galleryPopup.item.product_name}</h2>
+                            <button className="modal-close" onClick={() => setGalleryPopup(null)}>✕</button>
+                        </div>
+                        <div style={{ padding: '16px', maxHeight: '70vh', overflowY: 'auto' }}>
+                            {galleryPopup.matches.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: 30, color: 'var(--tx-muted)' }}>
+                                    Gallery માં આ product ની details મળી નથી.
+                                </div>
+                            ) : galleryPopup.matches.map((g) => (
+                                <div key={g.id} style={{ display: 'flex', gap: 16, marginBottom: 16, padding: 12, border: '1px solid var(--border)', borderRadius: 10, flexWrap: 'wrap' }}>
+                                    <img
+                                        src={g.photo_url}
+                                        alt={g.our_brand ?? ''}
+                                        style={{ width: 160, height: 160, objectFit: 'contain', borderRadius: 8, background: '#f8fafc', flexShrink: 0, cursor: 'pointer' }}
+                                        onClick={() => window.open(g.photo_url, '_blank')}
+                                    />
+                                    <div style={{ flex: 1, minWidth: 220, fontSize: 14 }}>
+                                        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>{g.our_brand ?? '—'}</div>
+                                        <table style={{ fontSize: 13, lineHeight: 1.9 }}>
+                                            <tbody>
+                                                {g.party_brand && <tr><td style={{ color: 'var(--tx-muted)', paddingRight: 14 }}>Party Brand</td><td><strong>{g.party_brand}</strong></td></tr>}
+                                                {g.party_name && <tr><td style={{ color: 'var(--tx-muted)', paddingRight: 14 }}>Party</td><td>{g.party_name}</td></tr>}
+                                                {g.bottle_jar && <tr><td style={{ color: 'var(--tx-muted)', paddingRight: 14 }}>Bottle / Jar</td><td>{g.bottle_jar}</td></tr>}
+                                                {g.cap_color && <tr><td style={{ color: 'var(--tx-muted)', paddingRight: 14 }}>Cap Color</td><td>{g.cap_color}</td></tr>}
+                                                {g.sizes?.length > 0 && (
+                                                    <tr>
+                                                        <td style={{ color: 'var(--tx-muted)', paddingRight: 14, verticalAlign: 'top' }}>Sizes / MRP</td>
+                                                        <td>
+                                                            {g.sizes.filter((s) => s.packing_size || s.mrp).map((s, i) => (
+                                                                <div key={i}>{s.packing_size || '—'}{s.mrp ? ` — ₹${s.mrp}` : ''}</div>
+                                                            ))}
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+                </ModalPortal>
             )}
 
             {/* ── Create / Edit Modal ── */}
