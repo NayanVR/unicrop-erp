@@ -119,6 +119,7 @@ type Photo = {
     uploaded_by: string | null;
     updated_by: string | null;
     updated_at: string | null;
+    can_modify?: boolean;
 };
 
 type PageProps = {
@@ -750,6 +751,7 @@ export default function DesignGallery() {
                                 </div>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                {lightbox.can_modify !== false && (
                                 <button
                                     type="button"
                                     className="btn secondary"
@@ -758,6 +760,7 @@ export default function DesignGallery() {
                                 >
                                     ✎ Edit
                                 </button>
+                                )}
                                 <button type="button" className="modal-close" onClick={() => setLightbox(null)}>✕</button>
                             </div>
                         </div>
@@ -1060,6 +1063,7 @@ function PhotoCard({ photo, deleting, onView, onEdit, onDelete }: {
                           ? <>By {photo.uploaded_by}</>
                           : null}
                 </div>
+                {photo.can_modify !== false && (
                 <div style={{ display: 'flex', gap: '12px', marginTop: '5px' }}>
                     <button
                         type="button"
@@ -1077,6 +1081,7 @@ function PhotoCard({ photo, deleting, onView, onEdit, onDelete }: {
                         {deleting ? 'Deleting…' : '✕ Delete'}
                     </button>
                 </div>
+                )}
             </div>
         </div>
     );

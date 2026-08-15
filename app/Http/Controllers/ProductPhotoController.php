@@ -26,12 +26,22 @@ class ProductPhotoController extends Controller
 
     public function index(): Response
     {
+        $user = request()->user();
+        $user?->loadMissing('roles');
+        $isSales = $user?->roles->first()?->slug === 'sales';
+        $myPartyIds = $isSales
+            ? Party::where('created_by', $user->id)->pluck('id')->all()
+            : [];
+
         $photos = ProductPhoto::with(['party:id,name', 'uploader:id,name', 'updater:id,name'])
             ->orderBy('party_id')
             ->orderBy('our_brand')
             ->orderBy('party_brand')
             ->get()
             ->map(fn($p) => [
+                'can_modify'     => ! $isSales
+                    || ($p->party_id && in_array($p->party_id, $myPartyIds))
+                    || (int) $p->uploaded_by === (int) $user->id,
                 'id'             => $p->id,
                 'party_id'       => $p->party_id,
                 'party_name'     => $p->party?->name,
@@ -237,8 +247,30 @@ class ProductPhotoController extends Controller
         return redirect()->back()->with('success', 'Product uploaded successfully.');
     }
 
+    /**
+     * Sales users may only modify photos of parties they created
+     * (or photos they uploaded themselves). Other roles are unrestricted.
+     */
+    private function authorizePhotoModify(Request $request, ProductPhoto $photo): void
+    {
+        $user = $request->user();
+        $user->loadMissing('roles');
+        if ($user->roles->first()?->slug !== 'sales') {
+            return;
+        }
+
+        $ownsParty  = $photo->party_id && Party::where('id', $photo->party_id)->where('created_by', $user->id)->exists();
+        $ownsUpload = (int) $photo->uploaded_by === (int) $user->id;
+
+        if (! $ownsParty && ! $ownsUpload) {
+            abort(403, 'You can only edit or delete products of your own parties.');
+        }
+    }
+
     public function update(Request $request, ProductPhoto $photo): RedirectResponse
     {
+        $this->authorizePhotoModify($request, $photo);
+
         $data = $request->validate([
             'our_brand'             => 'required|string|max:255',
             'party_brand'           => 'nullable|string|max:255',
@@ -390,6 +422,8 @@ class ProductPhotoController extends Controller
 
     public function destroy(ProductPhoto $photo): RedirectResponse
     {
+        $this->authorizePhotoModify(request(), $photo);
+
         $disk = $this->storageDisk();
 
         try {
