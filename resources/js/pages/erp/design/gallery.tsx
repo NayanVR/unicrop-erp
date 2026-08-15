@@ -447,6 +447,7 @@ export default function DesignGallery() {
                             label="Our Brand"
                             icon="🌿"
                             count={ourBrandPhotos.length}
+                            previews={ourBrandPhotos.slice(0, 4).map((p) => p.photo_url)}
                             onClick={() => goToFolder('our-brand')}
                             onUpload={() => openUpload()}
                         />
@@ -459,6 +460,7 @@ export default function DesignGallery() {
                             label={folder.party_name}
                             icon="🏢"
                             count={partyPhotoMap.get(folder.party_id)?.length ?? 0}
+                            previews={(partyPhotoMap.get(folder.party_id) ?? []).slice(0, 4).map((p) => p.photo_url)}
                             mine={isSales && folder.is_mine}
                             onClick={() => goToFolder(folder.party_id)}
                             onUpload={() => openUpload(folder.party_id)}
@@ -982,9 +984,10 @@ function FlashBar({ flash }: { flash?: { success?: string; error?: string } }) {
 }
 
 function FolderCard({
-    label, icon, count, onClick, onUpload, mine,
+    label, icon, count, onClick, onUpload, mine, previews = [],
 }: {
     label: string; icon: string; count: number; mine?: boolean;
+    previews?: string[];
     onClick: () => void; onUpload: () => void;
 }) {
     return (
@@ -1003,13 +1006,41 @@ function FolderCard({
             <div style={{
                 height: '100px',
                 background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-paper) 100%)',
-                display: 'flex',
+                display: previews.length > 0 ? 'grid' : 'flex',
+                gridTemplateColumns: previews.length > 1 ? '1fr 1fr' : '1fr',
+                gap: previews.length > 1 ? '2px' : 0,
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '48px',
                 borderBottom: '1px solid var(--border)',
+                overflow: 'hidden',
+                position: 'relative',
             }}>
-                {icon}
+                {previews.length === 0 ? icon : previews.slice(0, 4).map((src, i) => (
+                    <img
+                        key={i}
+                        src={src}
+                        alt=""
+                        loading="lazy"
+                        style={{
+                            width: '100%',
+                            height: previews.length > 2 ? '49px' : '100px',
+                            objectFit: 'contain',
+                            background: '#fff',
+                            // A single image fills the strip; 3 images leave the 4th cell empty
+                            gridColumn: previews.length === 3 && i === 2 ? 'span 2' : undefined,
+                        }}
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
+                    />
+                ))}
+                {count > 4 && (
+                    <span style={{
+                        position: 'absolute', right: '4px', bottom: '4px',
+                        background: 'rgba(0,0,0,.65)', color: '#fff',
+                        fontSize: '10px', fontWeight: 700,
+                        padding: '1px 6px', borderRadius: '10px',
+                    }}>+{count - 4}</span>
+                )}
             </div>
             <div style={{ padding: '12px 14px 14px' }}>
                 <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--tx-head)', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '5px' }}>
