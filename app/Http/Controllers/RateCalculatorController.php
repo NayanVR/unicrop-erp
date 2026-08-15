@@ -10,6 +10,12 @@ class RateCalculatorController extends Controller
 {
     public function index(): Response
     {
+        $user = request()->user();
+        $user?->loadMissing('roles');
+        // Only cost-cleared users get the per-item breakdown; for everyone else
+        // it never leaves the server.
+        $canSeeCost = $user?->roles->first()?->slug === 'admin' || $user?->cost_access === true;
+
         // Every packed size we can quote is a filling recipe: it already knows
         // the bottle, cap, label, outer box and the filling charges. The
         // calculator just adds the bulk material cost on top.
@@ -21,7 +27,7 @@ class RateCalculatorController extends Controller
             ])
             ->orderBy('name')
             ->get()
-            ->map(function (FillingRecipe $r) {
+            ->map(function (FillingRecipe $r) use ($canSeeCost) {
                 $items = $r->items->map(fn ($i) => [
                     'name'     => $i->rawMaterial?->name ?? '—',
                     'category' => $i->rawMaterial?->category,
@@ -38,14 +44,14 @@ class RateCalculatorController extends Controller
 
                 return [
                     'id'            => $r->id,
-                    'name'          => $r->name,
+                    'name'          => $canSeeCost ? $r->name : null,
                     'group_name'    => $r->group_name,
                     'packing_size'  => $r->packing_size,
                     'fill_quantity' => (float) $r->fill_quantity,
                     'shape'         => $r->outputMaterial?->shape,
                     'output_unit'   => $r->outputMaterial?->unit,
-                    'items'         => $items,
-                    'charges'       => $charges,
+                    'items'         => $canSeeCost ? $items : collect(),
+                    'charges'       => $canSeeCost ? $charges : collect(),
                     'packaging_cost' => round($items->sum(fn ($i) => $i['qty'] * $i['rate']), 4),
                     'charges_cost'   => round($charges->sum('amount'), 4),
                 ];

@@ -1,4 +1,5 @@
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
+import type { Auth } from '@/types/auth';
 import { Fragment, useMemo, useState } from 'react';
 
 type RecipeItem = {
@@ -13,7 +14,7 @@ type Charge = { label: string; amount: number };
 
 type Recipe = {
     id: number;
-    name: string;
+    name: string | null;
     group_name: string | null;
     packing_size: string | null;
     fill_quantity: number;
@@ -57,6 +58,11 @@ function sizeInBaseUnits(packingSize: string | null): number | null {
 const sizeRank = (r: Recipe) => sizeInBaseUnits(r.packing_size) ?? Number.MAX_SAFE_INTEGER;
 
 export default function RateCalculator({ recipes }: Props) {
+    const { auth } = usePage<{ auth: Auth }>().props;
+    // Only cost-cleared users see where the rate comes from; everyone else
+    // just gets the final per-pcs number.
+    const canSeeCost = auth.user?.role === 'admin' || auth.user?.cost_access === true;
+
     const [materialRate, setMaterialRate] = useState('');
     const [shape, setShape] = useState<string>('');
     const [expanded, setExpanded] = useState<number | null>(null);
@@ -166,20 +172,20 @@ export default function RateCalculator({ recipes }: Props) {
                     <div className="card" style={{ overflow: 'hidden' }}>
                         <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', fontSize: 13, color: 'var(--tx-muted)' }}>
                             {shape} — {computed.length} size{computed.length !== 1 ? 's' : ''}
-                            {rate > 0 && <> · material {money(rate)} / L·kg</>}
+                            {canSeeCost && rate > 0 && <> · material {money(rate)} / L·kg</>}
                         </div>
                         <div style={{ overflowX: 'auto' }}>
                             <table className="prod-table">
                                 <thead>
                                     <tr>
                                         <th>Size</th>
-                                        <th>Product</th>
-                                        <th style={{ textAlign: 'right' }}>Material</th>
-                                        <th style={{ textAlign: 'right' }}>Packaging</th>
-                                        <th style={{ textAlign: 'right' }}>Charges</th>
+                                        {canSeeCost && <th>Product</th>}
+                                        {canSeeCost && <th style={{ textAlign: 'right' }}>Material</th>}
+                                        {canSeeCost && <th style={{ textAlign: 'right' }}>Packaging</th>}
+                                        {canSeeCost && <th style={{ textAlign: 'right' }}>Charges</th>}
                                         <th style={{ textAlign: 'right' }}>Per pcs</th>
                                         {marginPct > 0 && <th style={{ textAlign: 'right' }}>+{marginPct}%</th>}
-                                        <th />
+                                        {canSeeCost && <th />}
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -187,41 +193,47 @@ export default function RateCalculator({ recipes }: Props) {
                                         <Fragment key={r.id}>
                                             <tr>
                                                 <td><strong>{r.packing_size ?? '—'}</strong></td>
-                                                <td>
-                                                    <span className="prod-name">{r.name}</span>
-                                                    {!sizeInBaseUnits(r.packing_size) && (
-                                                        <div style={{ fontSize: 11, color: '#b45309' }}>
-                                                            ⚠️ size વંચાઈ નથી — fill qty {r.fill_quantity} વપરાયું
-                                                        </div>
-                                                    )}
-                                                    {r.items.some((it) => !it.rate) && (
-                                                        <div style={{ fontSize: 11, color: '#b45309' }}>
-                                                            ⚠️ {r.items.filter((it) => !it.rate).length} item માં selling rate નથી
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td style={{ textAlign: 'right' }}>
-                                                    {money(materialCost)}
-                                                    <div style={{ fontSize: 10, color: 'var(--tx-muted)' }}>{size} × {money(rate)}</div>
-                                                </td>
-                                                <td style={{ textAlign: 'right' }}>{money(r.packaging_cost)}</td>
-                                                <td style={{ textAlign: 'right' }}>{money(r.charges_cost)}</td>
+                                                {canSeeCost && (
+                                                    <td>
+                                                        <span className="prod-name">{r.name}</span>
+                                                        {!sizeInBaseUnits(r.packing_size) && (
+                                                            <div style={{ fontSize: 11, color: '#b45309' }}>
+                                                                ⚠️ size વંચાઈ નથી — fill qty {r.fill_quantity} વપરાયું
+                                                            </div>
+                                                        )}
+                                                        {r.items.some((it) => !it.rate) && (
+                                                            <div style={{ fontSize: 11, color: '#b45309' }}>
+                                                                ⚠️ {r.items.filter((it) => !it.rate).length} item માં selling rate નથી
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                )}
+                                                {canSeeCost && (
+                                                    <td style={{ textAlign: 'right' }}>
+                                                        {money(materialCost)}
+                                                        <div style={{ fontSize: 10, color: 'var(--tx-muted)' }}>{size} × {money(rate)}</div>
+                                                    </td>
+                                                )}
+                                                {canSeeCost && <td style={{ textAlign: 'right' }}>{money(r.packaging_cost)}</td>}
+                                                {canSeeCost && <td style={{ textAlign: 'right' }}>{money(r.charges_cost)}</td>}
                                                 <td style={{ textAlign: 'right', fontWeight: 700, fontSize: 15 }}>{money(total)}</td>
                                                 {marginPct > 0 && (
                                                     <td style={{ textAlign: 'right', fontWeight: 700, color: '#059669' }}>{money(withMargin)}</td>
                                                 )}
-                                                <td>
-                                                    <button
-                                                        type="button"
-                                                        className="btn-icon"
-                                                        title="Breakdown"
-                                                        onClick={() => setExpanded(expanded === r.id ? null : r.id)}
-                                                    >
-                                                        {expanded === r.id ? '▾' : '▸'}
-                                                    </button>
-                                                </td>
+                                                {canSeeCost && (
+                                                    <td>
+                                                        <button
+                                                            type="button"
+                                                            className="btn-icon"
+                                                            title="Breakdown"
+                                                            onClick={() => setExpanded(expanded === r.id ? null : r.id)}
+                                                        >
+                                                            {expanded === r.id ? '▾' : '▸'}
+                                                        </button>
+                                                    </td>
+                                                )}
                                             </tr>
-                                            {expanded === r.id && (
+                                            {canSeeCost && expanded === r.id && (
                                                 <tr>
                                                     <td colSpan={marginPct > 0 ? 8 : 7} style={{ background: 'var(--bg-paper)', padding: '10px 16px' }}>
                                                         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--tx-muted)', marginBottom: 6 }}>
