@@ -206,6 +206,9 @@ class BomController extends Controller
             'batch_count'  => 'required|numeric|min:0.001',
             'batch_number' => 'nullable|string|max:50',
             'notes'        => 'nullable|string|max:500',
+            // Assay % of the lot actually being used, keyed by raw material id.
+            'potencies'    => 'nullable|array',
+            'potencies.*'  => 'nullable|numeric|min:0.001|max:100',
         ]);
 
         $batchCount = (float) $data['batch_count'];
@@ -229,7 +232,7 @@ class BomController extends Controller
                 $itemUnit  = $item->unit ?: $item->rawMaterial->unit;
                 $potencyMul = $this->potencyFactor(
                     $item->base_potency ? (float) $item->base_potency : null,
-                    $item->rawMaterial->potency ? (float) $item->rawMaterial->potency : null,
+                    $this->runPotency($item, $data['potencies'] ?? []),
                 );
                 $required  = $this->convertQty((float) $item->qty_per_batch * $batchCount * $potencyMul, $itemUnit, $item->rawMaterial->unit, $item->rawMaterial->density ? (float) $item->rawMaterial->density : null);
                 $available = (float) $item->rawMaterial->stock_qty;
@@ -251,7 +254,7 @@ class BomController extends Controller
                 $matUnit     = $item->rawMaterial->unit;
                 $qtyUsed     = (float) $item->qty_per_batch * $batchCount * $this->potencyFactor(
                     $item->base_potency ? (float) $item->base_potency : null,
-                    $item->rawMaterial->potency ? (float) $item->rawMaterial->potency : null,
+                    $this->runPotency($item, $data['potencies'] ?? []),
                 );
                 $qtyDeducted = $this->convertQty($qtyUsed, $itemUnit, $matUnit, $item->rawMaterial->density ? (float) $item->rawMaterial->density : null);
                 $cost        = $qtyDeducted * (float) $item->rawMaterial->cost_per_unit;
@@ -432,6 +435,20 @@ class BomController extends Controller
      * When a BOM item declares the assay its quantity was written for,
      * scale the quantity to whatever the stock actually tests at.
      */
+    /**
+     * Assay to dose against for this run: the value entered on the run form
+     * wins over whatever is stored on the material.
+     */
+    private function runPotency($item, array $overrides): ?float
+    {
+        $entered = $overrides[$item->raw_material_id] ?? null;
+        if ($entered !== null && $entered !== '' && (float) $entered > 0) {
+            return (float) $entered;
+        }
+
+        return $item->rawMaterial->potency ? (float) $item->rawMaterial->potency : null;
+    }
+
     private function potencyFactor(?float $basePotency, ?float $actualPotency): float
     {
         if (! $basePotency || $basePotency <= 0) return 1.0;

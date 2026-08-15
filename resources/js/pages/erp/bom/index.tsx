@@ -68,7 +68,7 @@ type BomFormData = {
     charges: { label: string; amount: string }[];
 };
 
-type RunFormData = { batch_number: string; batch_count: string; notes: string };
+type RunFormData = { batch_number: string; batch_count: string; notes: string; potencies: Record<string, string> };
 
 type NormalizedRunItem = { name: string; qtyUsed: number; itemUnit: string; qtyDeducted: number; matUnit: string; cost: number };
 type NormalizedRun = {
@@ -319,7 +319,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
         name: '', category: '', packing_size: '', batch_size: '1',
         batch_unit: 'kg', output_raw_material_id: '', output_category: '', notes: '', is_active: true, items: [], charges: [],
     });
-    const runForm = useForm<RunFormData>({ batch_number: '', batch_count: '1', notes: '' });
+    const runForm = useForm<RunFormData>({ batch_number: '', batch_count: '1', notes: '', potencies: {} });
 
     const openNew = () => {
         form.reset(); form.clearErrors(); setEditingBom(null); setItemSearches([]); setEditModal(true);
@@ -446,7 +446,13 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
             : bom.name.slice(0, 3).toUpperCase();
         const suggested = `${prefix}-${today.getFullYear()}${pad(today.getMonth() + 1)}${pad(today.getDate())}`;
         runForm.reset();
-        runForm.setData('batch_number', suggested);
+        const prefill: Record<string, string> = {};
+        for (const item of bom.items) {
+            if (!item.base_potency) continue;
+            const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
+            prefill[String(item.raw_material_id)] = mat?.potency != null ? String(Number(mat.potency)) : '';
+        }
+        runForm.setData((prev) => ({ ...prev, batch_number: suggested, potencies: prefill }));
         setRunTarget(bom);
         setRunModal(true);
     };
@@ -1497,17 +1503,52 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                         const matUnit  = mat?.unit ?? '';
                                         const itemUnit = item.unit || matUnit;
                                         const needed   = Number(item.qty_per_batch) * qty;
-                                        const neededInMatUnit = mat ? convertQty(potencyAdjusted(needed, item.base_potency, mat.potency), itemUnit, matUnit, mat.density) : needed;
+                                        // Assay entered for this run wins over the material's stored value
+                                        const key      = String(item.raw_material_id);
+                                        const runAssay = item.base_potency
+                                            ? (runForm.data.potencies[key] ?? (mat?.potency != null ? String(Number(mat.potency)) : ''))
+                                            : '';
+                                        const effAssay = Number(runAssay) > 0 ? runAssay : mat?.potency;
+                                        const neededAdj = potencyAdjusted(needed, item.base_potency, effAssay);
+                                        const neededInMatUnit = mat ? convertQty(neededAdj, itemUnit, matUnit, mat.density) : neededAdj;
                                         const inStock  = mat ? Number(mat.stock_qty) : 0;
                                         const ok       = inStock >= neededInMatUnit;
+                                        const shifted  = Math.abs(neededAdj - needed) >= 0.0005;
                                         return (
-                                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 12px', borderBottom: i < runTarget.items.length - 1 ? '1px solid var(--border)' : undefined, fontSize: 13, gap: 8 }}>
+                                            <div key={i} style={{ padding: '7px 12px', borderBottom: i < runTarget.items.length - 1 ? '1px solid var(--border)' : undefined, fontSize: 13 }}>
+                                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                                                 <span style={{ flex: 1, color: ok ? 'var(--tx-body)' : '#dc2626' }}>{mat?.name ?? `Material #${item.raw_material_id}`}</span>
+                                                {item.base_potency ? (
+                                                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+                                                        <span style={{ fontSize: 11, color: 'var(--tx-muted)' }}>assay</span>
+                                                        <input
+                                                            type="number"
+                                                            value={runAssay}
+                                                            onChange={(e) => runForm.setData('potencies', { ...runForm.data.potencies, [key]: e.target.value })}
+                                                            step="0.001" min="0" max="100"
+                                                            placeholder={String(item.base_potency)}
+                                                            title="આ lot ની ખરી ટકાવારી"
+                                                            style={{ width: 64, padding: '2px 5px', fontSize: 12 }}
+                                                        />
+                                                        <span style={{ fontSize: 11, color: 'var(--tx-muted)' }}>%</span>
+                                                    </span>
+                                                ) : null}
                                                 <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
-                                                    {fmtSmart(needed, itemUnit)}
+                                                    {fmtSmart(neededAdj, itemUnit)}
                                                     {!ok && <span style={{ marginLeft: 8, fontSize: 11, color: '#dc2626', background: '#fee2e2', padding: '1px 6px', borderRadius: 8 }}>⚠ short by {fmtSmart(neededInMatUnit - inStock, matUnit)}</span>}
                                                     {ok && <span style={{ marginLeft: 8, fontSize: 11, color: '#059669', background: '#d1fae5', padding: '1px 6px', borderRadius: 8 }}>✓</span>}
                                                 </span>
+                                              </div>
+                                              {item.base_potency && shifted && (
+                                                  <div style={{ fontSize: 11, color: '#0369a1', marginTop: 2 }}>
+                                                      🧪 recipe {fmtSmart(needed, itemUnit)} @ {item.base_potency}% → {effAssay}% માટે <strong>{fmtSmart(neededAdj, itemUnit)}</strong> નાખવું
+                                                  </div>
+                                              )}
+                                              {item.base_potency && !Number(effAssay) && (
+                                                  <div style={{ fontSize: 11, color: '#b45309', marginTop: 2 }}>
+                                                      ⚠️ assay % નાખો, નહીં તો recipe ની quantity જ વપરાશે
+                                                  </div>
+                                              )}
                                             </div>
                                         );
                                     })}
