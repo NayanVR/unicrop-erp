@@ -28,14 +28,18 @@ class RateCalculatorController extends Controller
             ->orderBy('name')
             ->get()
             ->map(function (FillingRecipe $r) use ($canSeeCost) {
-                $items = $r->items->map(fn ($i) => [
-                    'name'     => $i->rawMaterial?->name ?? '—',
-                    'category' => $i->rawMaterial?->category,
-                    'qty'      => (float) $i->qty_per_unit,
-                    'unit'     => $i->unit ?: $i->rawMaterial?->unit,
-                    // Always quoted at the material's selling rate.
-                    'rate'     => (float) ($i->rawMaterial?->selling_rate ?? 0),
-                ])->values();
+                // Only the bottle/jar and the outer box are quoted — caps,
+                // labels and the rest are not part of the calculator's rate.
+                $items = $r->items
+                    ->filter(fn ($i) => $this->isQuotedPackaging($i->rawMaterial?->category))
+                    ->map(fn ($i) => [
+                        'name'     => $i->rawMaterial?->name ?? '—',
+                        'category' => $i->rawMaterial?->category,
+                        'qty'      => (float) $i->qty_per_unit,
+                        'unit'     => $i->unit ?: $i->rawMaterial?->unit,
+                        // Always quoted at the material's selling rate.
+                        'rate'     => (float) ($i->rawMaterial?->selling_rate ?? 0),
+                    ])->values();
 
                 $charges = collect($r->charges ?? [])->map(fn ($c) => [
                     'label'  => $c['label'] ?? 'Charge',
@@ -62,5 +66,13 @@ class RateCalculatorController extends Controller
             'pageTitle' => 'Product Rate Calculator',
             'recipes'   => $recipes,
         ]);
+    }
+
+    /** Bottle/jar and outer box only — the two packaging costs we quote. */
+    private function isQuotedPackaging(?string $category): bool
+    {
+        $c = $category ?? '';
+
+        return (bool) preg_match('/bottle|botal|jar|dabba|box|carton|cartoon/i', $c);
     }
 }

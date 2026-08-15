@@ -181,7 +181,7 @@ export default function RateCalculator({ recipes }: Props) {
                                         <th>Size</th>
                                         {canSeeCost && <th>Product</th>}
                                         {canSeeCost && <th style={{ textAlign: 'right' }}>Material</th>}
-                                        {canSeeCost && <th style={{ textAlign: 'right' }}>Packaging</th>}
+                                        {canSeeCost && <th style={{ textAlign: 'right' }}>Bottle + Box</th>}
                                         {canSeeCost && <th style={{ textAlign: 'right' }}>Charges</th>}
                                         <th style={{ textAlign: 'right' }}>Per pcs</th>
                                         {marginPct > 0 && <th style={{ textAlign: 'right' }}>+{marginPct}%</th>}
@@ -237,10 +237,10 @@ export default function RateCalculator({ recipes }: Props) {
                                                 <tr>
                                                     <td colSpan={marginPct > 0 ? 8 : 7} style={{ background: 'var(--bg-paper)', padding: '10px 16px' }}>
                                                         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--tx-muted)', marginBottom: 6 }}>
-                                                            Filling recipe માંથી
+                                                            Filling recipe માંથી — bottle + outer box
                                                         </div>
                                                         {r.items.length === 0 && r.charges.length === 0 ? (
-                                                            <div style={{ fontSize: 13, color: 'var(--tx-muted)' }}>આ recipe માં કોઈ packaging item નથી.</div>
+                                                            <div style={{ fontSize: 13, color: 'var(--tx-muted)' }}>આ recipe માં bottle કે outer box નથી.</div>
                                                         ) : (
                                                             <table style={{ fontSize: 13, width: '100%', maxWidth: 560 }}>
                                                                 <tbody>
