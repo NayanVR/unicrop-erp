@@ -9,6 +9,7 @@ import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 import { ModalPortal } from '@/components/modal-portal';
 import SearchableSelect from '@/components/searchable-select';
+import { isSimilarName } from '@/lib/similar-name';
 
 type RawMaterial = {
     id: number;
@@ -283,6 +284,18 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
 
     const submitQuickAdd = () => {
         if (!quickForm.data.name.trim() || !quickForm.data.unit) return;
+        // Similar-name warning against existing materials
+        const qname = quickForm.data.name.trim();
+        const matSimilar = materials.filter((m) => isSimilarName(m.name, qname));
+        if (matSimilar.length > 0) {
+            const exact = matSimilar.find((m) => m.name.trim().toLowerCase() === qname.toLowerCase());
+            if (exact) {
+                window.alert(`⚠️ "${exact.name}" already exists in inventory (${exact.category ?? 'Uncategorized'}). Duplicate name allowed નથી.`);
+                return;
+            }
+            const ok = window.confirm(`⚠️ Similar material already exists:\n${matSimilar.map((m) => `• ${m.name} (${m.category ?? 'Uncategorized'})`).join('\n')}\n\nSame product હોય તો Cancel કરી existing select કરો. ખરેખર અલગ છે? OK દબાવો.`);
+            if (!ok) return;
+        }
         setPendingSelectName(quickForm.data.name.trim());
         quickForm.post('/inventory/materials', {
             preserveState: true,
@@ -375,6 +388,19 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
     };
 
     const saveBom = () => {
+        // Similar-name warning (typos / variants like "atonik" vs "Atonic(...)")
+        const similar = boms.filter((b) =>
+            b.id !== editingBom?.id && isSimilarName(b.name, form.data.name)
+        );
+        if (similar.length > 0) {
+            const exact = similar.find((b) => b.name.trim().toLowerCase() === form.data.name.trim().toLowerCase());
+            if (exact) {
+                window.alert(`⚠️ BOM "${exact.name}" already exists. Duplicate name allowed નથી.`);
+                return;
+            }
+            const ok = window.confirm(`⚠️ Similar BOM name already exists:\n${similar.map((b) => `• ${b.name}`).join('\n')}\n\nSame recipe હોય તો Cancel કરો. ખરેખર અલગ છે? OK દબાવો.`);
+            if (!ok) return;
+        }
         if (editingBom) {
             form.patch(bomUpdate(editingBom.id).url, {
                 preserveScroll: true,

@@ -7,6 +7,7 @@ import type { Auth } from '@/types/auth';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { ModalPortal } from '@/components/modal-portal';
+import { isSimilarName } from '@/lib/similar-name';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -383,30 +384,6 @@ function normalizeSize(s: string): string {
     return s.toUpperCase().replace(/\s+/g, '');
 }
 
-function levenshtein(a: string, b: string): number {
-    const m = a.length, n = b.length;
-    if (m === 0) return n;
-    if (n === 0) return m;
-    const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
-    for (let j = 0; j <= n; j++) dp[0][j] = j;
-    for (let i = 1; i <= m; i++) {
-        for (let j = 1; j <= n; j++) {
-            dp[i][j] = a[i - 1] === b[j - 1]
-                ? dp[i - 1][j - 1]
-                : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
-        }
-    }
-    return dp[m][n];
-}
-
-function isSimilarName(a: string, b: string): boolean {
-    const na = a.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const nb = b.toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (!na || !nb || na === nb) return na === nb;
-    const dist = levenshtein(na, nb);
-    const threshold = Math.max(2, Math.round(Math.max(na.length, nb.length) * 0.2));
-    return dist <= threshold;
-}
 
 function abbrevShape(s: string): string {
     const key = s.toLowerCase().trim();
@@ -1010,6 +987,15 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
         if (dup) {
             window.alert(`⚠️ "${dup.name}" already exists in category "${dup.category ?? 'Uncategorized'}"${dup.approval_status === 'pending' ? ' (pending approval)' : ''}. Duplicate names are not allowed.`);
             return;
+        }
+        const similar = [...materials, ...pendingMaterials].filter(
+            (m) => m.id !== editingMat?.id
+                && (m.company_id == null || currentCompanyId == null || m.company_id === currentCompanyId)
+                && isSimilarName(m.name, matForm.data.name)
+        );
+        if (similar.length > 0) {
+            const ok = window.confirm(`⚠️ Similar name already exists:\n${similar.map((m) => `• ${m.name} (${m.category ?? 'Uncategorized'})`).join('\n')}\n\nSame product હોય તો Cancel કરો. ખરેખર અલગ product છે? OK દબાવો.`);
+            if (!ok) return;
         }
         const showFirstError = (errs: Record<string, string>) => {
             const first = Object.values(errs)[0];
