@@ -1,253 +1,263 @@
 import { Head } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 
-type PackagingMaterial = {
-    id: number;
+type RecipeItem = {
     name: string;
     category: string | null;
-    unit: string;
-    selling_rate: string | number;
+    qty: number;
+    unit: string | null;
+    rate: number;
 };
 
-type Props = {
-    packagingMaterials: PackagingMaterial[];
+type Charge = { label: string; amount: number };
+
+type Recipe = {
+    id: number;
+    name: string;
+    group_name: string | null;
+    packing_size: string | null;
+    fill_quantity: number;
+    shape: string | null;
+    output_unit: string | null;
+    items: RecipeItem[];
+    charges: Charge[];
+    packaging_cost: number;
+    charges_cost: number;
 };
 
-const formatAmt = (v: number) =>
+type Props = { recipes: Recipe[] };
+
+const money = (v: number) =>
     '₹' + (Number.isFinite(v) ? v : 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// Match by keyword (case-insensitive substring) so renamed categories
-// like "Box/Carton" -> "Box" or "Bottles" still get picked up.
-const isBottleJar = (cat: string | null | undefined) => /bottle|botal|jar|dabba/i.test(cat ?? '');
-const isOuterBox = (cat: string | null | undefined) => /box|carton|cartoon/i.test(cat ?? '');
-const isOtherPackaging = (cat: string | null | undefined) =>
-    /label|pouch|drum|cap|closure|print|pack|seal|tape|sticker/i.test(cat ?? '');
+const NO_SHAPE = 'Other';
 
-function groupByCategory(items: PackagingMaterial[]): [string, PackagingMaterial[]][] {
-    const map = new Map<string, PackagingMaterial[]>();
-    for (const m of items) {
-        const key = m.category || 'Uncategorized';
-        if (!map.has(key)) map.set(key, []);
-        map.get(key)!.push(m);
+// "1ltr", "500 ml", "250gm" → volume/weight in base units (L or kg)
+function sizeInBaseUnits(packingSize: string | null): number | null {
+    if (!packingSize) return null;
+    const s = packingSize.toLowerCase().replace(/\s+/g, '');
+    const m = s.match(/^([\d.]+)\s*(ltr|litre|liter|l|ml|kg|kgs|gm|g|gram|mg)$/);
+    if (!m) return null;
+    const n = parseFloat(m[1]);
+    if (!Number.isFinite(n)) return null;
+    switch (m[2]) {
+        case 'ltr': case 'litre': case 'liter': case 'l':
+        case 'kg': case 'kgs':
+            return n;
+        case 'ml': case 'gm': case 'g': case 'gram':
+            return n / 1000;
+        case 'mg':
+            return n / 1_000_000;
+        default:
+            return null;
     }
-    return [...map.entries()];
 }
 
-export default function RateCalculator({ packagingMaterials }: Props) {
-    const [materialAmount, setMaterialAmount] = useState('');
-    const [bottleId, setBottleId] = useState<string>('');
-    const [outerBoxId, setOuterBoxId] = useState<string>('');
-    const [unitsPerBox, setUnitsPerBox] = useState('1');
-    const [extraIds, setExtraIds] = useState<number[]>([]);
+// Sort 5ml → 5ltr rather than alphabetically
+const sizeRank = (r: Recipe) => sizeInBaseUnits(r.packing_size) ?? Number.MAX_SAFE_INTEGER;
 
-    const bottleOptions = useMemo(
-        () => packagingMaterials.filter((m) => isBottleJar(m.category)),
-        [packagingMaterials],
-    );
+export default function RateCalculator({ recipes }: Props) {
+    const [materialRate, setMaterialRate] = useState('');
+    const [shape, setShape] = useState<string>('');
+    const [expanded, setExpanded] = useState<number | null>(null);
+    const [margin, setMargin] = useState('');
 
-    const outerBoxOptions = useMemo(
-        () => packagingMaterials.filter((m) => isOuterBox(m.category) && !isBottleJar(m.category)),
-        [packagingMaterials],
-    );
+    const shapes = useMemo(() => {
+        const set = new Set<string>();
+        for (const r of recipes) set.add((r.shape ?? '').trim() || NO_SHAPE);
+        return [...set].sort((a, b) => (a === NO_SHAPE ? 1 : b === NO_SHAPE ? -1 : a.localeCompare(b)));
+    }, [recipes]);
 
-    const extraOptions = useMemo(
-        () => packagingMaterials.filter(
-            (m) => isOtherPackaging(m.category) && !isBottleJar(m.category) && !isOuterBox(m.category),
-        ),
-        [packagingMaterials],
-    );
+    const rows = useMemo(() => {
+        if (!shape) return [];
+        return recipes
+            .filter((r) => ((r.shape ?? '').trim() || NO_SHAPE) === shape)
+            .sort((a, b) => sizeRank(a) - sizeRank(b));
+    }, [recipes, shape]);
 
-    // Fallback pools so a material is always findable even when its
-    // category name doesn't match any keyword.
-    const bottleFallback = useMemo(
-        () => packagingMaterials.filter((m) => !isBottleJar(m.category)),
-        [packagingMaterials],
-    );
+    const rate = parseFloat(materialRate) || 0;
+    const marginPct = parseFloat(margin) || 0;
 
-    const outerBoxFallback = useMemo(
-        () => packagingMaterials.filter((m) => !(isOuterBox(m.category) && !isBottleJar(m.category))),
-        [packagingMaterials],
-    );
-
-    const findMaterial = (id: string) => packagingMaterials.find((m) => String(m.id) === id);
-
-    const bottleCost = useMemo(() => {
-        const m = findMaterial(bottleId);
-        return m ? Number(m.selling_rate) || 0 : 0;
-    }, [bottleId, packagingMaterials]);
-
-    const outerBoxCost = useMemo(() => {
-        const m = findMaterial(outerBoxId);
-        if (!m) return 0;
-        const units = parseFloat(unitsPerBox) || 1;
-        return (Number(m.selling_rate) || 0) / units;
-    }, [outerBoxId, unitsPerBox, packagingMaterials]);
-
-    const extraTotal = useMemo(() => {
-        return extraIds.reduce((sum, id) => {
-            const m = findMaterial(String(id));
-            return sum + (m ? Number(m.selling_rate) || 0 : 0);
-        }, 0);
-    }, [extraIds, packagingMaterials]);
-
-    const toggleExtra = (id: number) => {
-        setExtraIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-    };
-
-    const matAmt = parseFloat(materialAmount) || 0;
-    const packagingCost = bottleCost + outerBoxCost + extraTotal;
-    const finalRate = matAmt + packagingCost;
+    const computed = rows.map((r) => {
+        // Size decides how much bulk goes in; fill_quantity is the fallback
+        const size = sizeInBaseUnits(r.packing_size) ?? r.fill_quantity ?? 0;
+        const materialCost = size * rate;
+        const total = materialCost + r.packaging_cost + r.charges_cost;
+        return { r, size, materialCost, total, withMargin: total * (1 + marginPct / 100) };
+    });
 
     return (
         <>
             <Head title="Product Rate Calculator" />
-            <div id="view-rate-calc" className="view active">
+            <div className="view active">
                 <div className="page-header">
                     <div className="page-header-left">
                         <h1>Product Rate Calculator</h1>
-                        <p>Enter the material cost — packaging rates are pulled automatically from inventory</p>
+                        <p>Material નો ભાવ નાખો અને bottle પસંદ કરો — બધી sizes નો per pcs rate આવી જશે</p>
                     </div>
                 </div>
 
-                <div className="rc-two-col">
-                    {/* Left: Inputs */}
-                    <div>
-                        <div className="form-card">
-                            <div className="form-card-title">💰 Material Cost</div>
-                            <div className="form-grid">
-                                <div className="form-group" style={{ gridColumn: '1/-1' }}>
-                                    <label>Material Amount (₹)</label>
-                                    <input
-                                        type="number"
-                                        placeholder="Enter material amount"
-                                        value={materialAmount}
-                                        onChange={(e) => setMaterialAmount(e.target.value)}
-                                        step="0.01" min="0"
-                                    />
-                                </div>
-                            </div>
+                {/* ── Inputs ── */}
+                <div className="card" style={{ padding: 16, marginBottom: 16 }}>
+                    <div className="form-grid" style={{ marginBottom: 14 }}>
+                        <div className="form-group">
+                            <label>Material Rate (₹ per L / kg) *</label>
+                            <input
+                                type="number"
+                                inputMode="decimal"
+                                autoFocus
+                                value={materialRate}
+                                onChange={(e) => setMaterialRate(e.target.value)}
+                                placeholder="e.g. 450"
+                                step="0.01"
+                                min="0"
+                            />
                         </div>
-
-                        <div className="form-card" style={{ marginTop: '12px' }}>
-                            <div className="form-card-title">🫙 Bottle / Jar (from Inventory)</div>
-                            <div className="form-grid">
-                                <div className="form-group" style={{ gridColumn: '1/-1' }}>
-                                    <label>Select Bottle / Jar</label>
-                                    <select value={bottleId} onChange={(e) => setBottleId(e.target.value)}>
-                                        <option value="">— None —</option>
-                                        {groupByCategory(bottleOptions).map(([cat, items]) => (
-                                            <optgroup key={cat} label={cat}>
-                                                {items.map((m) => (
-                                                    <option key={m.id} value={m.id}>
-                                                        {m.name} ({formatAmt(Number(m.selling_rate) || 0)} / {m.unit})
-                                                    </option>
-                                                ))}
-                                            </optgroup>
-                                        ))}
-                                        {bottleFallback.length > 0 && (
-                                            <optgroup label="— Other Materials —">
-                                                {bottleFallback.map((m) => (
-                                                    <option key={m.id} value={m.id}>
-                                                        {m.name} ({formatAmt(Number(m.selling_rate) || 0)} / {m.unit})
-                                                    </option>
-                                                ))}
-                                            </optgroup>
-                                        )}
-                                    </select>
-                                </div>
-                            </div>
+                        <div className="form-group">
+                            <label>Margin % <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 12 }}>(optional)</span></label>
+                            <input
+                                type="number"
+                                inputMode="decimal"
+                                value={margin}
+                                onChange={(e) => setMargin(e.target.value)}
+                                placeholder="e.g. 20"
+                                step="0.01"
+                                min="0"
+                            />
                         </div>
+                    </div>
 
-                        <div className="form-card" style={{ marginTop: '12px' }}>
-                            <div className="form-card-title">📦 Outer Box (from Inventory)</div>
-                            <div className="form-grid">
-                                <div className="form-group" style={{ gridColumn: '1/-1' }}>
-                                    <label>Select Outer Box</label>
-                                    <select value={outerBoxId} onChange={(e) => setOuterBoxId(e.target.value)}>
-                                        <option value="">— None —</option>
-                                        {groupByCategory(outerBoxOptions).map(([cat, items]) => (
-                                            <optgroup key={cat} label={cat}>
-                                                {items.map((m) => (
-                                                    <option key={m.id} value={m.id}>
-                                                        {m.name} ({formatAmt(Number(m.selling_rate) || 0)} / {m.unit})
-                                                    </option>
-                                                ))}
-                                            </optgroup>
-                                        ))}
-                                        {outerBoxFallback.length > 0 && (
-                                            <optgroup label="— Other Materials —">
-                                                {outerBoxFallback.map((m) => (
-                                                    <option key={m.id} value={m.id}>
-                                                        {m.name} ({formatAmt(Number(m.selling_rate) || 0)} / {m.unit})
-                                                    </option>
-                                                ))}
-                                            </optgroup>
-                                        )}
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label>Units per Box</label>
-                                    <input
-                                        type="number"
-                                        value={unitsPerBox}
-                                        onChange={(e) => setUnitsPerBox(e.target.value)}
-                                        step="1" min="1"
-                                        style={{ maxWidth: '120px' }}
-                                    />
-                                </div>
-                            </div>
+                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--tx-muted)', marginBottom: 8 }}>
+                        🍾 Bottle / Jar
+                    </div>
+                    {shapes.length === 0 ? (
+                        <div style={{ color: 'var(--tx-muted)', fontSize: 13 }}>
+                            કોઈ filling recipe મળી નથી — પહેલાં Filling page પર recipes બનાવો.
                         </div>
+                    ) : (
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            {shapes.map((s) => {
+                                const count = recipes.filter((r) => ((r.shape ?? '').trim() || NO_SHAPE) === s).length;
+                                return (
+                                    <button
+                                        key={s}
+                                        type="button"
+                                        className={`pill${shape === s ? ' active' : ''}`}
+                                        onClick={() => { setShape(shape === s ? '' : s); setExpanded(null); }}
+                                    >
+                                        {s} <span style={{ opacity: .65 }}>({count})</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
 
-                        {extraOptions.length > 0 && (
-                            <div className="form-card" style={{ marginTop: '12px' }}>
-                                <div className="form-card-title">🏷️ Other Packaging (from Inventory)</div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    {extraOptions.map((m) => (
-                                        <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={extraIds.includes(m.id)}
-                                                onChange={() => toggleExtra(m.id)}
-                                            />
-                                            <span>{m.name}</span>
-                                            <span style={{ marginLeft: 'auto', color: 'var(--tx-muted)' }}>
-                                                {formatAmt(Number(m.selling_rate) || 0)} / {m.unit}
-                                            </span>
-                                        </label>
+                {/* ── Results ── */}
+                {!shape ? (
+                    <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--tx-muted)' }}>
+                        ઉપરથી bottle પસંદ કરો.
+                    </div>
+                ) : computed.length === 0 ? (
+                    <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--tx-muted)' }}>
+                        "{shape}" માટે કોઈ size મળી નથી.
+                    </div>
+                ) : (
+                    <div className="card" style={{ overflow: 'hidden' }}>
+                        <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', fontSize: 13, color: 'var(--tx-muted)' }}>
+                            {shape} — {computed.length} size{computed.length !== 1 ? 's' : ''}
+                            {rate > 0 && <> · material {money(rate)} / L·kg</>}
+                        </div>
+                        <div style={{ overflowX: 'auto' }}>
+                            <table className="prod-table">
+                                <thead>
+                                    <tr>
+                                        <th>Size</th>
+                                        <th>Product</th>
+                                        <th style={{ textAlign: 'right' }}>Material</th>
+                                        <th style={{ textAlign: 'right' }}>Packaging</th>
+                                        <th style={{ textAlign: 'right' }}>Charges</th>
+                                        <th style={{ textAlign: 'right' }}>Per pcs</th>
+                                        {marginPct > 0 && <th style={{ textAlign: 'right' }}>+{marginPct}%</th>}
+                                        <th />
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {computed.map(({ r, size, materialCost, total, withMargin }) => (
+                                        <Fragment key={r.id}>
+                                            <tr>
+                                                <td><strong>{r.packing_size ?? '—'}</strong></td>
+                                                <td>
+                                                    <span className="prod-name">{r.name}</span>
+                                                    {!sizeInBaseUnits(r.packing_size) && (
+                                                        <div style={{ fontSize: 11, color: '#b45309' }}>
+                                                            ⚠️ size વંચાઈ નથી — fill qty {r.fill_quantity} વપરાયું
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td style={{ textAlign: 'right' }}>
+                                                    {money(materialCost)}
+                                                    <div style={{ fontSize: 10, color: 'var(--tx-muted)' }}>{size} × {money(rate)}</div>
+                                                </td>
+                                                <td style={{ textAlign: 'right' }}>{money(r.packaging_cost)}</td>
+                                                <td style={{ textAlign: 'right' }}>{money(r.charges_cost)}</td>
+                                                <td style={{ textAlign: 'right', fontWeight: 700, fontSize: 15 }}>{money(total)}</td>
+                                                {marginPct > 0 && (
+                                                    <td style={{ textAlign: 'right', fontWeight: 700, color: '#059669' }}>{money(withMargin)}</td>
+                                                )}
+                                                <td>
+                                                    <button
+                                                        type="button"
+                                                        className="btn-icon"
+                                                        title="Breakdown"
+                                                        onClick={() => setExpanded(expanded === r.id ? null : r.id)}
+                                                    >
+                                                        {expanded === r.id ? '▾' : '▸'}
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            {expanded === r.id && (
+                                                <tr>
+                                                    <td colSpan={marginPct > 0 ? 8 : 7} style={{ background: 'var(--bg-paper)', padding: '10px 16px' }}>
+                                                        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--tx-muted)', marginBottom: 6 }}>
+                                                            Filling recipe માંથી
+                                                        </div>
+                                                        {r.items.length === 0 && r.charges.length === 0 ? (
+                                                            <div style={{ fontSize: 13, color: 'var(--tx-muted)' }}>આ recipe માં કોઈ packaging item નથી.</div>
+                                                        ) : (
+                                                            <table style={{ fontSize: 13, width: '100%', maxWidth: 560 }}>
+                                                                <tbody>
+                                                                    {r.items.map((it, i) => (
+                                                                        <tr key={i}>
+                                                                            <td style={{ padding: '2px 0' }}>{it.name}</td>
+                                                                            <td style={{ padding: '2px 8px', color: 'var(--tx-muted)' }}>
+                                                                                {it.qty} {it.unit} × {money(it.rate)}
+                                                                            </td>
+                                                                            <td style={{ padding: '2px 0', textAlign: 'right', fontWeight: 600 }}>
+                                                                                {money(it.qty * it.rate)}
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))}
+                                                                    {r.charges.map((c, i) => (
+                                                                        <tr key={`c${i}`}>
+                                                                            <td style={{ padding: '2px 0' }}>💡 {c.label}</td>
+                                                                            <td />
+                                                                            <td style={{ padding: '2px 0', textAlign: 'right', fontWeight: 600 }}>{money(c.amount)}</td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </Fragment>
                                     ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Right: Output */}
-                    <div>
-                        <div className="form-card">
-                            <div className="form-card-title">🧮 Final Rate</div>
-
-                            <div className="rc-summary-bar">
-                                <span>Material Amount:</span>
-                                <strong>{formatAmt(matAmt)}</strong>
-                            </div>
-                            <div className="rc-summary-bar">
-                                <span>Bottle / Jar Rate:</span>
-                                <strong>{formatAmt(bottleCost)}</strong>
-                            </div>
-                            <div className="rc-summary-bar">
-                                <span>Outer Box Rate (per unit):</span>
-                                <strong>{formatAmt(outerBoxCost)}</strong>
-                            </div>
-                            <div className="rc-summary-bar">
-                                <span>Other Packaging Rate:</span>
-                                <strong>{formatAmt(extraTotal)}</strong>
-                            </div>
-                            <div className="rc-cost-bar">
-                                <span>Final Rate:</span>
-                                <strong style={{ fontSize: '16px' }}>{formatAmt(finalRate)}</strong>
-                            </div>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
-                </div>
+                )}
             </div>
         </>
     );
