@@ -30,10 +30,14 @@ class ProductPhotoController extends Controller
         $user?->loadMissing('roles');
         $isSales = $user?->roles->first()?->slug === 'sales';
         $myPartyIds = $isSales
-            ? Party::where('created_by', $user->id)->pluck('id')->all()
+            ? Party::withoutGlobalScopes()->where('created_by', $user->id)->pluck('id')->all()
             : [];
 
-        $photos = ProductPhoto::with(['party:id,name', 'uploader:id,name', 'updater:id,name'])
+        // Party carries a company global scope; resolve names without it so
+        // folders/photos from other companies still show their party name.
+        $partyNames = Party::withoutGlobalScopes()->pluck('name', 'id');
+
+        $photos = ProductPhoto::with(['uploader:id,name', 'updater:id,name'])
             ->orderBy('party_id')
             ->orderBy('our_brand')
             ->orderBy('party_brand')
@@ -44,7 +48,7 @@ class ProductPhotoController extends Controller
                     || (int) $p->uploaded_by === (int) $user->id,
                 'id'             => $p->id,
                 'party_id'       => $p->party_id,
-                'party_name'     => $p->party?->name,
+                'party_name'     => $p->party_id ? ($partyNames[$p->party_id] ?? 'Unknown Party') : null,
                 'our_brand'      => $p->our_brand,
                 'party_brand'    => $p->party_brand,
                 'packing_size'   => $p->packing_size,
@@ -58,13 +62,12 @@ class ProductPhotoController extends Controller
                 'updated_at'     => $p->updated_at?->toDateString(),
             ]);
 
-        $folders = ProductPhotoFolder::with('party:id,name')
-            ->orderBy('id')
+        $folders = ProductPhotoFolder::orderBy('id')
             ->get()
             ->map(fn($f) => [
                 'id' => $f->id,
                 'party_id' => $f->party_id,
-                'party_name' => $f->party?->name,
+                'party_name' => $partyNames[$f->party_id] ?? 'Unknown Party',
                 'is_mine' => $isSales ? in_array($f->party_id, $myPartyIds) : true,
             ]);
 
