@@ -40,7 +40,7 @@ type Bom = {
     batch_size: string | number;
     batch_unit: string;
     output_raw_material_id?: number | null;
-    output_material?: { id: number; name: string; unit: string; stock_qty?: string | number | null; min_stock?: string | number | null; category?: string | null } | null;
+    output_material?: { id: number; name: string; alternative_names?: string | null; unit: string; stock_qty?: string | number | null; min_stock?: string | number | null; category?: string | null } | null;
     notes?: string | null;
     charges?: { label: string; amount: string | number }[] | null;
     is_active: boolean;
@@ -674,6 +674,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
         if (search.trim()) {
             const q = search.trim();
             return fuzzyMatch(b.name, q)
+                || fuzzyMatch(b.output_material?.alternative_names, q)
                 || fuzzyMatch((b.category ?? '').trim() || UNCATEGORIZED, q)
                 || b.items.some((i) => fuzzyMatch(i.raw_material?.name, q) || fuzzyMatch(i.raw_material?.alternative_names, q));
         }

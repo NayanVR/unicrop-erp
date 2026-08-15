@@ -377,6 +377,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
         if (!search.trim()) return true;
         const q = search.trim();
         return fuzzyMatch(r.name, q)
+            || fuzzyMatch(r.output_material?.alternative_names, q)
             || fuzzyMatch(r.group_name, q)
             || fuzzyMatch(r.packing_size, q)
             || r.items.some((i) => fuzzyMatch(i.raw_material?.name, q) || fuzzyMatch(i.raw_material?.alternative_names, q));

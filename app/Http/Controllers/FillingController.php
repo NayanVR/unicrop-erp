@@ -21,7 +21,7 @@ class FillingController extends Controller
     public function index(): Response
     {
         $recipes = FillingRecipe::query()
-            ->with(['outputMaterial:id,name,unit,stock_qty,min_stock,category', 'items.rawMaterial:id,name,alternative_names,unit,stock_qty,cost_per_unit,category,dim_l,dim_w,dim_h'])
+            ->with(['outputMaterial:id,name,alternative_names,unit,stock_qty,min_stock,category', 'items.rawMaterial:id,name,alternative_names,unit,stock_qty,cost_per_unit,category,dim_l,dim_w,dim_h'])
             ->orderByRaw("CASE WHEN group_name IS NULL OR group_name = '' THEN 1 ELSE 0 END")
             ->orderBy('group_name')
             ->orderBy('name')
