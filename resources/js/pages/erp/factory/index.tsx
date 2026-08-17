@@ -2106,7 +2106,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                                 {current !== taken && (
                                     <div style={{ fontSize: '12px', fontWeight: 600, color: current < taken ? '#dc2626' : '#d97706', marginTop: '6px' }}>
                                         {current < taken
-                                            ? `${formatQty(taken - current)} pcs બાકી — એ ${STAGE_LABELS[stageQty.item.status] ?? stageQty.item.status} માં pending રહેશे (નવી row).`
+                                            ? `${formatQty(taken - current)} pcs remaining — they stay pending in ${STAGE_LABELS[stageQty.item.status] ?? stageQty.item.status} (new row).`
                                             : `${formatQty(current - taken)} more than ${stageQty.takenLabel.toLowerCase()}`}
                                     </div>
                                 )}

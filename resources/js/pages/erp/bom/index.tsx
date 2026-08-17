@@ -302,10 +302,10 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
         if (matSimilar.length > 0) {
             const exact = matSimilar.find((m) => m.name.trim().toLowerCase() === qname.toLowerCase());
             if (exact) {
-                window.alert(`⚠️ "${exact.name}" already exists in inventory (${exact.category ?? 'Uncategorized'}). Duplicate name allowed નથી.`);
+                window.alert(`⚠️ "${exact.name}" already exists in inventory (${exact.category ?? 'Uncategorized'}). Duplicate names are not allowed.`);
                 return;
             }
-            const ok = window.confirm(`⚠️ Similar material already exists:\n${matSimilar.map((m) => `• ${m.name} (${m.category ?? 'Uncategorized'})`).join('\n')}\n\nSame product હોય તો Cancel કરી existing select કરો. ખરેખર અલગ છે? OK દબાવો.`);
+            const ok = window.confirm(`⚠️ Similar material already exists:\n${matSimilar.map((m) => `• ${m.name} (${m.category ?? 'Uncategorized'})`).join('\n')}\n\nCancel and pick the existing one if it is the same product. Press OK only if this is genuinely different.`);
             if (!ok) return;
         }
         setPendingSelectName(quickForm.data.name.trim());
@@ -410,10 +410,10 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
         if (similar.length > 0) {
             const exact = similar.find((b) => b.name.trim().toLowerCase() === form.data.name.trim().toLowerCase());
             if (exact) {
-                window.alert(`⚠️ BOM "${exact.name}" already exists. Duplicate name allowed નથી.`);
+                window.alert(`⚠️ BOM "${exact.name}" already exists. Duplicate names are not allowed.`);
                 return;
             }
-            const ok = window.confirm(`⚠️ Similar BOM name already exists:\n${similar.map((b) => `• ${b.name}`).join('\n')}\n\nSame recipe હોય તો Cancel કરો. ખરેખર અલગ છે? OK દબાવો.`);
+            const ok = window.confirm(`⚠️ Similar BOM name already exists:\n${similar.map((b) => `• ${b.name}`).join('\n')}\n\nCancel if it is the same recipe. Press OK only if this is genuinely different.`);
             if (!ok) return;
         }
         if (editingBom) {
@@ -1298,7 +1298,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                       if (Number(item.base_potency) && !actual) {
                                           return (
                                               <div style={{ fontSize: 11, color: '#b45309', marginTop: 3 }}>
-                                                  ⚠️ "{mat.name}" માં potency % set નથી — Inventory માં ઉમેરો, પછી quantity આપોઆપ ગોઠવાશે.
+                                                  ⚠️ "{mat.name}" has no potency % set — add it in Inventory and quantities will adjust automatically.
                                               </div>
                                           );
                                       }
@@ -1306,7 +1306,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                       if (!Number(item.base_potency)) {
                                           return (
                                               <div style={{ fontSize: 11, color: 'var(--tx-muted)', marginTop: 3 }}>
-                                                  🧪 {qty} {item.unit || mat.unit} @ {actual}% ({mat.name} ની નોંધેલી assay) — production run વખતે બીજી assay નાખી શકાશે
+                                                  🧪 {qty} {item.unit || mat.unit} @ {actual}% ({mat.name}&apos;s recorded assay) — a different assay can be entered at production run
                                               </div>
                                           );
                                       }
@@ -1314,7 +1314,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                       if (Math.abs(adjusted - qty) < 0.0005) return null;
                                       return (
                                           <div style={{ fontSize: 11, color: '#0369a1', marginTop: 3 }}>
-                                              🧪 {mat.name} stock {actual}% છે → ખરેખર વપરાશે{' '}
+                                              🧪 {mat.name} stock is {actual}% → actually uses{' '}
                                               <strong>{adjusted.toLocaleString('en-IN', { maximumFractionDigits: 3 })} {item.unit || mat.unit}</strong>
                                               {' '}({qty} @ {base}%)
                                           </div>
@@ -1548,7 +1548,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                                             onChange={(e) => runForm.setData('potencies', { ...runForm.data.potencies, [key]: e.target.value })}
                                                             step="0.001" min="0" max="100"
                                                             placeholder={String(Number(baseAssay))}
-                                                            title="આ lot ની ખરી ટકાવારી"
+                                                            title="Actual assay of this lot"
                                                             style={{ width: 64, padding: '2px 5px', fontSize: 12 }}
                                                         />
                                                         <span style={{ fontSize: 11, color: 'var(--tx-muted)' }}>%</span>
@@ -1562,7 +1562,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                               </div>
                                               {hasAssay && shifted && (
                                                   <div style={{ fontSize: 11, color: '#0369a1', marginTop: 2 }}>
-                                                      🧪 recipe {fmtSmart(needed, itemUnit)} @ {Number(baseAssay)}% → {effAssay}% માટે <strong>{fmtSmart(neededAdj, itemUnit)}</strong> નાખવું
+                                                      🧪 recipe {fmtSmart(needed, itemUnit)} @ {Number(baseAssay)}% → add <strong>{fmtSmart(neededAdj, itemUnit)}</strong> for {effAssay}%
                                                   </div>
                                               )}
                                             </div>

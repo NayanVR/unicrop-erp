@@ -254,7 +254,7 @@ export default function SettingsIndex({ transports, alertSettings, reminderSetti
         }
         if (transportClashes.length > 0) {
             const ok = window.confirm(
-                `⚠️ મળતું નામ પહેલેથી છે:\n${transportClashes.map((t) => `• ${t.name}`).join('\n')}\n\nએ જ હોય તો Cancel કરો. ખરેખર અલગ છે? OK દબાવો.`,
+                `⚠️ A similar name already exists:\n${transportClashes.map((t) => `• ${t.name}`).join('\n')}\n\nCancel if it is the same one. Press OK only if this is genuinely different.`,
             );
             if (!ok) return;
         }
@@ -884,8 +884,8 @@ export default function SettingsIndex({ transports, alertSettings, reminderSetti
                                     fontWeight: exactClash ? 600 : 400,
                                 }}>
                                     {exactClash
-                                        ? `⚠️ "${exactClash.name}" પહેલેથી છે — duplicate allowed નથી`
-                                        : `⚠️ મળતું નામ: ${transportClashes.map((t) => `"${t.name}"`).join(', ')}`}
+                                        ? `⚠️ "${exactClash.name}" already exists — duplicates are not allowed`
+                                        : `⚠️ Similar name: ${transportClashes.map((t) => `"${t.name}"`).join(', ')}`}
                                 </div>
                             )}
                         </div>

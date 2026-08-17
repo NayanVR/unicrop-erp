@@ -116,7 +116,7 @@ export default function RateCalculator({ recipes, otherCostPct, canEditOtherCost
                 <div className="page-header">
                     <div className="page-header-left">
                         <h1>Product Rate Calculator</h1>
-                        <p>Material નો ભાવ નાખો અને bottle પસંદ કરો — બધી sizes નો per pcs rate આવી જશે</p>
+                        <p>Enter the material rate and pick a bottle — you get the per-pcs rate for every size</p>
                     </div>
                 </div>
 
@@ -138,7 +138,7 @@ export default function RateCalculator({ recipes, otherCostPct, canEditOtherCost
                         </div>
                         {canEditOtherCost && (
                             <div className="form-group">
-                                <label>Other Cost % <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 12 }}>(admin only — બધા rate પર લાગુ)</span></label>
+                                <label>Other Cost % <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 12 }}>(admin only — applied to every rate)</span></label>
                                 <div style={{ display: 'flex', gap: 6 }}>
                                     <input
                                         type="number"
@@ -160,7 +160,7 @@ export default function RateCalculator({ recipes, otherCostPct, canEditOtherCost
                                     </button>
                                 </div>
                                 <small style={{ fontSize: 11, color: 'var(--tx-muted)' }}>
-                                    બીજા users ને આ field દેખાશે નહીં — rate માં ગણાઈને જ જશે
+                                    Other users never see this field — it is already included in the rate
                                 </small>
                             </div>
                         )}
@@ -183,7 +183,7 @@ export default function RateCalculator({ recipes, otherCostPct, canEditOtherCost
                     </div>
                     {shapes.length === 0 ? (
                         <div style={{ color: 'var(--tx-muted)', fontSize: 13 }}>
-                            કોઈ filling recipe મળી નથી — પહેલાં Filling page પર recipes બનાવો.
+                            No filling recipes found — create them on the Filling page first.
                         </div>
                     ) : (
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -207,11 +207,11 @@ export default function RateCalculator({ recipes, otherCostPct, canEditOtherCost
                 {/* ── Results ── */}
                 {!shape ? (
                     <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--tx-muted)' }}>
-                        ઉપરથી bottle પસંદ કરો.
+                        Pick a bottle above.
                     </div>
                 ) : computed.length === 0 ? (
                     <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--tx-muted)' }}>
-                        "{shape}" માટે કોઈ size મળી નથી.
+                        No sizes found for "{shape}".
                     </div>
                 ) : (
                     <div className="card" style={{ overflow: 'hidden' }}>
@@ -244,12 +244,12 @@ export default function RateCalculator({ recipes, otherCostPct, canEditOtherCost
                                                         <span className="prod-name">{r.name}</span>
                                                         {!sizeInBaseUnits(r.packing_size) && (
                                                             <div style={{ fontSize: 11, color: '#b45309' }}>
-                                                                ⚠️ size વંચાઈ નથી — fill qty {r.fill_quantity} વપરાયું
+                                                                ⚠️ size not recognised — used fill qty {r.fill_quantity}
                                                             </div>
                                                         )}
                                                         {r.items.some((it) => !it.rate) && (
                                                             <div style={{ fontSize: 11, color: '#b45309' }}>
-                                                                ⚠️ {r.items.filter((it) => !it.rate).length} item માં selling rate નથી
+                                                                ⚠️ {r.items.filter((it) => !it.rate).length} item(s) have no selling rate
                                                             </div>
                                                         )}
                                                     </td>
@@ -284,10 +284,10 @@ export default function RateCalculator({ recipes, otherCostPct, canEditOtherCost
                                                 <tr>
                                                     <td colSpan={7 + (marginPct > 0 ? 1 : 0) + (canEditOtherCost && overheadPct > 0 ? 1 : 0)} style={{ background: 'var(--bg-paper)', padding: '10px 16px' }}>
                                                         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--tx-muted)', marginBottom: 6 }}>
-                                                            Filling recipe માંથી — bottle + outer box
+                                                            From the filling recipe — bottle + outer box
                                                         </div>
                                                         {r.items.length === 0 && r.charges.length === 0 ? (
-                                                            <div style={{ fontSize: 13, color: 'var(--tx-muted)' }}>આ recipe માં bottle કે outer box નથી.</div>
+                                                            <div style={{ fontSize: 13, color: 'var(--tx-muted)' }}>This recipe has no bottle or outer box.</div>
                                                         ) : (
                                                             <table style={{ fontSize: 13, width: '100%', maxWidth: 560 }}>
                                                                 <tbody>
@@ -297,7 +297,7 @@ export default function RateCalculator({ recipes, otherCostPct, canEditOtherCost
                                                                                 {it.name}
                                                                                 {!it.rate && (
                                                                                     <span style={{ marginLeft: 6, fontSize: 11, color: '#b45309' }}>
-                                                                                        ⚠️ selling rate નથી
+                                                                                        ⚠️ no selling rate
                                                                                     </span>
                                                                                 )}
                                                                             </td>

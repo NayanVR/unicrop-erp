@@ -358,7 +358,7 @@ export default function DesignIndex() {
                         <div style={{ padding: '16px', maxHeight: '70vh', overflowY: 'auto' }}>
                             {galleryPopup.matches.length === 0 ? (
                                 <div style={{ textAlign: 'center', padding: 30, color: 'var(--tx-muted)' }}>
-                                    Gallery માં આ product ની details મળી નથી.
+                                    No details for this product in the gallery.
                                 </div>
                             ) : galleryPopup.matches.map((g) => (
                                 <div key={g.id} style={{ display: 'flex', gap: 16, marginBottom: 16, padding: 12, border: '1px solid var(--border)', borderRadius: 10, flexWrap: 'wrap' }}>

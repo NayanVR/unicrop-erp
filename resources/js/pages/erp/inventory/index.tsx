@@ -1001,7 +1001,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                 && isSimilarName(m.name, matForm.data.name)
         );
         if (similar.length > 0) {
-            const ok = window.confirm(`⚠️ Similar name already exists:\n${similar.map((m) => `• ${m.name} (${m.category ?? 'Uncategorized'})`).join('\n')}\n\nSame product હોય તો Cancel કરો. ખરેખર અલગ product છે? OK દબાવો.`);
+            const ok = window.confirm(`⚠️ Similar name already exists:\n${similar.map((m) => `• ${m.name} (${m.category ?? 'Uncategorized'})`).join('\n')}\n\nCancel if it is the same product. Press OK only if this is genuinely different.`);
             if (!ok) return;
         }
         const showFirstError = (errs: Record<string, string>) => {
@@ -2474,7 +2474,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                         if (dup) {
                                             return (
                                                 <div style={{ marginTop: 4, padding: '5px 10px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 5, fontSize: 12, color: '#991b1b', fontWeight: 600 }}>
-                                                    ⚠️ "{dup.name}" already exists in category "{dup.category ?? 'Uncategorized'}"{dup.approval_status === 'pending' ? ' (pending approval)' : ''} — duplicate name allowed નથી
+                                                    ⚠️ "{dup.name}" already exists in category "{dup.category ?? 'Uncategorized'}"{dup.approval_status === 'pending' ? ' (pending approval)' : ''} — duplicate names are not allowed
                                                 </div>
                                             );
                                         }
@@ -2483,7 +2483,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                         );
                                         return similar.length > 0 ? (
                                             <div style={{ marginTop: 4, padding: '5px 10px', background: '#fefce8', border: '1px solid #fde68a', borderRadius: 5, fontSize: 12, color: '#92400e' }}>
-                                                ⚠️ Spelling check — maltu name: {similar.map((m) => `"${m.name}"`).join(', ')} (typo હોય તો ચેક કરો)
+                                                ⚠️ Spelling check — maltu name: {similar.map((m) => `"${m.name}"`).join(', ')} (check if this is a typo)
                                             </div>
                                         ) : null;
                                     })()}
@@ -2497,7 +2497,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                         placeholder="e.g. emamectine 1.9 ec, EMA 1.9"
                                     />
                                     <small style={{ fontSize: 11, color: 'var(--tx-muted)' }}>
-                                        Technical / બીજું નામ — comma થી અલગ કરો. Search માં આ નામથી પણ મળશે.
+                                        Technical or alternate names — separate with commas. Search will match these too.
                                     </small>
                                     {matForm.errors.alternative_names && <div className="form-error">{matForm.errors.alternative_names}</div>}
                                 </div>
@@ -2521,7 +2521,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                         value={matForm.data.density}
                                         onChange={(e) => matForm.setData('density', e.target.value)}
                                     />
-                                    <small style={{ fontSize: 11, color: 'var(--tx-muted)' }}>BOM માં kg↔L conversion માટે (optional)</small>
+                                    <small style={{ fontSize: 11, color: 'var(--tx-muted)' }}>For kg↔L conversion in BOMs (optional)</small>
                                 </div>
                                 <div className="form-group">
                                     <label>Potency / Assay (%)</label>
@@ -2534,7 +2534,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                         value={matForm.data.potency}
                                         onChange={(e) => matForm.setData('potency', e.target.value)}
                                     />
-                                    <small style={{ fontSize: 11, color: 'var(--tx-muted)' }}>Technical material ની ખરી ટકાવારી — BOM માં quantity આપોઆપ ગોઠવાશે</small>
+                                    <small style={{ fontSize: 11, color: 'var(--tx-muted)' }}>Actual assay of the technical material — BOM quantities adjust automatically</small>
                                     {matForm.errors.unit && <div className="form-error">{matForm.errors.unit}</div>}
                                 </div>
                                 <div className="form-group">

@@ -66,7 +66,7 @@ export default function TransportReport({ transports, totals, filters }: Props) 
                 <div className="page-header">
                     <div className="page-header-left">
                         <h1>Transport Report</h1>
-                        <p>કયા transport માં કયું material, કયા customer નું ગયું — transport પ્રમાણે</p>
+                        <p>Which material went to which customer, by transport</p>
                     </div>
                 </div>
 
@@ -106,7 +106,7 @@ export default function TransportReport({ transports, totals, filters }: Props) 
                 {/* Per-transport summary */}
                 {transports.length === 0 ? (
                     <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--tx-muted)' }}>
-                        આ સમયગાળામાં કોઈ order મળ્યો નથી.
+                        No orders found in this period.
                     </div>
                 ) : (
                     <div className="card" style={{ overflow: 'hidden' }}>
