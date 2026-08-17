@@ -56,6 +56,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Orders list — controller filters by role; sales see confirmed/dispatched only
     Route::middleware(['role:orders.view'])->group(function () {
         Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
+        // Factory has no orders.view permission, so allow its own instead
+        Route::get('transport-report', [\App\Http\Controllers\TransportReportController::class, 'index'])
+            ->withoutMiddleware('role:orders.view')
+            ->middleware('role:orders.view,factory.manage')
+            ->name('transport-report.index');
     });
 
     // Order print/PDF — also needed by factory for production orders

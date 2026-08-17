@@ -51,6 +51,7 @@ const NAV_DEFS: Record<string, NavItem[]> = {
             icon: '🌱',
             href: ordersCreate(),
         },
+        { id: 'transport-report', label: 'Transport Report', icon: '🚚', href: '/transport-report' as NonNullable<InertiaLinkProps['href']> },
         { id: 'factory', label: 'Production Orders', icon: '🏭', href: factoryIndex() },
         { id: 'filling', label: 'Filling', icon: '🧪', href: '/filling' as NonNullable<InertiaLinkProps['href']> },
         { id: 'bom', label: 'Bill of Materials', icon: '⚗️', href: bomIndex() },
@@ -74,6 +75,7 @@ const NAV_DEFS: Record<string, NavItem[]> = {
         { id: 'dashboard', label: 'Dashboard', icon: '🌾', href: dashboard() },
         { id: 'new-order', label: 'New Order', icon: '🌱', href: ordersCreate() },
         { id: 'all-orders', label: 'All Orders', icon: '📋', href: ordersIndex() },
+        { id: 'transport-report', label: 'Transport Report', icon: '🚚', href: '/transport-report' as NonNullable<InertiaLinkProps['href']> },
         { id: 'parties', label: 'Parties', icon: '🏢', href: partiesIndex() },
         { id: 'party-ledger', label: 'Party Ledger', icon: '📒', href: partyLedgerIndex() },
         { id: 'rate-calc', label: 'Rate Calculator', icon: '🧮', href: rateCalcIndex() },
@@ -85,6 +87,7 @@ const NAV_DEFS: Record<string, NavItem[]> = {
     factory: [
         { id: 'dashboard', label: 'Dashboard', icon: '🌾', href: dashboard() },
         { id: 'factory', label: 'Production Orders', icon: '🏭', href: factoryIndex() },
+        { id: 'transport-report', label: 'Transport Report', icon: '🚚', href: '/transport-report' as NonNullable<InertiaLinkProps['href']> },
         { id: 'unit-transfer', label: 'Unit Transfer', icon: '🔄', href: unitTransferIndex() },
         { id: 'bom', label: 'Bill of Materials', icon: '⚗️', href: bomIndex() },
         { id: 'products', label: 'Products', icon: '🏷️', href: productsIndex() },
@@ -100,6 +103,7 @@ const NAV_DEFS: Record<string, NavItem[]> = {
     accountant: [
         { id: 'acct-dashboard', label: 'Dashboard', icon: '📊', href: dashboard() },
         { id: 'all-orders', label: 'Orders', icon: '📋', href: ordersIndex() },
+        { id: 'transport-report', label: 'Transport Report', icon: '🚚', href: '/transport-report' as NonNullable<InertiaLinkProps['href']> },
         { id: 'party-ledger', label: 'Party Ledger', icon: '📒', href: partyLedgerIndex() },
         { id: 'inventory', label: 'Inventory', icon: '🗄️', href: inventoryIndex() },
     ],
