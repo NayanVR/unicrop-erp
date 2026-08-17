@@ -162,6 +162,10 @@ class SettingsController extends Controller
             'type' => 'required|in:transport,courier',
         ]);
 
+        if ($clash = $this->duplicateTransport($data['name'], $data['type'])) {
+            return redirect()->back()->with('error', "\"{$clash->name}\" already exists.");
+        }
+
         Transport::create($data);
 
         return redirect()->back()->with('success', ucfirst($data['type']).' added.');
@@ -174,9 +178,28 @@ class SettingsController extends Controller
             'type' => 'required|in:transport,courier',
         ]);
 
+        if ($clash = $this->duplicateTransport($data['name'], $data['type'], $transport->id)) {
+            return redirect()->back()->with('error', "\"{$clash->name}\" already exists.");
+        }
+
         $transport->update($data);
 
         return redirect()->back()->with('success', ucfirst($data['type']).' updated.');
+    }
+
+    /**
+     * An exact name clash within the same type, ignoring case, spacing and
+     * punctuation — so "Anjani Courier" and "anjani-courier" collide.
+     */
+    private function duplicateTransport(string $name, string $type, ?int $ignoreId = null): ?Transport
+    {
+        $normalize = fn (string $v) => preg_replace('/[^a-z0-9]/', '', mb_strtolower(trim($v)));
+        $target = $normalize($name);
+
+        return Transport::where('type', $type)
+            ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
+            ->get()
+            ->first(fn (Transport $t) => $normalize($t->name) === $target);
     }
 
     public function destroyTransport(Transport $transport): RedirectResponse

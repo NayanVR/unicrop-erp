@@ -15,6 +15,7 @@ import {
     update as bankAccountUpdate,
 } from '@/routes/settings/bank-accounts';
 import { Head, router, useForm } from '@inertiajs/react';
+import { isSimilarName } from '@/lib/similar-name';
 import { useState } from 'react';
 import { ModalPortal } from '@/components/modal-portal';
 
@@ -235,7 +236,28 @@ export default function SettingsIndex({ transports, alertSettings, reminderSetti
         setEditingTransport(null);
     };
 
+    // Same-type entries that clash with what is being typed
+    const transportClashes = transports.filter(
+        (t) => t.type === transportForm.data.type
+            && t.id !== editingTransport?.id
+            && isSimilarName(t.name, transportForm.data.name),
+    );
+    const exactClash = transportClashes.find(
+        (t) => t.name.trim().toLowerCase() === transportForm.data.name.trim().toLowerCase(),
+    );
+
     const saveTransport = () => {
+        const label = transportForm.data.type === 'courier' ? 'Courier' : 'Transport';
+        if (exactClash) {
+            window.alert(`⚠️ ${label} "${exactClash.name}" already exists.`);
+            return;
+        }
+        if (transportClashes.length > 0) {
+            const ok = window.confirm(
+                `⚠️ મળતું નામ પહેલેથી છે:\n${transportClashes.map((t) => `• ${t.name}`).join('\n')}\n\nએ જ હોય તો Cancel કરો. ખરેખર અલગ છે? OK દબાવો.`,
+            );
+            if (!ok) return;
+        }
         if (editingTransport) {
             transportForm.patch(transportUpdate(editingTransport.id).url, { preserveScroll: true, onSuccess: closeTransportModal });
         } else {
@@ -853,11 +875,24 @@ export default function SettingsIndex({ transports, alertSettings, reminderSetti
                                 autoFocus
                             />
                             {transportForm.errors.name && <span className="field-error">{transportForm.errors.name}</span>}
+                            {!transportForm.errors.name && transportForm.data.name.trim().length >= 3 && transportClashes.length > 0 && (
+                                <div style={{
+                                    marginTop: 4, padding: '5px 10px', borderRadius: 5, fontSize: 12,
+                                    background: exactClash ? '#fee2e2' : '#fefce8',
+                                    border: `1px solid ${exactClash ? '#fca5a5' : '#fde68a'}`,
+                                    color: exactClash ? '#991b1b' : '#92400e',
+                                    fontWeight: exactClash ? 600 : 400,
+                                }}>
+                                    {exactClash
+                                        ? `⚠️ "${exactClash.name}" પહેલેથી છે — duplicate allowed નથી`
+                                        : `⚠️ મળતું નામ: ${transportClashes.map((t) => `"${t.name}"`).join(', ')}`}
+                                </div>
+                            )}
                         </div>
                     </div>
                     <div className="modal-footer">
                         <button className="btn" onClick={closeTransportModal}>Cancel</button>
-                        <button className="btn primary" onClick={saveTransport} disabled={transportForm.processing}>
+                        <button className="btn primary" onClick={saveTransport} disabled={transportForm.processing || !!exactClash}>
                             {editingTransport ? 'Save Changes' : 'Add'}
                         </button>
                     </div>
