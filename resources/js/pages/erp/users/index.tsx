@@ -1,7 +1,7 @@
 import { ALL_NAV_ITEMS } from '@/layouts/erp-layout';
 import { destroy, store, update } from '@/routes/users';
 import type { Role, User } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { ModalPortal } from '@/components/modal-portal';
 
@@ -180,6 +180,11 @@ export default function UsersIndex({ users, roles, companies, canManageUsers, ma
         });
     };
 
+    const forceLogout = (user: User) => {
+        if (!confirm(`Log ${user.name} out of all devices?`)) return;
+        router.post(`/users/${user.id}/force-logout`, {}, { preserveScroll: true });
+    };
+
     const toggleUserStatus = (user: User) => {
         form.patch(update(user.id), {
             preserveScroll: true,
@@ -292,8 +297,17 @@ export default function UsersIndex({ users, roles, companies, canManageUsers, ma
                                             fontSize: 12,
                                         }}
                                     >
-                                        <div style={{ fontWeight: 700, color: 'var(--tx-muted)', marginBottom: 4 }}>
-                                            🖥️ Login Sessions
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                            <span style={{ fontWeight: 700, color: 'var(--tx-muted)' }}>
+                                                🖥️ Login Sessions ({user.sessions.length})
+                                            </span>
+                                            <button
+                                                className="btn danger-xs"
+                                                style={{ fontSize: 11, padding: '2px 8px' }}
+                                                onClick={() => forceLogout(user)}
+                                            >
+                                                Force Logout
+                                            </button>
                                         </div>
                                         {user.sessions.map((session, idx) => (
                                             <div

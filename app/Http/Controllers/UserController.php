@@ -10,6 +10,7 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -185,6 +186,27 @@ class UserController extends Controller
         $user->companies()->sync($this->buildCompanyPivot($data['company_ids'] ?? [], $data['roles']));
 
         return redirect()->back();
+    }
+
+    /** Kill every active session of a user, forcing them back to the login screen. */
+    public function forceLogout(User $user): RedirectResponse
+    {
+        abort_unless($this->canManageUsers(), 403);
+        $user->loadMissing('roles');
+        $this->assertSameRole($user);
+
+        $killed = DB::table('sessions')->where('user_id', $user->id)->delete();
+
+        // Invalidate "remember me" cookies too, otherwise the browser signs
+        // straight back in on the next request.
+        $user->forceFill(['remember_token' => Str::random(60)])->save();
+
+        return redirect()->back()->with(
+            'success',
+            $killed > 0
+                ? "{$user->name} logged out from {$killed} device" . ($killed > 1 ? 's' : '') . '.'
+                : "{$user->name} had no active session.",
+        );
     }
 
     public function destroy(User $user): RedirectResponse

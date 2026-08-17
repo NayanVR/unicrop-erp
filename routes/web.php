@@ -40,6 +40,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('users', [UserController::class, 'store'])->name('users.store');
         Route::patch('users/{user}', [UserController::class, 'update'])->name('users.update');
         Route::delete('users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
+        Route::post('users/{user}/force-logout', [UserController::class, 'forceLogout'])->name('users.force-logout');
 
         Route::get('companies', [CompanyController::class, 'index'])->name('companies.index');
         Route::post('companies', [CompanyController::class, 'store'])->name('companies.store');
