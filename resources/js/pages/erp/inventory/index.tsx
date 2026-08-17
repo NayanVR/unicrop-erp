@@ -217,7 +217,7 @@ function AdminCompanyInventory({ companies, expiryMap }: { companies: CompanyInv
                     placeholder="Search…"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, marginBottom: 10, minWidth: 200 }}
+                    style={{ marginBottom: 10, minWidth: 200 }}
                 />
                 <div style={{ overflowX: 'auto' }}>
                     <table className="prod-table">
@@ -1660,7 +1660,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                             placeholder="Search by name, SKU, HSN..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #d1d5db', minWidth: 200 }}
+                            style={{ minWidth: 200 }}
                         />
                         {(['all', 'low', 'out'] as const).map((s) => (
                             <button

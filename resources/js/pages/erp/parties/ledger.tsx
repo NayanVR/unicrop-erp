@@ -63,7 +63,7 @@ export default function PartyLedger() {
                             placeholder="Search party…"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            style={{ width: '100%', marginBottom: 8, padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db' }}
+                            style={{ width: '100%', marginBottom: 8 }}
                         />
                         <div style={{ maxHeight: 480, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 8 }}>
                             {filteredParties.map((p) => (

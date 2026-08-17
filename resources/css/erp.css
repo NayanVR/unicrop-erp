@@ -3802,12 +3802,15 @@ html.dark .badge.indigo {
 }
 /* Search fields are the first thing most users reach for, so they carry a
    tinted background, an accent border and a magnifier icon to stand out from
-   ordinary inputs. Applies to .search-input and every input[type=search]. */
+   ordinary inputs. Applies to .search-input and every input[type=search].
+   The left padding is forced because an inline `padding` shorthand at a call
+   site would otherwise let the typed text run under the magnifier. */
 .search-input,
 input[type='search'] {
     flex: 1;
     min-width: 160px;
-    padding: 8px 12px 8px 34px;
+    padding: 8px 12px;
+    padding-left: 34px !important;
     font-size: 13px;
     font-family: var(--font-body);
     border: 1.5px solid var(--accent);
