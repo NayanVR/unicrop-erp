@@ -168,6 +168,7 @@ export default function UnitTransferIndex() {
             <div className="card">
                 <div className="card-toolbar">
                     <input
+                        type="search"
                         className="search-input"
                         placeholder="Search item, order, from/to unit…"
                         value={search}

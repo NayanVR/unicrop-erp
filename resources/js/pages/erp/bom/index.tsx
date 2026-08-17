@@ -762,7 +762,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                         type="search"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="🔍 Search BOM, group or material…"
+                        placeholder="Search BOM, group or material…"
                         style={{ width: 260 }}
                     />
                     <div className="filter-bar" style={{ margin: 0 }}>
@@ -1069,7 +1069,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                             type="search"
                             value={histSearch}
                             onChange={(e) => setHistSearch(e.target.value)}
-                            placeholder="🔍 Search by BOM name or notes..."
+                            placeholder="Search by BOM name or notes..."
                             style={{ width: 280 }}
                         />
                         <span style={{ fontSize: 13, color: 'var(--tx-muted)' }}>{productionRuns.length} run{productionRuns.length !== 1 ? 's' : ''}</span>
@@ -1163,7 +1163,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px 32px', gap: 8 }}>
                                     <SearchableSelect
                                         value={form.data.output_raw_material_id}
-                                        placeholder="🔍 Search output product (typos ok)…"
+                                        placeholder="Search output product (typos ok)…"
                                         options={[
                                             { value: '', label: "— Not linked (won't update inventory stock) —" },
                                             ...materials.map((m) => ({

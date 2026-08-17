@@ -213,7 +213,7 @@ function AdminCompanyInventory({ companies, expiryMap }: { companies: CompanyInv
             </div>}
             {open && <div style={{ padding: '12px 16px' }}>
                 <input
-                    type="text"
+                    type="search"
                     placeholder="Search…"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
@@ -1656,7 +1656,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                     {/* Filter bar */}
                     <div className="filter-bar" style={{ marginBottom: 12 }}>
                         <input
-                            type="text"
+                            type="search"
                             placeholder="Search by name, SKU, HSN..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}

@@ -118,6 +118,10 @@ html.dark {
     --danger-lt: rgba(220, 38, 38, 0.12);
     --warning-lt: rgba(217, 119, 6, 0.12);
     --success-lt: rgba(5, 150, 105, 0.12);
+
+    /* Search fields sit a shade brighter than ordinary inputs on dark */
+    --bg-search: rgba(45, 212, 191, 0.1);
+    --bg-search-hover: rgba(45, 212, 191, 0.16);
     --info-lt: rgba(37, 99, 235, 0.12);
 
     --bg-input: #1a2540;
@@ -3796,22 +3800,56 @@ html.dark .badge.indigo {
     margin-bottom: 16px;
     flex-wrap: wrap;
 }
-.search-input {
+/* Search fields are the first thing most users reach for, so they carry a
+   tinted background, an accent border and a magnifier icon to stand out from
+   ordinary inputs. Applies to .search-input and every input[type=search]. */
+.search-input,
+input[type='search'] {
     flex: 1;
     min-width: 160px;
-    padding: 8px 12px;
+    padding: 8px 12px 8px 34px;
     font-size: 13px;
     font-family: var(--font-body);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--bg-input);
+    border: 1.5px solid var(--accent);
+    border-radius: 20px;
+    background-color: var(--bg-search, rgba(15, 118, 110, 0.06));
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230f766e' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 11px center;
+    background-size: 15px 15px;
     color: var(--tx-body);
     outline: none;
-    transition: border-color var(--t-fast);
+    transition: border-color var(--t-fast), box-shadow var(--t-fast), background-color var(--t-fast);
 }
-.search-input:focus {
+.search-input::placeholder,
+input[type='search']::placeholder {
+    color: var(--tx-muted);
+    opacity: 1;
+}
+.search-input:hover,
+input[type='search']:hover {
+    background-color: var(--bg-search-hover, rgba(15, 118, 110, 0.1));
+}
+.search-input:focus,
+input[type='search']:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.1);
+    box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.18);
+    background-color: var(--bg-input);
+}
+
+html.dark .search-input,
+html.dark input[type='search'] {
+    border-color: #2dd4bf;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232dd4bf' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E");
+}
+html.dark .search-input:focus,
+html.dark input[type='search']:focus {
+    box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.25);
+}
+
+/* Date pickers keep the plain input look — the icon would collide */
+input[type='search']::-webkit-search-cancel-button {
+    cursor: pointer;
 }
 .filter-tabs {
     display: flex;

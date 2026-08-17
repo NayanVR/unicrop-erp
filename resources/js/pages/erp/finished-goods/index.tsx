@@ -199,6 +199,7 @@ export default function FinishedGoodsIndex() {
             <div className="card">
                 <div className="card-toolbar">
                     <input
+                        type="search"
                         className="search-input"
                         placeholder="Search product, size or batch ref..."
                         value={search}

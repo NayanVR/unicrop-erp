@@ -208,6 +208,7 @@ export default function DesignIndex() {
             {/* Filters */}
             <div className="filter-bar" style={{ marginBottom: '16px' }}>
                 <input
+                        type="search"
                     className="search-input"
                     placeholder="Search brand or product…"
                     value={search}

@@ -443,7 +443,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                         type="search"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="🔍 Search product, group or material…"
+                        placeholder="Search product, group or material…"
                         style={{ width: 220 }}
                     />
                 </div>
@@ -670,7 +670,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                                 type="search"
                                 value={histSearch}
                                 onChange={(e) => setHistSearch(e.target.value)}
-                                placeholder="🔍 Search by product or size..."
+                                placeholder="Search by product or size..."
                                 style={{ width: 280 }}
                             />
                             <span style={{ fontSize: 13, color: 'var(--tx-muted)' }}>{fillingRuns.length} run{fillingRuns.length !== 1 ? 's' : ''}</span>

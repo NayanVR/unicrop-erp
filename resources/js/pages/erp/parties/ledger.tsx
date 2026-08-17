@@ -59,7 +59,7 @@ export default function PartyLedger() {
                 <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                     <div style={{ minWidth: 260 }}>
                         <input
-                            type="text"
+                            type="search"
                             placeholder="Search party…"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
