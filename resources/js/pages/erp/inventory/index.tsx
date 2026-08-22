@@ -1400,6 +1400,31 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                 </div>
             </div>
 
+            {/* Top search — jumps to the Materials tab so results are visible */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+                <input
+                    type="search"
+                    className="search-input"
+                    placeholder="Search material by name, alternate name, SKU, HSN or category…"
+                    value={search}
+                    onChange={(e) => { setSearch(e.target.value); if (e.target.value.trim()) setTab('materials'); }}
+                    style={{ flex: 1, minWidth: 260, maxWidth: 520, fontSize: 14, padding: '10px 14px' }}
+                />
+                {search.trim() && (
+                    <span style={{ fontSize: 13, color: 'var(--tx-muted)', whiteSpace: 'nowrap' }}>
+                        {filteredMaterials.length} result{filteredMaterials.length !== 1 ? 's' : ''}
+                        <button
+                            type="button"
+                            className="btn sm"
+                            style={{ marginLeft: 8 }}
+                            onClick={() => setSearch('')}
+                        >
+                            Clear
+                        </button>
+                    </span>
+                )}
+            </div>
+
             {/* Stats */}
             <div className="stats-grid">
                 <div className="stat-card">
