@@ -1425,6 +1425,75 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                 )}
             </div>
 
+            {/* Matches shown right under the box so nobody has to scroll */}
+            {search.trim() && (
+                <div className="card" style={{ marginBottom: 16, overflow: 'hidden' }}>
+                    {filteredMaterials.length === 0 ? (
+                        <div style={{ padding: 24, textAlign: 'center', color: 'var(--tx-muted)' }}>
+                            No material matches "{search.trim()}".
+                        </div>
+                    ) : (
+                        <>
+                            <div style={{ overflowX: 'auto' }}>
+                                <table className="prod-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Material</th>
+                                            <th>Category</th>
+                                            <th style={{ textAlign: 'right' }}>Stock</th>
+                                            <th>Status</th>
+                                            {canEditMaterial && <th />}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredMaterials.slice(0, 15).map((m) => {
+                                            const st = stockStatus(m);
+                                            const badge =
+                                                st === 'out' ? { label: 'Out of Stock', bg: '#fee2e2', fg: '#991b1b' } :
+                                                st === 'low' ? { label: 'Low', bg: '#ffedd5', fg: '#9a3412' } :
+                                                st === 'reorder' ? { label: 'Reorder', bg: '#fef9c3', fg: '#854d0e' } :
+                                                { label: 'OK', bg: '#d1fae5', fg: '#065f46' };
+                                            return (
+                                                <tr key={m.id}>
+                                                    <td>
+                                                        <div className="prod-name">{m.name}</div>
+                                                        {m.alternative_names && (
+                                                            <div className="prod-detail" style={{ fontStyle: 'italic', color: '#6b7280' }}>
+                                                                aka {m.alternative_names}
+                                                            </div>
+                                                        )}
+                                                        {!isSales && m.sku && <div className="prod-detail">{m.sku}</div>}
+                                                    </td>
+                                                    <td>{m.category ?? '—'}</td>
+                                                    <td style={{ textAlign: 'right', fontWeight: 700 }}>
+                                                        {fmt(m.stock_qty)} <span style={{ fontWeight: 400, color: 'var(--tx-muted)', fontSize: 12 }}>{m.unit}</span>
+                                                    </td>
+                                                    <td>
+                                                        <span style={{ background: badge.bg, color: badge.fg, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 }}>
+                                                            {badge.label}
+                                                        </span>
+                                                    </td>
+                                                    {canEditMaterial && (
+                                                        <td>
+                                                            <button className="btn-icon" title="Edit" onClick={() => openEditMat(m)}>✏️</button>
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {filteredMaterials.length > 15 && (
+                                <div style={{ padding: '8px 14px', fontSize: 12, color: 'var(--tx-muted)', borderTop: '1px solid var(--border)' }}>
+                                    Showing first 15 of {filteredMaterials.length} — refine the search or scroll to the Materials list for all.
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+            )}
+
             {/* Stats */}
             <div className="stats-grid">
                 <div className="stat-card">
