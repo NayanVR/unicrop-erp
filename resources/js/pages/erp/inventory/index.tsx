@@ -624,7 +624,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
     };
 
     // Selling rate mode for material form and packing form
-    const [matSellMode, setMatSellMode]   = useState<'manual' | 'profit'>('manual');
+    const [matSellMode, setMatSellMode]   = useState<'manual' | 'profit'>('profit');
     const [matProfitPct, setMatProfitPct] = useState('');
     const [pkgSellMode, setPkgSellMode]   = useState<'manual' | 'profit'>('manual');
     const [pkgProfitPct, setPkgProfitPct] = useState('');
@@ -931,7 +931,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
         matForm.reset();
         matForm.clearErrors();
         setEditingMat(null);
-        setMatSellMode('manual');
+        setMatSellMode('profit');
         setMatProfitPct('');
         setMatModal(true);
     };
@@ -966,10 +966,11 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
             is_active: m.is_active,
         });
         matForm.clearErrors();
-        // Restore profit-mode if selling_rate > cost (back-calculate %)
+        // Margin is the default mode; fall back to manual only when the saved
+        // rate can't be expressed as a non-negative margin over cost.
         const cost = Number(m.cost_per_unit) || 0;
         const rate = Number(m.selling_rate) || 0;
-        if (cost > 0 && rate > cost) {
+        if (cost > 0 && rate >= cost) {
             const pct = ((rate - cost) / cost) * 100;
             setMatSellMode('profit');
             setMatProfitPct(String(Math.round(pct * 100) / 100));
