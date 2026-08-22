@@ -626,7 +626,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
     // Selling rate mode for material form and packing form
     const [matSellMode, setMatSellMode]   = useState<'manual' | 'profit'>('profit');
     const [matProfitPct, setMatProfitPct] = useState('');
-    const [pkgSellMode, setPkgSellMode]   = useState<'manual' | 'profit'>('manual');
+    const [pkgSellMode, setPkgSellMode]   = useState<'manual' | 'profit'>('profit');
     const [pkgProfitPct, setPkgProfitPct] = useState('');
 
     // Packaging wizard
@@ -1298,7 +1298,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
         setPackStep(1);
         setPackCat(null);
         setPackForm({ size: '', shape: '', dim_l: '', dim_w: '', dim_h: '', hsn: '', gst: '18', sku: '', unit: 'pcs', supplier: '', min_stock: '0', reorder_level: '0', cost_per_unit: '', selling_rate: '', notes: '' });
-        setPkgSellMode('manual');
+        setPkgSellMode('profit');
         setPkgProfitPct('');
         setPackModal(true);
     };
@@ -3853,8 +3853,8 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                     <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                         <span>Selling Rate (₹)</span>
                                         <span style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden', fontSize: 11, height: 20 }}>
-                                            <button type="button" onClick={() => setPkgSellMode('manual')} style={{ padding: '0 8px', border: 'none', cursor: 'pointer', background: pkgSellMode === 'manual' ? 'var(--accent)' : 'var(--bg-paper)', color: pkgSellMode === 'manual' ? '#fff' : 'var(--tx-muted)', fontWeight: 600 }}>Manual</button>
-                                            <button type="button" onClick={() => setPkgSellMode('profit')} style={{ padding: '0 8px', border: 'none', borderLeft: '1px solid var(--border)', cursor: 'pointer', background: pkgSellMode === 'profit' ? '#059669' : 'var(--bg-paper)', color: pkgSellMode === 'profit' ? '#fff' : 'var(--tx-muted)', fontWeight: 600 }}>% Margin</button>
+                                            <button type="button" onClick={() => setPkgSellMode('profit')} style={{ padding: '0 8px', border: 'none', cursor: 'pointer', background: pkgSellMode === 'profit' ? '#059669' : 'var(--bg-paper)', color: pkgSellMode === 'profit' ? '#fff' : 'var(--tx-muted)', fontWeight: 600 }}>% Margin</button>
+                                            <button type="button" onClick={() => setPkgSellMode('manual')} style={{ padding: '0 8px', border: 'none', borderLeft: '1px solid var(--border)', cursor: 'pointer', background: pkgSellMode === 'manual' ? 'var(--accent)' : 'var(--bg-paper)', color: pkgSellMode === 'manual' ? '#fff' : 'var(--tx-muted)', fontWeight: 600 }}>Manual</button>
                                         </span>
                                     </label>
                                     {pkgSellMode === 'manual' ? (
