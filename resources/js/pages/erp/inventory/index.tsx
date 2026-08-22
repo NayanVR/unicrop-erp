@@ -2797,7 +2797,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                     <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                         <span>Selling Rate (₹)</span>
                                         <span style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden', fontSize: 11, height: 20 }}>
-                                            <button type="button" onClick={() => { setMatSellMode('profit'); if (matProfitPct) { const cost = Number(matForm.data.cost_per_unit) || 0; matForm.setData('selling_rate', String(cost * (1 + Number(matProfitPct) / 100))); } }} style={{ padding: '0 8px', border: 'none', cursor: 'pointer', background: matSellMode === 'profit' ? '#059669' : 'var(--bg-paper)', color: matSellMode === 'profit' ? '#fff' : 'var(--tx-muted)', fontWeight: 600 }}>% Profit</button>
+                                            <button type="button" onClick={() => { setMatSellMode('profit'); if (matProfitPct) { const cost = Number(matForm.data.cost_per_unit) || 0; matForm.setData('selling_rate', String(cost * (1 + Number(matProfitPct) / 100))); } }} style={{ padding: '0 8px', border: 'none', cursor: 'pointer', background: matSellMode === 'profit' ? '#059669' : 'var(--bg-paper)', color: matSellMode === 'profit' ? '#fff' : 'var(--tx-muted)', fontWeight: 600 }}>% Margin</button>
                                             <button type="button" onClick={() => setMatSellMode('manual')} style={{ padding: '0 8px', border: 'none', borderLeft: '1px solid var(--border)', cursor: 'pointer', background: matSellMode === 'manual' ? 'var(--accent)' : 'var(--bg-paper)', color: matSellMode === 'manual' ? '#fff' : 'var(--tx-muted)', fontWeight: 600 }}>Manual</button>
                                         </span>
                                     </label>
@@ -2816,7 +2816,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                                     type="number"
                                                     min="0"
                                                     step="0.1"
-                                                    placeholder="Profit %"
+                                                    placeholder="Margin %"
                                                     value={matProfitPct}
                                                     onChange={(e) => {
                                                         setMatProfitPct(e.target.value);
@@ -3853,7 +3853,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                         <span>Selling Rate (₹)</span>
                                         <span style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden', fontSize: 11, height: 20 }}>
                                             <button type="button" onClick={() => setPkgSellMode('manual')} style={{ padding: '0 8px', border: 'none', cursor: 'pointer', background: pkgSellMode === 'manual' ? 'var(--accent)' : 'var(--bg-paper)', color: pkgSellMode === 'manual' ? '#fff' : 'var(--tx-muted)', fontWeight: 600 }}>Manual</button>
-                                            <button type="button" onClick={() => setPkgSellMode('profit')} style={{ padding: '0 8px', border: 'none', borderLeft: '1px solid var(--border)', cursor: 'pointer', background: pkgSellMode === 'profit' ? '#059669' : 'var(--bg-paper)', color: pkgSellMode === 'profit' ? '#fff' : 'var(--tx-muted)', fontWeight: 600 }}>% Profit</button>
+                                            <button type="button" onClick={() => setPkgSellMode('profit')} style={{ padding: '0 8px', border: 'none', borderLeft: '1px solid var(--border)', cursor: 'pointer', background: pkgSellMode === 'profit' ? '#059669' : 'var(--bg-paper)', color: pkgSellMode === 'profit' ? '#fff' : 'var(--tx-muted)', fontWeight: 600 }}>% Margin</button>
                                         </span>
                                     </label>
                                     {pkgSellMode === 'manual' ? (
@@ -3871,7 +3871,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                                     type="number"
                                                     min="0"
                                                     step="0.1"
-                                                    placeholder="Profit %"
+                                                    placeholder="Margin %"
                                                     value={pkgProfitPct}
                                                     onChange={(e) => {
                                                         setPkgProfitPct(e.target.value);
