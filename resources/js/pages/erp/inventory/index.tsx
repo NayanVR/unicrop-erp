@@ -7,14 +7,30 @@ import type { Auth } from '@/types/auth';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { ModalPortal } from '@/components/modal-portal';
+import { matName } from '@/lib/material-name';
 import { fuzzyMatch, isSimilarName } from '@/lib/similar-name';
 
+// ── Name helpers ─────────────────────────────────────────────────────────────
+
+/** The name a specific company uses for a material. */
+const matNameFor = (m: RawMaterial, companyId?: number | null) =>
+    (companyId != null ? m.company_names?.find((n) => n.company_id === companyId)?.name : null) || matName(m);
+
+/** Every name a material answers to, for searching. */
+const allMatNames = (m: RawMaterial) => [m.name, ...(m.company_names ?? []).map((n) => n.name)];
+
 // ── Types ────────────────────────────────────────────────────────────────────
+
+export type CompanyName = { id?: number; company_id: number; name: string };
 
 type RawMaterial = {
     id: number;
     name: string;
-    alternative_names: string | null;
+    /** Name for the company currently being viewed — falls back to `name`. */
+    display_name?: string | null;
+    /** Per-company names; only sent where the material editor needs them. */
+    company_names?: CompanyName[];
+    description: string | null;
     sku: string | null;
     hsn: string | null;
     gst: string | number;
@@ -25,6 +41,7 @@ type RawMaterial = {
     density: string | number | null;
     potency: string | number | null;
     company_id?: number;
+    company?: { id: number; name: string } | null;
     stock_qty: string | number;
     min_stock: string | number;
     reorder_level: string | number;
@@ -56,7 +73,7 @@ type Transaction = {
     reference: string | null;
     notes: string | null;
     created_at: string;
-    raw_material: { id: number; name: string; unit: string } | null;
+    raw_material: { id: number; name: string; display_name?: string | null; unit: string } | null;
     user: { id: number; name: string } | null;
 };
 
@@ -121,7 +138,7 @@ type Reorder = {
     received_at: string | null;
     billed_at: string | null;
     received_by_user: { id: number; name: string } | null;
-    raw_material: { id: number; name: string } | null;
+    raw_material: { id: number; name: string; display_name?: string | null } | null;
 };
 
 type Stats = {
@@ -143,7 +160,7 @@ type GodownStock = {
     godown_id: number;
     raw_material_id: number;
     stock_qty: string | number;
-    raw_material?: { id: number; name: string; unit: string; category: string | null } | null;
+    raw_material?: { id: number; name: string; display_name?: string | null; unit: string; category: string | null } | null;
 };
 
 type Godown = {
@@ -166,7 +183,9 @@ function AdminCompanyInventory({ companies, expiryMap }: { companies: CompanyInv
 
     const company = companies.find((c) => c.id === activeCompany);
     const items = (company?.items ?? []).filter((m) =>
-        !search || m.name.toLowerCase().includes(search.toLowerCase()) || (m.sku ?? '').toLowerCase().includes(search.toLowerCase())
+        !search
+        || allMatNames(m).some((n) => n.toLowerCase().includes(search.toLowerCase()))
+        || (m.sku ?? '').toLowerCase().includes(search.toLowerCase())
     );
 
     const today = new Date();
@@ -244,7 +263,7 @@ function AdminCompanyInventory({ companies, expiryMap }: { companies: CompanyInv
                                 return (
                                     <tr key={m.id}>
                                         <td>{i + 1}</td>
-                                        <td><span className="prod-name">{m.name}</span></td>
+                                        <td><span className="prod-name">{matNameFor(m, activeCompany)}</span></td>
                                         <td>{m.sku ?? '—'}</td>
                                         <td>{m.category ?? '—'}</td>
                                         <td>{m.unit}</td>
@@ -298,6 +317,7 @@ type Props = {
     finishGoodGroups: FinishGoodGroup[];
     expiryMap: Record<string, string>;
     allCompaniesInventory: CompanyInventory[];
+    nameableCompanies: { id: number; name: string }[];
 };
 
 // ── Route constants ───────────────────────────────────────────────────────────
@@ -470,7 +490,7 @@ function SupplierField({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function InventoryIndex({ materials, pendingMaterials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomOutputMap, fillingOutputMap, godowns, finishGoodGroups, expiryMap, allCompaniesInventory }: Props) {
+export default function InventoryIndex({ materials, pendingMaterials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomOutputMap, fillingOutputMap, godowns, finishGoodGroups, expiryMap, allCompaniesInventory, nameableCompanies }: Props) {
     const { auth, flash } = usePage<{ auth: Auth; flash?: { success?: string; error?: string } }>().props;
     const role = auth.user?.role ?? auth.user?.roles?.[0]?.slug ?? '';
     const canSeeCost      = role === 'admin' || auth.user?.cost_access === true;
@@ -489,12 +509,12 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
     }, [flash]);
 
     const approvePendingMaterial = (m: PendingMaterial) => {
-        if (!window.confirm(`Approve "${m.name}" and add it to inventory?`)) return;
+        if (!window.confirm(`Approve "${matName(m)}" and add it to inventory?`)) return;
         router.post(ROUTES.approveMaterial(m.id), {}, { preserveScroll: true });
     };
 
     const rejectPendingMaterial = (m: PendingMaterial) => {
-        if (!window.confirm(`Reject and remove "${m.name}"?`)) return;
+        if (!window.confirm(`Reject and remove "${matName(m)}"?`)) return;
         router.post(ROUTES.rejectMaterial(m.id), {}, { preserveScroll: true });
     };
 
@@ -623,6 +643,31 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
         });
     };
 
+    const matCompanyOptions = editingMat?.company && !nameableCompanies.some((c) => c.id === editingMat.company!.id)
+        ? [...nameableCompanies, editingMat.company]
+        : nameableCompanies;
+
+    const companyLabel = (id: number) =>
+        matCompanyOptions.find((c) => c.id === id)?.name
+        ?? materials.find((m) => m.company?.id === id)?.company?.name
+        ?? `Company #${id}`;
+
+    /** "Acme: NPK 19-19-19" for every company that calls this material something else. */
+    const otherNames = (m: RawMaterial) => {
+        const shown  = matName(m).trim().toLowerCase();
+        const others = (m.company_names ?? []).filter((n) => n.name.trim().toLowerCase() !== shown);
+
+        if (others.length === 0) {
+            return null;
+        }
+
+        return (
+            <div className="prod-detail" style={{ fontStyle: 'italic', color: '#6b7280' }}>
+                {others.map((n) => `${companyLabel(n.company_id)}: ${n.name}`).join(' · ')}
+            </div>
+        );
+    };
+
     // Selling rate mode for material form and packing form
     const [matSellMode, setMatSellMode]   = useState<'manual' | 'profit'>('profit');
     const [matProfitPct, setMatProfitPct] = useState('');
@@ -656,7 +701,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
     const packExistingMatch = packCat
         ? materials.find((m) =>
               m.category === packCat.label &&
-              m.name.toLowerCase() === `${packCat.label}${packForm.size ? ' ' + packForm.size : ''}${packForm.shape ? ' ' + packForm.shape : ''}`.toLowerCase().trim() &&
+              matName(m).toLowerCase() === `${packCat.label}${packForm.size ? ' ' + packForm.size : ''}${packForm.shape ? ' ' + packForm.shape : ''}`.toLowerCase().trim() &&
               (m.dim_l || m.dim_w || m.dim_h)
           )
         : undefined;
@@ -773,7 +818,9 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
     // Material form
     const matForm = useForm({
         name: '',
-        alternative_names: '',
+        company_id: '',
+        company_names: [] as { company_id: string; name: string }[],
+        description: '',
         sku: '',
         hsn: '',
         gst: '18',
@@ -870,8 +917,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
         if (search.trim()) {
             const q = search.trim();
             if (
-                !fuzzyMatch(m.name, q) &&
-                !fuzzyMatch(m.alternative_names, q) &&
+                !allMatNames(m).some((n) => fuzzyMatch(n, q)) &&
                 !fuzzyMatch(m.sku, q) &&
                 !fuzzyMatch(m.category, q) &&
                 !fuzzyMatch(m.hsn, q)
@@ -930,6 +976,8 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
     const openNewMat = () => {
         matForm.reset();
         matForm.clearErrors();
+        matForm.setData('company_id', String(auth.current_company?.id ?? nameableCompanies[0]?.id ?? ''));
+        matForm.setData('company_names', []);
         setEditingMat(null);
         setMatSellMode('profit');
         setMatProfitPct('');
@@ -942,9 +990,16 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
         // values and the GST <select> can match its integer option values.
         const num = (v: number | string | null | undefined) =>
             v == null || v === '' ? '' : String(Number(v));
+        // The owning company's name is the material's default name; every other
+        // company it is named for gets its own row in the editor.
+        const ownerId = m.company_id ?? auth.current_company?.id ?? null;
         matForm.setData({
-            name: m.name,
-            alternative_names: m.alternative_names ?? '',
+            name: matNameFor(m, ownerId),
+            company_id: String(ownerId ?? ''),
+            company_names: (m.company_names ?? [])
+                .filter((n) => n.company_id !== ownerId && nameableCompanies.some((c) => c.id === n.company_id))
+                .map((n) => ({ company_id: String(n.company_id), name: n.name })),
+            description: m.description ?? '',
             sku: m.sku ?? '',
             hsn: m.hsn ?? '',
             gst: num(m.gst),
@@ -985,24 +1040,21 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
     const submitMat = (e: React.FormEvent) => {
         e.preventDefault();
         // Duplicate name check — block and tell the user which category it's in
+        // Names only have to be unique inside the company they are used in.
         const newName = matForm.data.name.trim().toLowerCase();
-        const currentCompanyId = auth.current_company?.id;
+        const targetCompanyId = Number(matForm.data.company_id) || auth.current_company?.id || null;
         const dup = [...materials, ...pendingMaterials].find(
-            (m) => m.name.trim().toLowerCase() === newName
-                && m.id !== editingMat?.id
-                && (m.company_id == null || currentCompanyId == null || m.company_id === currentCompanyId)
+            (m) => m.id !== editingMat?.id && matNameFor(m, targetCompanyId).trim().toLowerCase() === newName
         );
         if (dup) {
-            window.alert(`⚠️ "${dup.name}" already exists in category "${dup.category ?? 'Uncategorized'}"${dup.approval_status === 'pending' ? ' (pending approval)' : ''}. Duplicate names are not allowed.`);
+            window.alert(`⚠️ "${matNameFor(dup, targetCompanyId)}" already exists in category "${dup.category ?? 'Uncategorized'}"${dup.approval_status === 'pending' ? ' (pending approval)' : ''}. Duplicate names are not allowed.`);
             return;
         }
         const similar = [...materials, ...pendingMaterials].filter(
-            (m) => m.id !== editingMat?.id
-                && (m.company_id == null || currentCompanyId == null || m.company_id === currentCompanyId)
-                && isSimilarName(m.name, matForm.data.name)
+            (m) => m.id !== editingMat?.id && isSimilarName(matNameFor(m, targetCompanyId), matForm.data.name)
         );
         if (similar.length > 0) {
-            const ok = window.confirm(`⚠️ Similar name already exists:\n${similar.map((m) => `• ${m.name} (${m.category ?? 'Uncategorized'})`).join('\n')}\n\nCancel if it is the same product. Press OK only if this is genuinely different.`);
+            const ok = window.confirm(`⚠️ Similar name already exists:\n${similar.map((m) => `• ${matNameFor(m, targetCompanyId)} (${m.category ?? 'Uncategorized'})`).join('\n')}\n\nCancel if it is the same product. Press OK only if this is genuinely different.`);
             if (!ok) return;
         }
         const showFirstError = (errs: Record<string, string>) => {
@@ -1089,8 +1141,8 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                 ...prev,
                 {
                     raw_material_id: r.raw_material_id ? String(r.raw_material_id) : '',
-                    material_name: r.raw_material?.name ?? mat?.name ?? '',
-                    matSearch: r.raw_material?.name ?? mat?.name ?? '',
+                    material_name: matName(r.raw_material) || matName(mat),
+                    matSearch: matName(r.raw_material) || matName(mat),
                     sku: mat?.sku ?? '',
                     category: mat?.category ?? '',
                     hsn: mat?.hsn ?? '',
@@ -1119,8 +1171,8 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
             rows[i] = {
                 ...rows[i],
                 raw_material_id: String(mat.id),
-                material_name: mat.name,
-                matSearch: mat.name,
+                material_name: matName(mat),
+                matSearch: matName(mat),
                 sku: mat.sku ?? '',
                 category: mat.category ?? '',
                 hsn: mat.hsn ?? '',
@@ -1457,12 +1509,8 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                             return (
                                                 <tr key={m.id}>
                                                     <td>
-                                                        <div className="prod-name">{m.name}</div>
-                                                        {m.alternative_names && (
-                                                            <div className="prod-detail" style={{ fontStyle: 'italic', color: '#6b7280' }}>
-                                                                aka {m.alternative_names}
-                                                            </div>
-                                                        )}
+                                                        <div className="prod-name">{matName(m)}</div>
+                                                        {otherNames(m)}
                                                         {!isSales && m.sku && <div className="prod-detail">{m.sku}</div>}
                                                     </td>
                                                     <td>{m.category ?? '—'}</td>
@@ -1545,7 +1593,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                         {pendingMaterials.map((m) => (
                             <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderRadius: 8, border: '1px solid #fde68a', background: '#fffbeb', padding: '8px 12px', fontSize: 13 }}>
                                 <div>
-                                    <div style={{ fontWeight: 700 }}>{m.name}</div>
+                                    <div style={{ fontWeight: 700 }}>{matName(m)}</div>
                                     <div style={{ color: '#92400e', fontSize: 12 }}>
                                         {m.category ?? 'Uncategorized'} · {m.unit}
                                         {m.requested_by_user ? ` · requested by ${m.requested_by_user.name}` : ''}
@@ -1601,9 +1649,9 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <span
                                     style={{ cursor: 'pointer', fontWeight: 700, color: c.text }}
-                                    onClick={(e) => { e.stopPropagation(); if (productionTarget) goToProduction(); else { setSearch(m.name); setTab('materials'); } }}
+                                    onClick={(e) => { e.stopPropagation(); if (productionTarget) goToProduction(); else { setSearch(matName(m)); setTab('materials'); } }}
                                 >
-                                    {c.icon} {m.name}: {fmt(m.stock_qty)} {m.unit}
+                                    {c.icon} {matName(m)}: {fmt(m.stock_qty)} {m.unit}
                                 </span>
                                 {!recipes && (
                                     <button type="button" className="btn sm primary" style={{ fontSize: 11, padding: '2px 8px' }} onClick={(e) => { e.stopPropagation(); openOrderPlaced(m); }}>
@@ -1671,7 +1719,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                 onMouseEnter={(e) => (e.currentTarget.style.boxShadow = '0 2px 8px #bfdbfe')}
                                 onMouseLeave={(e) => (e.currentTarget.style.boxShadow = 'none')}
                             >
-                                <div style={{ fontWeight: 700, color: '#1e40af' }}>{r.raw_material?.name ?? '—'}</div>
+                                <div style={{ fontWeight: 700, color: '#1e40af' }}>{matName(r.raw_material) || '—'}</div>
                                 <div style={{ color: '#6b7280', marginTop: 2 }}>
                                     {fmt(r.qty_ordered)} {r.unit}
                                     {r.supplier ? ` · ${r.supplier}` : ''}
@@ -1700,7 +1748,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                     fontSize: 13,
                                 }}
                             >
-                                <div style={{ fontWeight: 700, color: '#92400e' }}>{r.raw_material?.name ?? '—'}</div>
+                                <div style={{ fontWeight: 700, color: '#92400e' }}>{matName(r.raw_material) || '—'}</div>
                                 <div style={{ color: '#6b7280', marginTop: 2 }}>
                                     {fmt(r.qty_ordered)} {r.unit}
                                     {r.supplier ? ` · ${r.supplier}` : ''}
@@ -1826,7 +1874,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                                     />
                                                 </td>
                                             )}
-                                            <td><div className="prod-name">{m.name}</div></td>
+                                            <td><div className="prod-name">{matName(m)}</div></td>
                                             <td>{m.sku ? <span style={{ fontFamily: 'monospace', fontSize: 13 }}>{m.sku}</span> : <span style={{ color: '#9ca3af' }}>—</span>}</td>
                                             <td>{m.category ?? <span style={{ color: '#9ca3af' }}>—</span>}</td>
                                             <td>
@@ -1986,10 +2034,10 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                                                 boxShadow: '0 1px 4px rgba(0,0,0,.06)',
                                                             }}>
                                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                                                                    <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.3 }}>{m.name}</div>
+                                                                    <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.3 }}>{matName(m)}</div>
                                                                     <StatusBadge m={m} />
                                                                 </div>
-                                                                {m.alternative_names && <div style={{ fontSize: 11, color: 'var(--tx-muted)', fontStyle: 'italic' }}>aka {m.alternative_names}</div>}
+                                                                {otherNames(m)}
                                                                 {m.sku && <div style={{ fontSize: 12, color: 'var(--tx-muted)', fontFamily: 'monospace' }}>{m.sku}</div>}
                                                                 {!isSales && <ExpiryBadge materialId={m.id} />}
                                                                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 13 }}>
@@ -2048,12 +2096,8 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                     {filteredMaterials.map((m) => (
                                         <tr key={m.id}>
                                             <td>
-                                                <div className="prod-name">{m.name}</div>
-                                                {m.alternative_names && (
-                                                    <div className="prod-detail" style={{ fontStyle: 'italic', color: '#6b7280' }}>
-                                                        aka {m.alternative_names}
-                                                    </div>
-                                                )}
+                                                <div className="prod-name">{matName(m)}</div>
+                                                {otherNames(m)}
                                                 {!isSales && m.sku && <div className="prod-detail">{m.sku}</div>}
                                                 {!isSales && (m.dim_l || m.dim_w || m.dim_h) && (
                                                     <div className="prod-detail" style={{ color: '#6b7280' }}>
@@ -2121,7 +2165,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                         return (
                                             <tr key={t.id}>
                                                 <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(t.created_at)}</td>
-                                                <td>{t.raw_material?.name ?? '—'}</td>
+                                                <td>{matName(t.raw_material) || '—'}</td>
                                                 <td>
                                                     <span className={badgeMap[t.type] ?? 'badge gray'}>
                                                         {t.type.charAt(0).toUpperCase() + t.type.slice(1)}
@@ -2265,7 +2309,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                 <tbody>
                                     {reorders.map((r) => (
                                         <tr key={r.id}>
-                                            <td>{r.raw_material?.name ?? '—'}</td>
+                                            <td>{matName(r.raw_material) || '—'}</td>
                                             <td>{fmt(r.qty_ordered)} {r.unit}</td>
                                             <td>{r.supplier ?? '—'}</td>
                                             <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(r.order_date)}</td>
@@ -2465,10 +2509,10 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                                 <tbody>
                                                     {(selectedGodown?.id === g.id && godownCatFilter !== 'all' ? filteredStocks : g.stocks)
                                                         .filter((s) => Number(s.stock_qty) > 0)
-                                                        .sort((a, b) => (a.raw_material?.name ?? '').localeCompare(b.raw_material?.name ?? ''))
+                                                        .sort((a, b) => matName(a.raw_material).localeCompare(matName(b.raw_material)))
                                                         .map((s) => (
                                                             <tr key={s.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                                                                <td style={{ padding: '5px 8px', fontWeight: 500 }}>{s.raw_material?.name ?? `#${s.raw_material_id}`}</td>
+                                                                <td style={{ padding: '5px 8px', fontWeight: 500 }}>{matName(s.raw_material) || `#${s.raw_material_id}`}</td>
                                                                 <td style={{ padding: '5px 8px', color: '#6b7280' }}>{s.raw_material?.category ?? '—'}</td>
                                                                 <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>
                                                                     {Number(s.stock_qty).toLocaleString('en-IN', { maximumFractionDigits: 3 })} {s.raw_material?.unit}
@@ -2550,7 +2594,21 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                         <div className="modal-body" onClick={() => setMatSupplierOpen(false)}>
                             <div className="form-grid">
                                 <div className="form-group">
-                                    <label>Name *</label>
+                                    <label>Company *</label>
+                                    <select
+                                        value={matForm.data.company_id}
+                                        onChange={(e) => matForm.setData('company_id', e.target.value)}
+                                        required
+                                    >
+                                        {matCompanyOptions.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                                    </select>
+                                    <small style={{ fontSize: 11, color: 'var(--tx-muted)' }}>
+                                        The company this material belongs to. Its stock and cost live here.
+                                    </small>
+                                    {matForm.errors.company_id && <div className="form-error">{matForm.errors.company_id}</div>}
+                                </div>
+                                <div className="form-group">
+                                    <label>Name in {companyLabel(Number(matForm.data.company_id)) || 'this company'} *</label>
                                     <input
                                         type="text"
                                         value={matForm.data.name}
@@ -2561,40 +2619,91 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                     {!matForm.errors.name && matForm.data.name.trim().length >= 3 && (() => {
                                         const nameVal = matForm.data.name.trim();
                                         const q = nameVal.toLowerCase();
-                                        const ccid = auth.current_company?.id;
+                                        const ccid = Number(matForm.data.company_id) || auth.current_company?.id;
                                         const dup = [...materials, ...pendingMaterials].find((m) =>
-                                            m.name.toLowerCase() === q && m.id !== editingMat?.id
-                                            && (m.company_id == null || ccid == null || m.company_id === ccid)
+                                            m.id !== editingMat?.id
+                                            && (ccid == null
+                                                ? allMatNames(m).some((n) => n.toLowerCase() === q)
+                                                : matNameFor(m, ccid).toLowerCase() === q)
                                         );
                                         if (dup) {
                                             return (
                                                 <div style={{ marginTop: 4, padding: '5px 10px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 5, fontSize: 12, color: '#991b1b', fontWeight: 600 }}>
-                                                    ⚠️ "{dup.name}" already exists in category "{dup.category ?? 'Uncategorized'}"{dup.approval_status === 'pending' ? ' (pending approval)' : ''} — duplicate names are not allowed
+                                                    ⚠️ "{matNameFor(dup, ccid)}" already exists in category "{dup.category ?? 'Uncategorized'}"{dup.approval_status === 'pending' ? ' (pending approval)' : ''} — duplicate names are not allowed
                                                 </div>
                                             );
                                         }
                                         const similar = materials.filter((m) =>
-                                            m.id !== editingMat?.id && isSimilarName(m.name, nameVal)
+                                            m.id !== editingMat?.id && isSimilarName(matNameFor(m, ccid), nameVal)
                                         );
                                         return similar.length > 0 ? (
                                             <div style={{ marginTop: 4, padding: '5px 10px', background: '#fefce8', border: '1px solid #fde68a', borderRadius: 5, fontSize: 12, color: '#92400e' }}>
-                                                ⚠️ Spelling check — maltu name: {similar.map((m) => `"${m.name}"`).join(', ')} (check if this is a typo)
+                                                ⚠️ Spelling check — maltu name: {similar.map((m) => `"${matNameFor(m, ccid)}"`).join(', ')} (check if this is a typo)
                                             </div>
                                         ) : null;
                                     })()}
                                 </div>
-                                <div className="form-group">
-                                    <label>Alternative Names</label>
-                                    <input
-                                        type="text"
-                                        value={matForm.data.alternative_names}
-                                        onChange={(e) => matForm.setData('alternative_names', e.target.value)}
-                                        placeholder="e.g. emamectine 1.9 ec, EMA 1.9"
+                                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                    <label>Name in other companies</label>
+                                    {matForm.data.company_names.length === 0 && (
+                                        <small style={{ fontSize: 11, color: 'var(--tx-muted)' }}>
+                                            Same product, different name elsewhere in the group. Add a row for each company that calls it something else.
+                                        </small>
+                                    )}
+                                    {matForm.data.company_names.map((row, i) => (
+                                        <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>
+                                            <select
+                                                value={row.company_id}
+                                                onChange={(e) => matForm.setData('company_names', matForm.data.company_names.map(
+                                                    (r, j) => (j === i ? { ...r, company_id: e.target.value } : r),
+                                                ))}
+                                                style={{ flex: '0 0 40%' }}
+                                                required
+                                            >
+                                                <option value="">— Company —</option>
+                                                {nameableCompanies
+                                                    .filter((c) => String(c.id) !== matForm.data.company_id)
+                                                    .map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                                            </select>
+                                            <input
+                                                type="text"
+                                                value={row.name}
+                                                onChange={(e) => matForm.setData('company_names', matForm.data.company_names.map(
+                                                    (r, j) => (j === i ? { ...r, name: e.target.value } : r),
+                                                ))}
+                                                placeholder="Name used there"
+                                                style={{ flex: 1 }}
+                                                required
+                                            />
+                                            <button
+                                                type="button"
+                                                className="btn btn-sm"
+                                                onClick={() => matForm.setData('company_names', matForm.data.company_names.filter((_, j) => j !== i))}
+                                                title="Remove"
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        className="btn btn-sm"
+                                        style={{ marginTop: 8 }}
+                                        onClick={() => matForm.setData('company_names', [...matForm.data.company_names, { company_id: '', name: '' }])}
+                                    >
+                                        + Add company name
+                                    </button>
+                                    {matForm.errors.company_names && <div className="form-error">{matForm.errors.company_names}</div>}
+                                </div>
+                                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                    <label>Description</label>
+                                    <textarea
+                                        rows={2}
+                                        value={matForm.data.description}
+                                        onChange={(e) => matForm.setData('description', e.target.value)}
+                                        placeholder="What this material is, technical details, handling notes…"
                                     />
-                                    <small style={{ fontSize: 11, color: 'var(--tx-muted)' }}>
-                                        Technical or alternate names — separate with commas. Search will match these too.
-                                    </small>
-                                    {matForm.errors.alternative_names && <div className="form-error">{matForm.errors.alternative_names}</div>}
+                                    {matForm.errors.description && <div className="form-error">{matForm.errors.description}</div>}
                                 </div>
                                 <div className="form-group">
                                     <label>Unit *</label>
@@ -2927,7 +3036,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                         <div className="modal-body">
                             {txnTarget && (
                                 <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
-                                    <strong>{txnTarget.name}</strong>
+                                    <strong>{matName(txnTarget)}</strong>
                                     <span style={{ marginLeft: 12, color: '#374151' }}>
                                         Current Stock: {fmt(txnTarget.stock_qty)} {txnTarget.unit}
                                     </span>
@@ -3200,7 +3309,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                                     fontWeight: 600,
                                                 }}
                                             >
-                                                {already ? '✓ ' : '+ '}{r.raw_material?.name ?? '—'}
+                                                {already ? '✓ ' : '+ '}{matName(r.raw_material) || '—'}
                                                 <span style={{ fontWeight: 400, color: already ? '#9ca3af' : '#6b7280' }}> · {fmt(r.qty_ordered)} {r.unit}</span>
                                             </button>
                                         );
@@ -3469,7 +3578,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                 onMouseEnter={(e) => (e.currentTarget.style.background = '#eff6ff')}
                                 onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
                             >
-                                <div style={{ fontWeight: 600, fontSize: 13 }}>{m.name}</div>
+                                <div style={{ fontWeight: 600, fontSize: 13 }}>{matName(m)}</div>
                                 <div style={{ fontSize: 11, color: '#6b7280' }}>
                                     {m.sku ? `SKU: ${m.sku} · ` : ''}{m.category ?? ''}{m.category ? ' · ' : ''}{m.unit}
                                     {Number(m.cost_per_unit) > 0 ? ` · ₹${Number(m.cost_per_unit).toFixed(2)}` : ''}
@@ -3518,7 +3627,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                         >
                                             <option value="">— Select material —</option>
                                             {materials.filter((m) => m.is_active).map((m) => (
-                                                <option key={m.id} value={String(m.id)}>{m.name} ({m.unit})</option>
+                                                <option key={m.id} value={String(m.id)}>{matName(m)} ({m.unit})</option>
                                             ))}
                                         </select>
                                     )}
@@ -3936,7 +4045,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 20px', fontSize: 14 }}>
                                 <div>
                                     <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 2 }}>MATERIAL</div>
-                                    <div style={{ fontWeight: 700, color: '#1e40af' }}>{viewReorder.raw_material?.name ?? '—'}</div>
+                                    <div style={{ fontWeight: 700, color: '#1e40af' }}>{matName(viewReorder.raw_material) || '—'}</div>
                                 </div>
                                 <div>
                                     <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 2 }}>QTY ORDERED</div>
@@ -4026,7 +4135,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                         <div className="modal-body">
                             {billReorder && (
                                 <div style={{ marginBottom: 12, fontSize: 13, color: '#374151' }}>
-                                    <strong>{billReorder.raw_material?.name ?? '—'}</strong> · {fmt(billReorder.qty_ordered)} {billReorder.unit}
+                                    <strong>{matName(billReorder.raw_material) || '—'}</strong> · {fmt(billReorder.qty_ordered)} {billReorder.unit}
                                 </div>
                             )}
                             <div className="form-group">

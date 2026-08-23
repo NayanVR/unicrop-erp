@@ -81,7 +81,7 @@ class DashboardController extends Controller
 
         $row = fn ($m, array $recipes) => [
             'id'        => $m->id,
-            'name'      => $m->name,
+            'name'      => $m->display_name,
             'unit'      => $m->unit,
             'stock_qty' => (float) $m->stock_qty,
             'min_stock' => (float) $m->min_stock,
@@ -215,7 +215,7 @@ class DashboardController extends Controller
             ->get(['id', 'name', 'unit', 'stock_qty', 'min_stock', 'category'])
             ->map(fn ($m) => [
                 'id'        => $m->id,
-                'name'      => $m->name,
+                'name'      => $m->display_name,
                 'unit'      => $m->unit,
                 'stock_qty' => (float) $m->stock_qty,
                 'min_stock' => (float) $m->min_stock,
@@ -323,7 +323,7 @@ class DashboardController extends Controller
             ->get(['id', 'name', 'category', 'hsn', 'gst'])
             ->map(fn ($m) => [
                 'id'       => $m->id,
-                'name'     => $m->name,
+                'name'     => $m->display_name,
                 'category' => $m->category,
                 'hsn'      => $m->hsn,
                 'gst'      => $m->gst,

@@ -448,7 +448,7 @@ class OrderController extends Controller
                 }
 
                 $shape = trim($item->shape ?? '');
-                $baseQuery = fn () => RawMaterial::whereRaw('LOWER(TRIM(name)) = ?', [strtolower($brandName)])
+                $baseQuery = fn () => RawMaterial::named($brandName)
                     ->whereRaw("LOWER(category) LIKE '%finish%good%'")
                     ->whereRaw("LOWER(category) NOT LIKE '%semi%'");
 
@@ -992,9 +992,10 @@ class OrderController extends Controller
             ->where('is_active', true)
             ->orderBy('group_name')
             ->orderBy('name')
-            ->get(['name', 'group_name', 'shape', 'stock_qty', 'unit', 'selling_rate'])
+            ->get(['id', 'name', 'group_name', 'shape', 'stock_qty', 'unit', 'selling_rate'])
             ->map(fn ($m) => [
-                'name'  => $m->name,
+                // The brand picker shows the name this company uses.
+                'name'  => $m->display_name,
                 'group' => $m->group_name,
                 'shape' => $m->shape,
                 'stock' => (float) $m->stock_qty,

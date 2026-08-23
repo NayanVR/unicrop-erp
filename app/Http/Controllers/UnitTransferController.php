@@ -36,7 +36,7 @@ class UnitTransferController extends Controller
     private function adjustGodownStock(string $godownName, string $itemName, float $qty, string $direction): void
     {
         $godown   = Godown::where('name', $godownName)->first();
-        $material = RawMaterial::where('name', $itemName)->first();
+        $material = RawMaterial::named($itemName)->first();
         if (! $godown || ! $material) return;
 
         $stock = GodownStock::firstOrCreate(

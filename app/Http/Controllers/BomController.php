@@ -23,11 +23,11 @@ class BomController extends Controller
     public function index(): Response
     {
         $boms = Bom::query()
-            ->with(['items.rawMaterial:id,name,alternative_names,unit,density,potency,stock_qty,cost_per_unit', 'outputMaterial:id,name,alternative_names,unit,stock_qty,min_stock,category'])
+            ->with(['items.rawMaterial:id,name,description,unit,density,potency,stock_qty,cost_per_unit', 'outputMaterial:id,name,description,unit,stock_qty,min_stock,category'])
             ->orderBy('name')
             ->get();
 
-        $materials  = RawMaterial::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'alternative_names', 'unit', 'density', 'potency', 'stock_qty', 'cost_per_unit', 'category']);
+        $materials  = RawMaterial::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'description', 'unit', 'density', 'potency', 'stock_qty', 'cost_per_unit', 'category']);
         $categories = InventoryCategory::orderBy('name')->pluck('name');
 
         $productionRuns = ProductionRun::query()
@@ -382,9 +382,7 @@ class BomController extends Controller
         DB::transaction(function () use ($run) {
             // Reverse stock deductions
             foreach ($run->items as $item) {
-                $material = \App\Models\RawMaterial::find(
-                    \App\Models\RawMaterial::where('name', $item['name'])->value('id')
-                );
+                $material = \App\Models\RawMaterial::named($item['name'])->first();
                 if ($material) {
                     $material->increment('stock_qty', $item['qty_deducted']);
 

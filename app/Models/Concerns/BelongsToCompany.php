@@ -19,7 +19,7 @@ trait BelongsToCompany
                 $companyId = app(CurrentCompany::class)->id();
 
                 if ($companyId !== null) {
-                    $builder->where($model->qualifyColumn('company_id'), $companyId);
+                    $model::applyCompanyScope($builder, $companyId);
                 }
             }
         });
@@ -29,6 +29,15 @@ trait BelongsToCompany
                 $model->company_id = app(CurrentCompany::class)->id();
             }
         });
+    }
+
+    /**
+     * How "belongs to the active company" is expressed for this model.
+     * Models that are shared between companies may widen this.
+     */
+    public static function applyCompanyScope(Builder $builder, int $companyId): void
+    {
+        $builder->where($builder->getModel()->qualifyColumn('company_id'), $companyId);
     }
 
     public function company(): BelongsTo

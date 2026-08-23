@@ -40,6 +40,9 @@ class ProductController extends Controller
             ->orderBy('name')
             ->get(['id', 'company_id', 'name']);
 
+        // Materials are shared, so show each child company its own name for them.
+        $rmItems->each(fn ($m) => $m->setAttribute('name', $m->nameForCompany($m->company_id)));
+
         $childProducts = $fgItems->concat($rmItems)
             ->sortBy('name')
             ->groupBy(fn($item) => (string) $item->company_id)

@@ -9,13 +9,15 @@ import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 import { ModalPortal } from '@/components/modal-portal';
 import SearchableSelect from '@/components/searchable-select';
+import { matName } from '@/lib/material-name';
 import { fuzzyMatch, isSimilarName } from '@/lib/similar-name';
 
 type RawMaterial = {
     id: number;
     name: string;
+    display_name?: string | null;
     unit: string;
-    alternative_names?: string | null;
+    description?: string | null;
     density?: string | number | null;
     potency?: string | number | null;
     stock_qty: string | number;
@@ -40,7 +42,7 @@ type Bom = {
     batch_size: string | number;
     batch_unit: string;
     output_raw_material_id?: number | null;
-    output_material?: { id: number; name: string; alternative_names?: string | null; unit: string; stock_qty?: string | number | null; min_stock?: string | number | null; category?: string | null } | null;
+    output_material?: { id: number; name: string; display_name?: string | null; description?: string | null; unit: string; stock_qty?: string | number | null; min_stock?: string | number | null; category?: string | null } | null;
     notes?: string | null;
     charges?: { label: string; amount: string | number }[] | null;
     is_active: boolean;
@@ -280,13 +282,13 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
     // After materials prop refreshes, auto-select the just-created material
     useEffect(() => {
         if (!pendingSelectName) return;
-        const mat = materials.find((m) => m.name.toLowerCase() === pendingSelectName.toLowerCase());
+        const mat = materials.find((m) => matName(m).toLowerCase() === pendingSelectName.toLowerCase());
         if (mat) {
             form.setData({
                 ...form.data,
                 output_raw_material_id: String(mat.id),
                 output_category: mat.category ?? '',
-                name: mat.name,
+                name: matName(mat),
             });
             setPendingSelectName(null);
             setQuickAddOpen(false);
@@ -298,14 +300,14 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
         if (!quickForm.data.name.trim() || !quickForm.data.unit) return;
         // Similar-name warning against existing materials
         const qname = quickForm.data.name.trim();
-        const matSimilar = materials.filter((m) => isSimilarName(m.name, qname));
+        const matSimilar = materials.filter((m) => isSimilarName(matName(m), qname));
         if (matSimilar.length > 0) {
-            const exact = matSimilar.find((m) => m.name.trim().toLowerCase() === qname.toLowerCase());
+            const exact = matSimilar.find((m) => matName(m).trim().toLowerCase() === qname.toLowerCase());
             if (exact) {
-                window.alert(`⚠️ "${exact.name}" already exists in inventory (${exact.category ?? 'Uncategorized'}). Duplicate names are not allowed.`);
+                window.alert(`⚠️ "${matName(exact)}" already exists in inventory (${exact.category ?? 'Uncategorized'}). Duplicate names are not allowed.`);
                 return;
             }
-            const ok = window.confirm(`⚠️ Similar material already exists:\n${matSimilar.map((m) => `• ${m.name} (${m.category ?? 'Uncategorized'})`).join('\n')}\n\nCancel and pick the existing one if it is the same product. Press OK only if this is genuinely different.`);
+            const ok = window.confirm(`⚠️ Similar material already exists:\n${matSimilar.map((m) => `• ${matName(m)} (${m.category ?? 'Uncategorized'})`).join('\n')}\n\nCancel and pick the existing one if it is the same product. Press OK only if this is genuinely different.`);
             if (!ok) return;
         }
         setPendingSelectName(quickForm.data.name.trim());
@@ -347,7 +349,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
         });
         const searches = bom.items.map((i) => {
             const mat = i.raw_material ?? materials.find((m) => m.id === i.raw_material_id);
-            return mat?.name ?? '';
+            return matName(mat);
         });
         form.clearErrors(); setEditingBom(bom); setItemSearches(searches); setEditModal(true);
     };
@@ -381,8 +383,8 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
     const updateItemSearch = (idx: number, val: string) => {
         setItemSearches((prev) => { const n = [...prev]; n[idx] = val; return n; });
         const typed = val.trim().toLowerCase();
-        const mat = materials.find((m) => m.name.toLowerCase() === typed)
-            ?? materials.find((m) => (m.alternative_names ?? '').split(',').some((alt) => alt.trim().toLowerCase() === typed && alt.trim() !== ''));
+        const mat = materials.find((m) => matName(m).toLowerCase() === typed)
+            ?? materials.find((m) => m.name.trim().toLowerCase() === typed);
         const items = [...form.data.items];
         if (mat) {
             items[idx] = { ...items[idx], raw_material_id: String(mat.id), unit: mat.unit };
@@ -674,9 +676,9 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
         if (search.trim()) {
             const q = search.trim();
             return fuzzyMatch(b.name, q)
-                || fuzzyMatch(b.output_material?.alternative_names, q)
+                || fuzzyMatch(matName(b.output_material), q)
                 || fuzzyMatch((b.category ?? '').trim() || UNCATEGORIZED, q)
-                || b.items.some((i) => fuzzyMatch(i.raw_material?.name, q) || fuzzyMatch(i.raw_material?.alternative_names, q));
+                || b.items.some((i) => fuzzyMatch(matName(i.raw_material), q));
         }
         return true;
     });
@@ -1168,7 +1170,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                             { value: '', label: "— Not linked (won't update inventory stock) —" },
                                             ...materials.map((m) => ({
                                                 value: m.id,
-                                                label: `${m.name} (${m.unit}) — Stock: ${formatQty(m.stock_qty)}`,
+                                                label: `${matName(m)} (${m.unit}) — Stock: ${formatQty(m.stock_qty)}`,
                                             })),
                                         ]}
                                         onChange={(id) => {
@@ -1177,7 +1179,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                                 ...form.data,
                                                 output_raw_material_id: id,
                                                 output_category: mat?.category ?? '',
-                                                name: mat?.name ?? form.data.name,
+                                                name: mat ? matName(mat) : form.data.name,
                                             });
                                         }}
                                     />
@@ -1246,13 +1248,8 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                             </div>
                             <datalist id="bom-materials-list">
                                 {materials.map((m) => (
-                                    <option key={m.id} value={m.name}>{formatQty(m.stock_qty)} {m.unit}</option>
+                                    <option key={m.id} value={matName(m)}>{formatQty(m.stock_qty)} {m.unit}</option>
                                 ))}
-                                {materials.flatMap((m) =>
-                                    (m.alternative_names ?? '').split(',').map((alt) => alt.trim()).filter(Boolean).map((alt) => (
-                                        <option key={`${m.id}-${alt}`} value={alt}>{m.name} — {formatQty(m.stock_qty)} {m.unit}</option>
-                                    )),
-                                )}
                             </datalist>
                             {form.data.items.length > 0 && (
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 90px 32px', gap: 8, marginBottom: 4, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px', color: 'var(--tx-faint)' }}>

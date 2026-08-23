@@ -1,4 +1,5 @@
 import SearchableSelect from '@/components/searchable-select';
+import { matName } from '@/lib/material-name';
 import { fuzzyMatch } from '@/lib/similar-name';
 import type { Auth } from '@/types/auth';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
@@ -7,7 +8,8 @@ import { useEffect, useState } from 'react';
 type RawMaterial = {
     id: number;
     name: string;
-    alternative_names?: string | null;
+    display_name?: string | null;
+    description?: string | null;
     unit: string;
     stock_qty: string | number;
     min_stock?: string | number | null;
@@ -170,7 +172,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
 
     const checkDuplicate = (outputMatId: string) => {
         if (!outputMatId) { setDupWarning(null); return; }
-        const matName = finishedGoodMaterials.find((m) => String(m.id) === outputMatId)?.name ?? '';
+        const outputName = matName(finishedGoodMaterials.find((m) => String(m.id) === outputMatId));
         const others  = recipes.filter((r) => String(r.id) !== String(editingRecipe?.id ?? ''));
 
         // Exact same output material
@@ -181,8 +183,8 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
         }
 
         // Similar name fuzzy check
-        if (matName) {
-            const h = matName.toLowerCase();
+        if (outputName) {
+            const h = outputName.toLowerCase();
             const similar = others.filter((r) => {
                 const rn = r.name.toLowerCase();
                 if (rn === h || rn.includes(h) || h.includes(rn)) return true;
@@ -307,7 +309,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
             const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
             const itemUnit = item.unit || mat?.unit || '';
             const need = Number(item.qty_per_unit) * qty;
-            return `  • ${mat?.name ?? 'Material'}: ${formatQty(need)} ${normalizeUnitDisplay(itemUnit)}`;
+            return `  • ${matName(mat) || 'Material'}: ${formatQty(need)} ${normalizeUnitDisplay(itemUnit)}`;
         }).join('\n');
         const msg = `Run Filling — ${recipe.name}${recipe.packing_size ? ` ${recipe.packing_size}` : ''} × ${qty} pcs\n\nThis will deduct from inventory:\n${lines}\n\nProceed?`;
         if (!window.confirm(msg)) return;
@@ -377,10 +379,10 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
         if (!search.trim()) return true;
         const q = search.trim();
         return fuzzyMatch(r.name, q)
-            || fuzzyMatch(r.output_material?.alternative_names, q)
+            || fuzzyMatch(matName(r.output_material), q)
             || fuzzyMatch(r.group_name, q)
             || fuzzyMatch(r.packing_size, q)
-            || r.items.some((i) => fuzzyMatch(i.raw_material?.name, q) || fuzzyMatch(i.raw_material?.alternative_names, q));
+            || r.items.some((i) => fuzzyMatch(matName(i.raw_material), q));
     });
 
     return (
@@ -569,7 +571,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                                     {/* Inventory output link (like BOM) */}
                                     {recipe.output_material ? (
                                         <div style={{ fontSize: 12, fontWeight: 600, color: '#15803d', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 4, padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                            📦 Inventory → {recipe.output_material.name}
+                                            📦 Inventory → {matName(recipe.output_material)}
                                             {canSeeCost && Number(recipe.output_material.cost_per_unit) > 0 && (
                                                 <span style={{ fontWeight: 400, color: '#166534' }}>
                                                     · ₹{Number(recipe.output_material.cost_per_unit).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/pc
@@ -600,7 +602,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                                             return (
                                                 <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14, gap: 8 }}>
                                                     <span style={{ color: sufficient ? 'var(--tx-body)' : 'var(--danger)', flex: 1 }}>
-                                                        {mat?.name ?? `Material #${item.raw_material_id}`}
+                                                        {matName(mat) || `Material #${item.raw_material_id}`}
                                                         {(mat?.dim_l || mat?.dim_w || mat?.dim_h) && (
                                                             <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--tx-muted)', fontWeight: 400 }}>
                                                                 📐 {[mat.dim_l, mat.dim_w, mat.dim_h].map((d) => d != null && Number(d) > 0 ? Number(d) : '?').join(' × ')} mm
@@ -743,7 +745,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                             <div className="form-group" style={{ gridColumn: '1/-1' }}>
                                 <label>Product Name *</label>
                                 <SearchableSelect
-                                    options={finishedGoodMaterials.map((m) => ({ value: m.id, label: m.alternative_names ? `${m.name} / ${m.alternative_names}` : m.name }))}
+                                    options={finishedGoodMaterials.map((m) => ({ value: m.id, label: matName(m) }))}
                                     value={form.data.output_raw_material_id}
                                     onChange={(v) => { form.setData('output_raw_material_id', v); checkDuplicate(v); }}
                                     placeholder="— Search finished good —"
@@ -812,7 +814,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                             ) : form.data.items.map((item, idx) => (
                                 <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 32px', gap: 8, marginBottom: 8, alignItems: 'start' }}>
                                     <SearchableSelect
-                                        options={materials.map((m) => ({ value: m.id, label: `${m.name}${m.alternative_names ? ` / ${m.alternative_names}` : ''} (${formatQty(m.stock_qty)} ${m.unit})` }))}
+                                        options={materials.map((m) => ({ value: m.id, label: `${matName(m)} (${formatQty(m.stock_qty)} ${m.unit})` }))}
                                         value={item.raw_material_id}
                                         onChange={(v) => updateItem(idx, 'raw_material_id', v)}
                                         placeholder="— Search material —"
@@ -877,7 +879,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                             {(() => {
                                 if (!runTarget) return null;
                                 const availableShapes = finishedGoodMaterials
-                                    .filter((m) => m.name.trim().toLowerCase() === runTarget.name.trim().toLowerCase() && m.shape)
+                                    .filter((m) => matName(m).trim().toLowerCase() === runTarget.name.trim().toLowerCase() && m.shape)
                                     .map((m) => m.shape as string);
                                 if (availableShapes.length === 0) return null;
                                 return (
@@ -937,7 +939,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                                         const ok       = inStock >= neededInMatUnit;
                                         return (
                                             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 12px', borderBottom: i < runTarget.items.length - 1 ? '1px solid var(--border)' : undefined, fontSize: 13, gap: 8 }}>
-                                                <span style={{ flex: 1, color: ok ? 'var(--tx-body)' : '#dc2626' }}>{mat?.name ?? `Material #${item.raw_material_id}`}</span>
+                                                <span style={{ flex: 1, color: ok ? 'var(--tx-body)' : '#dc2626' }}>{matName(mat) || `Material #${item.raw_material_id}`}</span>
                                                 <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
                                                     {formatQty(needed)} {normalizeUnitDisplay(itemUnit)}
                                                     {!ok && <span style={{ marginLeft: 8, fontSize: 11, color: '#dc2626', background: '#fee2e2', padding: '1px 6px', borderRadius: 8 }}>⚠ short</span>}

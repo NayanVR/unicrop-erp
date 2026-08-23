@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Bom;
+use App\Models\Company;
 use App\Services\CurrentCompany;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use App\Models\FillingRecipe;
 use App\Models\Godown;
 use App\Models\GodownStock;
@@ -48,7 +50,7 @@ class InventoryController extends Controller
         // For admin: attach company names grouped by company_id
         $allCompaniesInventory = collect();
         if ($role === 'admin') {
-            $companies = \App\Models\Company::orderBy('name')->get(['id', 'name']);
+            $companies = Company::orderBy('name')->get(['id', 'name']);
             $allCompaniesInventory = $companies->map(fn ($c) => [
                 'id'    => $c->id,
                 'name'  => $c->name,
@@ -133,6 +135,21 @@ class InventoryController extends Controller
             ),
         ];
 
+        // The material editor needs the per-company name rows so they can be edited.
+        $materials->each->makeVisible('companyNames');
+        $pendingMaterials->each->makeVisible('companyNames');
+        $materials->loadMissing('company:id,name');
+        $pendingMaterials->loadMissing('company:id,name');
+
+        // Companies a material may be named for: everything for admin, own companies otherwise.
+        $nameableCompanies = ($role === 'admin'
+            ? Company::query()
+            : $user->companies()->getQuery())
+            ->orderBy('name')
+            ->get(['companies.id', 'companies.name'])
+            ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])
+            ->values();
+
         $inventoryCategories = InventoryCategory::orderBy('name')->get();
         if ($isSales) {
             $inventoryCategories = $inventoryCategories->where('visible_to_sales', true)->values();
@@ -174,7 +191,7 @@ class InventoryController extends Controller
             ->map(fn ($group) => $group->first()->expiry_date->format('Y-m-d'));
 
         return Inertia::render('erp/inventory/index', array_merge(
-            compact('materials', 'pendingMaterials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats', 'vendors', 'inventoryCategories', 'bomOutputMap', 'fillingOutputMap', 'godowns', 'finishGoodGroups', 'expiryMap', 'allCompaniesInventory'),
+            compact('materials', 'pendingMaterials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats', 'vendors', 'inventoryCategories', 'bomOutputMap', 'fillingOutputMap', 'godowns', 'finishGoodGroups', 'expiryMap', 'allCompaniesInventory', 'nameableCompanies'),
             ['pageTitle' => 'Inventory']
         ));
     }
@@ -182,8 +199,12 @@ class InventoryController extends Controller
     public function storeMaterial(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'name'          => ['required','string','max:255', Rule::unique('raw_materials','name')->where('company_id', app(CurrentCompany::class)->id())],
-            'alternative_names' => 'nullable|string|max:500',
+            'name'          => ['required','string','max:255'],
+            'company_id'    => ['nullable','integer', Rule::in($this->nameableCompanyIds($request))],
+            'company_names'              => ['array'],
+            'company_names.*.company_id' => ['required','integer', Rule::in($this->nameableCompanyIds($request))],
+            'company_names.*.name'       => ['required','string','max:255'],
+            'description'   => 'nullable|string|max:2000',
             'sku'           => ['nullable','string','max:100', Rule::unique('raw_materials','sku')->where('company_id', app(CurrentCompany::class)->id())],
             'hsn'           => 'nullable|string|max:50',
             'gst'           => 'nullable|numeric|min:0|max:100',
@@ -219,12 +240,132 @@ class InventoryController extends Controller
             $data['is_active'] = false;
         }
 
-        RawMaterial::create($data);
+        $ownerCompanyId = (int) ($data['company_id'] ?? app(CurrentCompany::class)->id());
+        $companyNames   = $this->resolveCompanyNames($ownerCompanyId, $data['name'], $data['company_names'] ?? []);
+        $this->assertCompanyNamesAreFree($companyNames);
+
+        unset($data['company_names'], $data['company_id']);
+
+        $manageable = $this->nameableCompanyIds($request);
+
+        DB::transaction(function () use ($data, $ownerCompanyId, $companyNames, $manageable) {
+            $material = RawMaterial::make($data);
+            $material->company_id = $ownerCompanyId;
+            $material->save();
+
+            $this->syncCompanyNames($material, $companyNames, $manageable);
+        });
+
         $this->ensureSupplierParty($data['supplier'] ?? null);
 
         return redirect()->back()->with('success', $needsApproval
             ? 'Material submitted for admin approval. It will appear in inventory once approved.'
             : 'Material added.');
+    }
+
+    /**
+     * Companies the current user may name a material for: every company for an
+     * admin, otherwise the ones they belong to.
+     *
+     * @return array<int, int>
+     */
+    private function nameableCompanyIds(Request $request): array
+    {
+        $user = $request->user();
+        $user->loadMissing('roles', 'companies');
+
+        if ($user->roles->first()?->slug === 'admin') {
+            return Company::query()->pluck('id')->map(fn ($id) => (int) $id)->all();
+        }
+
+        return $user->companies->pluck('id')->map(fn ($id) => (int) $id)->all();
+    }
+
+    /**
+     * Fold the owning company's name and the extra per-company names into one
+     * company_id => name map. The owning company always wins for its own slot.
+     *
+     * @param  array<int, array{company_id: int|string, name: string}>  $extra
+     * @return array<int, string>
+     */
+    private function resolveCompanyNames(int $ownerCompanyId, string $ownerName, array $extra): array
+    {
+        $names = [];
+
+        foreach ($extra as $entry) {
+            $name = trim((string) ($entry['name'] ?? ''));
+
+            if ($name !== '') {
+                $names[(int) $entry['company_id']] = $name;
+            }
+        }
+
+        $names[$ownerCompanyId] = trim($ownerName);
+
+        return $names;
+    }
+
+    /**
+     * A name has to be unique inside a company, whether it is that company's
+     * own name for a material or the default name of a material it owns.
+     *
+     * @param  array<int, string>  $companyNames
+     */
+    private function assertCompanyNamesAreFree(array $companyNames, ?int $ignoreMaterialId = null): void
+    {
+        $errors = [];
+
+        foreach ($companyNames as $companyId => $name) {
+            $needle = mb_strtolower($name);
+
+            $taken = RawMaterial::withoutGlobalScopes()
+                ->when($ignoreMaterialId, fn ($q) => $q->whereKeyNot($ignoreMaterialId))
+                ->where(function ($q) use ($companyId, $needle) {
+                    $q->whereHas(
+                        'companyNames',
+                        fn ($n) => $n->where('company_id', $companyId)->whereRaw('LOWER(TRIM(name)) = ?', [$needle])
+                    )->orWhere(
+                        fn ($own) => $own->where('company_id', $companyId)
+                            ->whereRaw('LOWER(TRIM(name)) = ?', [$needle])
+                            ->whereDoesntHave('companyNames', fn ($n) => $n->where('company_id', $companyId))
+                    );
+                })
+                ->first();
+
+            if ($taken) {
+                $company = Company::find($companyId);
+                $errors['company_names'][] = "\"{$name}\" is already used in " . ($company?->name ?? 'that company') . '.';
+            }
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
+    /**
+     * Replace the material's per-company names with exactly the given map.
+     *
+     * @param  array<int, string>  $companyNames
+     */
+    private function syncCompanyNames(RawMaterial $material, array $companyNames, array $manageableCompanyIds): void
+    {
+        $keep = [];
+
+        foreach ($companyNames as $companyId => $name) {
+            $keep[] = $material->companyNames()
+                ->updateOrCreate(['company_id' => $companyId], ['name' => $name])
+                ->id;
+        }
+
+        // Names belonging to companies this user cannot manage are left alone —
+        // the editor never showed them, so it must not drop them either.
+        $material->companyNames()
+            ->whereKeyNot($keep)
+            ->whereIn('company_id', [...$manageableCompanyIds, $material->company_id])
+            ->delete();
+
+        $material->load('companyNames');
     }
 
     public function approveMaterial(RawMaterial $material): RedirectResponse
@@ -275,8 +416,12 @@ class InventoryController extends Controller
     public function updateMaterial(Request $request, RawMaterial $material): RedirectResponse
     {
         $data = $request->validate([
-            'name'          => ['required','string','max:255', Rule::unique('raw_materials','name')->where('company_id', app(CurrentCompany::class)->id())->ignore($material->id)],
-            'alternative_names' => 'nullable|string|max:500',
+            'name'          => ['required','string','max:255'],
+            'company_id'    => ['nullable','integer', Rule::in([...$this->nameableCompanyIds($request), $material->company_id])],
+            'company_names'              => ['array'],
+            'company_names.*.company_id' => ['required','integer', Rule::in($this->nameableCompanyIds($request))],
+            'company_names.*.name'       => ['required','string','max:255'],
+            'description'   => 'nullable|string|max:2000',
             'sku'           => ['nullable','string','max:100', Rule::unique('raw_materials','sku')->where('company_id', app(CurrentCompany::class)->id())->ignore($material->id)],
             'hsn'           => 'nullable|string|max:50',
             'gst'           => 'nullable|numeric|min:0|max:100',
@@ -302,9 +447,23 @@ class InventoryController extends Controller
             $data[$field] = $data[$field] ?? 0;
         }
 
-        $originalName = $material->name;
+        $originalName   = $material->name;
+        $ownerCompanyId = (int) ($data['company_id'] ?? $material->company_id ?? app(CurrentCompany::class)->id());
+        $companyNames   = $this->resolveCompanyNames($ownerCompanyId, $data['name'], $data['company_names'] ?? []);
+        $this->assertCompanyNamesAreFree($companyNames, $material->id);
 
-        $material->update($data);
+        unset($data['company_names'], $data['company_id']);
+
+        $manageable = $this->nameableCompanyIds($request);
+
+        DB::transaction(function () use ($material, $data, $ownerCompanyId, $companyNames, $manageable) {
+            $material->fill($data);
+            $material->company_id = $ownerCompanyId;
+            $material->save();
+
+            $this->syncCompanyNames($material, $companyNames, $manageable);
+        });
+
         $this->ensureSupplierParty($data['supplier'] ?? null);
 
         // Keep BOM / Filling recipe names in sync when their output product is renamed.
@@ -735,14 +894,15 @@ class InventoryController extends Controller
             ->when(strlen($q) >= 1, fn ($query) => $query->where(function ($sub) use ($q) {
                 $sub->where('name', 'like', "%{$q}%")
                     ->orWhere('sku', 'like', "%{$q}%")
-                    ->orWhere('hsn', 'like', "%{$q}%");
+                    ->orWhere('hsn', 'like', "%{$q}%")
+                    ->orWhereHas('companyNames', fn ($n) => $n->where('name', 'like', "%{$q}%"));
             }))
             ->orderBy('name')
             ->limit(15)
             ->get(['id', 'name', 'sku', 'hsn', 'gst', 'category', 'unit', 'cost_per_unit'])
             ->map(fn ($m) => [
                 'id'            => (int) $m->id,
-                'name'          => $m->name,
+                'name'          => $m->display_name,
                 'sku'           => $m->sku,
                 'hsn'           => $m->hsn,
                 'gst'           => (float) $m->gst,
