@@ -449,7 +449,19 @@ class InventoryController extends Controller
 
         $originalName   = $material->name;
         $ownerCompanyId = (int) ($data['company_id'] ?? $material->company_id ?? app(CurrentCompany::class)->id());
-        $companyNames   = $this->resolveCompanyNames($ownerCompanyId, $data['name'], $data['company_names'] ?? []);
+
+        // A client that never sends company_names (an old cached tab, a script)
+        // means "leave them alone", not "clear them" — only an explicit empty
+        // list from the editor removes a material's other names.
+        $extraNames   = $request->has('company_names')
+            ? ($data['company_names'] ?? [])
+            : $material->companyNames
+                ->where('company_id', '!=', $ownerCompanyId)
+                ->map(fn ($n) => ['company_id' => $n->company_id, 'name' => $n->name])
+                ->values()
+                ->all();
+
+        $companyNames = $this->resolveCompanyNames($ownerCompanyId, $data['name'], $extraNames);
         $this->assertCompanyNamesAreFree($companyNames, $material->id);
 
         unset($data['company_names'], $data['company_id']);

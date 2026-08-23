@@ -227,3 +227,33 @@ test('a user cannot file a material under a company they do not belong to', func
     expect(RawMaterial::withoutGlobalScopes()->where('name', 'Zinc Sulphate')->exists())->toBeFalse()
         ->and($companyA->id)->not->toBe($outsider->id);
 });
+
+test('an update that omits company_names leaves the other names in place', function () {
+    [$user, $companyA, $companyB] = twoCompanyAdmin();
+
+    $material = makeMaterial($companyA, '19:19:19');
+    $material->companyNames()->createMany([
+        ['company_id' => $companyA->id, 'name' => '19:19:19'],
+        ['company_id' => $companyB->id, 'name' => 'NPK 19-19-19'],
+    ]);
+
+    // An old cached tab posts the pre-overhaul payload: no company_names key.
+    $this->actingAs($user)->patch("/inventory/materials/{$material->id}", [
+        'name' => '19:19:19', 'unit' => 'kg',
+    ])->assertSessionHasNoErrors();
+
+    $material->refresh()->load('companyNames');
+
+    expect($material->nameForCompany($companyB->id))->toBe('NPK 19-19-19')
+        ->and($material->companyNames)->toHaveCount(2);
+
+    // An explicit empty list from the editor still clears them.
+    $this->actingAs($user)->patch("/inventory/materials/{$material->id}", [
+        'name' => '19:19:19', 'unit' => 'kg', 'company_names' => [],
+    ])->assertSessionHasNoErrors();
+
+    $material->refresh()->load('companyNames');
+
+    expect($material->companyNames)->toHaveCount(1)
+        ->and($material->nameForCompany($companyB->id))->toBe('19:19:19');
+});
