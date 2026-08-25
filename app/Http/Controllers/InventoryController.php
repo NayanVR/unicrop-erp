@@ -18,6 +18,7 @@ use App\Models\InventoryTransaction;
 use App\Models\Party;
 use App\Models\RawMaterial;
 use App\Services\LowStockAlertService;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -58,7 +59,9 @@ class InventoryController extends Controller
             ])->filter(fn ($c) => $c['items']->isNotEmpty())->values();
         }
 
-        $pendingMaterials = collect();
+        // makeVisible()/loadMissing() are called on this below, so it has to be an
+        // Eloquent collection even when the role has nothing pending.
+        $pendingMaterials = new EloquentCollection();
         if ($role === 'admin') {
             $pendingMaterials = RawMaterial::withoutGlobalScopes()
                 ->where('approval_status', 'pending')
