@@ -6,11 +6,9 @@ use App\Models\Bom;
 use App\Models\FinishedGood;
 use App\Models\InventoryCategory;
 use App\Models\InventoryTransaction;
-use App\Models\Product;
 use App\Models\ProductionRun;
 use App\Models\RawMaterial;
 use App\Models\Role;
-use App\Services\InventoryPoolService;
 use App\Services\LowStockAlertService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -259,29 +257,16 @@ class BomController extends Controller
                 $qtyDeducted = $this->convertQty($qtyUsed, $itemUnit, $matUnit, $item->rawMaterial->density ? (float) $item->rawMaterial->density : null);
                 $cost        = $qtyDeducted * (float) $item->rawMaterial->cost_per_unit;
 
-                $product = Product::where('raw_material_id', $item->rawMaterial->id)->first();
-                $pooled = $product
-                    ? app(InventoryPoolService::class)->decrementForProduct(
-                        $product,
-                        $qtyDeducted,
-                        "BOM Run: {$bom->name} × {$batchCount}",
-                        $request->user(),
-                        $data['notes'] ?? null,
-                    )
-                    : false;
+                $item->rawMaterial->decrement('stock_qty', $qtyDeducted);
 
-                if (! $pooled) {
-                    $item->rawMaterial->decrement('stock_qty', $qtyDeducted);
-
-                    InventoryTransaction::create([
-                        'raw_material_id' => $item->rawMaterial->id,
-                        'user_id'         => $request->user()?->id,
-                        'type'            => 'issue',
-                        'qty'             => $qtyDeducted,
-                        'reference'       => "BOM Run: {$bom->name} × {$batchCount}",
-                        'notes'           => $data['notes'] ?? null,
-                    ]);
-                }
+                InventoryTransaction::create([
+                    'raw_material_id' => $item->rawMaterial->id,
+                    'user_id'         => $request->user()?->id,
+                    'type'            => 'issue',
+                    'qty'             => $qtyDeducted,
+                    'reference'       => "BOM Run: {$bom->name} × {$batchCount}",
+                    'notes'           => $data['notes'] ?? null,
+                ]);
 
                 $item->rawMaterial->refresh();
                 (new LowStockAlertService())->checkAndAlert($item->rawMaterial);

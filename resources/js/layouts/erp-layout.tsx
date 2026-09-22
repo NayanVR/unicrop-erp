@@ -11,7 +11,6 @@ import { create as ordersCreate, index as ordersIndex } from '@/routes/orders';
 import { index as partiesIndex } from '@/routes/parties';
 import { index as partyLedgerIndex } from '@/routes/parties/ledger';
 import { index as productsIndex } from '@/routes/products';
-import { index as inventoryPoolsIndex } from '@/routes/inventory-pools';
 import { index as companiesIndex } from '@/routes/companies';
 import { index as policiesIndex } from '@/routes/policies';
 import { index as rateCalcIndex } from '@/routes/rate-calculator';
@@ -56,7 +55,6 @@ const NAV_DEFS: Record<string, NavItem[]> = {
         { id: 'filling', label: 'Filling', icon: '🧪', href: '/filling' as NonNullable<InertiaLinkProps['href']> },
         { id: 'bom', label: 'Bill of Materials', icon: '⚗️', href: bomIndex() },
         { id: 'products', label: 'Products', icon: '🏷️', href: productsIndex() },
-        { id: 'inventory-pools', label: 'Shared Inventory', icon: '🔗', href: inventoryPoolsIndex() },
         { id: 'inventory', label: 'Inventory', icon: '🗄️', href: inventoryIndex() },
         { id: 'rate-calc', label: 'Rate Calculator', icon: '🧮', href: rateCalcIndex() },
         { id: 'unit-transfer', label: 'Unit Transfer', icon: '🔄', href: unitTransferIndex() },

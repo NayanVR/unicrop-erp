@@ -13,14 +13,12 @@ use App\Models\OrderAttachment;
 use App\Models\OrderPayment;
 use App\Models\PackingSize;
 use App\Models\Party;
-use App\Models\Product;
 use App\Models\ProductFillingConfig;
 use App\Models\ProductPhoto;
 use App\Models\RawMaterial;
 use App\Models\Role;
 use App\Models\Transport;
 use App\Models\User;
-use App\Services\InventoryPoolService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -470,34 +468,21 @@ class OrderController extends Controller
 
                 $qty = (float) $item->quantity * $multiplier;
 
-                $product = Product::where('raw_material_id', $material->id)->first();
-                $pooled = $product
-                    ? app(InventoryPoolService::class)->decrementForProduct(
-                        $product,
-                        $qty,
-                        'Order: '.$order->order_number,
-                        $user,
-                        'Auto-deducted on order confirmation',
-                    )
-                    : false;
+                $previousStock = (float) $material->stock_qty;
+                $newStock = $previousStock - $qty;
 
-                if (! $pooled) {
-                    $previousStock = (float) $material->stock_qty;
-                    $newStock = $previousStock - $qty;
+                $material->decrement('stock_qty', $qty);
 
-                    $material->decrement('stock_qty', $qty);
-
-                    InventoryTransaction::create([
-                        'raw_material_id' => $material->id,
-                        'user_id'         => $user?->id,
-                        'type'            => 'issue',
-                        'qty'             => $qty,
-                        'previous_stock'  => $previousStock,
-                        'new_stock'       => $newStock,
-                        'reference'       => 'Order: '.$order->order_number,
-                        'notes'           => 'Auto-deducted on order confirmation',
-                    ]);
-                }
+                InventoryTransaction::create([
+                    'raw_material_id' => $material->id,
+                    'user_id'         => $user?->id,
+                    'type'            => 'issue',
+                    'qty'             => $qty,
+                    'previous_stock'  => $previousStock,
+                    'new_stock'       => $newStock,
+                    'reference'       => 'Order: '.$order->order_number,
+                    'notes'           => 'Auto-deducted on order confirmation',
+                ]);
             }
         });
 

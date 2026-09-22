@@ -32,10 +32,6 @@ class Product extends Model
         return $this->belongsTo(FinishedGood::class);
     }
 
-    public function inventoryLink(): HasOne
-    {
-        return $this->hasOne(ProductInventoryLink::class);
-    }
 
     public function parent(): BelongsTo
     {
