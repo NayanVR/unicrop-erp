@@ -8,6 +8,7 @@ use App\Models\FinishedGood;
 use App\Models\InventoryTransaction;
 use App\Models\RawMaterial;
 use App\Services\LowStockAlertService;
+use App\Services\RecordChangeLog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -80,7 +81,10 @@ class FillingController extends Controller
     {
         $data = $this->validateRecipe($request, true);
 
-        DB::transaction(function () use ($data, $recipe) {
+        DB::transaction(function () use ($data, $recipe, $request) {
+            $fieldsBefore = $this->recipeFields($recipe);
+            $itemsBefore  = $this->recipeItems($recipe);
+
             $outputMat = $data['output_raw_material_id'] ? RawMaterial::find($data['output_raw_material_id']) : null;
             $recipe->update([
                 'output_raw_material_id' => $outputMat?->id,
@@ -103,6 +107,20 @@ class FillingController extends Controller
             }
 
             $this->syncOutputCost($recipe);
+
+            // Record what this edit actually touched, for the "Updated" note.
+            $recipe->refresh();
+            $changes = RecordChangeLog::build(
+                $fieldsBefore,
+                $this->recipeFields($recipe),
+                $itemsBefore,
+                $this->recipeItems($recipe),
+                $request->user()?->name,
+            );
+
+            if ($changes) {
+                $recipe->forceFill(['last_changes' => $changes])->save();
+            }
         });
 
         return redirect()->back()->with('success', 'Filling recipe updated.');
@@ -323,6 +341,47 @@ class FillingController extends Controller
     /**
      * @return array<string, mixed>
      */
+    /** Header fields we track for the "what changed" note, labelled for people. */
+    private function recipeFields(FillingRecipe $recipe): array
+    {
+        return [
+            'Product'       => $recipe->name,
+            'Group'         => $recipe->group_name,
+            'Packing Size'  => $recipe->packing_size,
+            'Fill Quantity' => $recipe->fill_quantity,
+            'Notes'         => $recipe->notes,
+            'Charges'       => collect($recipe->charges ?? [])
+                ->map(fn ($c) => ($c['label'] ?? '').' ₹'.($c['amount'] ?? 0))
+                ->sort()->implode(', '),
+            'Active'        => (bool) $recipe->is_active,
+        ];
+    }
+
+    /** Ingredients keyed by material, each summarised so a diff reads well. */
+    private function recipeItems(FillingRecipe $recipe): array
+    {
+        $items = $recipe->items()->get();
+
+        // A change log records what happened, so the material's name must not
+        // depend on which company is looking at it.
+        $materials = RawMaterial::withoutGlobalScopes()
+            ->whereIn('id', $items->pluck('raw_material_id'))
+            ->get(['id', 'name', 'unit'])
+            ->keyBy('id');
+
+        return $items
+            ->mapWithKeys(function ($i) use ($materials) {
+                $mat = $materials->get($i->raw_material_id);
+
+                return [$i->raw_material_id => [
+                    'name'    => $mat?->name ?? "Material #{$i->raw_material_id}",
+                    'summary' => rtrim(rtrim(number_format((float) $i->qty_per_unit, 3, '.', ''), '0'), '.')
+                        .' '.($i->unit ?: $mat?->unit),
+                ]];
+            })
+            ->all();
+    }
+
     private function validateRecipe(Request $request, bool $withActive = false): array
     {
         $rules = [

@@ -11,7 +11,8 @@ import { ModalPortal } from '@/components/modal-portal';
 import SearchableSelect from '@/components/searchable-select';
 import { matName } from '@/lib/material-name';
 import { fuzzyMatch, isSimilarName } from '@/lib/similar-name';
-import RecencyBadge from '@/components/recency-badge';
+import { recencyOf } from '@/lib/recency';
+import RecencyBadge, { changedItemIds, type ChangeLog } from '@/components/recency-badge';
 
 type RawMaterial = {
     id: number;
@@ -50,6 +51,7 @@ type Bom = {
     items: BomItem[];
     created_at?: string;
     updated_at?: string;
+    last_changes?: ChangeLog;
 };
 
 type Props = {
@@ -886,7 +888,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                                         <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                                             {bom.name}
-                                            <RecencyBadge createdAt={bom.created_at} updatedAt={bom.updated_at} />
+                                            <RecencyBadge createdAt={bom.created_at} updatedAt={bom.updated_at} changes={bom.last_changes} />
                                         </div>
                                         <span style={{ flexShrink: 0, background: '#f3f4f6', color: '#374151', fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20, whiteSpace: 'nowrap' }}>
                                             Yield: {formatQty(bom.batch_size)} {bom.batch_unit}
@@ -956,13 +958,24 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                     <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 5 }}>
                                         {bom.items.map((item, idx) => {
                                             const mat = item.raw_material ?? materials.find((m) => m.id === item.raw_material_id);
+                                            // Rows the last edit touched, while the Updated badge is still showing
+                                            const touched = recencyOf(bom.created_at, bom.updated_at)?.kind === 'updated'
+                                                && changedItemIds(bom.last_changes).has(item.raw_material_id);
                                             const matUnit = mat?.unit ?? '';
                                             const itemUnit = item.unit || matUnit;
                                             const neededInMatUnit = mat ? convertQty(potencyAdjusted(Number(item.qty_per_batch), item.base_potency ?? mat.potency, mat.potency), itemUnit, matUnit, mat.density) : Number(item.qty_per_batch);
                                             const inStock = mat ? Number(mat.stock_qty) : 0;
                                             const sufficient = inStock >= neededInMatUnit;
                                             return (
-                                                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14, gap: 8 }}>
+                                                <div key={idx} style={{
+                                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                                    fontSize: 14, gap: 8,
+                                                    ...(touched ? {
+                                                        background: '#eff6ff',
+                                                        borderLeft: '3px solid #3b82f6',
+                                                        margin: '0 -8px', padding: '2px 8px', borderRadius: 4,
+                                                    } : {}),
+                                                }}>
                                                     <span style={{ color: sufficient ? 'var(--tx-body)' : 'var(--danger)', flex: 1 }}>
                                                         {mat?.name ?? `Material #${item.raw_material_id}`}
                                                     </span>

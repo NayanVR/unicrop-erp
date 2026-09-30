@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\RawMaterial;
 
-#[Fillable(['product_id', 'name', 'category', 'packing_size', 'batch_size', 'batch_unit', 'output_raw_material_id', 'notes', 'charges', 'is_active'])]
+#[Fillable(['product_id', 'name', 'category', 'packing_size', 'batch_size', 'batch_unit', 'output_raw_material_id', 'notes', 'charges', 'is_active', 'last_changes'])]
 class Bom extends Model
 {
     use BelongsToCompany;
@@ -20,6 +20,7 @@ class Bom extends Model
     protected function casts(): array
     {
         return [
+            'last_changes' => 'array',
             'batch_size' => 'decimal:3',
             'charges'    => 'array',
             'is_active' => 'boolean',

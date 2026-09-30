@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['raw_material_id', 'finished_good_id', 'parent_product_id', 'name', 'our_brand', 'sku', 'hsn_code', 'gst_percent', 'category', 'packing_size', 'is_active'])]
+#[Fillable(['raw_material_id', 'finished_good_id', 'parent_product_id', 'name', 'our_brand', 'sku', 'hsn_code', 'gst_percent', 'category', 'packing_size', 'is_active', 'last_changes'])]
 class Product extends Model
 {
     use BelongsToCompany;
@@ -17,6 +17,7 @@ class Product extends Model
     protected function casts(): array
     {
         return [
+            'last_changes' => 'array',
             'gst_percent' => 'decimal:2',
             'is_active' => 'boolean',
         ];

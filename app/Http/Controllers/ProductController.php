@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\FinishedGood;
 use App\Models\Product;
 use App\Services\CurrentCompany;
+use App\Services\RecordChangeLog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -79,9 +80,22 @@ class ProductController extends Controller
 
         $data = $this->validateProduct($request, $product);
 
+        $fieldsBefore = $this->productFields($product);
+
         $product->name = $data['name'];
         $product->finished_good_id = $data['finished_good_id'];
         $product->save();
+
+        // Record what this edit actually touched, for the "Updated" note.
+        $changes = RecordChangeLog::build(
+            $fieldsBefore,
+            $this->productFields($product->refresh()),
+            by: $request->user()?->name,
+        );
+
+        if ($changes) {
+            $product->forceFill(['last_changes' => $changes])->save();
+        }
 
         return redirect()->back()->with('success', 'Product mapping updated.');
     }
@@ -97,6 +111,15 @@ class ProductController extends Controller
     /**
      * @return array<string, mixed>
      */
+    /** Fields we track for the "what changed" note, labelled for people. */
+    private function productFields(Product $product): array
+    {
+        return [
+            'Child Product'   => $product->name,
+            'Unicrop Product' => $product->finishedGood()->first()?->name,
+        ];
+    }
+
     private function validateProduct(Request $request, ?Product $product = null): array
     {
         return $request->validate([

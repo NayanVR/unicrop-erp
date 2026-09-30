@@ -10,6 +10,7 @@ use App\Models\ProductionRun;
 use App\Models\RawMaterial;
 use App\Models\Role;
 use App\Services\LowStockAlertService;
+use App\Services\RecordChangeLog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -125,7 +126,11 @@ class BomController extends Controller
             'charges.*.amount'       => 'required|numeric|min:0',
         ]);
 
-        return DB::transaction(function () use ($data, $bom) {
+        return DB::transaction(function () use ($data, $bom, $request) {
+            $bom->loadMissing('outputMaterial:id,name');
+            $fieldsBefore = $this->bomFields($bom);
+            $itemsBefore  = $this->bomItems($bom);
+
             // BOM name always follows its linked output product (like Filling recipes).
             if (! empty($data['output_raw_material_id'])) {
                 $outputMat = RawMaterial::find($data['output_raw_material_id']);
@@ -160,6 +165,20 @@ class BomController extends Controller
                     'base_potency'    => $item['base_potency'] ?? null,
                     'unit'            => $item['unit'] ?? null,
                 ]);
+            }
+
+            // Record what this edit actually touched, for the "Updated" note.
+            $bom->refresh()->loadMissing('outputMaterial:id,name');
+            $changes = RecordChangeLog::build(
+                $fieldsBefore,
+                $this->bomFields($bom),
+                $itemsBefore,
+                $this->bomItems($bom),
+                $request->user()?->name,
+            );
+
+            if ($changes) {
+                $bom->forceFill(['last_changes' => $changes])->save();
             }
 
             return redirect()->back()->with('success', 'BOM updated.');
@@ -413,6 +432,56 @@ class BomController extends Controller
     }
 
     // Convert qty between compatible units (weight: kg/g/mg; volume: L/mL).
+    /** Header fields we track for the "what changed" note, labelled for people. */
+    private function bomFields(Bom $bom): array
+    {
+        return [
+            'Name'         => $bom->name,
+            'Category'     => $bom->category,
+            'Packing Size' => $bom->packing_size,
+            'Batch Size'   => $bom->batch_size,
+            'Batch Unit'   => $bom->batch_unit,
+            'Output Product' => $bom->outputMaterial?->name,
+            'Notes'        => $bom->notes,
+            'Charges'      => collect($bom->charges ?? [])
+                ->map(fn ($c) => ($c['label'] ?? '').' ₹'.($c['amount'] ?? 0))
+                ->sort()->implode(', '),
+            'Active'       => (bool) $bom->is_active,
+        ];
+    }
+
+    /** Ingredients keyed by material, each summarised so a diff reads well. */
+    private function bomItems(Bom $bom): array
+    {
+        $items = $bom->items()->get();
+
+        // A change log records what happened, so the material's name must not
+        // depend on which company is looking at it.
+        $materials = RawMaterial::withoutGlobalScopes()
+            ->whereIn('id', $items->pluck('raw_material_id'))
+            ->get(['id', 'name', 'unit'])
+            ->keyBy('id');
+
+        return $items
+            ->mapWithKeys(function ($i) use ($materials) {
+                $mat = $materials->get($i->raw_material_id);
+
+                return [$i->raw_material_id => [
+                    'name'    => $mat?->name ?? "Material #{$i->raw_material_id}",
+                    'summary' => self::num($i->qty_per_batch)
+                        .' '.($i->unit ?: $mat?->unit)
+                        .($i->base_potency ? ' @ '.self::num($i->base_potency).'%' : ''),
+                ]];
+            })
+            ->all();
+    }
+
+    /** Trim the trailing zeros Eloquent's decimal casts add. */
+    private static function num(mixed $v): string
+    {
+        return rtrim(rtrim(number_format((float) $v, 3, '.', ''), '0'), '.') ?: '0';
+    }
+
     /**
      * Technical materials are bought at varying assay (70%, 90%, 95%…).
      * When a BOM item declares the assay its quantity was written for,

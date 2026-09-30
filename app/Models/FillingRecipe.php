@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['output_raw_material_id', 'name', 'group_name', 'packing_size', 'fill_quantity', 'notes', 'charges', 'is_active'])]
+#[Fillable(['output_raw_material_id', 'name', 'group_name', 'packing_size', 'fill_quantity', 'notes', 'charges', 'is_active', 'last_changes'])]
 class FillingRecipe extends Model
 {
     /**
@@ -15,6 +15,7 @@ class FillingRecipe extends Model
     protected function casts(): array
     {
         return [
+            'last_changes' => 'array',
             'fill_quantity' => 'decimal:2',
             'charges'       => 'array',
             'is_active'     => 'boolean',

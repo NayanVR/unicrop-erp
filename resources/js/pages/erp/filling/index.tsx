@@ -1,7 +1,8 @@
 import SearchableSelect from '@/components/searchable-select';
 import { matName } from '@/lib/material-name';
 import { fuzzyMatch } from '@/lib/similar-name';
-import RecencyBadge from '@/components/recency-badge';
+import RecencyBadge, { changedItemIds, type ChangeLog } from '@/components/recency-badge';
+import { recencyOf } from '@/lib/recency';
 import type { Auth } from '@/types/auth';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
@@ -44,6 +45,7 @@ type Recipe = {
     items: RecipeItem[];
     created_at?: string;
     updated_at?: string;
+    last_changes?: ChangeLog;
 };
 
 type FillingRunItem = { raw_material_id?: number; name: string; qty: number; unit: string };
@@ -544,7 +546,7 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                                         <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                                             {recipe.name}
-                                            <RecencyBadge createdAt={recipe.created_at} updatedAt={recipe.updated_at} />
+                                            <RecencyBadge createdAt={recipe.created_at} updatedAt={recipe.updated_at} changes={recipe.last_changes} />
                                         </div>
                                         {recipe.packing_size && (
                                             <span style={{ flexShrink: 0, background: '#eff6ff', color: '#1d4ed8', fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 20, whiteSpace: 'nowrap' }}>
@@ -605,8 +607,19 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                                             const neededPerPc = mat ? convertQty(Number(item.qty_per_unit), itemUnit, matUnit) : Number(item.qty_per_unit);
                                             const inStock = mat ? Number(mat.stock_qty) : 0;
                                             const sufficient = inStock >= neededPerPc * qtyPreview;
+                                            // Rows the last edit touched, while the Updated badge is still showing
+                                            const touched = recencyOf(recipe.created_at, recipe.updated_at)?.kind === 'updated'
+                                                && changedItemIds(recipe.last_changes).has(item.raw_material_id);
                                             return (
-                                                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14, gap: 8 }}>
+                                                <div key={idx} style={{
+                                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                                    fontSize: 14, gap: 8,
+                                                    ...(touched ? {
+                                                        background: '#eff6ff',
+                                                        borderLeft: '3px solid #3b82f6',
+                                                        margin: '0 -8px', padding: '2px 8px', borderRadius: 4,
+                                                    } : {}),
+                                                }}>
                                                     <span style={{ color: sufficient ? 'var(--tx-body)' : 'var(--danger)', flex: 1 }}>
                                                         {matName(mat) || `Material #${item.raw_material_id}`}
                                                         {(mat?.dim_l || mat?.dim_w || mat?.dim_h) && (
