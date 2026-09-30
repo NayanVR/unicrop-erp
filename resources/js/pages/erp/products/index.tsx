@@ -7,6 +7,7 @@ import { router, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { ModalPortal } from '@/components/modal-portal';
 import SearchableSelect from '@/components/searchable-select';
+import RecencyBadge from '@/components/recency-badge';
 
 type Company = { id: number; name: string };
 type UnicropProduct = { id: number; name: string; packing_size: string | null };
@@ -17,6 +18,8 @@ type Product = {
     finished_good_id: number | null;
     company?: Company | null;
     finished_good?: { id: number; name: string } | null;
+    created_at?: string;
+    updated_at?: string;
 };
 
 type ChildProduct = { id: number; company_id: number; name: string };
@@ -182,7 +185,12 @@ export default function ProductsIndex() {
                                         <span className="badge badge-green">{p.finished_good.name}</span>
                                     ) : <span className="text-muted">—</span>}
                                 </td>
-                                <td className="font-medium">{p.name}</td>
+                                <td className="font-medium">
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                        {p.name}
+                                        <RecencyBadge createdAt={p.created_at} updatedAt={p.updated_at} />
+                                    </span>
+                                </td>
                                 <td className="action-cell">
                                     <button className="btn-icon" onClick={() => openEdit(p)} title="Edit">✏️</button>
                                     <button className="btn-icon btn-danger-icon" onClick={() => deleteProduct(p)} title="Delete">🗑️</button>

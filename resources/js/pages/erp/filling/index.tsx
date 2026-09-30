@@ -1,6 +1,7 @@
 import SearchableSelect from '@/components/searchable-select';
 import { matName } from '@/lib/material-name';
 import { fuzzyMatch } from '@/lib/similar-name';
+import RecencyBadge from '@/components/recency-badge';
 import type { Auth } from '@/types/auth';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
@@ -41,6 +42,8 @@ type Recipe = {
     charges?: { label: string; amount: string | number }[] | null;
     is_active: boolean;
     items: RecipeItem[];
+    created_at?: string;
+    updated_at?: string;
 };
 
 type FillingRunItem = { raw_material_id?: number; name: string; qty: number; unit: string };
@@ -539,7 +542,10 @@ export default function FillingIndex({ recipes, materials, finishedGoodMaterials
                                                 >
                                     {/* Top row: name + packing size */}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                                        <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.3 }}>{recipe.name}</div>
+                                        <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                            {recipe.name}
+                                            <RecencyBadge createdAt={recipe.created_at} updatedAt={recipe.updated_at} />
+                                        </div>
                                         {recipe.packing_size && (
                                             <span style={{ flexShrink: 0, background: '#eff6ff', color: '#1d4ed8', fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 20, whiteSpace: 'nowrap' }}>
                                                 {recipe.packing_size}

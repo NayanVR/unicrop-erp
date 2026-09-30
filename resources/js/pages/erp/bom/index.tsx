@@ -11,6 +11,7 @@ import { ModalPortal } from '@/components/modal-portal';
 import SearchableSelect from '@/components/searchable-select';
 import { matName } from '@/lib/material-name';
 import { fuzzyMatch, isSimilarName } from '@/lib/similar-name';
+import RecencyBadge from '@/components/recency-badge';
 
 type RawMaterial = {
     id: number;
@@ -48,6 +49,7 @@ type Bom = {
     is_active: boolean;
     items: BomItem[];
     created_at?: string;
+    updated_at?: string;
 };
 
 type Props = {
@@ -882,7 +884,10 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                 >
                                     {/* Top row: name + yield */}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                                        <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.3 }}>{bom.name}</div>
+                                        <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                            {bom.name}
+                                            <RecencyBadge createdAt={bom.created_at} updatedAt={bom.updated_at} />
+                                        </div>
                                         <span style={{ flexShrink: 0, background: '#f3f4f6', color: '#374151', fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20, whiteSpace: 'nowrap' }}>
                                             Yield: {formatQty(bom.batch_size)} {bom.batch_unit}
                                         </span>
