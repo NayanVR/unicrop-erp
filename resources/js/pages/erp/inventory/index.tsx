@@ -317,6 +317,7 @@ type Props = {
     finishGoodGroups: FinishGoodGroup[];
     expiryMap: Record<string, string>;
     allCompaniesInventory: CompanyInventory[];
+    canSeeSellingRate: boolean;
     nameableCompanies: { id: number; name: string }[];
 };
 
@@ -490,7 +491,7 @@ function SupplierField({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function InventoryIndex({ materials, pendingMaterials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomOutputMap, fillingOutputMap, godowns, finishGoodGroups, expiryMap, allCompaniesInventory, nameableCompanies }: Props) {
+export default function InventoryIndex({ materials, pendingMaterials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomOutputMap, fillingOutputMap, godowns, finishGoodGroups, expiryMap, allCompaniesInventory, nameableCompanies, canSeeSellingRate }: Props) {
     const { auth, flash } = usePage<{ auth: Auth; flash?: { success?: string; error?: string } }>().props;
     const role = auth.user?.role ?? auth.user?.roles?.[0]?.slug ?? '';
     const canSeeCost      = role === 'admin' || auth.user?.cost_access === true;
@@ -1858,7 +1859,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                         <th>HSN Code</th>
                                         <th>GST %</th>
                                         <th>Stock</th>
-                                        <th>Selling Rate</th>
+                                        {canSeeSellingRate && <th>Selling Rate</th>}
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -1888,7 +1889,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                                     : <span style={{ color: '#ef4444', fontSize: 12 }}>Not set</span>}
                                             </td>
                                             <td style={{ fontWeight: 600 }}>{fmt(m.stock_qty)} {m.unit}</td>
-                                            <td>{fmtAmt(m.selling_rate)}</td>
+                                            {canSeeSellingRate && <td>{fmtAmt(m.selling_rate)}</td>}
                                             <td>
                                                 <button className="btn sm" onClick={() => openEditMat(m)}>Edit</button>
                                             </td>
@@ -2047,10 +2048,12 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                                                             {fmt(m.stock_qty)} {m.unit}
                                                                         </div>
                                                                     </div>
-                                                                    <div>
-                                                                        <span style={{ color: 'var(--tx-muted)', fontSize: 11 }}>Selling Rate</span>
-                                                                        <div style={{ fontWeight: 600 }}>{fmtAmt(m.selling_rate)}</div>
-                                                                    </div>
+                                                                    {canSeeSellingRate && (
+                                                                        <div>
+                                                                            <span style={{ color: 'var(--tx-muted)', fontSize: 11 }}>Selling Rate</span>
+                                                                            <div style={{ fontWeight: 600 }}>{fmtAmt(m.selling_rate)}</div>
+                                                                        </div>
+                                                                    )}
                                                                     {canSeeCost && (
                                                                         <div>
                                                                             <span style={{ color: 'var(--tx-muted)', fontSize: 11 }}>Cost/Unit</span>
@@ -2088,7 +2091,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                         <th>Status</th>
                                         {canSeeCost && <th>Cost/Unit</th>}
                                         {canSeeCost && <th>Value</th>}
-                                        <th>Selling Rate</th>
+                                        {canSeeSellingRate && <th>Selling Rate</th>}
                                         {canEditMaterial && <th>Actions</th>}
                                     </tr>
                                 </thead>
@@ -2114,7 +2117,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                             </td>
                                             {canSeeCost && <td>{fmtAmt(m.cost_per_unit)}</td>}
                                             {canSeeCost && <td>{fmtAmt(Number(m.stock_qty) * Number(m.cost_per_unit))}</td>}
-                                            <td>{fmtAmt(m.selling_rate)}</td>
+                                            {canSeeSellingRate && <td>{fmtAmt(m.selling_rate)}</td>}
                                             {canEditMaterial && (
                                                 <td>
                                                     <div style={{ display: 'flex', gap: 4 }}>
@@ -2903,7 +2906,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                     />
                                     {matForm.errors.cost_per_unit && <div className="form-error">{matForm.errors.cost_per_unit}</div>}
                                 </div>}
-                                {role !== 'accountant' && <div className="form-group">
+                                {role !== 'accountant' && canSeeSellingRate && <div className="form-group">
                                     <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                         <span>Selling Rate (₹)</span>
                                         <span style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden', fontSize: 11, height: 20 }}>
@@ -3958,7 +3961,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                         onChange={(e) => setPackForm((p) => ({ ...p, cost_per_unit: e.target.value }))}
                                     />
                                 </div>
-                                <div className="form-group">
+                                {canSeeSellingRate && <div className="form-group">
                                     <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                         <span>Selling Rate (₹)</span>
                                         <span style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden', fontSize: 11, height: 20 }}>
@@ -3998,7 +4001,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                             </span>
                                         </div>
                                     )}
-                                </div>
+                                </div>}
                                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                                     <label>Notes</label>
                                     <textarea

@@ -36,6 +36,9 @@ class InventoryController extends Controller
         $role = $user->roles->first()?->slug;
         $fullAccessRoles = ['admin', 'factory', 'accountant'];
         $isSales = ! in_array($role, $fullAccessRoles);
+        // The factory works to cost, not to price — selling rates stay out of
+        // their inventory entirely rather than just being hidden in the UI.
+        $hideSellingRate = self::hidesSellingRate($role);
 
         // Admin sees all companies' inventory; others see only current company
         $materialsQuery = $role === 'admin'
@@ -86,6 +89,11 @@ class InventoryController extends Controller
             $materials = $materials->reject(
                 fn ($m) => $hiddenCategories->contains(mb_strtolower(trim((string) $m->category)))
             )->values();
+        }
+
+        if ($hideSellingRate) {
+            $materials->each(fn ($m) => $m->selling_rate = null);
+            $pendingMaterials->each(fn ($m) => $m->selling_rate = null);
         }
 
         if ($isSales) {
@@ -195,7 +203,7 @@ class InventoryController extends Controller
 
         return Inertia::render('erp/inventory/index', array_merge(
             compact('materials', 'pendingMaterials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats', 'vendors', 'inventoryCategories', 'bomOutputMap', 'fillingOutputMap', 'godowns', 'finishGoodGroups', 'expiryMap', 'allCompaniesInventory', 'nameableCompanies'),
-            ['pageTitle' => 'Inventory']
+            ['pageTitle' => 'Inventory', 'canSeeSellingRate' => ! $hideSellingRate]
         ));
     }
 
@@ -232,6 +240,8 @@ class InventoryController extends Controller
         foreach (['cost_per_unit', 'selling_rate', 'min_stock', 'reorder_level', 'stock_qty', 'gst', 'dim_l', 'dim_w', 'dim_h'] as $field) {
             $data[$field] = $data[$field] ?? 0;
         }
+
+        $data = $this->stripSellingRate($request, $data);
 
         $user = $request->user();
         $user->loadMissing('roles');
@@ -272,6 +282,27 @@ class InventoryController extends Controller
      *
      * @return array<int, int>
      */
+    /** Roles that must never see or write a selling rate. */
+    private static function hidesSellingRate(?string $role): bool
+    {
+        return $role === 'factory';
+    }
+
+    /**
+     * The factory never receives a selling rate, so their form posts a blank
+     * one — drop it so saving a material can't wipe the stored price.
+     */
+    private function stripSellingRate(Request $request, array $data): array
+    {
+        $request->user()?->loadMissing('roles');
+
+        if (self::hidesSellingRate($request->user()?->roles->first()?->slug)) {
+            unset($data['selling_rate']);
+        }
+
+        return $data;
+    }
+
     private function nameableCompanyIds(Request $request): array
     {
         $user = $request->user();
@@ -449,6 +480,8 @@ class InventoryController extends Controller
         foreach (['cost_per_unit', 'selling_rate', 'min_stock', 'reorder_level', 'gst', 'dim_l', 'dim_w', 'dim_h'] as $field) {
             $data[$field] = $data[$field] ?? 0;
         }
+
+        $data = $this->stripSellingRate($request, $data);
 
         $originalName   = $material->name;
         $ownerCompanyId = (int) ($data['company_id'] ?? $material->company_id ?? app(CurrentCompany::class)->id());
