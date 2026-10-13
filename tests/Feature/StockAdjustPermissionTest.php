@@ -40,7 +40,7 @@ function stockMaterial(float $qty = 50): RawMaterial
     return $material;
 }
 
-function addStock(User $user, RawMaterial $material, string $type, float $qty)
+function postStock(User $user, RawMaterial $material, string $type, float $qty)
 {
     return test()->actingAs($user)->post("/inventory/materials/{$material->id}/transactions", [
         'type' => $type,
@@ -48,50 +48,85 @@ function addStock(User $user, RawMaterial $material, string $type, float $qty)
     ]);
 }
 
-it('lets a granted user add stock', function () {
-    $user = stockUser('sales', ['stock_adjust']);
+it('lets a factory user with stock-in add but not deduct', function () {
+    $user = stockUser('factory', ['stock_in']);
+
     $material = stockMaterial(50);
-
-    addStock($user, $material, 'purchase', 10)->assertRedirect();
-
+    postStock($user, $material, 'purchase', 10)->assertRedirect();
     expect((float) $material->refresh()->stock_qty)->toBe(60.0);
+
+    $material = stockMaterial(50);
+    postStock($user, $material, 'issue', 10)->assertForbidden();
+    expect((float) $material->refresh()->stock_qty)->toBe(50.0);
 });
 
-it('lets a granted user deduct stock', function () {
-    $user = stockUser('sales', ['stock_adjust']);
+it('lets a factory user with stock-out deduct but not add', function () {
+    $user = stockUser('factory', ['stock_out']);
+
     $material = stockMaterial(50);
-
-    addStock($user, $material, 'issue', 15)->assertRedirect();
-
+    postStock($user, $material, 'issue', 15)->assertRedirect();
     expect((float) $material->refresh()->stock_qty)->toBe(35.0);
+
+    $material = stockMaterial(50);
+    postStock($user, $material, 'purchase', 10)->assertForbidden();
+    expect((float) $material->refresh()->stock_qty)->toBe(50.0);
 });
 
-it('blocks a user without the permission', function () {
-    $user = stockUser('sales');          // no permissions
+it('judges an adjustment by which way it moves the level', function () {
+    // Stock-in may correct upwards, not downwards.
+    $in = stockUser('factory', ['stock_in']);
+    $material = stockMaterial(50);
+    postStock($in, $material, 'adjustment', 60)->assertRedirect();
+    expect((float) $material->refresh()->stock_qty)->toBe(60.0);
+
+    postStock($in, $material, 'adjustment', 40)->assertForbidden();
+    expect((float) $material->refresh()->stock_qty)->toBe(60.0);
+
+    // Stock-out is the mirror image.
+    $out = stockUser('factory', ['stock_out']);
+    postStock($out, $material, 'adjustment', 40)->assertRedirect();
+    expect((float) $material->refresh()->stock_qty)->toBe(40.0);
+});
+
+it('blocks a factory user with neither permission', function () {
     $material = stockMaterial(50);
 
-    addStock($user, $material, 'purchase', 10)->assertForbidden();
+    postStock(stockUser('factory'), $material, 'purchase', 10)->assertForbidden();
 
     expect((float) $material->refresh()->stock_qty)->toBe(50.0);
 });
 
-it('still lets admins and the factory move stock by role alone', function () {
-    foreach (['admin', 'factory'] as $slug) {
-        $user = stockUser($slug);
-        $material = stockMaterial(50);
+it('never lets sales move stock, even if the permissions are ticked', function () {
+    $sales = stockUser('sales', ['stock_in', 'stock_out']);
+    $material = stockMaterial(50);
 
-        addStock($user, $material, 'purchase', 5)->assertRedirect();
+    postStock($sales, $material, 'purchase', 10)->assertForbidden();
+    postStock($sales, $material, 'issue', 10)->assertForbidden();
 
-        expect((float) $material->refresh()->stock_qty)->toBe(55.0);
-    }
+    expect((float) $material->refresh()->stock_qty)->toBe(50.0);
 });
 
-it('tells the page who may move stock', function () {
-    $this->actingAs(stockUser('sales', ['stock_adjust']))
-        ->get('/inventory')
-        ->assertInertia(fn ($page) => $page->where('canAdjustStock', true));
+it('leaves admins with both sides', function () {
+    $admin = stockUser('admin');
 
-    $this->actingAs(stockUser('sales'))
+    $material = stockMaterial(50);
+    postStock($admin, $material, 'purchase', 10)->assertRedirect();
+    expect((float) $material->refresh()->stock_qty)->toBe(60.0);
+
+    postStock($admin, $material, 'issue', 20)->assertRedirect();
+    expect((float) $material->refresh()->stock_qty)->toBe(40.0);
+});
+
+it('tells the page which sides a user has', function () {
+    $this->actingAs(stockUser('factory', ['stock_in']))
         ->get('/inventory')
-        ->assertInertia(fn ($page) => $page->where('canAdjustStock', false));
+        ->assertInertia(fn ($page) => $page
+            ->where('canStockIn', true)
+            ->where('canStockOut', false));
+
+    $this->actingAs(stockUser('sales', ['stock_in', 'stock_out']))
+        ->get('/inventory')
+        ->assertInertia(fn ($page) => $page
+            ->where('canStockIn', false)
+            ->where('canStockOut', false));
 });

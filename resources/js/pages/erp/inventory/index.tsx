@@ -318,7 +318,8 @@ type Props = {
     expiryMap: Record<string, string>;
     allCompaniesInventory: CompanyInventory[];
     canSeeSellingRate: boolean;
-    canAdjustStock: boolean;
+    canStockIn: boolean;
+    canStockOut: boolean;
     nameableCompanies: { id: number; name: string }[];
 };
 
@@ -492,13 +493,14 @@ function SupplierField({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function InventoryIndex({ materials, pendingMaterials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomOutputMap, fillingOutputMap, godowns, finishGoodGroups, expiryMap, allCompaniesInventory, nameableCompanies, canSeeSellingRate, canAdjustStock }: Props) {
+export default function InventoryIndex({ materials, pendingMaterials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomOutputMap, fillingOutputMap, godowns, finishGoodGroups, expiryMap, allCompaniesInventory, nameableCompanies, canSeeSellingRate, canStockIn, canStockOut }: Props) {
     const { auth, flash } = usePage<{ auth: Auth; flash?: { success?: string; error?: string } }>().props;
     const role = auth.user?.role ?? auth.user?.roles?.[0]?.slug ?? '';
     const canSeeCost      = role === 'admin' || auth.user?.cost_access === true;
     const canSeeTotalValue = role === 'accountant' || canSeeCost;
     const canMarkReceived  = role === 'admin' || role === 'factory';
     const canManageStock   = role === 'admin' || role === 'factory';
+    const canAdjustStock   = canStockIn || canStockOut;
     const canEditMaterial  = role === 'admin' || role === 'factory' || role === 'accountant';
     const canEnterBill    = role === 'admin' || role === 'factory' || role === 'accountant';
     const canAddMaterial  = role === 'admin' || role === 'factory' || role === 'accountant';
@@ -1086,6 +1088,8 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
     const openTxn = (m: RawMaterial) => {
         txnForm.reset();
         txnForm.clearErrors();
+        // Start on a type this user is allowed to post, not always "purchase".
+        txnForm.setData('type', canStockIn ? 'purchase' : 'issue');
         if (defaultGodownId) txnForm.setData('godown_id', String(defaultGodownId));
         setTxnTarget(m);
         setTxnModal(true);
@@ -3054,10 +3058,11 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                         onChange={(e) => txnForm.setData('type', e.target.value)}
                                         required
                                     >
-                                        <option value="purchase">📥 Stock In</option>
-                                        <option value="issue">📤 Issue / Use</option>
-                                        <option value="adjustment">⚖️ Adjust Stock</option>
-                                        <option value="return">↩ Return</option>
+                                        {canStockIn && <option value="purchase">📥 Stock In</option>}
+                                        {canStockOut && <option value="issue">📤 Issue / Use</option>}
+                                        {/* An adjustment can land either side of the current level */}
+                                        {canStockIn && canStockOut && <option value="adjustment">⚖️ Adjust Stock</option>}
+                                        {canStockIn && <option value="return">↩ Return</option>}
                                     </select>
                                     {txnForm.errors.type && <div className="form-error">{txnForm.errors.type}</div>}
                                 </div>

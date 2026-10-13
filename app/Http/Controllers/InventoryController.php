@@ -206,7 +206,8 @@ class InventoryController extends Controller
             [
                 'pageTitle' => 'Inventory',
                 'canSeeSellingRate' => ! $hideSellingRate,
-                'canAdjustStock' => self::canAdjustStock($user),
+                'canStockIn' => self::canStockIn($user),
+                'canStockOut' => self::canStockOut($user),
             ]
         ));
     }
@@ -286,11 +287,24 @@ class InventoryController extends Controller
      *
      * @return array<int, int>
      */
+    /** May this user bring stock in (purchase / return)? */
+    public static function canStockIn(?\App\Models\User $user): bool
+    {
+        return self::hasStockRight($user, 'stock_in');
+    }
+
+    /** May this user take stock out (issue)? */
+    public static function canStockOut(?\App\Models\User $user): bool
+    {
+        return self::hasStockRight($user, 'stock_out');
+    }
+
     /**
-     * Who may add or deduct stock: admins and the factory by their role, plus
-     * anyone an admin has ticked the permission for.
+     * Admins run the system, so they keep both. Everyone else needs the
+     * permission, and only factory users may be given it — stock never moves
+     * on the sales side whatever is ticked.
      */
-    public static function canAdjustStock(?\App\Models\User $user): bool
+    private static function hasStockRight(?\App\Models\User $user, string $permission): bool
     {
         if (! $user) {
             return false;
@@ -299,8 +313,34 @@ class InventoryController extends Controller
         $user->loadMissing('roles');
         $role = $user->roles->first()?->slug;
 
-        return in_array($role, ['admin', 'factory'], true)
-            || in_array('stock_adjust', $user->permissions ?? [], true);
+        if ($role === 'admin') {
+            return true;
+        }
+
+        if ($role !== 'factory') {
+            return false;
+        }
+
+        return in_array($permission, $user->permissions ?? [], true);
+    }
+
+    /**
+     * Which way a transaction moves stock. An adjustment sets the level
+     * outright, so its direction depends on where that lands; null means the
+     * level does not move at all.
+     */
+    private static function stockDirection(string $type, float $qty, float $current): ?string
+    {
+        return match ($type) {
+            'purchase', 'return' => 'in',
+            'issue'              => 'out',
+            'adjustment'         => match (true) {
+                abs($qty) > $current => 'in',
+                abs($qty) < $current => 'out',
+                default              => null,
+            },
+            default => null,
+        };
     }
 
     /** Roles that must never see or write a selling rate. */
@@ -580,8 +620,6 @@ class InventoryController extends Controller
 
     public function addTransaction(Request $request, RawMaterial $material): RedirectResponse
     {
-        abort_unless(self::canAdjustStock($request->user()), 403);
-
         $data = $request->validate([
             'type'          => 'required|in:purchase,issue,adjustment,return',
             'qty'           => 'required|numeric',
@@ -592,6 +630,16 @@ class InventoryController extends Controller
             'mfg_date'      => 'nullable|date',
             'expiry_date'   => 'nullable|date',
         ]);
+
+        $user      = $request->user();
+        $direction = self::stockDirection($data['type'], (float) $data['qty'], (float) $material->stock_qty);
+
+        abort_unless(match ($direction) {
+            'in'  => self::canStockIn($user),
+            'out' => self::canStockOut($user),
+            // A no-op adjustment needs no particular side, just some right to be here.
+            default => self::canStockIn($user) || self::canStockOut($user),
+        }, 403);
 
         return DB::transaction(function () use ($data, $material, $request) {
             $previous = (float) $material->stock_qty;
