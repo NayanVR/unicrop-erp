@@ -318,6 +318,7 @@ type Props = {
     expiryMap: Record<string, string>;
     allCompaniesInventory: CompanyInventory[];
     canSeeSellingRate: boolean;
+    canAdjustStock: boolean;
     nameableCompanies: { id: number; name: string }[];
 };
 
@@ -491,7 +492,7 @@ function SupplierField({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function InventoryIndex({ materials, pendingMaterials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomOutputMap, fillingOutputMap, godowns, finishGoodGroups, expiryMap, allCompaniesInventory, nameableCompanies, canSeeSellingRate }: Props) {
+export default function InventoryIndex({ materials, pendingMaterials, recentTransactions, purchaseBills, reorders, stats, vendors, inventoryCategories, bomOutputMap, fillingOutputMap, godowns, finishGoodGroups, expiryMap, allCompaniesInventory, nameableCompanies, canSeeSellingRate, canAdjustStock }: Props) {
     const { auth, flash } = usePage<{ auth: Auth; flash?: { success?: string; error?: string } }>().props;
     const role = auth.user?.role ?? auth.user?.roles?.[0]?.slug ?? '';
     const canSeeCost      = role === 'admin' || auth.user?.cost_access === true;
@@ -2061,10 +2062,10 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                                                         </div>
                                                                     )}
                                                                 </div>
-                                                                {canEditMaterial && (
+                                                                {(canEditMaterial || canAdjustStock) && (
                                                                     <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                                                                        {canManageStock && <button className="btn sm primary" onClick={() => openTxn(m)}>+ Stock</button>}
-                                                                        <button className="btn sm" onClick={() => openEditMat(m)}>Edit</button>
+                                                                        {canAdjustStock && <button className="btn sm primary" onClick={() => openTxn(m)}>± Stock</button>}
+                                                                        {canEditMaterial && <button className="btn sm" onClick={() => openEditMat(m)}>Edit</button>}
                                                                         {canManageStock && <button className="btn danger sm" onClick={() => deleteMaterial(m.id)}>🗑</button>}
                                                                     </div>
                                                                 )}
@@ -2118,11 +2119,11 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                             {canSeeCost && <td>{fmtAmt(m.cost_per_unit)}</td>}
                                             {canSeeCost && <td>{fmtAmt(Number(m.stock_qty) * Number(m.cost_per_unit))}</td>}
                                             {canSeeSellingRate && <td>{fmtAmt(m.selling_rate)}</td>}
-                                            {canEditMaterial && (
+                                            {(canEditMaterial || canAdjustStock) && (
                                                 <td>
                                                     <div style={{ display: 'flex', gap: 4 }}>
-                                                        {canManageStock && <button className="btn sm primary" onClick={() => openTxn(m)}>+ Stock</button>}
-                                                        <button className="btn sm" onClick={() => openEditMat(m)}>Edit</button>
+                                                        {canAdjustStock && <button className="btn sm primary" onClick={() => openTxn(m)}>± Stock</button>}
+                                                        {canEditMaterial && <button className="btn sm" onClick={() => openEditMat(m)}>Edit</button>}
                                                         {canManageStock && <button className="btn danger sm" onClick={() => deleteMaterial(m.id)}>🗑</button>}
                                                     </div>
                                                 </td>

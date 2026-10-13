@@ -203,7 +203,11 @@ class InventoryController extends Controller
 
         return Inertia::render('erp/inventory/index', array_merge(
             compact('materials', 'pendingMaterials', 'recentTransactions', 'purchaseBills', 'reorders', 'stats', 'vendors', 'inventoryCategories', 'bomOutputMap', 'fillingOutputMap', 'godowns', 'finishGoodGroups', 'expiryMap', 'allCompaniesInventory', 'nameableCompanies'),
-            ['pageTitle' => 'Inventory', 'canSeeSellingRate' => ! $hideSellingRate]
+            [
+                'pageTitle' => 'Inventory',
+                'canSeeSellingRate' => ! $hideSellingRate,
+                'canAdjustStock' => self::canAdjustStock($user),
+            ]
         ));
     }
 
@@ -282,6 +286,23 @@ class InventoryController extends Controller
      *
      * @return array<int, int>
      */
+    /**
+     * Who may add or deduct stock: admins and the factory by their role, plus
+     * anyone an admin has ticked the permission for.
+     */
+    public static function canAdjustStock(?\App\Models\User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        $user->loadMissing('roles');
+        $role = $user->roles->first()?->slug;
+
+        return in_array($role, ['admin', 'factory'], true)
+            || in_array('stock_adjust', $user->permissions ?? [], true);
+    }
+
     /** Roles that must never see or write a selling rate. */
     private static function hidesSellingRate(?string $role): bool
     {
@@ -559,6 +580,8 @@ class InventoryController extends Controller
 
     public function addTransaction(Request $request, RawMaterial $material): RedirectResponse
     {
+        abort_unless(self::canAdjustStock($request->user()), 403);
+
         $data = $request->validate([
             'type'          => 'required|in:purchase,issue,adjustment,return',
             'qty'           => 'required|numeric',

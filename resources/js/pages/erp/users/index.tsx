@@ -39,6 +39,7 @@ const stagePermissions = [
 ];
 
 const bomPermissions = [
+    { id: 'stock_adjust', label: 'Add / Deduct Inventory Stock' },
     { id: 'bom_delete', label: 'Delete BOM & Run History' },
     { id: 'low_stock_alerts', label: 'Low Stock Alerts on Dashboard' },
     { id: 'manage_users', label: 'User Management (Add / Edit / Delete)' },

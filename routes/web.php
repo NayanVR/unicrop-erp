@@ -118,7 +118,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('factory/orders/{order}/label-print', [FactoryController::class, 'recordLabelPrint'])->name('factory.orders.label-print');
 
         // Inventory — factory + admin only
-        Route::post('inventory/materials/{material}/transactions', [InventoryController::class, 'addTransaction'])->name('inventory.materials.transactions');
         Route::delete('inventory/materials/{material}', [InventoryController::class, 'destroyMaterial'])->name('inventory.materials.destroy');
         Route::post('inventory/reorders', [InventoryController::class, 'storeReorder'])->name('inventory.reorders.store');
         Route::post('inventory/reorders/{reorder}/receive', [InventoryController::class, 'receiveReorder'])->name('inventory.reorders.receive');
@@ -145,6 +144,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Inventory — view: admin, factory, accountant, sales
     Route::middleware(['role:inventory.view'])->group(function () {
         Route::get('inventory', [InventoryController::class, 'index'])->name('inventory.index');
+
+        // Adding or deducting stock is open to admins, the factory, and anyone
+        // an admin has granted the permission — the controller does the check.
+        Route::post('inventory/materials/{material}/transactions', [InventoryController::class, 'addTransaction'])->name('inventory.materials.transactions');
     });
 
     // Inventory — edit material + bill entry: factory, accountant, and admin
