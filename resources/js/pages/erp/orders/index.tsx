@@ -584,7 +584,9 @@ export default function OrdersIndex({ orders, deletedOrders = [], currentUserId,
 
     const [activeFilter, setActiveFilter] = useState<'mine' | 'mine-confirmed' | 'mine-dispatched' | 'all' | 'all-dispatched'>(isAccountant ? 'all' : 'mine');
     const [openOrders, setOpenOrders] = useState<number[]>([]);
-    const [view, setView] = useState<'list' | 'board'>('list');
+    // The board opens by default. Accountants keep the list, whose pending /
+    // done grouping is the whole point of the page for them.
+    const [view, setView] = useState<'list' | 'board'>(isAccountant ? 'list' : 'board');
     const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
     const [confirmStep, setConfirmStep] = useState<'payment' | 'factory' | 'design'>('payment');
     const [submitting, setSubmitting] = useState(false);

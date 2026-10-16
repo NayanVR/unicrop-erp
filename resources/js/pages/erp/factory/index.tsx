@@ -461,7 +461,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
     const { auth } = usePage<{ auth: Auth }>().props;
     const canFill = auth.user?.role === 'admin' || (auth.user?.permissions ?? []).includes('filling');
     const [search, setSearch] = useState('');
-    const [view, setView] = useState<'list' | 'board'>('list');
+    const [view, setView] = useState<'list' | 'board'>('board');
     const [openOrders, setOpenOrders] = useState<number[]>([]);
     const [stagingItem, setStagingItem] = useState<number | null>(null);
     const [fillingPrompt, setFillingPrompt] = useState<{ item: OrderItem; current: string | null } | null>(null);
