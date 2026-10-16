@@ -55,10 +55,10 @@
 
     --sidebar-w: 248px;
     --topbar-h: 60px;
-    --radius: 10px;
-    --radius-sm: 7px;
-    --radius-xs: 5px;
-    --radius-lg: 14px;
+    --radius: 14px;
+    --radius-sm: 10px;
+    --radius-xs: 7px;
+    --radius-lg: 18px;
 
     --font-head: 'Sora', system-ui, sans-serif;
     --font-body: 'DM Sans', system-ui, sans-serif;
@@ -613,21 +613,21 @@ body {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1.4px;
-    color: rgba(255, 255, 255, 0.18);
-    padding: 14px 10px 6px;
+    color: rgba(255, 255, 255, 0.3);
+    padding: 16px 12px 7px;
 }
 .nav-item {
     display: flex;
     align-items: center;
-    gap: 9px;
-    padding: 8px 12px;
+    gap: 10px;
+    padding: 9px 13px;
     border-radius: var(--radius-sm);
     cursor: pointer;
     color: rgba(255, 255, 255, 0.48);
     font-size: 13px;
     font-weight: 500;
     transition: all var(--t-fast);
-    margin-bottom: 1px;
+    margin-bottom: 2px;
     position: relative;
 }
 .nav-item:hover {
@@ -638,16 +638,17 @@ body {
     background: var(--sb-active);
     color: #fff;
     font-weight: 600;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 .nav-item.active::before {
     content: '';
     position: absolute;
-    left: 0;
-    top: 20%;
-    bottom: 20%;
+    left: 5px;
+    top: 22%;
+    bottom: 22%;
     width: 3px;
     background: var(--accent-hover);
-    border-radius: 0 2px 2px 0;
+    border-radius: 3px;
 }
 .nav-icon {
     font-size: 15px;
@@ -812,6 +813,104 @@ body {
     border-radius: 20px;
 }
 
+/* ── Dashboard hero ───────────────────────────────────────────────────
+   The greeting strip that opens a dashboard: company, welcome, the day's
+   headline figures, and the actions most people came here for. */
+.hero {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    padding: 26px 30px;
+    margin-bottom: 20px;
+    color: #fff;
+    background:
+        radial-gradient(120% 140% at 100% 0%, rgba(16, 185, 129, 0.55) 0%, rgba(16, 185, 129, 0) 55%),
+        linear-gradient(120deg, #0b1b33 0%, #10243f 55%, #0f3b35 100%);
+    box-shadow: var(--shadow-lg);
+}
+.hero-company {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: #6ee7b7;
+    margin-bottom: 6px;
+}
+.hero-title {
+    font-family: var(--font-head);
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    line-height: 1.15;
+}
+.hero-sub {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.72);
+    margin-top: 6px;
+}
+.hero-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    flex-wrap: wrap;
+}
+.hero-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+/* Buttons sitting on the dark hero need their own light treatment. */
+.hero .btn {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.18);
+    color: #fff;
+}
+.hero .btn:hover {
+    background: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+.hero .btn.primary {
+    background: #22c55e;
+    border-color: #22c55e;
+    color: #06240f;
+}
+.hero .btn.primary:hover {
+    background: #4ade80;
+    border-color: #4ade80;
+}
+.hero-figures {
+    display: flex;
+    gap: 34px;
+    flex-wrap: wrap;
+    margin-top: 22px;
+}
+.hero-figure-value {
+    font-family: var(--font-head);
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.5px;
+}
+.hero-figure-value span {
+    font-size: 14px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.6);
+}
+.hero-figure-label {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.66);
+    margin-top: 6px;
+}
+@media (max-width: 720px) {
+    .hero {
+        padding: 20px;
+    }
+    .hero-figures {
+        gap: 20px;
+    }
+}
+
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -822,7 +921,7 @@ body {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 18px 20px;
+    padding: 20px 22px;
     box-shadow: var(--shadow-sm);
     position: relative;
     overflow: hidden;
@@ -858,36 +957,37 @@ body {
 .dash-kpi-card:hover {
     border-color: var(--accent);
 }
+/* The accent runs down the left edge, so a card reads as a labelled strip. */
 .stat-card::before {
     content: '';
     position: absolute;
     top: 0;
+    bottom: 0;
     left: 0;
-    right: 0;
-    height: 3px;
-    border-radius: var(--radius) var(--radius) 0 0;
+    width: 4px;
+    border-radius: var(--radius) 0 0 var(--radius);
 }
 .stat-card.c-green::before {
-    background: linear-gradient(90deg, #059669, #10b981);
+    background: linear-gradient(180deg, #10b981, #059669);
 }
 .stat-card.c-amber::before {
-    background: linear-gradient(90deg, #d97706, #f59e0b);
+    background: linear-gradient(180deg, #f59e0b, #d97706);
 }
 .stat-card.c-sky::before {
-    background: linear-gradient(90deg, #2563eb, #3b82f6);
+    background: linear-gradient(180deg, #3b82f6, #2563eb);
 }
 .stat-card.c-slate::before {
-    background: linear-gradient(90deg, #475569, #64748b);
+    background: linear-gradient(180deg, #64748b, #475569);
 }
 .stat-icon {
-    width: 36px;
-    height: 36px;
+    width: 42px;
+    height: 42px;
     border-radius: var(--radius-sm);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 17px;
-    margin-bottom: 12px;
+    font-size: 19px;
+    margin-bottom: 14px;
 }
 .si-green {
     background: var(--success-lt);
@@ -903,7 +1003,7 @@ body {
 }
 .stat-val {
     font-family: var(--font-head);
-    font-size: 30px;
+    font-size: 32px;
     font-weight: 700;
     color: var(--tx-head);
     line-height: 1;
@@ -1496,7 +1596,7 @@ html.dark .badge.indigo {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 16px;
+    padding: 9px 18px;
     border-radius: var(--radius-sm);
     font-family: var(--font-body);
     font-size: 13px;

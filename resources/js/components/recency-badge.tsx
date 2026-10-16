@@ -10,7 +10,7 @@ export type ChangeLog = {
 } | null;
 
 /** Material ids touched by the last edit, for highlighting ingredient rows. */
-export function changedItemIds(log: ChangeLog): Set<number> {
+export function changedItemIds(log?: ChangeLog): Set<number> {
     return new Set((log?.items ?? []).filter((i) => i.kind !== 'removed').map((i) => i.id));
 }
 

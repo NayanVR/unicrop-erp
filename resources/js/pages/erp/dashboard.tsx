@@ -1,6 +1,6 @@
 import LowStockProductionCard, { type LowStockProduction } from '@/components/low-stock-production-card';
 import { create as ordersCreate, edit as ordersEdit, index as ordersIndex } from '@/routes/orders';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
 type LeaderboardEntry = { userId: number; name: string; orders: number; value: number };
@@ -53,7 +53,17 @@ const statusStyle: Record<string, { bg: string; color: string; label: string }> 
     submitted:  { bg: '#fef3c7', color: '#b45309', label: 'Pending' },
 };
 
+const greeting = (d: Date) => {
+    const h = d.getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+};
+
 export default function Dashboard({ salesData, currentUserId, recentOrders, pendingOrders, pendingPayments, lowStockProduction }: Props) {
+    const { auth } = usePage<{ auth: { user?: { name?: string }; current_company?: { name?: string } | null } }>().props;
+    const now = new Date();
+
     const [period, setPeriod] = useState<Period>('thisMonth');
     const data    = salesData[period];
     const prevData = salesData['lastMonth'];
@@ -79,12 +89,46 @@ export default function Dashboard({ salesData, currentUserId, recentOrders, pend
         <>
             <Head title="Dashboard" />
 
-            <div className="page-header">
-                <div className="page-header-left">
-                    <h1>Dashboard</h1>
-                    <p>Your sales performance &amp; team leaderboard</p>
+            <div className="hero">
+                <div className="hero-top">
+                    <div>
+                        <div className="hero-company">{auth?.current_company?.name ?? 'Unicrop Biochem'}</div>
+                        <div className="hero-title">
+                            {greeting(now)}, {auth?.user?.name?.split(' ')[0] ?? 'there'} 👋
+                        </div>
+                        <div className="hero-sub">
+                            Here&apos;s how your sales look today — {now.toLocaleDateString('en-IN', {
+                                weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+                            })}.
+                        </div>
+                    </div>
+                    <div className="hero-actions">
+                        <Link className="btn primary" href={ordersCreate().url}>＋ New Order</Link>
+                        <Link className="btn" href={ordersIndex().url}>📋 All Orders</Link>
+                    </div>
                 </div>
-                <Link className="btn primary" href={ordersCreate().url}>＋ New Order</Link>
+
+                <div className="hero-figures">
+                    <div>
+                        <div className="hero-figure-value">{data.myOrders}</div>
+                        <div className="hero-figure-label">My orders</div>
+                    </div>
+                    <div>
+                        <div className="hero-figure-value">{fmt(data.myValue)}</div>
+                        <div className="hero-figure-label">My value</div>
+                    </div>
+                    <div>
+                        <div className="hero-figure-value">
+                            {myRank > 0 ? `#${myRank}` : '—'}
+                            <span> / {data.leaderboard.length || 1}</span>
+                        </div>
+                        <div className="hero-figure-label">My rank</div>
+                    </div>
+                    <div>
+                        <div className="hero-figure-value">{pendingOrders.length}</div>
+                        <div className="hero-figure-label">Pending orders</div>
+                    </div>
+                </div>
             </div>
 
             <LowStockProductionCard data={lowStockProduction} />

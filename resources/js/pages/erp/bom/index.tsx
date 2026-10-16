@@ -901,7 +901,7 @@ export default function BomIndex({ boms, materials, categories, productionRuns }
                                         let inBase = 0;
                                         let allConvertible = true;
                                         for (const it of bom.items) {
-                                            const b = toBaseGramsMl(Number(it.qty_per_batch), it.unit);
+                                            const b = toBaseGramsMl(Number(it.qty_per_batch), it.unit ?? '');
                                             if (b === null) { allConvertible = false; break; }
                                             inBase += b;
                                         }
