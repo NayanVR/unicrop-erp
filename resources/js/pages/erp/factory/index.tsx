@@ -4,6 +4,7 @@ import { approveUrgent as ordersApproveUrgent, rejectUrgent as ordersRejectUrgen
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import type { Auth } from '@/types/auth';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import KanbanBoard, { ViewToggle, type KanbanColumn } from '@/components/kanban-board';
 
 type ProductPhotoSize = {
     packing_size?: string | null;
@@ -217,6 +218,17 @@ const STAGE_LABELS: Record<string, string> = {
     ready:      'Ready',
     dispatched: 'Dispatched',
 };
+
+// Board lanes: the production stages, with items awaiting acceptance first.
+const STAGE_LANES: KanbanColumn[] = [
+    { key: 'pending',    label: 'Awaiting Acceptance', accent: '#64748b' },
+    { key: 'accepted',   label: 'Accepted',            accent: '#2563eb' },
+    { key: 'filling',    label: 'Filling',             accent: '#0891b2' },
+    { key: 'filled',     label: 'Filled',              accent: '#0d9488' },
+    { key: 'labeling',   label: 'Labeling',            accent: '#7c3aed' },
+    { key: 'ready',      label: 'Ready',               accent: '#059669' },
+    { key: 'dispatched', label: 'Dispatched',          accent: '#16a34a' },
+];
 
 const STAGE_CLASS: Record<string, string> = {
     accepted:   's-processing',
@@ -449,6 +461,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
     const { auth } = usePage<{ auth: Auth }>().props;
     const canFill = auth.user?.role === 'admin' || (auth.user?.permissions ?? []).includes('filling');
     const [search, setSearch] = useState('');
+    const [view, setView] = useState<'list' | 'board'>('list');
     const [openOrders, setOpenOrders] = useState<number[]>([]);
     const [stagingItem, setStagingItem] = useState<number | null>(null);
     const [fillingPrompt, setFillingPrompt] = useState<{ item: OrderItem; current: string | null } | null>(null);
@@ -941,6 +954,9 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                             {f.label}
                         </button>
                     ))}
+                    <span style={{ marginLeft: 'auto' }}>
+                        <ViewToggle view={view} onChange={setView} />
+                    </span>
                 </div>
 
                 {/* ── Urgent Approval Requests (factory/admin only) ── */}
@@ -1013,7 +1029,35 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                     </div>
                 )}
 
-                {visibleOrders.length === 0 ? (
+                {view === 'board' && visibleOrders.length > 0 ? (
+                    <KanbanBoard
+                        columns={STAGE_LANES}
+                        // Stages belong to items, so the board is a board of items.
+                        items={visibleOrders.flatMap((order) => order.items.map((item) => ({ order, item })))}
+                        keyOf={({ item }) => item.id}
+                        columnOf={({ item }) => isNewItem(item.status) ? 'pending' : (item.status as string)}
+                        onCardClick={({ order }) => toggleOrder(order.id)}
+                        emptyText="No items"
+                        renderCard={({ order, item }) => (
+                            <>
+                                <div className="kanban-card-title">{order.order_number}</div>
+                                <div className="kanban-card-sub">
+                                    {item.party_brand || item.our_brand || 'Item'}
+                                    {item.packing_size ? ` · ${item.packing_size}` : ''}
+                                </div>
+                                <div className="kanban-card-meta">
+                                    <span>{order.company_name}</span>
+                                    <strong style={{ color: 'var(--tx-head)' }}>{formatQty(item.quantity)} pcs</strong>
+                                </div>
+                                {order.priority === 'urgent' && (
+                                    <div className="kanban-card-meta" style={{ marginTop: 4 }}>
+                                        <span style={{ color: '#dc2626', fontWeight: 700 }}>URGENT</span>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    />
+                ) : visibleOrders.length === 0 ? (
                     <div className="empty-state">
                         <div className="icon">🏭</div>
                         <p>

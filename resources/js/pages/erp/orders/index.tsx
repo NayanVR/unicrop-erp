@@ -3,6 +3,7 @@ import { confirm as ordersConfirm, create as ordersCreate, destroy as ordersDest
 import { store as orderPaymentsStore, destroy as orderPaymentsDestroy, tallyEntry as orderPaymentsTallyEntry } from '@/routes/orders/payments';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import KanbanBoard, { ViewToggle, type KanbanColumn } from '@/components/kanban-board';
 
 type PhotoInfo = { url: string; mrp: string | null };
 
@@ -329,6 +330,15 @@ const formatQty = (value: string | number) => {
     return isNaN(n) ? String(value) : String(n);
 };
 
+// Lanes for the pipeline view, in the order an order travels through them.
+const ORDER_LANES: KanbanColumn[] = [
+    { key: 'draft',      label: 'Draft',      accent: '#d97706' },
+    { key: 'submitted',  label: 'Submitted',  accent: '#2563eb' },
+    { key: 'design',     label: 'Design',     accent: '#7c3aed' },
+    { key: 'confirmed',  label: 'Confirmed',  accent: '#0f766e' },
+    { key: 'dispatched', label: 'Dispatched', accent: '#059669' },
+];
+
 const statusClassName = (status?: string | null) => {
     switch (status) {
         case 'submitted':  return 'badge sky';
@@ -574,6 +584,7 @@ export default function OrdersIndex({ orders, deletedOrders = [], currentUserId,
 
     const [activeFilter, setActiveFilter] = useState<'mine' | 'mine-confirmed' | 'mine-dispatched' | 'all' | 'all-dispatched'>(isAccountant ? 'all' : 'mine');
     const [openOrders, setOpenOrders] = useState<number[]>([]);
+    const [view, setView] = useState<'list' | 'board'>('list');
     const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
     const [confirmStep, setConfirmStep] = useState<'payment' | 'factory' | 'design'>('payment');
     const [submitting, setSubmitting] = useState(false);
@@ -1434,10 +1445,41 @@ export default function OrdersIndex({ orders, deletedOrders = [], currentUserId,
                                 {label}
                             </button>
                         ))}
+                        <span style={{ marginLeft: 'auto' }}>
+                            <ViewToggle view={view} onChange={setView} />
+                        </span>
                     </div>
                 )}
 
-                {visibleOrders.length === 0 ? (
+                {view === 'board' && visibleOrders.length > 0 ? (
+                    <KanbanBoard
+                        columns={ORDER_LANES}
+                        items={visibleOrders}
+                        keyOf={(o) => o.id}
+                        // Anything outside the known lanes sits in Draft.
+                        columnOf={(o) => ORDER_LANES.some((l) => l.key === o.status)
+                            ? (o.status as string)
+                            : 'draft'}
+                        onCardClick={(o) => toggleOrder(o.id)}
+                        emptyText="No orders"
+                        renderCard={(o) => (
+                            <>
+                                <div className="kanban-card-title">{o.order_number}</div>
+                                <div className="kanban-card-sub">{o.company_name}</div>
+                                <div className="kanban-card-meta">
+                                    <span>{formatDate(o.order_date)}</span>
+                                    <strong style={{ color: 'var(--tx-head)' }}>₹{formatAmount(o.total_amount)}</strong>
+                                </div>
+                                <div className="kanban-card-meta" style={{ marginTop: 4 }}>
+                                    <span>{o.items?.length ?? 0} item{(o.items?.length ?? 0) === 1 ? '' : 's'}</span>
+                                    {o.priority === 'urgent' && (
+                                        <span style={{ color: '#dc2626', fontWeight: 700 }}>URGENT</span>
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    />
+                ) : visibleOrders.length === 0 ? (
                     <div className="empty-state">
                         <div className="icon">📋</div>
                         <p>
