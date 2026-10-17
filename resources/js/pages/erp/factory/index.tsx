@@ -586,7 +586,6 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
      * live in the list, so switch there, open that order and scroll to it.
      */
     const openFromBoard = (orderId: number) => {
-        setView('list');
         setOpenOrders((cur) => cur.includes(orderId) ? cur : [...cur, orderId]);
         setScrollTo(orderId);
     };
@@ -1031,7 +1030,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                     </div>
                 )}
 
-                {view === 'board' && visibleOrders.length > 0 ? (
+                {view === 'board' && visibleOrders.length > 0 && (
                     <KanbanBoard
                         columns={STAGE_LANES}
                         // Stages belong to items, so the board is a board of items.
@@ -1059,7 +1058,9 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                             </>
                         )}
                     />
-                ) : visibleOrders.length === 0 ? (
+                )}
+
+                {visibleOrders.length === 0 ? (
                     <div className="empty-state">
                         <div className="icon">🏭</div>
                         <p>
@@ -1069,7 +1070,10 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                         </p>
                     </div>
                 ) : (
-                    visibleOrders.map((order) => {
+                    (view === 'board'
+                        ? visibleOrders.filter((o) => openOrders.includes(o.id))
+                        : visibleOrders
+                    ).map((order) => {
                         const isOpen = openOrders.includes(order.id);
                         const progress = orderProgress(order);
                         const readyCount = order.items.filter((i) => i.status === 'ready').length;

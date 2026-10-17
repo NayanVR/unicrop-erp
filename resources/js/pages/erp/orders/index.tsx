@@ -644,7 +644,6 @@ export default function OrdersIndex({ orders, deletedOrders = [], currentUserId,
      * the list, so switch there, open that order and scroll it into view.
      */
     const openFromBoard = (id: number) => {
-        setView('list');
         setOpenOrders((cur) => cur.includes(id) ? cur : [...cur, id]);
         setScrollTo(id);
     };
@@ -1459,7 +1458,7 @@ export default function OrdersIndex({ orders, deletedOrders = [], currentUserId,
                     </div>
                 )}
 
-                {view === 'board' && visibleOrders.length > 0 ? (
+                {view === 'board' && visibleOrders.length > 0 && (
                     <KanbanBoard
                         columns={ORDER_LANES}
                         items={visibleOrders}
@@ -1487,7 +1486,9 @@ export default function OrdersIndex({ orders, deletedOrders = [], currentUserId,
                             </>
                         )}
                     />
-                ) : visibleOrders.length === 0 ? (
+                )}
+
+                {visibleOrders.length === 0 ? (
                     <div className="empty-state">
                         <div className="icon">📋</div>
                         <p>
@@ -1499,6 +1500,13 @@ export default function OrdersIndex({ orders, deletedOrders = [], currentUserId,
                         </p>
                     </div>
                 ) : (() => {
+                    // The board stays put; only the cards opened from it expand below.
+                    const shownOrders = view === 'board'
+                        ? visibleOrders.filter((o) => openOrders.includes(o.id))
+                        : visibleOrders;
+
+                    if (shownOrders.length === 0) return null;
+
                     const billingDone = (order: Order) => {
                         const hasTax  = (order.docs ?? []).some((d) => d.document_type === 'tax_invoice');
                         const hasEway = (order.docs ?? []).some((d) => d.document_type === 'eway_bill');
@@ -1506,14 +1514,14 @@ export default function OrdersIndex({ orders, deletedOrders = [], currentUserId,
                         return hasTax && ewayOk;
                     };
 
-                    const pendingOrders = isAccountant ? visibleOrders.filter((o) => !billingDone(o)) : [];
-                    const doneOrders    = isAccountant ? visibleOrders.filter((o) =>  billingDone(o)) : [];
+                    const pendingOrders = isAccountant ? shownOrders.filter((o) => !billingDone(o)) : [];
+                    const doneOrders    = isAccountant ? shownOrders.filter((o) =>  billingDone(o)) : [];
                     const orderGroups   = isAccountant
                         ? [
                             { label: `Pending (${pendingOrders.length})`, orders: pendingOrders, accent: '#b45309', bg: '#fef3c7', border: '#fcd34d' },
                             { label: `Done (${doneOrders.length})`,    orders: doneOrders,    accent: '#16a34a', bg: '#f0fdf4', border: '#86efac' },
                           ]
-                        : [{ label: null, orders: visibleOrders, accent: '', bg: '', border: '' }];
+                        : [{ label: null, orders: shownOrders, accent: '', bg: '', border: '' }];
 
                     return orderGroups.map(({ label, orders, accent, bg, border }) => (
                         <div key={label ?? 'all'}>
