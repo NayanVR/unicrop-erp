@@ -289,15 +289,6 @@ type EditableLabel = {
 
 type FilterKey = 'all' | 'new' | 'in-process' | 'filling' | 'ready' | 'dispatched';
 
-const FILTERS: { key: FilterKey; label: string }[] = [
-    { key: 'new', label: 'New' },
-    { key: 'in-process', label: 'In Process' },
-    { key: 'filling', label: 'Filling' },
-    { key: 'ready', label: 'Ready' },
-    { key: 'dispatched', label: 'Dispatched' },
-    { key: 'all', label: 'All' },
-];
-
 // An item is "new" (awaiting acceptance) when it has no status or the
 // legacy 'pending' status. The DB column is NOT NULL and defaults to
 // 'pending', so new order items arrive here as 'pending'.
@@ -455,7 +446,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
     const initialFilter = (): FilterKey => {
         const param = new URLSearchParams(window.location.search).get('filter');
         const valid: FilterKey[] = ['all', 'new', 'in-process', 'filling', 'ready', 'dispatched'];
-        return valid.includes(param as FilterKey) ? (param as FilterKey) : 'new';
+        return valid.includes(param as FilterKey) ? (param as FilterKey) : 'all';
     };
     const [activeFilter, setActiveFilter] = useState<FilterKey>(initialFilter);
     const { auth } = usePage<{ auth: Auth }>().props;
@@ -944,16 +935,6 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                         placeholder="🔍 Search order, company, customer…"
                         style={{ width: '220px', flexShrink: 1 }}
                     />
-                    {FILTERS.map((f) => (
-                        <button
-                            key={f.key}
-                            type="button"
-                            className={`pill ${activeFilter === f.key ? 'active' : ''}`}
-                            onClick={() => setActiveFilter(f.key)}
-                        >
-                            {f.label}
-                        </button>
-                    ))}
                     <span style={{ marginLeft: 'auto' }}>
                         <ViewToggle view={view} onChange={setView} />
                     </span>

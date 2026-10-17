@@ -582,7 +582,7 @@ export default function OrdersIndex({ orders, deletedOrders = [], currentUserId,
         return ['draft', 'submitted'].includes(order.status ?? '') && order.created_by === currentUserId;
     };
 
-    const [activeFilter, setActiveFilter] = useState<'mine' | 'mine-confirmed' | 'mine-dispatched' | 'all' | 'all-dispatched'>(isAccountant ? 'all' : 'mine');
+    const [activeFilter, setActiveFilter] = useState<'mine' | 'all'>(isAccountant ? 'all' : 'mine');
     const [openOrders, setOpenOrders] = useState<number[]>([]);
     // The board opens by default. Accountants keep the list, whose pending /
     // done grouping is the whole point of the page for them.
@@ -622,19 +622,8 @@ export default function OrdersIndex({ orders, deletedOrders = [], currentUserId,
     const visibleOrders = useMemo(() => {
         if (isDesign) return orders;
         const isMine = (o: Order) => o.created_by === currentUserId || o.sales_user_id === currentUserId;
-        switch (activeFilter) {
-            case 'mine':
-                // Only new (not yet confirmed/dispatched) orders of mine
-                return orders.filter((o) => isMine(o) && ['draft', 'submitted'].includes(o.status ?? ''));
-            case 'mine-confirmed':
-                return orders.filter((o) => isMine(o) && o.status === 'confirmed');
-            case 'mine-dispatched':
-                return orders.filter((o) => isMine(o) && o.status === 'dispatched');
-            case 'all-dispatched':
-                return orders.filter((o) => o.status === 'dispatched');
-            default:
-                return orders;
-        }
+        // Every status of mine — the board lanes are what separate them.
+        return activeFilter === 'mine' ? orders.filter(isMine) : orders;
     }, [activeFilter, orders, currentUserId, isDesign]);
 
     const toggleOrder = (id: number) =>
@@ -1433,11 +1422,8 @@ export default function OrdersIndex({ orders, deletedOrders = [], currentUserId,
                         <h2>Orders</h2>
                         {([
                             ['mine', 'My Orders'],
-                            ['mine-confirmed', 'My Confirmed Orders'],
-                            ['mine-dispatched', 'My Dispatched Orders'],
                             ['all', 'All Orders'],
-                            ['all-dispatched', 'All Dispatched Orders'],
-                        ] as const).filter(([key]) => !isAccountant || (key === 'all' || key === 'all-dispatched')).map(([key, label]) => (
+                        ] as const).filter(([key]) => !isAccountant || key === 'all').map(([key, label]) => (
                             <button
                                 key={key}
                                 type="button"
