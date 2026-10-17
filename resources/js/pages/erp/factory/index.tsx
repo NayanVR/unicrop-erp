@@ -571,6 +571,27 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
     const toggleOrder = (orderId: number) =>
         setOpenOrders((curr) => (curr.includes(orderId) ? curr.filter((id) => id !== orderId) : [...curr, orderId]));
 
+    // Set by a board card; cleared once the row has been scrolled to.
+    const [scrollTo, setScrollTo] = useState<number | null>(null);
+
+    useEffect(() => {
+        if (scrollTo == null) return;
+        document.getElementById(`order-${scrollTo}`)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setScrollTo(null);
+    }, [scrollTo]);
+
+    /**
+     * A board card is a shortcut into the order itself: the stage controls
+     * live in the list, so switch there, open that order and scroll to it.
+     */
+    const openFromBoard = (orderId: number) => {
+        setView('list');
+        setOpenOrders((cur) => cur.includes(orderId) ? cur : [...cur, orderId]);
+        setScrollTo(orderId);
+    };
+
+
     const setItemStage = (itemId: number, stage: string, current: string | null, onDone?: () => void, extra?: Record<string, string | number>) => {
         if (stage === current) {
             onDone?.();
@@ -1017,7 +1038,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                         items={visibleOrders.flatMap((order) => order.items.map((item) => ({ order, item })))}
                         keyOf={({ item }) => item.id}
                         columnOf={({ item }) => isNewItem(item.status) ? 'pending' : (item.status as string)}
-                        onCardClick={({ order }) => toggleOrder(order.id)}
+                        onCardClick={({ order }) => openFromBoard(order.id)}
                         emptyText="No items"
                         renderCard={({ order, item }) => (
                             <>
@@ -1055,7 +1076,7 @@ export default function FactoryIndex({ orders, urgentPending, canAdvance, produc
                         const notesValue = notesDraft[order.id] ?? order.factory_notes ?? '';
 
                         return (
-                            <div key={order.id} className={`order-card${isOpen ? ' open' : ''}`}>
+                            <div key={order.id} id={`order-${order.id}`} className={`order-card${isOpen ? ' open' : ''}`}>
                                 <div
                                     className="order-card-header"
                                     onClick={() => toggleOrder(order.id)}

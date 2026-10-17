@@ -629,6 +629,26 @@ export default function OrdersIndex({ orders, deletedOrders = [], currentUserId,
     const toggleOrder = (id: number) =>
         setOpenOrders((cur) => cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
 
+    // Set by a board card; cleared once the row has been scrolled to.
+    const [scrollTo, setScrollTo] = useState<number | null>(null);
+
+    useEffect(() => {
+        if (scrollTo == null) return;
+        document.getElementById(`order-${scrollTo}`)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setScrollTo(null);
+    }, [scrollTo]);
+
+    /**
+     * A board card is a shortcut into the order itself: the detail lives in
+     * the list, so switch there, open that order and scroll it into view.
+     */
+    const openFromBoard = (id: number) => {
+        setView('list');
+        setOpenOrders((cur) => cur.includes(id) ? cur : [...cur, id]);
+        setScrollTo(id);
+    };
+
     const deleteOrder = (order: Order, e: React.MouseEvent) => {
         e.stopPropagation();
         if (!confirm(`Delete order ${order.order_number} for ${order.company_name}?\n\nYou can restore it later from “Deleted orders”.`)) return;
@@ -1448,7 +1468,7 @@ export default function OrdersIndex({ orders, deletedOrders = [], currentUserId,
                         columnOf={(o) => ORDER_LANES.some((l) => l.key === o.status)
                             ? (o.status as string)
                             : 'draft'}
-                        onCardClick={(o) => toggleOrder(o.id)}
+                        onCardClick={(o) => openFromBoard(o.id)}
                         emptyText="No orders"
                         renderCard={(o) => (
                             <>
@@ -1512,7 +1532,7 @@ export default function OrdersIndex({ orders, deletedOrders = [], currentUserId,
                         const progress = totalItems ? Math.round((dispatchedItems / totalItems) * 100) : 0;
 
                         return (
-                            <div key={order.id} className={`order-card${isOpen ? ' open' : ''}`}>
+                            <div key={order.id} id={`order-${order.id}`} className={`order-card${isOpen ? ' open' : ''}`}>
                                 <div
                                     className="order-card-header"
                                     onClick={() => toggleOrder(order.id)}
