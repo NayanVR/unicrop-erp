@@ -24,11 +24,20 @@ return new class extends Migration
             });
         }
 
-        Schema::table('raw_material_names', function (Blueprint $table) {
-            // Until now every (material, company) pair had exactly one row, so
-            // the existing rows are all position 0 already.
-            $table->dropUnique(['raw_material_id', 'company_id']);
-        });
+        // Until now every (material, company) pair had exactly one row, so the
+        // existing rows are all position 0 already. The index is only dropped
+        // if it is actually there — a database built before this table was a
+        // migration may not carry it, and a failed drop would stop the deploy.
+        foreach (Schema::getIndexes('raw_material_names') as $index) {
+            $columns = $index['columns'] ?? [];
+            sort($columns);
+
+            if (($index['unique'] ?? false) && $columns === ['company_id', 'raw_material_id']) {
+                Schema::table('raw_material_names', function (Blueprint $table) use ($index) {
+                    $table->dropUnique($index['name']);
+                });
+            }
+        }
     }
 
     public function down(): void
