@@ -7,9 +7,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * The name one company uses for a shared material.
+ * A name one company uses for a shared material. A company may have several —
+ * position 0 is its main name, the rest are alternatives it also orders by.
  */
-#[Fillable(['raw_material_id', 'company_id', 'name'])]
+#[Fillable(['raw_material_id', 'company_id', 'name', 'position'])]
 class RawMaterialName extends Model
 {
     /**

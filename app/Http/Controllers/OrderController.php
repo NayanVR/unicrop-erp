@@ -16,6 +16,7 @@ use App\Models\Party;
 use App\Models\ProductFillingConfig;
 use App\Models\ProductPhoto;
 use App\Models\RawMaterial;
+use App\Services\CurrentCompany;
 use App\Models\Role;
 use App\Models\Transport;
 use App\Models\User;
@@ -970,6 +971,8 @@ class OrderController extends Controller
      */
     private function finishGoodBrands(): \Illuminate\Support\Collection
     {
+        $companyId = app(CurrentCompany::class)->id();
+
         return RawMaterial::whereRaw(
                 "LOWER(category) LIKE ? AND LOWER(category) NOT LIKE ?",
                 ['%finish%good%', '%semi%']
@@ -978,15 +981,17 @@ class OrderController extends Controller
             ->orderBy('group_name')
             ->orderBy('name')
             ->get(['id', 'name', 'group_name', 'shape', 'stock_qty', 'unit', 'selling_rate'])
-            ->map(fn ($m) => [
-                // The brand picker shows the name this company uses.
-                'name'  => $m->display_name,
+            // A product often goes by several names in one company. Sales sees
+            // every one of them and may order under whichever the party uses.
+            ->flatMap(fn ($m) => array_map(fn (string $name) => [
+                'name'  => $name,
                 'group' => $m->group_name,
                 'shape' => $m->shape,
                 'stock' => (float) $m->stock_qty,
                 'unit'  => $m->unit ?? '',
                 'selling_rate' => $m->selling_rate !== null ? (float) $m->selling_rate : null,
-            ]);
+            ], $m->namesForCompany($companyId)))
+            ->values();
     }
 
     private function mapProductPhotos(): \Illuminate\Support\Collection

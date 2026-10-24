@@ -994,14 +994,24 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
         // values and the GST <select> can match its integer option values.
         const num = (v: number | string | null | undefined) =>
             v == null || v === '' ? '' : String(Number(v));
-        // The owning company's name is the material's default name; every other
-        // company it is named for gets its own row in the editor.
+        // The owning company's first name is the material's default name; every
+        // other name it answers to gets its own row in the editor.
         const ownerId = m.company_id ?? auth.current_company?.id ?? null;
+        const mainName = matNameFor(m, ownerId);
+        let mainSeen = false;
         matForm.setData({
-            name: matNameFor(m, ownerId),
+            name: mainName,
             company_id: String(ownerId ?? ''),
             company_names: (m.company_names ?? [])
-                .filter((n) => n.company_id !== ownerId && nameableCompanies.some((c) => c.id === n.company_id))
+                .filter((n) => {
+                    if (n.company_id !== ownerId && !nameableCompanies.some((c) => c.id === n.company_id)) return false;
+                    // Drop only the single row the Name field above already shows.
+                    if (n.company_id === ownerId && n.name === mainName && !mainSeen) {
+                        mainSeen = true;
+                        return false;
+                    }
+                    return true;
+                })
                 .map((n) => ({ company_id: String(n.company_id), name: n.name })),
             description: m.description ?? '',
             sku: m.sku ?? '',
@@ -2652,10 +2662,10 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                     })()}
                                 </div>
                                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                                    <label>Name in other companies</label>
+                                    <label>Other names for this product</label>
                                     {matForm.data.company_names.length === 0 && (
                                         <small style={{ fontSize: 11, color: 'var(--tx-muted)' }}>
-                                            Same product, different name elsewhere in the group. Add a row for each company that calls it something else.
+                                            The same product often goes by more than one name. Add a row for each one — sales sees every name here and can place an order under any of them. Pick another company if it is known by that name elsewhere in the group.
                                         </small>
                                     )}
                                     {matForm.data.company_names.map((row, i) => (
@@ -2669,9 +2679,7 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                                 required
                                             >
                                                 <option value="">— Company —</option>
-                                                {nameableCompanies
-                                                    .filter((c) => String(c.id) !== matForm.data.company_id)
-                                                    .map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                                                {matCompanyOptions.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
                                             </select>
                                             <input
                                                 type="text"
@@ -2697,9 +2705,13 @@ export default function InventoryIndex({ materials, pendingMaterials, recentTran
                                         type="button"
                                         className="btn btn-sm"
                                         style={{ marginTop: 8 }}
-                                        onClick={() => matForm.setData('company_names', [...matForm.data.company_names, { company_id: '', name: '' }])}
+                                        onClick={() => matForm.setData('company_names', [
+                                            ...matForm.data.company_names,
+                                            // Most extra names belong to the product's own company.
+                                            { company_id: matForm.data.company_id, name: '' },
+                                        ])}
                                     >
-                                        + Add company name
+                                        + Add another name
                                     </button>
                                     {matForm.errors.company_names && <div className="form-error">{matForm.errors.company_names}</div>}
                                 </div>

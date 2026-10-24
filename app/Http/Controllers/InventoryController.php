@@ -377,40 +377,53 @@ class InventoryController extends Controller
     }
 
     /**
-     * Fold the owning company's name and the extra per-company names into one
-     * company_id => name map. The owning company always wins for its own slot.
+     * Fold the owning company's main name and the extra names into one ordered
+     * list of company/name pairs. A company may appear more than once — the
+     * same material is often sold under several names in one company — but the
+     * owning company's main name always comes first, and a name repeated
+     * within a company is kept only once.
      *
      * @param  array<int, array{company_id: int|string, name: string}>  $extra
-     * @return array<int, string>
+     * @return array<int, array{company_id: int, name: string}>
      */
     private function resolveCompanyNames(int $ownerCompanyId, string $ownerName, array $extra): array
     {
-        $names = [];
+        $pairs = [[ 'company_id' => $ownerCompanyId, 'name' => trim($ownerName) ]];
 
         foreach ($extra as $entry) {
             $name = trim((string) ($entry['name'] ?? ''));
 
             if ($name !== '') {
-                $names[(int) $entry['company_id']] = $name;
+                $pairs[] = ['company_id' => (int) $entry['company_id'], 'name' => $name];
             }
         }
 
-        $names[$ownerCompanyId] = trim($ownerName);
+        $seen = [];
 
-        return $names;
+        return array_values(array_filter($pairs, function (array $pair) use (&$seen) {
+            $key = $pair['company_id'].'|'.mb_strtolower($pair['name']);
+
+            if (isset($seen[$key]) || $pair['name'] === '') {
+                return false;
+            }
+
+            $seen[$key] = true;
+
+            return true;
+        }));
     }
 
     /**
      * A name has to be unique inside a company, whether it is that company's
      * own name for a material or the default name of a material it owns.
      *
-     * @param  array<int, string>  $companyNames
+     * @param  array<int, array{company_id: int, name: string}>  $companyNames
      */
     private function assertCompanyNamesAreFree(array $companyNames, ?int $ignoreMaterialId = null): void
     {
         $errors = [];
 
-        foreach ($companyNames as $companyId => $name) {
+        foreach ($companyNames as ['company_id' => $companyId, 'name' => $name]) {
             $needle = mb_strtolower($name);
 
             $taken = RawMaterial::withoutGlobalScopes()
@@ -439,17 +452,26 @@ class InventoryController extends Controller
     }
 
     /**
-     * Replace the material's per-company names with exactly the given map.
+     * Replace the material's per-company names with exactly the given list.
+     * Each company's names keep the order they were given, so its first one
+     * stays the name shown wherever only one will fit.
      *
-     * @param  array<int, string>  $companyNames
+     * @param  array<int, array{company_id: int, name: string}>  $companyNames
      */
     private function syncCompanyNames(RawMaterial $material, array $companyNames, array $manageableCompanyIds): void
     {
         $keep = [];
+        $next = [];
 
-        foreach ($companyNames as $companyId => $name) {
+        foreach ($companyNames as ['company_id' => $companyId, 'name' => $name]) {
+            $position = $next[$companyId] ?? 0;
+            $next[$companyId] = $position + 1;
+
             $keep[] = $material->companyNames()
-                ->updateOrCreate(['company_id' => $companyId], ['name' => $name])
+                ->updateOrCreate(
+                    ['company_id' => $companyId, 'name' => $name],
+                    ['position' => $position],
+                )
                 ->id;
         }
 
@@ -514,7 +536,7 @@ class InventoryController extends Controller
             'name'          => ['required','string','max:255'],
             'company_id'    => ['nullable','integer', Rule::in([...$this->nameableCompanyIds($request), $material->company_id])],
             'company_names'              => ['array'],
-            'company_names.*.company_id' => ['required','integer', Rule::in($this->nameableCompanyIds($request))],
+            'company_names.*.company_id' => ['required','integer', Rule::in([...$this->nameableCompanyIds($request), $material->company_id])],
             'company_names.*.name'       => ['required','string','max:255'],
             'description'   => 'nullable|string|max:2000',
             'sku'           => ['nullable','string','max:100', Rule::unique('raw_materials','sku')->where('company_id', app(CurrentCompany::class)->id())->ignore($material->id)],
@@ -553,7 +575,9 @@ class InventoryController extends Controller
         $extraNames   = $request->has('company_names')
             ? ($data['company_names'] ?? [])
             : $material->companyNames
-                ->where('company_id', '!=', $ownerCompanyId)
+                // The owner's main name is supplied separately as `name`; its
+                // other names here are alternatives and must survive.
+                ->reject(fn ($n) => (int) $n->company_id === $ownerCompanyId && (int) $n->position === 0)
                 ->map(fn ($n) => ['company_id' => $n->company_id, 'name' => $n->name])
                 ->values()
                 ->all();

@@ -68,7 +68,9 @@ class RawMaterial extends Model
      */
     public function companyNames(): HasMany
     {
-        return $this->hasMany(RawMaterialName::class);
+        return $this->hasMany(RawMaterialName::class)
+            ->orderBy('position')
+            ->orderBy('id');
     }
 
     /**
@@ -93,6 +95,38 @@ class RawMaterial extends Model
     public function bomItems(): HasMany
     {
         return $this->hasMany(BomItem::class);
+    }
+
+    /**
+     * Every name the given company knows this material by, its main name
+     * first. One company often sells the same thing under several names, and
+     * an order may be placed under any of them.
+     *
+     * @return array<int, string>
+     */
+    public function namesForCompany(?int $companyId): array
+    {
+        $names = $companyId === null || $this->getKey() === null
+            ? []
+            : $this->companyNames
+                ->where('company_id', $companyId)
+                ->pluck('name')
+                ->all();
+
+        if ($names === []) {
+            $names = [(string) $this->name];
+        }
+
+        // Case-insensitive dedupe that keeps the first spelling of each name.
+        return array_values(array_reduce(
+            $names,
+            function (array $kept, string $name) {
+                $kept[mb_strtolower(trim($name))] ??= trim($name);
+
+                return $kept;
+            },
+            [],
+        ));
     }
 
     /** The name the given company uses, falling back to the default name. */
