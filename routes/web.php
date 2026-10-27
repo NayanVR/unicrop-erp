@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AssetController;
 use App\Http\Controllers\BomController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\NotificationController;
@@ -257,6 +258,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('products/{product}', [ProductController::class, 'update'])->name('products.update');
         Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
     });
+
+    // Asset register. Who gets in is a per-user grant an admin ticks, not a
+    // role, so AssetController does the checking itself.
+    Route::get('assets', [AssetController::class, 'index'])->name('assets.index');
+    Route::post('assets', [AssetController::class, 'store'])->name('assets.store');
+    Route::patch('assets/{asset}', [AssetController::class, 'update'])->name('assets.update');
+    Route::delete('assets/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
 
     // Design page view: design users + sales (order processors) can see status
     Route::middleware(['role:design.manage,orders.process'])->group(function () {

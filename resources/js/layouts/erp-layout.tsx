@@ -1,6 +1,7 @@
 import { useAppearance } from '@/hooks/use-appearance';
 import { useDraggableModals } from '@/hooks/use-draggable-modals';
 import { dashboard, logout } from '@/routes';
+import { index as assetsIndex } from '@/routes/assets';
 import { index as bomIndex } from '@/routes/bom';
 import { index as designIndex } from '@/routes/design';
 import { index as galleryIndex } from '@/routes/design/gallery';
@@ -64,6 +65,7 @@ const NAV_DEFS: Record<string, NavItem[]> = {
         { id: 'party-ledger', label: 'Party Ledger', icon: '📒', href: partyLedgerIndex() },
         { id: 'suppliers', label: 'Supplier / Vendor', icon: '🏭', href: '/suppliers' as NonNullable<InertiaLinkProps['href']> },
         { id: 'profit-loss', label: 'Profit / Loss', icon: '📈', href: '/reports/profit-loss' as NonNullable<InertiaLinkProps['href']> },
+        { id: 'assets', label: 'Assets', icon: '🖥️', href: assetsIndex() },
         { id: 'users', label: 'User Management', icon: '👥', href: usersIndex() },
         { id: 'companies', label: 'Companies', icon: '🏬', href: companiesIndex() },
         { id: 'policies', label: 'Policies', icon: '🛡️', href: policiesIndex() },
@@ -179,6 +181,11 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
         }
         if (role !== 'admin' && !permissions.includes('manage_users')) {
             items = items.filter((i) => i.id !== 'users');
+        }
+        // The asset register is a per-user grant, so it is not in any role's
+        // list except the admin's — add it for whoever has been given it.
+        if (role !== 'admin' && (permissions.includes('assets_view') || permissions.includes('assets_manage'))) {
+            items = [...items, { id: 'assets', label: 'Assets', icon: '🖥️', href: assetsIndex() }];
         }
         if (hiddenNavItems.length > 0) {
             items = items.filter((item) => !hiddenNavItems.includes(item.id));
