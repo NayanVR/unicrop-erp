@@ -1,0 +1,21 @@
+name: Deploy to CloudPanel
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency: deploy
+
+jobs:
+  deploy:
+    # Skipped until the repo variable CLOUDPANEL_DEPLOY is set to "true".
+    if: vars.CLOUDPANEL_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: bash ${{ secrets.DEPLOY_PATH }}/deploy.sh
