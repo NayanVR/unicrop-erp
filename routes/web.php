@@ -198,6 +198,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('rate-calculator.other-cost');
     });
 
+    Route::middleware(['role:price-list.view'])->group(function () {
+        Route::get('price-list', [\App\Http\Controllers\PriceListController::class, 'index'])->name('price-list.index');
+        Route::get('price-list/pdf', [\App\Http\Controllers\PriceListController::class, 'download'])->name('price-list.pdf');
+        // Maintaining the list is an admin job; sales only reads and prints it.
+        Route::middleware('role:admin.settings')->group(function () {
+            Route::post('price-list/items', [\App\Http\Controllers\PriceListController::class, 'store'])->name('price-list.store');
+            Route::patch('price-list/items/{priceListItem}', [\App\Http\Controllers\PriceListController::class, 'update'])->name('price-list.update');
+            Route::delete('price-list/items/{priceListItem}', [\App\Http\Controllers\PriceListController::class, 'destroy'])->name('price-list.destroy');
+            Route::post('price-list/import', [\App\Http\Controllers\PriceListController::class, 'import'])->name('price-list.import');
+            Route::post('price-list/settings', [\App\Http\Controllers\PriceListController::class, 'updateSettings'])->name('price-list.settings');
+        });
+    });
+
     // In-app notifications (JSON API, no Inertia)
     Route::get('erp/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('erp/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');

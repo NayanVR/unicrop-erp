@@ -81,10 +81,7 @@ class InventoryController extends Controller
 
         if ($isSales) {
             // Admin controls which categories the sales team can see
-            $hiddenCategories = InventoryCategory::query()
-                ->where('visible_to_sales', false)
-                ->pluck('name')
-                ->map(fn ($n) => mb_strtolower(trim($n)));
+            $hiddenCategories = \App\Services\SalesCatalogue::hiddenCategories();
 
             $materials = $materials->reject(
                 fn ($m) => $hiddenCategories->contains(mb_strtolower(trim((string) $m->category)))
