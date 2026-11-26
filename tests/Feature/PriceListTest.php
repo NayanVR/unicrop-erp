@@ -171,11 +171,8 @@ it('puts only the chosen products in the PDF', function () {
 
     $keep = PriceListItem::withoutGlobalScopes()->where('name', 'Keep Me')->firstOrFail();
 
-    $one = $this->get("/price-list/pdf?only={$keep->id}")->getContent();
-    $all = $this->get('/price-list/pdf')->getContent();
-
-    // dompdf compresses its text, so compare sizes rather than words.
-    expect(strlen($one))->toBeLessThan(strlen($all));
+    expect(app(\App\Http\Controllers\PriceListController::class)
+        ->itemsFor(['only' => (string) $keep->id])->pluck('name')->all())->toBe(['Keep Me']);
 });
 
 it('leaves a hidden product and one with no packings off the PDF', function () {
@@ -187,12 +184,8 @@ it('leaves a hidden product and one with no packings off the PDF', function () {
 
     expect(PriceListItem::withoutGlobalScopes()->count())->toBe(3);
 
-    $full = $this->get('/price-list/pdf')->getContent();
-    $onlyPrinted = $this->get(
-        '/price-list/pdf?only='.PriceListItem::withoutGlobalScopes()->where('name', 'Printed')->value('id'),
-    )->getContent();
-
-    expect(strlen($full))->toBe(strlen($onlyPrinted));
+    expect(app(\App\Http\Controllers\PriceListController::class)
+        ->itemsFor([])->pluck('name')->all())->toBe(['Printed']);
 });
 
 it('refuses the PDF to a role that may not sell', function () {
@@ -215,4 +208,152 @@ it('lets an admin save the cover text and keeps sales out of it', function () {
     $this->actingAs(priceListUser('sales'))
         ->post('/price-list/settings', ['price_list_title' => 'hacked'])
         ->assertForbidden();
+});
+
+// ── Live rates ───────────────────────────────────────────────────────────────
+
+it('prints the product selling rate as it stands now, not the one typed in', function () {
+    $this->actingAs(priceListUser('admin'));
+    $material = priceListMaterial('Ribophyll', 'Finished Goods', 22);
+
+    $this->post('/price-list/items', priceListPayload('Ribophyll', [
+        ['packing' => '1 Ltr', 'raw_material_id' => $material->id, 'rate' => 22],
+    ]))->assertSessionHasNoErrors();
+
+    // The rate moves in inventory; the list must follow it.
+    $material->update(['selling_rate' => 29]);
+
+    $this->get('/price-list')->assertInertia(function ($page) {
+        $packing = $page->toArray()['props']['items'][0]['packings'][0];
+
+        expect((float) $packing['rate'])->toBe(29.0);
+        expect((float) $packing['typed_rate'])->toBe(22.0);
+        expect($packing['is_live'])->toBeTrue();
+    });
+});
+
+it('falls back to the typed rate when a packing has no product', function () {
+    $this->actingAs(priceListUser('admin'))
+        ->post('/price-list/items', priceListPayload('Hand priced', [
+            ['packing' => '5 Ltr', 'rate' => 480],
+        ]))->assertSessionHasNoErrors();
+
+    $this->get('/price-list')->assertInertia(function ($page) {
+        $packing = $page->toArray()['props']['items'][0]['packings'][0];
+
+        expect((float) $packing['rate'])->toBe(480.0);
+        expect($packing['is_live'])->toBeFalse();
+    });
+});
+
+it('links an imported packing to its product so the rate stays live', function () {
+    $this->actingAs(priceListUser('admin'));
+    $material = priceListMaterial('Ribophyll', 'Finished Goods', 22);
+
+    $this->post('/price-list/import')->assertSessionHasNoErrors();
+    $material->update(['selling_rate' => 31]);
+
+    $this->get('/price-list')->assertInertia(fn ($page) => expect(
+        (float) $page->toArray()['props']['items'][0]['packings'][0]['rate']
+    )->toBe(31.0));
+});
+
+it('takes a packing rate without one typed when a product is linked', function () {
+    $this->actingAs(priceListUser('admin'));
+    $material = priceListMaterial('Ribophyll', 'Finished Goods', 22);
+
+    $this->post('/price-list/items', priceListPayload('Ribophyll', [
+        ['packing' => '1 Ltr', 'raw_material_id' => $material->id],
+    ]))->assertSessionHasNoErrors();
+
+    $this->get('/price-list')->assertInertia(fn ($page) => expect(
+        (float) $page->toArray()['props']['items'][0]['packings'][0]['rate']
+    )->toBe(22.0));
+});
+
+// ── Category and group ───────────────────────────────────────────────────────
+
+function priceListLinked(string $name, string $category, ?string $group, float $rate): int
+{
+    $material = priceListMaterial($name, $category, $rate);
+    $material->update(['group_name' => $group]);
+
+    test()->post('/price-list/items', priceListPayload($name, [
+        ['packing' => '1 Ltr', 'raw_material_id' => $material->id],
+    ], ['raw_material_id' => $material->id, 'section' => null]))->assertSessionHasNoErrors();
+
+    return $material->id;
+}
+
+it('heads a product with its inventory group, falling back to its category', function () {
+    $this->actingAs(priceListUser('admin'));
+    priceListLinked('Ribophyll', 'Finished Goods', 'Bio Stimulant', 22);
+    priceListLinked('Plain Jane', 'Finished Goods', null, 40);
+
+    $this->get('/price-list')->assertInertia(function ($page) {
+        $headings = collect($page->toArray()['props']['items'])->pluck('heading', 'name');
+
+        expect($headings['Ribophyll'])->toBe('Bio Stimulant');
+        expect($headings['Plain Jane'])->toBe('Finished Goods');
+    });
+});
+
+it('offers the categories and groups actually on the list', function () {
+    $this->actingAs(priceListUser('admin'));
+    priceListLinked('Ribophyll', 'Finished Goods', 'Bio Stimulant', 22);
+    priceListLinked('Micro 1000', 'Bio Fertilizer', 'Bio Fertilizer Powder', 48);
+
+    $this->get('/price-list')->assertInertia(function ($page) {
+        $props = $page->toArray()['props'];
+
+        expect($props['categories'])->toBe(['Bio Fertilizer', 'Finished Goods']);
+        expect($props['groups'])->toBe(['Bio Fertilizer Powder', 'Bio Stimulant']);
+    });
+});
+
+/**
+ * dompdf compresses its text streams, so the bytes cannot be searched.
+ * Ask the controller what a PDF with these filters would carry instead.
+ *
+ * @return array<int, string>
+ */
+function priceListNamesFor(array $filters): array
+{
+    return app(\App\Http\Controllers\PriceListController::class)
+        ->itemsFor($filters)->pluck('name')->sort()->values()->all();
+}
+
+it('pulls a price list for one group only', function () {
+    $this->actingAs(priceListUser('admin'));
+    priceListLinked('Ribophyll', 'Finished Goods', 'Bio Stimulant', 22);
+    priceListLinked('Micro 1000', 'Bio Fertilizer', 'Bio Fertilizer Powder', 48);
+
+    expect(priceListNamesFor([]))->toBe(['Micro 1000', 'Ribophyll']);
+    expect(priceListNamesFor(['group' => 'Bio Stimulant']))->toBe(['Ribophyll']);
+});
+
+it('pulls a price list for one category only', function () {
+    $this->actingAs(priceListUser('admin'));
+    priceListLinked('Ribophyll', 'Finished Goods', 'Bio Stimulant', 22);
+    priceListLinked('Micro 1000', 'Bio Fertilizer', 'Bio Fertilizer Powder', 48);
+
+    expect(priceListNamesFor(['category' => 'Finished Goods']))->toBe(['Ribophyll']);
+    expect(priceListNamesFor(['category' => 'Nothing Here']))->toBe([]);
+});
+
+it('narrows by category and group together', function () {
+    $this->actingAs(priceListUser('admin'));
+    priceListLinked('Ribophyll', 'Finished Goods', 'Bio Stimulant', 22);
+    priceListLinked('Spiral', 'Finished Goods', 'Bio Fertilizer Powder', 30);
+
+    expect(priceListNamesFor(['category' => 'Finished Goods', 'group' => 'Bio Stimulant']))
+        ->toBe(['Ribophyll']);
+});
+
+it('names the file after the slice that was pulled', function () {
+    $this->actingAs(priceListUser('admin'));
+    priceListLinked('Ribophyll', 'Finished Goods', 'Bio Stimulant', 22);
+
+    $this->get('/price-list/pdf?group=Bio+Stimulant')
+        ->assertDownload('Price-List-bio-stimulant-'.now()->format('Y-m-d').'.pdf');
 });

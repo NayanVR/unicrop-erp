@@ -192,7 +192,7 @@
                     @endunless
                     <td class="c-rate stack">
                         @foreach ($item->packings as $p)
-                            {{ rtrim(rtrim(number_format((float) $p->rate, 2, '.', ''), '0'), '.') }}@if (! $loop->last)<br>@endif
+                            {{ rtrim(rtrim(number_format($p->liveRate(), 2, '.', ''), '0'), '.') }}@if (! $loop->last)<br>@endif
                         @endforeach
                     </td>
                     @unless ($isBulk)

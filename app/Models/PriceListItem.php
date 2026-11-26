@@ -52,4 +52,28 @@ class PriceListItem extends Model
     {
         return $this->belongsTo(RawMaterial::class);
     }
+
+    /** The inventory category this product is filed under, live. */
+    public function category(): ?string
+    {
+        return $this->rawMaterial?->category ?: null;
+    }
+
+    /** The inventory group, live — "Bio Stimulant" and the like. */
+    public function group(): ?string
+    {
+        return $this->rawMaterial?->group_name ?: null;
+    }
+
+    /**
+     * The heading this product prints under. An admin may override it;
+     * otherwise it follows the product's group, then its category.
+     */
+    public function heading(): string
+    {
+        return $this->section
+            ?: $this->group()
+            ?: $this->category()
+            ?: 'Price List';
+    }
 }

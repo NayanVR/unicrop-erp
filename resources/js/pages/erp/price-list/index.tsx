@@ -12,16 +12,26 @@ import { ModalPortal } from '@/components/modal-portal';
 type Packing = {
     id?: number;
     packing: string;
+    raw_material_id: number | null;
     mrp: number | null;
+    /** What will be printed — live from the product when one is linked. */
     rate: number;
+    typed_rate: number;
+    is_live: boolean;
     qty_per_box: number | null;
 };
+
+type Product = { id: number; name: string; category: string | null; group: string | null; rate: number };
 
 type Item = {
     id: number;
     name: string;
     description: string | null;
-    section: string;
+    section: string | null;
+    heading: string;
+    category: string | null;
+    group: string | null;
+    raw_material_id: number | null;
     gst_percent: number;
     is_bulk: boolean;
     is_active: boolean;
@@ -33,6 +43,9 @@ type Settings = Record<string, string>;
 
 type PageProps = {
     items: Item[];
+    categories: string[];
+    groups: string[];
+    products: Product[];
     settings: Settings;
     canEdit: boolean;
     importable: number;
@@ -40,14 +53,15 @@ type PageProps = {
 };
 
 /** Blank row the editor starts each new packing from. */
-const blankPacking = (): PackingDraft => ({ packing: '', mrp: '', rate: '', qty_per_box: '' });
+const blankPacking = (): PackingDraft => ({ packing: '', raw_material_id: '', mrp: '', rate: '', qty_per_box: '' });
 
-type PackingDraft = { packing: string; mrp: string; rate: string; qty_per_box: string };
+type PackingDraft = { packing: string; raw_material_id: string; mrp: string; rate: string; qty_per_box: string };
 
 const emptyItem = {
     name: '',
     description: '',
-    section: 'Bio Stimulant Product Price List',
+    section: '',
+    raw_material_id: '',
     gst_percent: '18',
     is_bulk: false,
     is_active: true,
@@ -70,10 +84,14 @@ const SETTING_FIELDS: { key: string; label: string; rows?: number }[] = [
 ];
 
 export default function PriceListIndex() {
-    const { items, settings, canEdit, importable, flash } = usePage<PageProps>().props;
+    const { items, categories, groups, products, settings, canEdit, importable, flash } = usePage<PageProps>().props;
 
     const [search, setSearch] = useState('');
     const [customer, setCustomer] = useState('');
+    // Which slice of the list is being pulled: "the finished goods one",
+    // "the bio stimulant one".
+    const [category, setCategory] = useState('');
+    const [group, setGroup] = useState('');
     const [excluded, setExcluded] = useState<Set<number>>(new Set());
     const [editing, setEditing] = useState<Item | null>(null);
     const [showItemModal, setShowItemModal] = useState(false);
@@ -84,26 +102,32 @@ export default function PriceListIndex() {
         Object.fromEntries(SETTING_FIELDS.map((f) => [f.key, settings[f.key] ?? ''])) as Settings,
     );
 
+    const inScope = useMemo(
+        () => items.filter((i) =>
+            (!category || i.category === category) && (!group || i.group === group)),
+        [items, category, group],
+    );
+
     const visible = useMemo(() => {
         const q = search.trim().toLowerCase();
-        if (!q) return items;
+        if (!q) return inScope;
 
-        return items.filter((i) =>
-            [i.name, i.description, i.section].some((f) => (f ?? '').toLowerCase().includes(q)),
+        return inScope.filter((i) =>
+            [i.name, i.description, i.heading].some((f) => (f ?? '').toLowerCase().includes(q)),
         );
-    }, [items, search]);
+    }, [inScope, search]);
 
-    const groups = useMemo(() => {
+    const sections = useMemo(() => {
         const map = new Map<string, Item[]>();
         for (const i of visible) {
-            const key = i.is_bulk ? `${i.section} (Bulk)` : i.section;
+            const key = i.is_bulk ? `${i.heading} (Bulk)` : i.heading;
             if (!map.has(key)) map.set(key, []);
             map.get(key)!.push(i);
         }
         return [...map.entries()];
     }, [visible]);
 
-    const printable = items.filter((i) => i.is_active && i.packings.length > 0);
+    const printable = inScope.filter((i) => i.is_active && i.packings.length > 0);
     const included = printable.filter((i) => !excluded.has(i.id));
 
     const toggle = (id: number) =>
@@ -124,6 +148,8 @@ export default function PriceListIndex() {
     const downloadPdf = () => {
         const params = new URLSearchParams();
         if (customer.trim()) params.set('for', customer.trim());
+        if (category) params.set('category', category);
+        if (group) params.set('group', group);
         if (excluded.size > 0) params.set('only', included.map((i) => i.id).join(','));
 
         const query = params.toString();
@@ -142,7 +168,8 @@ export default function PriceListIndex() {
         itemForm.setData({
             name: item.name,
             description: item.description ?? '',
-            section: item.section,
+            section: item.section ?? '',
+            raw_material_id: item.raw_material_id != null ? String(item.raw_material_id) : '',
             gst_percent: String(item.gst_percent),
             is_bulk: item.is_bulk,
             is_active: item.is_active,
@@ -150,8 +177,10 @@ export default function PriceListIndex() {
             packings: item.packings.length
                 ? item.packings.map((p) => ({
                       packing: p.packing,
+                      raw_material_id: p.raw_material_id != null ? String(p.raw_material_id) : '',
                       mrp: p.mrp != null ? String(p.mrp) : '',
-                      rate: String(p.rate),
+                      // The typed fallback, not the live rate being printed.
+                      rate: String(p.typed_rate),
                       qty_per_box: p.qty_per_box != null ? String(p.qty_per_box) : '',
                   }))
                 : [blankPacking()],
@@ -167,12 +196,16 @@ export default function PriceListIndex() {
             ...itemForm.data,
             gst_percent: Number(itemForm.data.gst_percent || 0),
             sort_order: Number(itemForm.data.sort_order || 0),
+            raw_material_id: numOrNull(itemForm.data.raw_material_id),
+            // A packing needs either a product to take its rate from or a
+            // rate of its own; anything with neither is an unfinished row.
             packings: itemForm.data.packings
-                .filter((p) => p.packing.trim() !== '' && p.rate.trim() !== '')
+                .filter((p) => p.packing.trim() !== '' && (p.rate.trim() !== '' || p.raw_material_id !== ''))
                 .map((p) => ({
                     packing: p.packing.trim(),
+                    raw_material_id: numOrNull(p.raw_material_id),
                     mrp: numOrNull(p.mrp),
-                    rate: Number(p.rate),
+                    rate: numOrNull(p.rate),
                     qty_per_box: numOrNull(p.qty_per_box),
                 })),
         };
@@ -274,12 +307,20 @@ export default function PriceListIndex() {
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
+                    <select value={category} onChange={(e) => setCategory(e.target.value)} title="Category">
+                        <option value="">All categories</option>
+                        {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <select value={group} onChange={(e) => setGroup(e.target.value)} title="Group">
+                        <option value="">All groups</option>
+                        {groups.map((g) => <option key={g} value={g}>{g}</option>)}
+                    </select>
                     <input
                         type="text"
                         value={customer}
                         onChange={(e) => setCustomer(e.target.value)}
                         placeholder="Prepared for (customer name)"
-                        style={{ minWidth: 220 }}
+                        style={{ minWidth: 200 }}
                     />
                     <button type="button" className="btn-secondary" onClick={() => setAllVisible(true)}>Select all</button>
                     <button type="button" className="btn-secondary" onClick={() => setAllVisible(false)}>Clear</button>
@@ -307,10 +348,10 @@ export default function PriceListIndex() {
                             </tr>
                         </thead>
                         <tbody>
-                            {groups.length === 0 && (
+                            {sections.length === 0 && (
                                 <tr><td colSpan={canEdit ? 5 : 4} className="empty-row">Nothing matches that search.</td></tr>
                             )}
-                            {groups.map(([section, rows]) => (
+                            {sections.map(([section, rows]) => (
                                 <Fragment key={section}>
                                     <tr>
                                         <td colSpan={canEdit ? 5 : 4} style={{ background: 'var(--bg-paper)', fontWeight: 700, fontSize: 12 }}>
@@ -348,6 +389,9 @@ export default function PriceListIndex() {
                                                                 <strong>{p.packing}</strong>
                                                                 {p.mrp != null && ` · MRP ₹${money(p.mrp)}`}
                                                                 {` · ₹${money(p.rate)}`}
+                                                                {p.is_live && (
+                                                                    <span title="Live from the product's selling rate"> ⟳</span>
+                                                                )}
                                                                 {p.qty_per_box != null && ` · ${p.qty_per_box}/box`}
                                                             </div>
                                                         ))
@@ -401,12 +445,30 @@ export default function PriceListIndex() {
                                         />
                                     </div>
                                     <div className="form-group">
-                                        <label>Section *</label>
+                                        <label>Product in inventory</label>
+                                        <select
+                                            value={itemForm.data.raw_material_id}
+                                            onChange={(e) => itemForm.setData('raw_material_id', e.target.value)}
+                                        >
+                                            <option value="">— not linked —</option>
+                                            {products.map((p) => (
+                                                <option key={p.id} value={String(p.id)}>
+                                                    {p.name}{p.category ? ` · ${p.category}` : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <small style={{ fontSize: 11, color: 'var(--tx-muted)' }}>
+                                            Sets the category and group this product is listed under, and hides it
+                                            from the list if sales may not see that category.
+                                        </small>
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Heading override</label>
                                         <input
                                             type="text"
                                             value={itemForm.data.section}
                                             onChange={(e) => itemForm.setData('section', e.target.value)}
-                                            required
+                                            placeholder="Leave empty to use the group / category"
                                         />
                                     </div>
                                     <div className="form-group">
@@ -456,8 +518,9 @@ export default function PriceListIndex() {
                                         <thead>
                                             <tr>
                                                 <th>Packing *</th>
+                                                <th>Live rate from</th>
                                                 <th>M.R.P.</th>
-                                                <th>Rate *</th>
+                                                <th>Rate</th>
                                                 <th>Qty per box</th>
                                                 <th style={{ width: 40 }}></th>
                                             </tr>
@@ -474,6 +537,20 @@ export default function PriceListIndex() {
                                                         />
                                                     </td>
                                                     <td>
+                                                        <select
+                                                            value={p.raw_material_id}
+                                                            onChange={(e) => updatePacking(i, 'raw_material_id', e.target.value)}
+                                                            title="Take the rate from this product every time the PDF is made"
+                                                        >
+                                                            <option value="">— type a rate —</option>
+                                                            {products.map((prod) => (
+                                                                <option key={prod.id} value={String(prod.id)}>
+                                                                    {prod.name} (₹{money(prod.rate)})
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
+                                                    <td>
                                                         <input
                                                             type="number"
                                                             min="0"
@@ -488,6 +565,8 @@ export default function PriceListIndex() {
                                                             min="0"
                                                             step="0.01"
                                                             value={p.rate}
+                                                            disabled={p.raw_material_id !== ''}
+                                                            placeholder={p.raw_material_id !== '' ? 'live' : ''}
                                                             onChange={(e) => updatePacking(i, 'rate', e.target.value)}
                                                         />
                                                     </td>

@@ -33,28 +33,17 @@ class PriceListController extends Controller
     {
         $isAdmin = $this->isAdmin($request);
 
+        $items = $this->items();
+
         return Inertia::render('erp/price-list/index', [
-            'pageTitle' => 'Price List',
-            'items'     => $this->items()->map(fn ($item) => [
-                'id'          => $item->id,
-                'name'        => $item->name,
-                'description' => $item->description,
-                'section'     => $item->section,
-                'gst_percent' => (float) $item->gst_percent,
-                'is_bulk'     => $item->is_bulk,
-                'is_active'   => $item->is_active,
-                'sort_order'  => $item->sort_order,
-                'packings'    => $item->packings->map(fn ($p) => [
-                    'id'          => $p->id,
-                    'packing'     => $p->packing,
-                    'mrp'         => $p->mrp !== null ? (float) $p->mrp : null,
-                    'rate'        => (float) $p->rate,
-                    'qty_per_box' => $p->qty_per_box,
-                ])->values(),
-            ])->values(),
-            'settings'    => $this->settings(),
-            'canEdit'     => $isAdmin,
-            'importable'  => $isAdmin ? $this->importable()->count() : 0,
+            'pageTitle'  => 'Price List',
+            'items'      => $items->map(fn ($item) => $this->itemPayload($item))->values(),
+            'categories' => $items->map->category()->filter()->unique()->sort()->values(),
+            'groups'     => $items->map->group()->filter()->unique()->sort()->values(),
+            'settings'   => $this->settings(),
+            'canEdit'    => $isAdmin,
+            'importable' => $isAdmin ? $this->importable()->count() : 0,
+            'products'   => $isAdmin ? $this->linkableProducts() : [],
         ]);
     }
 
@@ -62,14 +51,56 @@ class PriceListController extends Controller
     public function download(Request $request): HttpResponse
     {
         $data = $request->validate([
-            'only' => ['nullable', 'string', 'max:20000'],
-            'for'  => ['nullable', 'string', 'max:120'],
+            'only'     => ['nullable', 'string', 'max:20000'],
+            'for'      => ['nullable', 'string', 'max:120'],
+            'category' => ['nullable', 'string', 'max:120'],
+            'group'    => ['nullable', 'string', 'max:120'],
         ]);
 
+        $items    = $this->itemsFor($data);
+        $settings = $this->settings();
+        $scope    = ($data['group'] ?? '') ?: ($data['category'] ?? '') ?: null;
+
+        if ($scope) {
+            $settings['price_list_title'] = $scope.' Price List';
+        }
+
+        $pdf = Pdf::loadView('pdf.price-list', [
+            'settings' => $settings,
+            'sections' => $items->where('is_bulk', false)->groupBy(fn ($i) => $i->heading()),
+            'bulk'     => $items->where('is_bulk', true)->groupBy(fn ($i) => $i->heading()),
+            'for'      => trim($data['for'] ?? ''),
+            'date'     => now()->format('F Y'),
+            'logo'     => $this->logo(),
+        ])->setPaper('a4');
+
+        $slug = $scope ? '-'.str($scope)->slug() : '';
+
+        return $pdf->download('Price-List'.$slug.'-'.now()->format('Y-m-d').'.pdf');
+    }
+
+    /**
+     * Exactly what a PDF built with these filters would print. A price list
+     * is usually pulled for one category or group at a time — "the finished
+     * goods one", "the bio stimulant one".
+     *
+     * @param  array{category?: string|null, group?: string|null, only?: string|null}  $filters
+     * @return Collection<int, PriceListItem>
+     */
+    public function itemsFor(array $filters): Collection
+    {
         $items = $this->items()->where('is_active', true);
 
-        if (! empty($data['only'])) {
-            $wanted = collect(explode(',', $data['only']))
+        if (! empty($filters['category'])) {
+            $items = $items->filter(fn ($item) => $item->category() === $filters['category']);
+        }
+
+        if (! empty($filters['group'])) {
+            $items = $items->filter(fn ($item) => $item->group() === $filters['group']);
+        }
+
+        if (! empty($filters['only'])) {
+            $wanted = collect(explode(',', $filters['only']))
                 ->map(fn ($id) => (int) trim($id))
                 ->filter()
                 ->flip();
@@ -78,18 +109,56 @@ class PriceListController extends Controller
         }
 
         // Keep a product off the sheet unless it has a price to print.
-        $items = $items->filter(fn ($item) => $item->packings->isNotEmpty())->values();
+        return $items->filter(fn ($item) => $item->packings->isNotEmpty())->values();
+    }
 
-        $pdf = Pdf::loadView('pdf.price-list', [
-            'settings' => $this->settings(),
-            'sections' => $items->where('is_bulk', false)->groupBy('section'),
-            'bulk'     => $items->where('is_bulk', true)->groupBy('section'),
-            'for'      => trim($data['for'] ?? ''),
-            'date'     => now()->format('F Y'),
-            'logo'     => $this->logo(),
-        ])->setPaper('a4');
+    /**
+     * @return array<string, mixed>
+     */
+    private function itemPayload(PriceListItem $item): array
+    {
+        return [
+            'id'          => $item->id,
+            'name'        => $item->name,
+            'description' => $item->description,
+            'section'     => $item->section,
+            'heading'     => $item->heading(),
+            'category'    => $item->category(),
+            'group'       => $item->group(),
+            'raw_material_id' => $item->raw_material_id,
+            'gst_percent' => (float) $item->gst_percent,
+            'is_bulk'     => $item->is_bulk,
+            'is_active'   => $item->is_active,
+            'sort_order'  => $item->sort_order,
+            'packings'    => $item->packings->map(fn ($p) => [
+                'id'              => $p->id,
+                'packing'         => $p->packing,
+                'raw_material_id' => $p->raw_material_id,
+                'mrp'             => $p->mrp !== null ? (float) $p->mrp : null,
+                'rate'            => $p->liveRate(),
+                'typed_rate'      => (float) $p->rate,
+                'is_live'         => $p->followsProduct(),
+                'qty_per_box'     => $p->qty_per_box,
+            ])->values(),
+        ];
+    }
 
-        return $pdf->download('Price-List-'.now()->format('Y-m-d').'.pdf');
+    /**
+     * Products an admin may point a packing at, so its rate stays live.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function linkableProducts(): array
+    {
+        return SalesCatalogue::pricedProducts()
+            ->map(fn ($m) => [
+                'id'       => $m->id,
+                'name'     => $m->display_name,
+                'category' => $m->category,
+                'group'    => $m->group_name,
+                'rate'     => (float) $m->selling_rate,
+            ])
+            ->all();
     }
 
     public function store(Request $request): RedirectResponse
@@ -150,9 +219,12 @@ class PriceListController extends Controller
                     'gst_percent'     => $material->gst ?: 18,
                 ]);
 
+                // Pointed at the product, so the printed rate follows
+                // whatever inventory says today.
                 $item->packings()->create([
-                    'packing' => $material->unit ?: 'unit',
-                    'rate'    => (float) $material->selling_rate,
+                    'packing'         => $material->unit ?: 'unit',
+                    'raw_material_id' => $material->id,
+                    'rate'            => (float) $material->selling_rate,
                 ]);
 
                 $added++;
@@ -192,15 +264,19 @@ class PriceListController extends Controller
      */
     private function items(): Collection
     {
+        $hidden = SalesCatalogue::hiddenCategories();
+        $isHidden = fn (?string $category) => $hidden->contains(mb_strtolower(trim((string) $category)));
+
         return PriceListItem::query()
-            ->with(['packings', 'rawMaterial:id,category'])
+            ->with(['packings.rawMaterial', 'rawMaterial'])
             ->orderBy('is_bulk')
-            ->orderBy('section')
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get()
-            ->reject(fn ($item) => $item->rawMaterial
-                && SalesCatalogue::hidesCategory($item->rawMaterial->category))
+            ->reject(fn ($item) => $item->rawMaterial && $isHidden($item->rawMaterial->category))
+            // Headings come from live inventory groups, so they can only be
+            // sorted once the rows are in hand.
+            ->sortBy(fn ($item) => [$item->is_bulk ? 1 : 0, $item->heading(), $item->sort_order, $item->id])
             ->values();
     }
 
@@ -224,17 +300,21 @@ class PriceListController extends Controller
         return $request->validate([
             'name'        => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:255'],
-            'section'     => ['required', 'string', 'max:120'],
-            'gst_percent' => ['required', 'numeric', 'min:0', 'max:100'],
-            'is_bulk'     => ['boolean'],
-            'is_active'   => ['boolean'],
-            'sort_order'  => ['nullable', 'integer', 'min:0', 'max:9999'],
+            // Blank means "follow the product's group / category".
+            'section'         => ['nullable', 'string', 'max:120'],
+            'raw_material_id' => ['nullable', 'integer', 'exists:raw_materials,id'],
+            'gst_percent'     => ['required', 'numeric', 'min:0', 'max:100'],
+            'is_bulk'         => ['boolean'],
+            'is_active'       => ['boolean'],
+            'sort_order'      => ['nullable', 'integer', 'min:0', 'max:9999'],
 
-            'packings'               => ['array', 'max:20'],
-            'packings.*.packing'     => ['required', 'string', 'max:60'],
-            'packings.*.mrp'         => ['nullable', 'numeric', 'min:0'],
-            'packings.*.rate'        => ['required', 'numeric', 'min:0'],
-            'packings.*.qty_per_box' => ['nullable', 'integer', 'min:0'],
+            'packings'                   => ['array', 'max:20'],
+            'packings.*.packing'         => ['required', 'string', 'max:60'],
+            'packings.*.raw_material_id' => ['nullable', 'integer', 'exists:raw_materials,id'],
+            'packings.*.mrp'             => ['nullable', 'numeric', 'min:0'],
+            // Only needed when the packing has no product to take it from.
+            'packings.*.rate'            => ['nullable', 'numeric', 'min:0'],
+            'packings.*.qty_per_box'     => ['nullable', 'integer', 'min:0'],
         ]);
     }
 
@@ -247,11 +327,12 @@ class PriceListController extends Controller
 
         foreach (array_values($rows) as $i => $row) {
             $item->packings()->create([
-                'packing'     => $row['packing'],
-                'mrp'         => $row['mrp'] ?? null,
-                'rate'        => $row['rate'],
-                'qty_per_box' => $row['qty_per_box'] ?? null,
-                'sort_order'  => $i,
+                'packing'         => $row['packing'],
+                'raw_material_id' => $row['raw_material_id'] ?? null,
+                'mrp'             => $row['mrp'] ?? null,
+                'rate'            => $row['rate'] ?? 0,
+                'qty_per_box'     => $row['qty_per_box'] ?? null,
+                'sort_order'      => $i,
             ]);
         }
     }
